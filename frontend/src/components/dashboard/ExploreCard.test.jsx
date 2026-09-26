@@ -50,7 +50,9 @@ describe('ExploreCard', () => {
     expect(previewSpy).toHaveBeenCalledWith(expect.objectContaining({
       site,
       source: 'public',
-      height: 150,
+      height: 164,
+      // The card is the frame; the thumbnail runs edge to edge inside it.
+      framed: false,
     }))
     expect(screen.getByTitle('Open the live site')).toHaveAttribute('href', '/site/modern-portfolio')
     expect(screen.getByRole('link', { name: 'View' })).toHaveAttribute('href', '/site/modern-portfolio')

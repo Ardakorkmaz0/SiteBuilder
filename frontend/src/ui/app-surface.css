@@ -1,0 +1,342 @@
+/* Hallmark · genre: modern-minimal · design-system: design.md · designed-as-app
+ *
+ * The app surface: every screen except the editor (/editor, /code). The
+ * direction lives in design.md at the repo root; this file is its
+ * implementation. Dials: ENERGY 1 / RHYTHM 2 / MOTION 1.
+ *
+ * Everything is keyed on <html data-surface="app"> (ui/surface.js), so the
+ * editor keeps the studio theme in index.css untouched. Component rules sit in
+ * Tailwind's components layer: a page's own utility classes still win.
+ * Nothing here reaches a site drawn into [data-public-site-canvas].
+ */
+
+/* Tokens. Unlayered, like the :root blocks they redefine. The dark block
+   restates every colour the light one sets: both selectors tie with index.css's
+   :root[data-ui-theme="dark"], so anything left out would leak the light value
+   into dark mode. */
+:root[data-surface="app"] {
+  /* Headings: a compact grotesk, so long Turkish words fit a heading line and
+     titles read as the product's voice. Interface text: Inter, for its
+     small-size legibility and aligned figures. */
+  --font-display: "Instrument Sans", "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-ui: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* One brand colour, the logo's indigo: the primary action, focus, links and
+     the selection frame. Everything else is neutral. */
+  --studio-accent: #2e2b6c;
+  --studio-accent-hover: #3b388a;
+  --studio-accent-pressed: #24225a;
+  --studio-accent-text: #2e2b6c;
+  --studio-accent-fill: #2e2b6c;
+  --studio-accent-fill-hover: #3b388a;
+  --studio-accent-soft: #ecebf6;
+  --studio-accent-glow: transparent;
+  --studio-on-accent: #ffffff;
+
+  --studio-shell: #f5f6f8;
+  --studio-panel: #f5f6f8;
+  --studio-panel-raised: #ffffff;
+  --studio-panel-muted: #eff1f4;
+  --studio-surface: var(--studio-panel-raised);
+  --studio-control: #eceef2;
+  --studio-control-hover: #e3e6eb;
+  --studio-border: #dde1e7;
+  --studio-border-strong: #c3c9d2;
+  --studio-text: #14151a;
+  --studio-text-muted: #555b69;
+  --studio-text-faint: #5f6573;
+  --studio-focus-ring: color-mix(in srgb, var(--studio-accent) 28%, transparent);
+
+  /* Elevation belongs to what floats over the page: menus and dialogs. Cards
+     sit flat on a 1px rule. */
+  --studio-shadow-sm: 0 1px 2px rgba(20, 21, 26, 0.06);
+  --studio-shadow: 0 12px 32px rgba(20, 21, 26, 0.1);
+  --studio-shadow-lg: 0 24px 60px rgba(20, 21, 26, 0.16);
+  --studio-shadow-menu: 0 16px 40px rgba(20, 21, 26, 0.14);
+
+  /* Three radii (controls, cards, dialogs). Round only for avatars and
+     status chips. */
+  --studio-radius-sm: 6px;
+  --studio-radius: 8px;
+  --studio-radius-lg: 12px;
+  --studio-radius-xl: 12px;
+  --studio-radius-2xl: 16px;
+
+  --sb-handle: 7px;
+  --ms-accent-hover: var(--studio-accent-fill-hover);
+}
+
+:root[data-surface="app"][data-ui-theme="dark"] {
+  --studio-accent: #5550d6;
+  --studio-accent-hover: #aeabff;
+  --studio-accent-pressed: #4843c4;
+  --studio-accent-text: #aeabff;
+  --studio-accent-fill: #5550d6;
+  --studio-accent-fill-hover: #625ee0;
+  --studio-accent-soft: #1b1a38;
+  --studio-accent-glow: transparent;
+  --studio-on-accent: #ffffff;
+
+  /* Lifted just off #000 so a raised surface can read as raised by lightness
+     alone, which is how depth works on dark (shadows barely show). */
+  --studio-shell: #0b0b0e;
+  --studio-panel: #0b0b0e;
+  --studio-panel-raised: #131317;
+  --studio-panel-muted: #0f0f12;
+  --studio-surface: var(--studio-panel-raised);
+  --studio-control: #19191e;
+  --studio-control-hover: #222228;
+  --studio-border: #2c2c33;
+  --studio-border-strong: #45454e;
+  --studio-text: #f4f4f6;
+  --studio-text-muted: #a9abb3;
+  --studio-text-faint: #93959d;
+  --studio-focus-ring: color-mix(in srgb, var(--studio-accent) 45%, transparent);
+
+  --studio-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --studio-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --studio-shadow-lg: 0 28px 72px rgba(0, 0, 0, 0.65);
+  --studio-shadow-menu: 0 20px 48px rgba(0, 0, 0, 0.7);
+}
+
+/* Touch: on a coarse pointer every control is at least 44px. Unlayered on
+   purpose, so a page's own min-h-* or h-9 utility cannot shrink a tap target.
+   Fine pointers keep the denser desktop sizes. A published site drawn into
+   [data-public-site-canvas] is never touched: its buttons are the owner's. */
+@media (pointer: coarse) {
+  :root[data-surface="app"] :is(main, header, nav, [role="dialog"]) :is(button, select, [role="button"], [role="tab"], [role="menuitem"], input:not([type="checkbox"], [type="radio"], [type="hidden"])):not([data-public-site-canvas] *) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* Links laid out as controls. Inline links inside running text are left
+     alone (min-height does nothing to an inline box anyway). */
+  :root[data-surface="app"] :is(main, header, nav, [role="dialog"]) a:not(:where(p, li, label) a):not([data-public-site-canvas] *) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  :root[data-surface="app"] :is(main, header, [role="dialog"]) label:has(> input:is([type="checkbox"], [type="radio"])) {
+    min-height: 44px;
+  }
+  :root[data-surface="app"] :is(
+    .dashboard-brand, .dashboard-site-card-title-link, .dashboard-site-card-owner,
+    .brand-mark
+  ) {
+    display: flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+  :root[data-surface="app"] .dashboard-site-card-title-link {
+    width: 100%;
+  }
+  :root[data-surface="app"] .dashboard-site-card-pin {
+    right: calc(0.75rem + 44px + 0.5rem);
+  }
+}
+
+@layer base {
+  :root[data-surface="app"] :is(h1, h2, h3):not(:where([data-public-site-canvas], [data-public-site-canvas] *)) {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  /* Buttons: flat fills, a colour change on hover and nothing else. */
+  :root[data-surface="app"] :is(.studio-btn, .studio-icon-btn, .ms-btn) {
+    border-radius: var(--studio-radius);
+    transition: 140ms var(--studio-motion-ease);
+    transition-property: color, background-color, border-color;
+  }
+  :root[data-surface="app"] :is(.studio-btn, .studio-icon-btn, .ms-btn):active:not(:disabled) {
+    transform: none;
+  }
+  :root[data-surface="app"] :is(.studio-btn-primary, .ms-btn-primary) {
+    border-color: var(--studio-accent-fill);
+    background: var(--studio-accent-fill);
+    color: var(--studio-on-accent);
+    box-shadow: none;
+  }
+  :root[data-surface="app"] :is(.studio-btn-primary, .ms-btn-primary):hover:not(:disabled) {
+    border-color: var(--studio-accent-fill-hover);
+    background: var(--studio-accent-fill-hover);
+    color: var(--studio-on-accent);
+    box-shadow: none;
+    transform: none;
+  }
+  :root[data-surface="app"] :is(.studio-btn-primary, .ms-btn-primary):active:not(:disabled) {
+    background: var(--studio-accent-pressed);
+  }
+  :root[data-surface="app"] :is(.studio-btn-secondary, .ms-btn:not(.ms-btn-primary):not(.ms-btn-subtle)) {
+    border-color: var(--studio-border-strong);
+    background: var(--studio-panel-raised);
+    color: var(--studio-text);
+    box-shadow: none;
+  }
+  :root[data-surface="app"] :is(.studio-btn-secondary, .ms-btn:not(.ms-btn-primary):not(.ms-btn-subtle)):hover:not(:disabled) {
+    background: var(--studio-control);
+  }
+
+  /* Fields: a white well with a visible edge. Focus is the brand colour. */
+  :root[data-surface="app"] :is(.studio-input, .ms-input) {
+    border: 1px solid var(--studio-border-strong);
+    border-radius: var(--studio-radius);
+    background: var(--studio-panel-raised);
+    color: var(--studio-text);
+    transition: 140ms var(--studio-motion-ease);
+    transition-property: border-color, box-shadow;
+  }
+  :root[data-surface="app"] :is(.studio-input, .ms-input):focus {
+    border-color: var(--studio-accent);
+    box-shadow: 0 0 0 3px var(--studio-focus-ring);
+  }
+
+  :root[data-surface="app"] .studio-menu {
+    border-radius: var(--studio-radius-lg);
+  }
+  :root[data-surface="app"] .studio-segment-btn-active {
+    box-shadow: var(--studio-shadow-sm);
+  }
+  :root[data-surface="app"] .studio-utility-switcher {
+    border-radius: var(--studio-radius);
+    background: var(--studio-panel-raised);
+    box-shadow: none;
+  }
+  :root[data-surface="app"] .studio-utility-button {
+    border-radius: var(--studio-radius-sm);
+  }
+
+  /* Header. The one blurred surface on these screens: content scrolls under
+     it, and the blur keeps what passes beneath legible. */
+  :root[data-surface="app"] .dashboard-header {
+    background: color-mix(in srgb, var(--studio-shell) 86%, transparent);
+    backdrop-filter: blur(16px);
+  }
+  :root[data-surface="app"] .dashboard-primary-nav {
+    border-color: transparent;
+    border-radius: var(--studio-radius);
+    background: transparent;
+    padding: 0;
+  }
+  :root[data-surface="app"] .dashboard-nav-link {
+    border-radius: var(--studio-radius);
+    font-weight: 600;
+  }
+  /* Where you are is shown in ink, not in the brand colour: the brand colour is
+     kept for the one action that matters on each screen. */
+  :root[data-surface="app"] .dashboard-nav-link-active {
+    border-color: var(--studio-border);
+    background: var(--studio-panel-raised);
+    color: var(--studio-text);
+    box-shadow: none;
+  }
+  :root[data-surface="app"] .dashboard-account-trigger {
+    border-radius: var(--studio-radius);
+    background: var(--studio-panel-raised);
+  }
+  :root[data-surface="app"] .dashboard-account-trigger:is(:hover, [aria-expanded="true"]) {
+    box-shadow: none;
+  }
+  :root[data-surface="app"] .dashboard-search {
+    border-radius: var(--studio-radius);
+    background: var(--studio-panel-raised);
+  }
+
+  /* Surfaces */
+  :root[data-surface="app"] :is(.dashboard-section-card, .dashboard-welcome, .ms-card) {
+    border-radius: var(--studio-radius-lg);
+    background: var(--studio-panel-raised);
+    box-shadow: none;
+  }
+  :root[data-surface="app"] .dashboard-welcome {
+    border-color: var(--studio-border);
+  }
+  :root[data-surface="app"] :is(.dashboard-site-card, .dashboard-workspace-project) {
+    border-radius: var(--studio-radius-lg);
+    box-shadow: none;
+  }
+  :root[data-surface="app"] .dashboard-site-card-favorite,
+  :root[data-surface="app"] .dashboard-site-card-pin {
+    border-radius: var(--studio-radius);
+  }
+  :root[data-surface="app"] :is(.dashboard-site-card-remix, .dashboard-site-card-open) {
+    border-radius: var(--studio-radius);
+  }
+
+  /* Home: the greeting sits on the page itself; the project you will go back
+     to is the one framed object beside it. */
+  :root[data-surface="app"] .dashboard-workspace-primary {
+    min-height: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: clamp(0.25rem, 2vw, 1.25rem) 0;
+  }
+  :root[data-surface="app"] .dashboard-workspace-project {
+    overflow: visible;
+  }
+  :root[data-surface="app"] .dashboard-workspace-preview {
+    overflow: hidden;
+    border-radius: calc(var(--studio-radius-lg) - 1px) calc(var(--studio-radius-lg) - 1px) 0 0;
+  }
+  :root[data-surface="app"] .dashboard-filter-rail {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  /* Labels are sentence case at reading size, never spaced-out capitals. */
+  :root[data-surface="app"] .dashboard-kicker,
+  :root[data-surface="app"] .dashboard-site-card-category {
+    color: var(--studio-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  :root[data-surface="app"] .dashboard-status {
+    font-weight: 600;
+  }
+
+  /* The identity motif: the editor's selection frame, with its four corner
+     handles. It marks a thing of yours you can open and change, on hover and
+     on keyboard focus, and nowhere else. */
+  :root[data-surface="app"] .sb-frame {
+    position: relative;
+  }
+  :root[data-surface="app"] .sb-frame::after {
+    position: absolute;
+    z-index: 6;
+    inset: -5px;
+    border: 1px solid var(--studio-accent);
+    border-radius: 2px;
+    background:
+      linear-gradient(var(--studio-accent), var(--studio-accent)) left top / var(--sb-handle) var(--sb-handle) no-repeat,
+      linear-gradient(var(--studio-accent), var(--studio-accent)) right top / var(--sb-handle) var(--sb-handle) no-repeat,
+      linear-gradient(var(--studio-accent), var(--studio-accent)) left bottom / var(--sb-handle) var(--sb-handle) no-repeat,
+      linear-gradient(var(--studio-accent), var(--studio-accent)) right bottom / var(--sb-handle) var(--sb-handle) no-repeat;
+    content: "";
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms var(--studio-motion-ease);
+  }
+  :root[data-surface="app"] .sb-frame:focus-within::after {
+    opacity: 1;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :root[data-surface="app"] .sb-frame:hover::after {
+      opacity: 1;
+    }
+  }
+  /* In dark mode the fill colour is too dim to read as a hairline. */
+  :root[data-surface="app"][data-ui-theme="dark"] .sb-frame::after {
+    --studio-accent: #8f8bf2;
+  }
+
+  /* Legacy auth buttons inherit the system too. */
+  :root[data-surface="app"] .ms-btn-subtle {
+    border-radius: var(--studio-radius);
+  }
+}

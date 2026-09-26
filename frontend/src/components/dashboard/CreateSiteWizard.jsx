@@ -5,7 +5,7 @@ import { TEMPLATE_LIBRARY, TEMPLATE_SITE_CATEGORY_MAP } from '../../utils/templa
 import { localizeTemplateHtml } from '../../utils/templateLocalization.js'
 import { DEFAULT_THEME } from '../../utils/theme.js'
 import { apiError } from '../../utils/errors.js'
-import { CheckIcon, FileCodeIcon, LayersIcon, SparklesIcon } from '../icons.jsx'
+import { CheckIcon, FileCodeIcon, LayersIcon, PaletteIcon } from '../icons.jsx'
 import { useDialogMotion } from '../../ui/useDialogMotion.js'
 
 const LEGACY_CATEGORY_MAP = {
@@ -20,7 +20,7 @@ const OTHER_CATEGORY = {
   id: 'other',
   icon: '✨',
   name: 'Other / custom',
-  desc: 'Anything else — start from a blank canvas or bring your own HTML.',
+  desc: 'Anything else: start from a blank canvas or bring your own HTML.',
   variants: [],
 }
 
@@ -28,7 +28,7 @@ const OTHER_CATEGORY = {
 // recommended templates: an empty drag-and-drop canvas, or the user's own
 // HTML (uploaded file or pasted code).
 const START_MODES = [
-  { id: 'template', icon: SparklesIcon, name: 'Ready template', desc: 'Pick a designed starting point and edit it.' },
+  { id: 'template', icon: PaletteIcon, name: 'Ready template', desc: 'Pick a designed starting point and edit it.' },
   { id: 'blank', icon: LayersIcon, name: 'Blank canvas', desc: 'Start empty and drag components onto the canvas yourself.' },
   { id: 'import', icon: FileCodeIcon, name: 'Your own HTML', desc: 'Upload an .html file or paste code.' },
 ]
@@ -50,7 +50,7 @@ function MiniPreview({ html, title }) {
   }, [])
 
   return (
-    <div ref={boxRef} className="aspect-[4/3] overflow-hidden border-b border-[var(--studio-border)] bg-white" data-theme-inverted>
+    <div ref={boxRef} className="aspect-[4/3] overflow-hidden border-b border-[var(--studio-border)] bg-[var(--studio-panel-raised)]" data-theme-inverted>
       <iframe
         title={title}
         srcDoc={html}
@@ -129,7 +129,7 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
     file.text().then((text) => {
       setImportHtml(text)
       setImportName(file.name)
-    }).catch(() => setError(t('Could not read that file — try pasting the code instead.')))
+    }).catch(() => setError(t('Could not read that file. Try pasting the code instead.')))
   }
 
   async function create() {
@@ -197,9 +197,6 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
       >
         <header className="border-b border-[var(--studio-border)] px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]">
-              <SparklesIcon size={18} />
-            </span>
             <div className="min-w-0 flex-1">
               <h2 id="create-site-title" className="truncate font-bold text-[var(--studio-text)]">{t('Create a new site')}</h2>
               <p className="text-xs text-[var(--studio-text-muted)]">{t('Step {current} of 3', { current: step + 1 })} · {stepLabels[step]}</p>
@@ -238,9 +235,8 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
                       aria-pressed={categoryId === item.id}
                       className={`studio-create-choice relative flex min-h-20 items-center gap-3 rounded-xl border p-3 text-left transition ${categoryId === item.id ? 'border-[var(--studio-accent)] bg-[var(--studio-accent-soft)] shadow-sm' : 'border-[var(--studio-border)] bg-[var(--studio-panel-muted)] hover:border-[var(--studio-border-strong)] hover:bg-[var(--studio-control-hover)]'}`}
                     >
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--studio-panel-raised)] text-xl shadow-sm">{item.icon}</span>
                       <span className="min-w-0 pr-5"><strong className="block text-sm text-[var(--studio-text)]">{t(item.name)}</strong><span className="mt-0.5 line-clamp-2 text-xs leading-4 text-[var(--studio-text-muted)]">{t(item.desc)}</span></span>
-                      {categoryId === item.id && <span className="absolute right-2.5 top-2.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--studio-accent)] text-white"><CheckIcon size={12} /></span>}
+                      {categoryId === item.id && <span className="absolute right-2.5 top-2.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--studio-accent)] text-[var(--studio-on-accent)]"><CheckIcon size={12} /></span>}
                     </button>
                   ))}
                 </div>
@@ -264,7 +260,7 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
                         aria-pressed={selected}
                         className={`studio-create-choice relative flex min-h-28 flex-col gap-3 rounded-xl border p-3.5 text-left transition ${selected ? 'border-[var(--studio-accent)] bg-[var(--studio-accent-soft)] shadow-sm' : 'border-[var(--studio-border)] bg-[var(--studio-panel-muted)] hover:border-[var(--studio-border-strong)] hover:bg-[var(--studio-control-hover)]'}`}
                       >
-                        <span className={`grid h-9 w-9 place-items-center rounded-xl ${selected ? 'bg-[var(--studio-accent)] text-white' : 'bg-[var(--studio-control)] text-[var(--studio-text-muted)]'}`} aria-hidden><ModeIcon size={17} /></span>
+                        <span className={`grid h-9 w-9 place-items-center rounded-xl ${selected ? 'bg-[var(--studio-accent)] text-[var(--studio-on-accent)]' : 'bg-[var(--studio-control)] text-[var(--studio-text-muted)]'}`} aria-hidden><ModeIcon size={17} /></span>
                         <span className="min-w-0"><strong className="block text-sm text-[var(--studio-text)]">{t(mode.name)}</strong><span className="mt-1 block text-xs leading-4 text-[var(--studio-text-muted)]">{t(mode.desc)}</span></span>
                       </button>
                     )
@@ -302,7 +298,7 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
 
               {effectiveMode === 'blank' && (
                 <div className="rounded-xl border border-dashed border-[var(--studio-border-strong)] bg-[var(--studio-panel-muted)] p-5 text-sm leading-6 text-[var(--studio-text-muted)]">
-                  {t('You start with an empty canvas and drag components onto it yourself — nothing is pre-made.')}
+                  {t('You start with an empty canvas and drag components onto it yourself; nothing is pre-made.')}
                 </div>
               )}
 
@@ -339,7 +335,7 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
                   />
                   {importHtml.trim() && (
                     <div className="overflow-hidden rounded-xl border border-[var(--studio-border)]">
-                      <iframe title={t('Imported HTML preview')} srcDoc={importHtml} sandbox="" className="h-[240px] w-full border-0 bg-white" />
+                      <iframe title={t('Imported HTML preview')} srcDoc={importHtml} sandbox="" className="h-[240px] w-full border-0 bg-[var(--studio-panel-raised)]" />
                     </div>
                   )}
                 </div>
@@ -366,7 +362,7 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
               </div>
               {effectiveMode === 'blank' ? (
                 <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[var(--studio-border-strong)] bg-[var(--studio-panel-muted)] p-6 text-center text-sm text-[var(--studio-text-faint)]">
-                  {t('Empty canvas — you will design this page from scratch in the editor.')}
+                  {t('Empty canvas: you will design this page from scratch in the editor.')}
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-xl border border-[var(--studio-border)] bg-[var(--studio-control)]">
@@ -374,7 +370,7 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
                     title={t('Selected template preview')}
                     srcDoc={effectiveMode === 'template' ? localizedPreview : importHtml}
                     sandbox=""
-                    className="h-[420px] w-full border-0 bg-white"
+                    className="h-[420px] w-full border-0 bg-[var(--studio-panel-raised)]"
                   />
                 </div>
               )}

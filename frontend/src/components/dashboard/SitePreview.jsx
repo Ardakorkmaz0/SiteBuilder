@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { getSite, getPublicSite } from '../../api/sites.js'
 import { schemaToResponsiveHtml } from '../../utils/responsiveHtml.js'
 import { withoutExecutableScripts } from '../../utils/htmlRuntime.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 
 // A live, scaled-down thumbnail of a site's home page (the "Minecraft map"
 // under the title). Lazy: only fetches + renders once the card scrolls near
@@ -19,7 +20,11 @@ function buildDoc(site) {
   return withoutExecutableScripts(raw)
 }
 
-export default function SitePreview({ site, height = 150, source = 'owner' }) {
+// `framed={false}` drops the thumbnail's own border and rounding, for a card
+// that already frames it — a frame inside a frame reads as nesting for its
+// own sake.
+export default function SitePreview({ site, height = 150, source = 'owner', framed = true }) {
+  const { t } = useLanguage()
   const boxRef = useRef(null)
   const [doc, setDoc] = useState(() => cache.get(site.id) || null)
   const [visible, setVisible] = useState(false)
@@ -75,7 +80,7 @@ export default function SitePreview({ site, height = 150, source = 'owner' }) {
   return (
     <div
       ref={boxRef}
-      className="relative w-full overflow-hidden rounded-xl border border-[var(--studio-border)] bg-[var(--studio-control)]"
+      className={`relative w-full overflow-hidden bg-[var(--studio-control)] ${framed ? 'rounded-xl border border-[var(--studio-border)]' : ''}`}
       style={{ height }}
     >
       {doc ? (
@@ -97,8 +102,7 @@ export default function SitePreview({ site, height = 150, source = 'owner' }) {
         />
       ) : (
         <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-[var(--studio-text-faint)]">
-          {!failed && <span className="h-5 w-5 animate-pulse rounded-full border border-[var(--studio-border-strong)] bg-[var(--studio-panel-raised)]" />}
-          <span>{failed ? 'No preview' : 'Loading preview…'}</span>
+          <span>{failed ? t('No preview') : t('Loading preview…')}</span>
         </div>
       )}
     </div>

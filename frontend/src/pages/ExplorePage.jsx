@@ -15,12 +15,9 @@ import SitePreview from '../components/dashboard/SitePreview.jsx'
 import {
   ArrowRightIcon,
   ClockIcon,
-  EyeIcon,
-  FolderIcon,
   FolderOpenIcon,
   GlobeIcon,
   PlusIcon,
-  StarIcon,
 } from '../components/icons.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
 
@@ -44,7 +41,7 @@ const CATEGORIES = [
 
 function formattedDate(value, language) {
   const date = new Date(value || 0)
-  if (Number.isNaN(date.getTime())) return '—'
+  if (Number.isNaN(date.getTime())) return ''
   return new Intl.DateTimeFormat(language === 'tr' ? 'tr-TR' : 'en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -88,6 +85,7 @@ export default function ExplorePage() {
     favorites: ownSites.reduce((sum, site) => sum + (site.favorite_count || 0), 0),
   }), [ownSites])
   const displayName = user?.display_name || user?.username || t('Creator')
+  const lastEdited = latestSite ? formattedDate(latestSite.updated_at, language) : ''
 
   function openCreate(event) {
     const trigger = event.currentTarget
@@ -262,70 +260,67 @@ export default function ExplorePage() {
         )}
         <section className="dashboard-workspace-grid" aria-labelledby="workspace-heading">
           <div className="dashboard-workspace-primary">
-            <div className="relative z-10 max-w-2xl">
-              <p className="dashboard-kicker">{t('Workspace')}</p>
-              <h1 id="workspace-heading" className="mt-3 text-3xl font-bold tracking-[-0.045em] text-[var(--studio-text)] [overflow-wrap:anywhere] sm:text-4xl">
+            <div className="max-w-2xl">
+              <h1 id="workspace-heading" className="text-3xl font-semibold text-[var(--studio-text)] [overflow-wrap:anywhere] sm:text-4xl">
                 {t('Welcome back, {name}', { name: displayName })}
               </h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--studio-text-muted)]">
                 {t('Continue your latest project or start with a fresh idea.')}
               </p>
               <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-                <button type="button" onClick={openCreate} aria-haspopup="dialog" aria-expanded={createOpen} className="studio-btn studio-btn-primary studio-create-trigger relative z-10 min-h-11 px-4">
+                <button type="button" onClick={openCreate} aria-haspopup="dialog" aria-expanded={createOpen} className="studio-btn studio-btn-primary studio-create-trigger min-h-11 px-4">
                   <PlusIcon size={16} /> {t('Create new site')}
                 </button>
-                <Link to="/code" className="studio-btn studio-btn-secondary relative z-10 min-h-11 px-4">
+                <Link to="/code" className="studio-btn studio-btn-secondary min-h-11 px-4">
                   <FolderOpenIcon size={16} /> {t('Open local project')}
                 </Link>
               </div>
             </div>
 
-            <div className="dashboard-stat-strip relative z-10 mt-8" aria-label={t('Workspace')} aria-busy={projectsLoading}>
+            {/* Plain figures on one rule: four coloured icon tiles in four
+                different hues were decoration competing with the one accent. */}
+            <dl className="dashboard-stat-strip mt-8" aria-label={t('Workspace')} aria-busy={projectsLoading}>
               {[
-                [FolderIcon, workspaceStats.total, t('Sites'), 'accent'],
-                [GlobeIcon, workspaceStats.published, t('Published'), 'success'],
-                [EyeIcon, workspaceStats.views.toLocaleString(), t('Total views'), 'info'],
-                [StarIcon, workspaceStats.favorites.toLocaleString(), t('Favorites'), 'warning'],
-              ].map(([StatIcon, value, label, tone]) => (
-                <div key={label} className="dashboard-stat" data-tone={tone}>
-                  <span className="dashboard-stat-icon"><StatIcon size={16} /></span>
-                  <span className="min-w-0">
-                    <strong className="block truncate text-base font-bold tracking-tight text-[var(--studio-text)]">{projectsLoading ? '—' : value}</strong>
-                    <span className="block truncate text-[11px] font-medium text-[var(--studio-text-faint)]">{label}</span>
-                  </span>
+                [workspaceStats.total, t('Sites')],
+                [workspaceStats.published, t('Published')],
+                [workspaceStats.views.toLocaleString(), t('Total views')],
+                [workspaceStats.favorites.toLocaleString(), t('Favorites')],
+              ].map(([value, label]) => (
+                <div key={label} className="dashboard-figure">
+                  <dt>{label}</dt>
+                  <dd>{projectsLoading ? '…' : value}</dd>
                 </div>
               ))}
-            </div>
+            </dl>
           </div>
 
           {projectsLoading ? (
-            <div className="dashboard-workspace-project animate-pulse p-3" aria-label={t('Loading…')}>
-              <div className="min-h-44 flex-1 rounded-xl bg-[var(--studio-control)]" />
-              <div className="mt-3 h-14 rounded-xl bg-[var(--studio-control)]" />
+            <div className="dashboard-workspace-project items-center justify-center p-7" aria-busy="true">
+              <p role="status" className="text-sm text-[var(--studio-text-muted)]">{t('Loading…')}</p>
             </div>
           ) : latestSite ? (
-            <article className="dashboard-workspace-project" aria-labelledby="recent-project-title">
+            <article className="dashboard-workspace-project sb-frame" aria-labelledby="recent-project-title">
               <Link
                 to={`/editor/${latestSite.id}`}
                 className="dashboard-workspace-preview block"
                 aria-label={`${t('Continue editing')}: ${latestSite.title}`}
               >
                 <div className="absolute left-4 top-4 z-10">
-                  <span className={`dashboard-status shadow-sm ${latestSite.published ? 'dashboard-status-live' : ''}`}>
+                  <span className={`dashboard-status ${latestSite.published ? 'dashboard-status-live' : ''}`}>
                     <span className="h-1.5 w-1.5 rounded-full bg-current" />
                     {latestSite.published ? t('Published') : t('Draft')}
                   </span>
                 </div>
-                <SitePreview site={latestSite} source="owner" height={188} />
+                <SitePreview site={latestSite} source="owner" height={188} framed={false} />
               </Link>
               <div className="dashboard-workspace-meta">
                 <div className="min-w-0 flex-1">
-                  <p className="dashboard-kicker">{t('Recent project')}</p>
-                  <h2 className="mt-1 text-[11px] font-semibold text-[var(--studio-text-muted)]">{t('Continue where you left off')}</h2>
-                  <h3 id="recent-project-title" className="mt-0.5 truncate text-base font-bold text-[var(--studio-text)]">{latestSite.title}</h3>
-                  <p className="mt-1 flex items-center gap-1.5 truncate text-[10px] text-[var(--studio-text-faint)]">
-                    <ClockIcon size={12} /> {t('Last edited {date}', { date: formattedDate(latestSite.updated_at, language) })}
-                  </p>
+                  <h2 id="recent-project-title" className="truncate text-base font-semibold text-[var(--studio-text)]">{latestSite.title}</h2>
+                  {lastEdited && (
+                    <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--studio-text-muted)]">
+                      <ClockIcon size={12} /> {t('Last edited {date}', { date: lastEdited })}
+                    </p>
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {latestSite.published && (
@@ -340,14 +335,10 @@ export default function ExplorePage() {
               </div>
             </article>
           ) : (
-            <div className="dashboard-workspace-project items-center justify-center p-7 text-center">
-              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]">
-                <FolderIcon size={22} />
-              </span>
-              <p className="dashboard-kicker mt-5">{t('Start something new')}</p>
-              <h2 className="mt-1 text-xl font-bold text-[var(--studio-text)]">{t('Create your first project')}</h2>
+            <div className="dashboard-workspace-project justify-center p-7">
+              <h2 className="text-xl font-semibold text-[var(--studio-text)]">{t('Create your first project')}</h2>
               <p className="mt-2 max-w-sm text-sm leading-6 text-[var(--studio-text-muted)]">{t('Choose a template, use AI, or bring your own HTML.')}</p>
-              <button type="button" onClick={openCreate} aria-haspopup="dialog" aria-expanded={createOpen} className="studio-btn studio-btn-accent studio-create-trigger mt-5 min-h-10 px-4">
+              <button type="button" onClick={openCreate} aria-haspopup="dialog" aria-expanded={createOpen} className="studio-btn studio-btn-secondary studio-create-trigger mt-5 min-h-10 w-fit px-4">
                 <PlusIcon size={15} /> {t('Create new site')}
               </button>
             </div>
@@ -363,8 +354,7 @@ export default function ExplorePage() {
         <section aria-labelledby="discover-heading">
           <div className="dashboard-section-heading">
             <div>
-              <p className="dashboard-kicker">{t('Community')}</p>
-              <h2 id="discover-heading" className="mt-1 text-xl font-bold tracking-tight text-[var(--studio-text)] sm:text-2xl">{t('Discover ideas')}</h2>
+              <h2 id="discover-heading" className="text-xl font-semibold text-[var(--studio-text)] sm:text-2xl">{t('Discover ideas')}</h2>
               <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('Explore published work from the community.')}</p>
             </div>
             <div ref={filterRailRef} className="dashboard-filter-rail flex max-w-full gap-1.5 overflow-x-auto" aria-label={t('Site categories')}>
@@ -376,7 +366,7 @@ export default function ExplorePage() {
                   aria-pressed={category === id}
                   className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
                     category === id
-                      ? 'border-[var(--studio-accent)] bg-[var(--studio-accent)] text-white'
+                      ? 'border-[var(--studio-text)] bg-[var(--studio-text)] text-[var(--studio-panel-raised)]'
                       : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)] text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]'
                   }`}
                 >
@@ -395,7 +385,7 @@ export default function ExplorePage() {
             <p role="status" className="text-sm text-[var(--studio-text-muted)]">{t('Loading…')}</p>
           ) : items.length === 0 ? (
             <div className="dashboard-section-card border-dashed py-16 text-center">
-              <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]"><GlobeIcon size={24} /></div>
+              <div className="mx-auto mb-3 grid place-items-center text-[var(--studio-text-faint)]"><GlobeIcon size={24} /></div>
               <p className="font-medium text-[var(--studio-text)]">{t('Nothing here yet')}</p>
               <p className="mt-1 text-sm text-[var(--studio-text-muted)]">
                 {category

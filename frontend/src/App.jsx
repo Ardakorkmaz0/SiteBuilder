@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useLayoutEffect } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
@@ -12,6 +12,7 @@ import { useLanguage } from './i18n/useLanguage.js'
 import UiThemeProvider from './ui/UiThemeProvider.jsx'
 import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 import { rememberVisit } from './utils/lastVisited.js'
+import { markSurface } from './ui/surface.js'
 
 // The editor and the public preview are the heaviest screens — together they
 // pull in the entire renderer, all eight AI templates, the schema validators,
@@ -41,6 +42,14 @@ function VisitTracker() {
   return null
 }
 
+// Moving between the editor and the rest of the app swaps the theme system;
+// a layout effect so the new screen's first paint is already in its own.
+function SurfaceMarker() {
+  const { pathname } = useLocation()
+  useLayoutEffect(() => { markSurface(pathname) }, [pathname])
+  return null
+}
+
 function FullScreenLoading() {
   const { t } = useLanguage()
   return (
@@ -62,6 +71,7 @@ export default function App() {
           {/* Inside the router so it can key itself on the path, and around
               Suspense so a chunk that fails to load is caught too. */}
           <VisitTracker />
+          <SurfaceMarker />
           <AppErrorBoundary>
             <Suspense fallback={<FullScreenLoading />}>
               <Routes>

@@ -5,7 +5,7 @@ function PersonAvatar({ person, compact }) {
   const [failed, setFailed] = useState(false)
   const name = person.display_name || person.username
   return (
-    <span aria-hidden="true" className={`dashboard-avatar overflow-hidden ${compact ? 'h-14 w-14 text-lg' : 'h-16 w-16 text-xl'} transition-transform group-hover:scale-105 motion-reduce:transform-none`}>
+    <span aria-hidden="true" className={`dashboard-avatar overflow-hidden ${compact ? 'h-14 w-14 text-lg' : 'h-16 w-16 text-xl'}`}>
       {person.avatar_url && !failed ? (
         <img src={person.avatar_url} alt="" className="h-full w-full object-cover" onError={() => setFailed(true)} />
       ) : name?.charAt(0).toUpperCase()}

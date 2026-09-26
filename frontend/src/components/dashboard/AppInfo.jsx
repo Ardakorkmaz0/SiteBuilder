@@ -81,12 +81,7 @@ export default function AppInfo({ className = '' }) {
               {APP_FEATURES.map((feature, index) => {
                 const Art = ART[feature.icon] || ScratchArt
                 return (
-                  <li
-                    key={feature.id}
-                    className="app-info-row"
-                    data-tone={feature.tone}
-                    style={{ '--app-info-delay': `${index * 70}ms` }}
-                  >
+                  <li key={feature.id} className="app-info-row">
                     <span className="app-info-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                     <div className="app-info-body">
                       <p className="app-info-tag">{t(feature.tag)}</p>

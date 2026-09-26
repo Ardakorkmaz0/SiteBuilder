@@ -422,7 +422,7 @@ export default function PreviewPage() {
 
   if (status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center text-gray-400">
+      <div className="flex min-h-screen items-center justify-center text-[var(--studio-text-faint)]">
         {t('Loading...')}
       </div>
     )
@@ -430,11 +430,11 @@ export default function PreviewPage() {
 
   if (status === 'notfound' || status === 'error') {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-gray-100 text-center">
-        <h1 className="text-xl font-semibold text-gray-700">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-[var(--studio-control)] text-center">
+        <h1 className="text-xl font-semibold text-[var(--studio-text)]">
           {status === 'notfound' ? t('Site not available') : t('Something went wrong')}
         </h1>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-[var(--studio-text-muted)]">
           {status === 'notfound'
             ? t('This site does not exist or has not been published yet.')
             : t('Please try again later.')}
@@ -511,8 +511,8 @@ export default function PreviewPage() {
           />
         </PreviewStage>
         {site.published === false && (
-          <div className="fixed bottom-4 left-1/2 z-[100] -translate-x-1/2 rounded-lg border border-[#d1d5db] bg-[#fff4ce] px-4 py-2 text-xs font-medium text-[#5d4a06] shadow-lg">
-            {t('Draft preview — this site is not published yet, only you can see it.')}
+          <div className="fixed bottom-4 left-1/2 z-[100] -translate-x-1/2 studio-status-warning rounded-[var(--studio-radius)] border px-4 py-2 text-xs font-medium shadow-[var(--studio-shadow)]">
+            {t('Draft preview: this site is not published yet, only you can see it.')}
           </div>
         )}
       </>
@@ -561,8 +561,8 @@ ${customCssBlock(site?.schema?.customCss)}`
           />
         </PreviewStage>
         {site.published === false && (
-          <div className="fixed bottom-4 left-1/2 z-[120] -translate-x-1/2 rounded-lg border border-[#d1d5db] bg-[#fff4ce] px-4 py-2 text-xs font-medium text-[#5d4a06] shadow-lg">
-            {t('Draft preview — this site is not published yet, only you can see it.')}
+          <div className="fixed bottom-4 left-1/2 z-[120] -translate-x-1/2 studio-status-warning rounded-[var(--studio-radius)] border px-4 py-2 text-xs font-medium shadow-[var(--studio-shadow)]">
+            {t('Draft preview: this site is not published yet, only you can see it.')}
           </div>
         )}
       </>
@@ -599,8 +599,8 @@ ${customCssBlock(site?.schema?.customCss)}`
       </PreviewStage>
 
       {site && site.published === false && (
-        <div className="fixed bottom-4 left-1/2 z-[100] -translate-x-1/2 rounded-lg border border-[#d1d5db] bg-[#fff4ce] px-4 py-2 text-xs font-medium text-[#5d4a06] shadow-lg">
-          {t('Draft preview — this site is not published yet, only you can see it.')}
+        <div className="fixed bottom-4 left-1/2 z-[100] -translate-x-1/2 studio-status-warning rounded-[var(--studio-radius)] border px-4 py-2 text-xs font-medium shadow-[var(--studio-shadow)]">
+          {t('Draft preview: this site is not published yet, only you can see it.')}
         </div>
       )}
     </div>

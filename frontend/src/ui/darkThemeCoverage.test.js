@@ -46,9 +46,6 @@ const ALLOWED = new Map([
   ['#dbeafe', 'drop-indicator tint'],
   ['#93c5fd', 'drop-indicator tint'],
   ['#fde68a', 'inline warning tint'],
-  ['#bbf7d0', 'inline success tint'],
-  ['#f0fdf4', 'inline success tint'],
-  ['#166534', 'inline success text'],
   ['#fafaff', 'palette swatch background'],
   ['#111827', 'wizard preview frame border'],
   // The dark-theme audit's findings were fixed rather than accepted: the

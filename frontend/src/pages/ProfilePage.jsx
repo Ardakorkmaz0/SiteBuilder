@@ -12,8 +12,6 @@ import DashboardHeader, { DashboardAvatar } from '../components/dashboard/Dashbo
 import {
   CheckIcon,
   ClockIcon,
-  EyeIcon,
-  FileIcon,
   GithubIcon,
   GlobeIcon,
   InstagramIcon,
@@ -21,7 +19,6 @@ import {
   MapPinIcon,
   PlusIcon,
   SearchIcon,
-  StarIcon,
   XSocialIcon,
 } from '../components/icons.jsx'
 import { profileLinks } from '../utils/profileLinks.js'
@@ -241,9 +238,8 @@ export default function ProfilePage() {
       <main className="dashboard-container">
         <div className="dashboard-page-heading">
           <div>
-            <p className="dashboard-kicker">{t('Workspace')}</p>
-            <div className="mt-1">
-              <h1 className="text-2xl font-bold tracking-[-0.03em] text-[var(--studio-text)] sm:text-3xl">{t('Profile and projects')}</h1>
+            <div>
+              <h1 className="text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">{t('Profile and projects')}</h1>
               <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('Manage your public identity and every site in one place.')}</p>
             </div>
           </div>
@@ -261,7 +257,7 @@ export default function ProfilePage() {
         )}
 
         {loading ? (
-          <div className="dashboard-section-card mb-6 animate-pulse p-6">
+          <div className="dashboard-section-card mb-6 p-6">
             <div className="h-20 w-20 rounded-full bg-[var(--studio-control)]" />
             <div className="mt-4 h-5 w-48 rounded bg-[var(--studio-control)]" />
           </div>
@@ -289,7 +285,7 @@ export default function ProfilePage() {
                   </button>
                 </div>
                 <div className="min-w-0">
-                  <h2 id="profile-name" className="truncate text-2xl font-bold tracking-tight text-[var(--studio-text)]">{profileName}</h2>
+                  <h2 id="profile-name" className="truncate text-2xl font-semibold text-[var(--studio-text)]">{profileName}</h2>
                   <p className="mt-0.5 text-sm font-medium text-[var(--studio-text-muted)]">
                     @{profileUser.username}
                     {profile?.headline && <span className="text-[var(--studio-text)]"> · {profile.headline}</span>}
@@ -321,22 +317,21 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[30rem]">
+              {/* The same plain figures as the home page, so the numbers read as
+                  one system wherever they appear. */}
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 xl:min-w-[30rem]">
                 {[
-                  ['Sites', stats.total, FileIcon],
-                  ['Published', stats.published, GlobeIcon],
-                  ['Total views', stats.views, EyeIcon],
-                  ['Favorites', stats.favorites, StarIcon],
-                ].map(([label, value, StatIcon]) => (
-                  <div key={label} className="dashboard-stat">
-                    <span className="dashboard-stat-icon"><StatIcon size={15} /></span>
-                    <span className="min-w-0">
-                      <strong className="block truncate text-sm text-[var(--studio-text)]">{Number(value).toLocaleString()}</strong>
-                      <span className="block truncate text-[10px] font-semibold text-[var(--studio-text-faint)]">{t(label)}</span>
-                    </span>
+                  ['Sites', stats.total],
+                  ['Published', stats.published],
+                  ['Total views', stats.views],
+                  ['Favorites', stats.favorites],
+                ].map(([label, value]) => (
+                  <div key={label} className="dashboard-figure">
+                    <dt>{t(label)}</dt>
+                    <dd>{Number(value).toLocaleString()}</dd>
                   </div>
                 ))}
-              </div>
+              </dl>
             </div>
           </section>
         )}
@@ -344,8 +339,7 @@ export default function ProfilePage() {
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(17rem,0.72fr)_minmax(0,1.55fr)]">
           <div className="space-y-6">
           <section className="dashboard-section-card p-5 sm:p-6" aria-labelledby="profile-details-heading">
-            <p className="dashboard-kicker">{t('Account')}</p>
-            <h2 id="profile-details-heading" className="mt-1 text-lg font-bold text-[var(--studio-text)]">{t('Profile details')}</h2>
+            <h2 id="profile-details-heading" className="text-lg font-semibold text-[var(--studio-text)]">{t('Profile details')}</h2>
             <p className="mt-1 text-xs leading-5 text-[var(--studio-text-muted)]">{t('Update the name and bio shown across Sitebuilder.')}</p>
 
             {!loading && (
@@ -407,7 +401,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <p className="mb-1.5 text-xs font-semibold text-[var(--studio-text-muted)]">{t('Social links')}</p>
-                  <p className="mb-2 text-[11px] leading-4 text-[var(--studio-text-faint)]">{t('A handle (@you) or a full link — both work.')}</p>
+                  <p className="mb-2 text-[11px] leading-4 text-[var(--studio-text-faint)]">{t('A handle (@you) or a full link: both work.')}</p>
                   <div className="space-y-2">
                     {[
                       ['github', GithubIcon, 'GitHub'],
@@ -441,8 +435,7 @@ export default function ProfilePage() {
           <section className="dashboard-section-card p-5" aria-labelledby="launch-checklist-heading">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="dashboard-kicker">{t('Launch checklist')}</p>
-                <h2 id="launch-checklist-heading" className="mt-1 font-bold text-[var(--studio-text)]">{t('Make your workspace ready')}</h2>
+                <h2 id="launch-checklist-heading" className="font-semibold text-[var(--studio-text)]">{t('Make your workspace ready')}</h2>
               </div>
               <span className="text-xs font-bold text-[var(--studio-accent-hover)]">{completedLaunchSteps}/{launchSteps.length}</span>
             </div>
@@ -452,7 +445,7 @@ export default function ProfilePage() {
             <div className="mt-4 space-y-2.5">
               {launchSteps.map((step) => (
                 <div key={step.label} className="flex items-center gap-2 text-xs">
-                  <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${step.done ? 'border-[var(--studio-success)] bg-[var(--studio-success)] text-white' : 'border-[var(--studio-border)] text-[var(--studio-text-faint)]'}`}>
+                  <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${step.done ? 'border-[var(--studio-success)] bg-[var(--studio-success-soft)] text-[var(--studio-success)]' : 'border-[var(--studio-border)] text-[var(--studio-text-faint)]'}`}>
                     {step.done && <CheckIcon size={12} />}
                   </span>
                   <span className={step.done ? 'text-[var(--studio-text-muted)] line-through' : 'font-medium text-[var(--studio-text)]'}>{step.label}</span>
@@ -463,8 +456,7 @@ export default function ProfilePage() {
 
           {recentActivity.length > 0 && (
             <section className="dashboard-section-card p-5" aria-labelledby="activity-heading">
-              <p className="dashboard-kicker">{t('Activity')}</p>
-              <h2 id="activity-heading" className="mt-1 font-bold text-[var(--studio-text)]">{t('Recent changes')}</h2>
+              <h2 id="activity-heading" className="font-semibold text-[var(--studio-text)]">{t('Recent changes')}</h2>
               <div className="mt-4 space-y-3">
                 {recentActivity.map((site) => (
                   <Link key={site.id} to={`/editor/${site.id}`} className="flex items-start gap-3 rounded-lg p-1.5 hover:bg-[var(--studio-control-hover)]">
@@ -483,8 +475,7 @@ export default function ProfilePage() {
           <section id="projects" className="dashboard-section-card min-w-0 p-5 sm:p-6" aria-labelledby="projects-heading">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="dashboard-kicker">{t('Project library')}</p>
-                <h2 id="projects-heading" className="mt-1 text-lg font-bold text-[var(--studio-text)]">{t('My sites')}</h2>
+                <h2 id="projects-heading" className="text-lg font-semibold text-[var(--studio-text)]">{t('My sites')}</h2>
                 <p className="mt-1 text-xs leading-5 text-[var(--studio-text-muted)]">{t('Create, search, and manage every site you own.')}</p>
               </div>
               <form onSubmit={onCreate} className="flex min-w-0 gap-2">

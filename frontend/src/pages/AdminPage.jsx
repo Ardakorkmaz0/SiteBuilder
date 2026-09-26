@@ -28,7 +28,7 @@ function Avatar({ url, name, size = 36 }) {
   }
   return (
     <span
-      className="grid place-items-center rounded-full bg-[#eef2ff] font-semibold text-[#4f46e5]"
+      className="grid place-items-center rounded-full bg-[var(--studio-accent-soft)] font-semibold text-[var(--studio-accent-text)]"
       style={{ width: size, height: size, fontSize: size * 0.42 }}
     >
       {letter}
@@ -74,8 +74,8 @@ function StatsHeader() {
               {icon || <FileIcon size={16} />}
             </span>
             <div className="min-w-0">
-              <div className="text-lg font-bold leading-tight text-[#111827]">{(value || 0).toLocaleString()}</div>
-              <div className="truncate text-xs text-[#6b7280]">{t(label)}</div>
+              <div className="text-lg font-bold leading-tight text-[var(--studio-text)]">{(value || 0).toLocaleString()}</div>
+              <div className="truncate text-xs text-[var(--studio-text-muted)]">{t(label)}</div>
             </div>
           </div>
         ))}
@@ -83,15 +83,15 @@ function StatsHeader() {
 
       {stats.top_sites?.length > 0 && (
         <div className="ms-card mt-3 p-4">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#9ca3af]">{t('Top sites by views')}</div>
+          <div className="mb-2 text-sm font-semibold text-[var(--studio-text-muted)]">{t('Top sites by views')}</div>
           <div className="space-y-1.5">
             {stats.top_sites.map((s, i) => (
               <div key={s.id} className="flex items-center gap-3 text-sm">
-                <span className="w-4 shrink-0 text-right text-xs font-bold text-[#9ca3af]">{i + 1}</span>
-                <Link to={`/site/${s.slug}`} className="min-w-0 flex-1 truncate font-medium text-[#111827] hover:text-[#4f46e5] hover:underline">{s.title}</Link>
-                <span className="shrink-0 text-xs text-[#9ca3af]">@{s.owner}</span>
-                <span className="flex shrink-0 items-center gap-1 text-xs text-[#9ca3af]"><EyeIcon size={12} /> {s.view_count.toLocaleString()}</span>
-                <span className="flex shrink-0 items-center gap-1 text-xs text-[#9ca3af]"><StarIcon size={12} /> {s.favorite_count.toLocaleString()}</span>
+                <span className="w-4 shrink-0 text-right text-xs font-bold text-[var(--studio-text-faint)]">{i + 1}</span>
+                <Link to={`/site/${s.slug}`} className="min-w-0 flex-1 truncate font-medium text-[var(--studio-text)] hover:text-[var(--studio-accent-text)] hover:underline">{s.title}</Link>
+                <span className="shrink-0 text-xs text-[var(--studio-text-faint)]">@{s.owner}</span>
+                <span className="flex shrink-0 items-center gap-1 text-xs text-[var(--studio-text-faint)]"><EyeIcon size={12} /> {s.view_count.toLocaleString()}</span>
+                <span className="flex shrink-0 items-center gap-1 text-xs text-[var(--studio-text-faint)]"><StarIcon size={12} /> {s.favorite_count.toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -217,15 +217,15 @@ function UsersTab() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={t('Search users by name, @username, or email…')}
-          className="w-full rounded-lg border border-[#d1d5db] bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#c7d2fe]"
+          className="w-full rounded-lg border border-[var(--studio-border-strong)] bg-[var(--studio-panel-raised)] px-3.5 py-2.5 text-sm text-[var(--studio-text)] outline-none focus:border-[var(--studio-accent)] focus:ring-2 focus:ring-[var(--studio-focus-ring)]"
         />
       </div>
       {users === null && !error ? (
-        <p className="text-sm text-[#6b7280]">{t('Loading…')}</p>
+        <p className="text-sm text-[var(--studio-text-muted)]">{t('Loading…')}</p>
       ) : (
       <>
       {users && (
-        <p className="mb-6 text-sm text-[#6b7280]">
+        <p className="mb-6 text-sm text-[var(--studio-text-muted)]">
           {t(count === 1 ? '{count} user' : '{count} users', { count })}
           {hasMore ? ` (${t('{count} loaded', { count: users.length })})` : ''} · {t(totalSites === 1 ? '{count} site' : '{count} sites', { count: totalSites })}
           {hasMore ? ` ${t('shown')}` : ''}
@@ -240,30 +240,30 @@ function UsersTab() {
         {(users || []).map((u) => (
           <div key={u.id} className={`ms-card p-5 ${u.is_active ? '' : 'opacity-70 ring-1 ring-red-200'}`}>
             <div className="flex flex-wrap items-center gap-3">
-              <Link to={`/u/${u.id}`} title={t('Open public profile')} className="shrink-0 rounded-full ring-offset-2 hover:ring-2 hover:ring-[#c7d2fe]">
+              <Link to={`/u/${u.id}`} title={t('Open public profile')} className="shrink-0 rounded-full ring-offset-2 hover:ring-2 hover:ring-[color-mix(in_srgb,var(--studio-accent)_35%,transparent)]">
                 <Avatar url={u.avatar_url} name={u.display_name} />
               </Link>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Link to={`/u/${u.id}`} title={t('Open public profile')} className="font-semibold text-[#111827] hover:text-[#4f46e5] hover:underline">
+                  <Link to={`/u/${u.id}`} title={t('Open public profile')} className="font-semibold text-[var(--studio-text)] hover:text-[var(--studio-accent-text)] hover:underline">
                     {u.display_name}
                   </Link>
-                  <span className="text-xs text-[#9ca3af]">@{u.username}</span>
+                  <span className="text-xs text-[var(--studio-text-faint)]">@{u.username}</span>
                   {u.is_superuser ? (
-                    <span className="rounded-full bg-[#fee2e2] px-2 py-0.5 text-[10px] font-bold uppercase text-[#b91c1c]">{t('Superuser')}</span>
+                    <span className="studio-status-danger rounded-full border px-2 py-0.5 text-[11px] font-semibold">{t('Superuser')}</span>
                   ) : u.is_staff ? (
-                    <span className="rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-bold uppercase text-[#15803d]">{t('Staff')}</span>
+                    <span className="studio-status-success rounded-full border px-2 py-0.5 text-[11px] font-semibold">{t('Staff')}</span>
                   ) : null}
                   {!u.is_active && (
-                    <span className="rounded-full bg-[#fef2f2] px-2 py-0.5 text-[10px] font-bold uppercase text-[#b91c1c]">{t('Suspended')}</span>
+                    <span className="studio-status-danger rounded-full border px-2 py-0.5 text-[11px] font-semibold">{t('Suspended')}</span>
                   )}
                 </div>
-                <div className="text-xs text-[#9ca3af]">
+                <div className="text-xs text-[var(--studio-text-faint)]">
                   {u.email || t('no email')} · {t('joined')} {new Date(u.date_joined).toLocaleDateString(language === 'tr' ? 'tr-TR' : 'en-US')}
                 </div>
               </div>
               <div className="ml-auto flex items-center gap-2">
-                <span className="rounded-full bg-[#f3f4f6] px-2.5 py-0.5 text-xs font-semibold text-[#6b7280]">
+                <span className="rounded-full bg-[var(--studio-control)] px-2.5 py-0.5 text-xs font-semibold text-[var(--studio-text-muted)]">
                   {t(u.site_count === 1 ? '{count} site' : '{count} sites', { count: u.site_count })}
                 </span>
                 {!u.is_staff && !u.is_superuser && (
@@ -272,8 +272,8 @@ function UsersTab() {
                     disabled={busy === u.id}
                     className={`rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
                       u.is_active
-                        ? 'border border-[#fecaca] text-[#b91c1c] hover:bg-[#fef2f2]'
-                        : 'border border-[#bbf7d0] text-[#15803d] hover:bg-[#f0fdf4]'
+                        ? 'border border-[color-mix(in_srgb,var(--studio-danger)_35%,var(--studio-border))] text-[var(--studio-danger)] hover:bg-[var(--studio-danger-soft)]'
+                        : 'border border-[color-mix(in_srgb,var(--studio-success)_35%,var(--studio-border))] text-[var(--studio-success)] hover:bg-[var(--studio-success-soft)]'
                     }`}
                   >
                     {u.is_active ? t('Suspend') : t('Reinstate')}
@@ -287,21 +287,21 @@ function UsersTab() {
                 Delete out of reach with no way to get at them. Scrolling keeps
                 every control usable without a mobile redesign. */}
             {u.sites.length > 0 && (
-              <div className="mt-4 overflow-x-auto rounded-lg border border-[#eef0f3]">
+              <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--studio-border)]">
                 <table className="w-full min-w-[26rem] text-sm">
                   <tbody>
                     {u.sites.map((s) => (
-                      <tr key={s.id} className="border-b border-[#f3f4f6] last:border-0">
+                      <tr key={s.id} className="border-b border-[var(--studio-border)] last:border-0">
                         <td className="px-3 py-2">
-                          <div className="flex items-center gap-2 font-medium text-[#111827]">
+                          <div className="flex items-center gap-2 font-medium text-[var(--studio-text)]">
                             {s.title}
                             {s.open_report_count > 0 && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-[#fee2e2] px-1.5 py-0.5 text-[10px] font-bold text-[#b91c1c]">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--studio-danger-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--studio-danger)]">
                                 <FlagIcon size={11} /> {s.open_report_count}
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-[#9ca3af]">/site/{s.slug}</div>
+                          <div className="text-xs text-[var(--studio-text-faint)]">/site/{s.slug}</div>
                         </td>
                         <td className="px-3 py-2 text-xs">
                           {s.moderation_blocked ? (
@@ -311,14 +311,14 @@ function UsersTab() {
                           ) : (
                             <span
                               className={`rounded-full px-2 py-0.5 font-semibold ${
-                                s.published ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#f3f4f6] text-[#6b7280]'
+                                s.published ? 'bg-[var(--studio-success-soft)] text-[var(--studio-success)]' : 'bg-[var(--studio-control)] text-[var(--studio-text-muted)]'
                               }`}
                             >
                               {s.published ? t('Published') : t('Draft')}
                             </span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-xs text-[#9ca3af]">
+                        <td className="px-3 py-2 text-xs text-[var(--studio-text-faint)]">
                           <span className="inline-flex items-center gap-3">
                             <span className="inline-flex items-center gap-1" title={t('Views')}><EyeIcon size={13} /> {(s.view_count || 0).toLocaleString()}</span>
                             <span className="inline-flex items-center gap-1" title={t('Favorites')}><StarIcon size={13} /> {(s.favorite_count || 0).toLocaleString()}</span>
@@ -327,13 +327,13 @@ function UsersTab() {
                         <td className="px-3 py-2 text-right text-xs">
                           <div className="flex items-center justify-end gap-2">
                             {s.published && (
-                              <Link to={`/site/${s.slug}`} className="font-medium text-[#4f46e5] hover:underline">{t('View')}</Link>
+                              <Link to={`/site/${s.slug}`} className="font-medium text-[var(--studio-accent-text)] hover:underline">{t('View')}</Link>
                             )}
                             {s.published && !s.moderation_blocked && (
                               <button
                                 onClick={() => onModerate(u, s, 'unpublish')}
                                 disabled={busy === s.id}
-                                className="font-medium text-[var(--studio-warning)] hover:underline disabled:opacity-50"
+                                className="whitespace-nowrap font-medium text-[var(--studio-warning)] hover:underline disabled:opacity-50"
                               >
                                 {t('Unpublish')}
                               </button>
@@ -342,7 +342,7 @@ function UsersTab() {
                               <button
                                 onClick={() => onModerate(u, s, 'reinstate')}
                                 disabled={busy === s.id}
-                                className="font-medium text-[#4f46e5] hover:underline disabled:opacity-50"
+                                className="font-medium text-[var(--studio-accent-text)] hover:underline disabled:opacity-50"
                               >
                                 {t('Reinstate')}
                               </button>
@@ -350,7 +350,7 @@ function UsersTab() {
                             <button
                               onClick={() => onModerate(u, s, 'delete')}
                               disabled={busy === s.id}
-                              className="font-medium text-[#b91c1c] hover:underline disabled:opacity-50"
+                              className="font-medium text-[var(--studio-danger)] hover:underline disabled:opacity-50"
                             >
                               {t('Delete')}
                             </button>
@@ -372,7 +372,7 @@ function UsersTab() {
           </div>
         )}
         {users && users.length === 0 && (
-          <p className="py-10 text-center text-sm text-[#9ca3af]">{t('No users match “{query}”.', { query: q })}</p>
+          <p className="py-10 text-center text-sm text-[var(--studio-text-faint)]">{t('No users match “{query}”.', { query: q })}</p>
         )}
       </div>
       </>
@@ -442,7 +442,7 @@ function ReportsTab() {
             type="button"
             onClick={() => { setError(''); setStatusFilter(id) }}
             className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-              statusFilter === id ? 'bg-[#111827] text-white' : 'bg-white text-[#374151] ring-1 ring-[#e5e7eb] hover:bg-[#f3f4f6]'
+              statusFilter === id ? 'bg-[var(--studio-text)] text-[var(--studio-panel-raised)]' : 'bg-[var(--studio-panel-raised)] text-[var(--studio-text)] ring-1 ring-[var(--studio-border)] hover:bg-[var(--studio-control-hover)]'
             }`}
           >
             {t(label)}
@@ -455,12 +455,12 @@ function ReportsTab() {
       )}
 
       {loading ? (
-        <p className="text-sm text-[#6b7280]">{t('Loading…')}</p>
+        <p className="text-sm text-[var(--studio-text-muted)]">{t('Loading…')}</p>
       ) : rows.length === 0 ? (
         <div className="ms-card border-dashed py-16 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[#dcfce7] text-[#15803d]"><CheckIcon size={24} /></div>
-          <p className="font-medium text-[#374151]">{statusFilter === 'all' ? t('No reports') : t('No {status} reports', { status: t(statusFilter) })}</p>
-          <p className="mt-1 text-sm text-[#6b7280]">{t('The moderation queue is clear.')}</p>
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[var(--studio-success-soft)] text-[var(--studio-success)]"><CheckIcon size={24} /></div>
+          <p className="font-medium text-[var(--studio-text)]">{statusFilter === 'all' ? t('No reports') : t('No {status} reports', { status: t(statusFilter) })}</p>
+          <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('The moderation queue is clear.')}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -469,23 +469,23 @@ function ReportsTab() {
               <div className="flex flex-wrap items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-[#fee2e2] px-2 py-0.5 text-[11px] font-bold uppercase text-[#b91c1c]">
+                    <span className="studio-status-danger rounded-full border px-2 py-0.5 text-[11px] font-semibold">
                       {t(r.reason_label || r.reason)}
                     </span>
-                    <span className="font-semibold text-[#111827]">{r.site_title}</span>
-                    <span className="text-xs text-[#9ca3af]">{t('by')} @{r.site_owner}</span>
+                    <span className="font-semibold text-[var(--studio-text)]">{r.site_title}</span>
+                    <span className="text-xs text-[var(--studio-text-faint)]">{t('by')} @{r.site_owner}</span>
                     {!r.site_published && (
-                      <span className="rounded-full bg-[#f3f4f6] px-2 py-0.5 text-[10px] font-bold uppercase text-[#6b7280]">{t('Not public')}</span>
+                      <span className="dashboard-status">{t('Not public')}</span>
                     )}
                   </div>
-                  {r.detail && <p className="mt-2 text-sm text-[#374151]">“{r.detail}”</p>}
-                  <div className="mt-1 text-xs text-[#9ca3af]">
+                  {r.detail && <p className="mt-2 text-sm text-[var(--studio-text)]">“{r.detail}”</p>}
+                  <div className="mt-1 text-xs text-[var(--studio-text-faint)]">
                     {t('reported by')} @{r.reporter_username} · {new Date(r.created_at).toLocaleString(language === 'tr' ? 'tr-TR' : 'en-US')}
                     {r.status !== 'open' && <span> · <span className="font-semibold capitalize">{t(r.status)}</span></span>}
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  <Link to={`/site/${r.site_slug}`} className="rounded-lg border border-[#e5e7eb] px-3 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#f3f4f6]">
+                  <Link to={`/site/${r.site_slug}`} className="rounded-lg border border-[var(--studio-border)] px-3 py-1.5 text-xs font-semibold text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]">
                     {t('View')}
                   </Link>
                   {r.status === 'open' && (
@@ -494,7 +494,7 @@ function ReportsTab() {
                         <button
                           onClick={() => onTakedown(r)}
                           disabled={busy === r.id}
-                          className="rounded-lg border border-[#fecaca] px-3 py-1.5 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2] disabled:opacity-50"
+                          className="rounded-lg border border-[color-mix(in_srgb,var(--studio-danger)_35%,var(--studio-border))] px-3 py-1.5 text-xs font-semibold text-[var(--studio-danger)] hover:bg-[var(--studio-danger-soft)] disabled:opacity-50"
                         >
                           {t('Unpublish site')}
                         </button>
@@ -502,14 +502,14 @@ function ReportsTab() {
                       <button
                         onClick={() => onResolve(r, 'resolve')}
                         disabled={busy === r.id}
-                        className="rounded-lg bg-[#15803d] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#166534] disabled:opacity-50"
+                        className="rounded-[var(--studio-radius)] border border-[color-mix(in_srgb,var(--studio-success)_45%,var(--studio-border))] px-3 py-1.5 text-xs font-semibold text-[var(--studio-success)] hover:bg-[var(--studio-success-soft)] disabled:opacity-50"
                       >
                         {t('Resolve')}
                       </button>
                       <button
                         onClick={() => onResolve(r, 'dismiss')}
                         disabled={busy === r.id}
-                        className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#6b7280] hover:bg-[#f3f4f6] disabled:opacity-50"
+                        className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] disabled:opacity-50"
                       >
                         {t('Dismiss')}
                       </button>
@@ -543,7 +543,7 @@ function FlaggedBlock({ report }) {
       srcDoc={source}
       sandbox={STATIC_HTML_SANDBOX}
       loading="lazy"
-      className="h-40 w-full max-w-xs rounded-lg border border-[#e5e7eb] bg-white"
+      className="h-40 w-full max-w-xs rounded-lg border border-[var(--studio-border)] bg-[var(--studio-panel-raised)]"
     />
   )
 }
@@ -613,7 +613,7 @@ function ComponentReportsTab() {
             type="button"
             onClick={() => { setError(''); setStatusFilter(id) }}
             className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-              statusFilter === id ? 'bg-[#111827] text-white' : 'bg-white text-[#374151] ring-1 ring-[#e5e7eb] hover:bg-[#f3f4f6]'
+              statusFilter === id ? 'bg-[var(--studio-text)] text-[var(--studio-panel-raised)]' : 'bg-[var(--studio-panel-raised)] text-[var(--studio-text)] ring-1 ring-[var(--studio-border)] hover:bg-[var(--studio-control-hover)]'
             }`}
           >
             {t(label)}
@@ -626,12 +626,12 @@ function ComponentReportsTab() {
       )}
 
       {loading ? (
-        <p className="text-sm text-[#6b7280]">{t('Loading…')}</p>
+        <p className="text-sm text-[var(--studio-text-muted)]">{t('Loading…')}</p>
       ) : rows.length === 0 ? (
         <div className="ms-card border-dashed py-16 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[#dcfce7] text-[#15803d]"><CheckIcon size={24} /></div>
-          <p className="font-medium text-[#374151]">{t('No flagged blocks')}</p>
-          <p className="mt-1 text-sm text-[#6b7280]">{t('The moderation queue is clear.')}</p>
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[var(--studio-success-soft)] text-[var(--studio-success)]"><CheckIcon size={24} /></div>
+          <p className="font-medium text-[var(--studio-text)]">{t('No flagged blocks')}</p>
+          <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('The moderation queue is clear.')}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -641,19 +641,19 @@ function ComponentReportsTab() {
                 <FlaggedBlock report={r} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-[#fee2e2] px-2 py-0.5 text-[11px] font-bold uppercase text-[#b91c1c]">
+                    <span className="studio-status-danger rounded-full border px-2 py-0.5 text-[11px] font-semibold">
                       {t(r.reason_label || r.reason)}
                     </span>
-                    <span className="font-semibold text-[#111827]">{r.component_title}</span>
-                    <span className="text-xs text-[#9ca3af]">{t('by')} @{r.component_author}</span>
+                    <span className="font-semibold text-[var(--studio-text)]">{r.component_title}</span>
+                    <span className="text-xs text-[var(--studio-text-faint)]">{t('by')} @{r.component_author}</span>
                     {r.component_status !== 'published' && (
-                      <span className="rounded-full bg-[#f3f4f6] px-2 py-0.5 text-[10px] font-bold uppercase text-[#6b7280]">
+                      <span className="dashboard-status">
                         {t(r.component_status)}
                       </span>
                     )}
                   </div>
-                  {r.detail && <p className="mt-2 text-sm text-[#374151]">“{r.detail}”</p>}
-                  <div className="mt-1 text-xs text-[#9ca3af]">
+                  {r.detail && <p className="mt-2 text-sm text-[var(--studio-text)]">“{r.detail}”</p>}
+                  <div className="mt-1 text-xs text-[var(--studio-text-faint)]">
                     {t('reported by')} @{r.reporter_username} · {new Date(r.created_at).toLocaleString(language === 'tr' ? 'tr-TR' : 'en-US')}
                     {' · '}
                     {/* How far it already travelled — the number that decides
@@ -667,7 +667,7 @@ function ComponentReportsTab() {
                       <button
                         onClick={() => onModerate(r, 'remove')}
                         disabled={busy === r.id}
-                        className="rounded-lg border border-[#fecaca] px-3 py-1.5 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2] disabled:opacity-50"
+                        className="rounded-lg border border-[color-mix(in_srgb,var(--studio-danger)_35%,var(--studio-border))] px-3 py-1.5 text-xs font-semibold text-[var(--studio-danger)] hover:bg-[var(--studio-danger-soft)] disabled:opacity-50"
                       >
                         {t('Unlist block')}
                       </button>
@@ -675,14 +675,14 @@ function ComponentReportsTab() {
                     <button
                       onClick={() => onModerate(r, 'purge')}
                       disabled={busy === r.id}
-                      className="rounded-lg bg-[#b91c1c] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#991b1b] disabled:opacity-50"
+                      className="rounded-[var(--studio-radius)] border border-[color-mix(in_srgb,var(--studio-danger)_45%,var(--studio-border))] px-3 py-1.5 text-xs font-semibold text-[var(--studio-danger)] hover:bg-[var(--studio-danger-soft)] disabled:opacity-50"
                     >
                       {t('Delete everywhere')}
                     </button>
                     <button
                       onClick={() => onResolve(r, 'dismiss')}
                       disabled={busy === r.id}
-                      className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#6b7280] hover:bg-[#f3f4f6] disabled:opacity-50"
+                      className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] disabled:opacity-50"
                     >
                       {t('Dismiss')}
                     </button>
@@ -706,7 +706,7 @@ export default function AdminPage() {
   useScrollRestore()
 
   return (
-    <div className="studio-theme-surface studio-brand-backdrop min-h-screen bg-[var(--studio-shell)] text-[var(--studio-text)]">
+    <div className="studio-theme-surface min-h-screen bg-[var(--studio-shell)] text-[var(--studio-text)]">
       <header className="sticky top-0 z-10 border-b border-[var(--studio-border)] bg-[color-mix(in_srgb,var(--studio-panel-raised)_92%,transparent)] backdrop-blur">
         {/* flex-wrap + a narrower gutter below `sm`: on a phone this row was
             wider than the screen, so the Admin badge and part of the Settings
@@ -714,7 +714,7 @@ export default function AdminPage() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-2 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2.5">
             <Link to="/" title={t('Sitebuilder home')} className="brand-mark">S</Link>
-            <button type="button" onClick={goBack} className="text-sm font-medium text-[#374151] hover:text-[#111827]">
+            <button type="button" onClick={goBack} className="text-sm font-medium text-[var(--studio-text-muted)] hover:text-[var(--studio-text)]">
               &larr; {t('Back')}
             </button>
           </div>
@@ -724,29 +724,26 @@ export default function AdminPage() {
               <Link
                 to="/admin/settings"
                 title={t('Server settings (Google, reCAPTCHA, email)')}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-[#4f46e5] hover:bg-[#eef2ff]"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-[var(--studio-accent-text)] hover:bg-[var(--studio-accent-soft)]"
               >
                 <CogIcon size={15} /> {t('Settings')}
               </Link>
             )}
-            <span className="rounded-full border border-[color-mix(in_srgb,var(--studio-accent)_30%,var(--studio-border))] bg-[var(--studio-accent-soft)] px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-[var(--studio-accent-hover)]">
-              {t('Admin')}
-            </span>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <h1 className="text-2xl font-bold tracking-tight text-[#111827]">{t('Moderation')}</h1>
+        <h1 className="text-2xl font-semibold text-[var(--studio-text)]">{t('Moderation')}</h1>
 
-        <div className="mb-8 mt-4 flex gap-2 border-b border-[#e5e7eb]">
+        <div className="mb-8 mt-4 flex gap-2 overflow-x-auto border-b border-[var(--studio-border)]">
           {[['users', 'Users & sites'], ['reports', 'Reports'], ['blocks', 'Blocks']].map(([id, label]) => (
             <button
               key={id}
               type="button"
               onClick={() => setTab(id)}
-              className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition ${
-                tab === id ? 'border-[#4f46e5] text-[#4f46e5]' : 'border-transparent text-[#6b7280] hover:text-[#374151]'
+              className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold transition ${
+                tab === id ? 'border-[var(--studio-text)] text-[var(--studio-text)]' : 'border-transparent text-[var(--studio-text-muted)] hover:text-[var(--studio-text)]'
               }`}
             >
               {t(label)}
