@@ -2580,7 +2580,7 @@ export default function EditorPage() {
                         value={htmlDevice}
                         onChange={(e) => chooseHtmlDevice(e.target.value)}
                         title={t('Screen / device width')}
-                        className="studio-input hidden max-w-[150px] shrink-0 truncate px-2 py-1.5 text-xs font-medium @[980px]:block"
+                        className="studio-input hidden max-w-[190px] shrink-0 truncate px-2 py-1.5 text-xs font-medium @[980px]:block"
                       >
                         {DEVICES.map((d) => (
                           <option key={d.id} value={d.id}>
@@ -2735,7 +2735,7 @@ export default function EditorPage() {
                   workspace has — identical chrome in both editor modes.
                   `relative` anchors the live code ticker to the canvas. */}
               <div className="relative flex min-w-0 flex-1 flex-col">
-                <div className="studio-toolbar relative flex min-w-0 items-center gap-2 border-b px-3 py-1.5">
+                <div className="studio-toolbar @container relative flex min-w-0 items-center gap-2 border-b px-3 py-1.5">
                   <div data-tour="canvas-modes" className="studio-segment shrink-0">
                     {[['view', 'View'], ['edit', 'Edit'], ['source', 'Source']].map(([id, label]) => (
                       <button
@@ -2752,7 +2752,9 @@ export default function EditorPage() {
                     ))}
                   </div>
                   {/* Device controls — moved out of the app header so it stays
-                      one row; they act on the canvas this bar belongs to. */}
+                      one row; they act on the canvas this bar belongs to. Same
+                      order, widths and breakpoints as the HTML workspace's bar. */}
+                  <span aria-hidden="true" className="studio-toolbar-sep" />
                   <div data-tour="devices" className="studio-segment shrink-0">
                     <button
                       onClick={() => chooseViewport('pc')}
@@ -2786,7 +2788,7 @@ export default function EditorPage() {
                         ? t('Phone screen size')
                         : t('Preview screen size')
                     }
-                    className="studio-input hidden max-w-[190px] px-2 py-1.5 text-xs font-medium md:block"
+                    className="studio-input hidden max-w-[190px] shrink-0 truncate px-2 py-1.5 text-xs font-medium @[980px]:block"
                   >
                     {sizePresets.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -2803,14 +2805,14 @@ export default function EditorPage() {
                       onClick={toggleBrowserFrame}
                       aria-pressed={browserFrameEnabled}
                       title={t(browserFrameEnabled ? 'Hide browser frame' : 'Show browser frame')}
-                      className={`studio-btn hidden shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs lg:inline-flex ${
+                      className={`studio-btn inline-flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs ${
                         browserFrameEnabled
                           ? 'border-[var(--studio-accent)] bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]'
                           : 'studio-btn-secondary'
                       }`}
                     >
                       <MonitorIcon size={14} />
-                      {t('Browser')}
+                      <span className="hidden @[1000px]:inline">{t('Browser')}</span>
                     </button>
                   )}
                   {/* Selected element's actions, docked right after the screen
@@ -2937,7 +2939,7 @@ export default function EditorPage() {
                       onToggleFullscreen={toggleFullscreen}
                     />
                   )}
-                  <div className="relative ml-auto shrink-0">
+                  <div className="relative shrink-0">
                     <button
                       type="button"
                       onClick={() => setCanvasToolsOpen((open) => !open)}
@@ -2986,7 +2988,7 @@ export default function EditorPage() {
                       </>
                     )}
                   </div>
-                  <span className="hidden min-w-0 truncate text-xs text-[var(--studio-text-muted)] 2xl:block">
+                  <span className="ml-auto hidden min-w-0 flex-1 truncate pl-1 text-xs text-[var(--studio-text-muted)] @[1180px]:block">
                     {canvasMode === 'view'
                       ? t('Read-only preview of this page')
                       : canvasMode === 'source'
