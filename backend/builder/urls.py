@@ -1,6 +1,18 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from .admin_api import (
+    AdminAccountDetailView,
+    AdminAccountListView,
+    AdminAccountRoleView,
+    AdminAccountSessionsView,
+    AdminAuditView,
+    AdminComponentListView,
+    AdminOverviewView,
+    AdminSiteDetailView,
+    AdminSiteListView,
+    AdminSystemView,
+)
 from .views import (
     ReportSharedComponentView,
     ShareComponentView,
@@ -102,5 +114,16 @@ urlpatterns = [
     path('admin/component-reports/', AdminComponentReportsView.as_view(), name='admin-component-reports'),
     path('admin/component-reports/<int:report_id>/resolve/', AdminComponentReportResolveView.as_view(), name='admin-component-report-resolve'),
     path('admin/components/<int:component_id>/moderate/', AdminComponentModerateView.as_view(), name='admin-component-moderate'),
+    # Admin console (admin_api.py)
+    path('admin/overview/', AdminOverviewView.as_view(), name='admin-overview'),
+    path('admin/accounts/', AdminAccountListView.as_view(), name='admin-accounts'),
+    path('admin/accounts/<int:user_id>/', AdminAccountDetailView.as_view(), name='admin-account'),
+    path('admin/accounts/<int:user_id>/role/', AdminAccountRoleView.as_view(), name='admin-account-role'),
+    path('admin/accounts/<int:user_id>/sessions/', AdminAccountSessionsView.as_view(), name='admin-account-sessions'),
+    path('admin/sites/', AdminSiteListView.as_view(), name='admin-sites'),
+    path('admin/sites/<int:site_id>/', AdminSiteDetailView.as_view(), name='admin-site'),
+    path('admin/components/', AdminComponentListView.as_view(), name='admin-components'),
+    path('admin/audit/', AdminAuditView.as_view(), name='admin-audit'),
+    path('admin/system/', AdminSystemView.as_view(), name='admin-system'),
     path('', include(router.urls)),
 ]

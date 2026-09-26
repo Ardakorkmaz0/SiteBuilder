@@ -151,6 +151,13 @@ def _local_ai_blocked():
     )
 
 
+def _signed_in(user):
+    """Stamp the account's last sign-in. The admin console reads it; DRF's
+    token views never send user_logged_in, so nothing recorded it before."""
+    from django.contrib.auth.models import update_last_login
+    update_last_login(None, user)
+
+
 class RegisterView(APIView):
     permission_classes = [AllowAny]
     # Tight per-IP cap on the credential endpoints (~10/min) to stop signup spam
@@ -168,6 +175,7 @@ class RegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         token, _ = Token.objects.get_or_create(user=user)
+        _signed_in(user)
         return Response(
             {'token': token.key, 'user': UserSerializer(user, context={'request': request}).data},
             status=status.HTTP_201_CREATED,
@@ -220,6 +228,7 @@ class GoogleLoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         token, _ = Token.objects.get_or_create(user=user)
+        _signed_in(user)
         return Response(
             {'token': token.key, 'user': UserSerializer(user, context={'request': request}).data},
         )
@@ -264,6 +273,7 @@ class LoginView(ObtainAuthToken):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
         token, _ = Token.objects.get_or_create(user=user)
+        _signed_in(user)
         return Response(
             {'token': token.key, 'user': UserSerializer(user, context={'request': request}).data},
         )
@@ -379,6 +389,7 @@ class GuestSessionView(APIView):
     def post(self, request):
         user = create_guest_user()
         token, _ = Token.objects.get_or_create(user=user)
+        _signed_in(user)
         return Response(
             {'token': token.key, 'user': UserSerializer(user, context={'request': request}).data},
             status=status.HTTP_201_CREATED,
@@ -415,6 +426,7 @@ class GuestUpgradeView(APIView):
         # working because the client is handed the replacement right here.
         Token.objects.filter(user=user).delete()
         token = Token.objects.create(user=user)
+        _signed_in(user)
         return Response(
             {'token': token.key, 'user': UserSerializer(user, context={'request': request}).data},
         )
@@ -1480,6 +1492,11 @@ class ReportSiteView(APIView):
         return Response({'detail': 'Thanks — our team will review this site.'}, status=status.HTTP_201_CREATED)
 
 
+def _log_admin(request, target, action, detail=''):
+    from .admin_api import log_admin_action
+    log_admin_action(request.user, target, action, detail)
+
+
 class IsSuperUser(IsAdminUser):
     """Stricter than IsAdminUser (is_staff): the runtime Settings page edits
     secrets, so it's gated to superusers only."""
@@ -1502,6 +1519,7 @@ class AdminSettingsView(APIView):
         serializer = SiteSettingsSerializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        _log_admin(request, instance, 'settings.update', ', '.join(sorted(serializer.validated_data)))
         return Response(SiteSettingsSerializer(SiteSettings.load()).data)
 
 
@@ -1604,6 +1622,7 @@ class AdminReportResolveView(APIView):
         report.status = 'resolved' if action == 'resolve' else 'dismissed'
         report.resolved_at = timezone.now()
         report.save(update_fields=['status', 'resolved_at'])
+        _log_admin(request, report.site, f'report.{action}', f'Report {report.id} ({report.reason})')
         return Response({'detail': 'Report updated.', 'status': report.status})
 
 
@@ -1628,6 +1647,7 @@ class AdminUserSuspendView(APIView):
         target.save(update_fields=['is_active'])
         if suspend:
             Token.objects.filter(user=target).delete()  # kick existing sessions
+        _log_admin(request, target, 'user.suspend' if suspend else 'user.reinstate')
         return Response({'detail': 'User updated.', 'is_active': target.is_active})
 
 
@@ -1652,12 +1672,14 @@ class AdminSiteModerateView(APIView):
         except Site.DoesNotExist:
             return error_response('site_not_found', 'Site not found.', status.HTTP_404_NOT_FOUND)
         if action == 'delete':
+            _log_admin(request, site, 'site.delete', f'Owner @{site.owner.username}')
             site.delete()
             return Response({'detail': 'Site deleted.', 'deleted': True})
         if action == 'reinstate':
             site.moderation_blocked = False
             site.moderated_at = None
             site.save(update_fields=['moderation_blocked', 'moderated_at'])
+            _log_admin(request, site, 'site.reinstate')
             return Response({'detail': 'Site reinstated.', 'published': site.published, 'moderation_blocked': False})
         site.published = False
         site.moderation_blocked = True
@@ -1665,6 +1687,7 @@ class AdminSiteModerateView(APIView):
         site.save(update_fields=['published', 'moderation_blocked', 'moderated_at'])
         # Resolve any open reports on a taken-down site.
         Report.objects.filter(site=site, status='open').update(status='resolved', resolved_at=timezone.now())
+        _log_admin(request, site, 'site.unpublish')
         return Response({'detail': 'Site unpublished.', 'published': False, 'moderation_blocked': True})
 
 
@@ -1698,6 +1721,7 @@ class AdminSitePinView(APIView):
             )
         site.pinned_at = timezone.now() if pinned else None
         site.save(update_fields=['pinned_at'])
+        _log_admin(request, site, 'site.pin' if pinned else 'site.unpin')
         return Response({
             'detail': 'Site pinned to the home page.' if pinned else 'Site unpinned.',
             'pinned': pinned,
@@ -2041,6 +2065,7 @@ class AdminComponentReportResolveView(APIView):
         report.status = 'resolved' if action == 'resolve' else 'dismissed'
         report.resolved_at = timezone.now()
         report.save(update_fields=['status', 'resolved_at'])
+        _log_admin(request, report.component, f'component_report.{action}', f'Report {report.id} ({report.reason})')
         return Response({'detail': 'Report updated.', 'status': report.status})
 
 
@@ -2111,6 +2136,7 @@ class AdminComponentModerateView(APIView):
         if action == 'restore':
             component.status = 'published'
             component.save(update_fields=['status'])
+            _log_admin(request, component, 'component.restore')
             return Response({'detail': 'Component restored.', 'status': component.status})
 
         component.status = 'removed'
@@ -2124,4 +2150,6 @@ class AdminComponentModerateView(APIView):
             sites_touched, copies_removed = _purge_shared_copies(component.pk)
             payload.update(detail='Component removed and copies deleted.',
                            sites_touched=sites_touched, copies_removed=copies_removed)
+        _log_admin(request, component, f'component.{action}',
+                   f"{payload['copies_removed']} copies removed" if action == 'purge' else '')
         return Response(payload)

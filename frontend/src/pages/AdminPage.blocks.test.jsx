@@ -24,6 +24,17 @@ vi.mock('../api/admin.js', () => ({
   listComponentReports: vi.fn(),
   resolveComponentReport: vi.fn(),
   moderateComponent: vi.fn(),
+  getAdminOverview: vi.fn(),
+  listAccounts: vi.fn(),
+  getAccount: vi.fn(),
+  setAccountAdmin: vi.fn(),
+  signOutAccount: vi.fn(),
+  listAdminSites: vi.fn(),
+  getAdminSite: vi.fn(),
+  listAdminComponents: vi.fn(),
+  listAdminActivity: vi.fn(),
+  getAdminSystem: vi.fn(),
+  pinSite: vi.fn(),
 }))
 
 const REPORT = {
@@ -48,15 +59,15 @@ async function openBlocksTab() {
   render(
     <UiThemeProvider>
       <LanguageProvider>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={['/admin?section=moderation&queue=blocks']}>
           <AdminPage />
         </MemoryRouter>
       </LanguageProvider>
     </UiThemeProvider>,
   )
-  const user = userEvent.setup()
-  await user.click(screen.getByRole('button', { name: 'Blocks' }))
-  return user
+  // The block queue lives under Moderation in the console; opened straight
+  // from its address, the way a link to it would.
+  return userEvent.setup()
 }
 
 beforeEach(() => {
