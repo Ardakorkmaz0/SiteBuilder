@@ -81,7 +81,7 @@ export default function DashboardHeader({ current = '', showSearch = true }) {
     // A guest has no password to come back with: signing out throws the
     // identity away, and every draft on it with no way to reach them again.
     // So it is a question here, not a button.
-    if (isGuest && !window.confirm(t('Signing out of a guest session cannot be undone — there is no password to come back with, and what you made stays behind. Create an account first?'))) {
+    if (isGuest && !window.confirm(t('Signing out of a guest session cannot be undone: there is no password to come back with, and what you made stays behind. Create an account first?'))) {
       return
     }
     logout()
@@ -92,11 +92,8 @@ export default function DashboardHeader({ current = '', showSearch = true }) {
     <header className="dashboard-header">
       <div data-testid="explore-header-inner" className="dashboard-header-inner">
         <Link to="/" aria-label={t('Sitebuilder home')} className="dashboard-brand">
-          <span className="brand-mark">S</span>
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-bold tracking-tight text-[var(--studio-text)] sm:text-base">Sitebuilder</span>
-            <span className="hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--studio-text-faint)] sm:block">Studio</span>
-          </span>
+          <span className="brand-mark" aria-hidden="true">S</span>
+          <span className="block min-w-0 truncate text-sm font-semibold text-[var(--studio-text)] sm:text-base">Sitebuilder</span>
         </Link>
 
         {showSearch ? (
@@ -133,8 +130,8 @@ export default function DashboardHeader({ current = '', showSearch = true }) {
           {isGuest && (
             <Link
               to="/register"
-              className="hidden shrink-0 items-center gap-1.5 rounded-full border border-[var(--studio-warning)] bg-[color-mix(in_srgb,var(--studio-warning)_12%,transparent)] px-3 py-1.5 text-xs font-semibold text-[var(--studio-text)] sm:inline-flex"
-              title={t('You are browsing as a guest: your work lives in this browser only. Create an account to publish it — and to reach it from anywhere.')}
+              className="studio-status-warning hidden shrink-0 items-center gap-1.5 rounded-[var(--studio-radius)] border px-3 py-1.5 text-xs font-semibold sm:inline-flex"
+              title={t('You are browsing as a guest: your work lives in this browser only. Create an account to publish it and to reach it from anywhere.')}
             >
               {t('Guest')} · {t('Create my account')}
             </Link>

@@ -38,7 +38,7 @@ export default function GuestEntry({ onError }) {
     <div className="space-y-2">
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-[var(--studio-border)]" />
-        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--studio-text-faint)]">
+        <span className="text-xs font-medium text-[var(--studio-text-muted)]">
           {t('or')}
         </span>
         <span className="h-px flex-1 bg-[var(--studio-border)]" />
@@ -57,7 +57,7 @@ export default function GuestEntry({ onError }) {
         </p>
       ) : (
         <p className="text-center text-xs text-[var(--studio-text-muted)]">
-          {t('Build right away. Your work is kept in this browser; publishing needs an account — and signing up later keeps everything you made.')}
+          {t('Build right away. Your work is kept in this browser; publishing needs an account, and signing up later keeps everything you made.')}
         </p>
       )}
     </div>

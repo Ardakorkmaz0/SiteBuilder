@@ -57,7 +57,7 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
           try first. The frame itself takes no pointer events, so the click
           lands here instead of disappearing into the iframe. */}
       <div className="dashboard-site-card-media">
-        <div className="dashboard-site-card-preview relative block overflow-hidden bg-white">
+        <div className="dashboard-site-card-preview relative block overflow-hidden bg-[var(--studio-panel-raised)]">
           <iframe
             title={component.title}
             srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:14px;font-family:system-ui}</style></head><body>${sharedBlockHtml(component)}</body></html>`}
@@ -75,14 +75,14 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
         {/* Said on the card, because "is this one out there?" is the question
             you ask about your own shelf. */}
         {isPrivate && (
-          <span className="absolute right-3 top-3 z-[2] rounded-full border border-[var(--studio-border)] bg-[var(--studio-panel)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--studio-text-muted)] shadow-sm">
+          <span className="absolute right-3 top-3 z-[2] rounded-full border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] px-2 py-0.5 text-[11px] font-semibold text-[var(--studio-text-muted)]">
             {t('Private')}
           </span>
         )}
       </div>
 
       <div className="dashboard-site-card-body">
-        <h3 className="truncate text-base font-bold tracking-[-0.025em] text-[var(--studio-text)]">{component.title}</h3>
+        <h3 className="truncate text-base font-semibold text-[var(--studio-text)]">{component.title}</h3>
         {component.description && (
           <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--studio-text-muted)]">{component.description}</p>
         )}
@@ -191,12 +191,11 @@ export default function CommunityPage() {
         <section aria-labelledby="blocks-heading">
           <div className="dashboard-section-heading">
             <div className="min-w-0">
-              <p className="dashboard-kicker">{t('Library')}</p>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <h1 id="blocks-heading" className="text-2xl font-bold tracking-[-0.03em] text-[var(--studio-text)] sm:text-3xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 id="blocks-heading" className="text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">
                   {t('Community blocks')}
                 </h1>
-                <span className="studio-status-warning rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                <span className="studio-status-warning rounded-full border px-2 py-0.5 text-[11px] font-semibold">
                   {t('In development')}
                 </span>
               </div>
@@ -240,7 +239,7 @@ export default function CommunityPage() {
                   aria-pressed={category === value}
                   className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
                     category === value
-                      ? 'border-[var(--studio-accent)] bg-[var(--studio-accent)] text-white'
+                      ? 'border-[var(--studio-text)] bg-[var(--studio-text)] text-[var(--studio-panel-raised)]'
                       : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)] text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]'
                   }`}
                 >
@@ -255,7 +254,7 @@ export default function CommunityPage() {
         {loading ? (
           <div role="status" aria-label={t('Loading…')} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="dashboard-site-card animate-pulse">
+              <div key={item} className="dashboard-site-card">
                 <div className="dashboard-site-card-media"><div className="h-44 rounded-xl bg-[var(--studio-control)]" /></div>
                 <div className="dashboard-site-card-body">
                   <div className="h-4 w-2/3 rounded bg-[var(--studio-control)]" />
@@ -268,13 +267,13 @@ export default function CommunityPage() {
           // Only when the library really is empty. After a failure the alert
           // above says what happened; "nothing here yet" would be a lie.
           <div className="dashboard-section-card border-dashed py-16 text-center">
-            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]">
+            <div className="mx-auto mb-3 grid place-items-center text-[var(--studio-text-faint)]">
               <LayersIcon size={24} />
             </div>
             <p className="font-medium text-[var(--studio-text)]">{t('Nothing here yet.')}</p>
             <p className="mt-1 text-sm text-[var(--studio-text-muted)]">
               {scope === 'mine'
-                ? t('Blocks you share — public or private — land here.')
+                ? t('Blocks you share, public or private, land here.')
                 : t('Share a block from one of your own sites to start the library.')}
             </p>
           </div>

@@ -17,7 +17,7 @@ const LINK_ICONS = { website: LinkIcon, github: GithubIcon, twitter: XSocialIcon
 function BigAvatar({ url, name }) {
   const letter = (name || '?').trim().charAt(0).toUpperCase()
   if (url) {
-    return <img src={url} alt="" className="h-24 w-24 rounded-full border border-[var(--studio-border)] object-cover shadow-[var(--studio-shadow)] sm:h-28 sm:w-28" />
+    return <img src={url} alt="" className="h-24 w-24 rounded-full border border-[var(--studio-border)] object-cover sm:h-28 sm:w-28" />
   }
   return (
     <span className="dashboard-avatar h-24 w-24 text-3xl sm:h-28 sm:w-28">
@@ -102,7 +102,7 @@ export default function PublicProfilePage() {
             </Link>
           </div>
         ) : !data ? (
-          <div role="status" className="dashboard-welcome animate-pulse p-6 sm:p-8" aria-label={t('Loading…')}>
+          <div role="status" className="dashboard-welcome p-6 sm:p-8" aria-label={t('Loading…')}>
             <div className="flex items-center gap-5">
               <div className="h-24 w-24 shrink-0 rounded-full bg-[var(--studio-control)]" />
               <div className="min-w-0 flex-1">
@@ -118,8 +118,7 @@ export default function PublicProfilePage() {
               <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-center">
                 <BigAvatar url={data.avatar_url} name={data.display_name} />
                 <div className="min-w-0 flex-1">
-                  <p className="dashboard-kicker">{t('Profile')}</p>
-                  <h1 id="public-profile-name" className="mt-1 truncate text-2xl font-bold tracking-[-0.03em] text-[var(--studio-text)] sm:text-3xl">{data.display_name}</h1>
+                  <h1 id="public-profile-name" className="truncate text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">{data.display_name}</h1>
                   <div className="mt-1 text-sm text-[var(--studio-text-faint)]">
                     @{data.username}
                     {data.headline && <span className="font-medium text-[var(--studio-text-muted)]"> · {data.headline}</span>}
@@ -161,14 +160,13 @@ export default function PublicProfilePage() {
             <section aria-labelledby="public-sites-heading">
               <div className="mb-4 flex items-end justify-between gap-4">
                 <div>
-                  <p className="dashboard-kicker">{t('Portfolio')}</p>
-                  <h2 id="public-sites-heading" className="mt-1 text-xl font-bold tracking-tight text-[var(--studio-text)] sm:text-2xl">{t('Sites')}</h2>
+                  <h2 id="public-sites-heading" className="text-xl font-semibold text-[var(--studio-text)] sm:text-2xl">{t('Sites')}</h2>
                 </div>
                 <span className="dashboard-status">{data.sites.length}</span>
               </div>
               {data.sites.length === 0 ? (
                 <div className="dashboard-section-card border-dashed px-5 py-16 text-center">
-                  <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]"><GlobeIcon size={23} /></div>
+                  <div className="mx-auto mb-3 grid place-items-center text-[var(--studio-text-faint)]"><GlobeIcon size={23} /></div>
                   <p className="font-medium text-[var(--studio-text)]">{t('No published sites yet')}</p>
                   <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('When {name} publishes a site, it shows up here.', { name: data.display_name })}</p>
                 </div>

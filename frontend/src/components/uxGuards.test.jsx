@@ -126,7 +126,8 @@ describe('responsive and accessibility guards', () => {
     ])
     renderWithShell(<ExplorePage />)
 
-    expect(await screen.findByRole('heading', { name: 'Continue where you left off' })).toBeInTheDocument()
+    // The project's own name is the heading; the continue link says the rest.
+    expect(await screen.findByRole('heading', { name: 'Latest portfolio' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Continue editing: Latest portfolio' })).toHaveAttribute('href', '/editor/42')
   })
 

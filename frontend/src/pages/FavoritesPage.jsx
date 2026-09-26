@@ -97,15 +97,9 @@ export default function FavoritesPage() {
         <section aria-labelledby="favorites-heading">
           <div className="dashboard-section-heading">
             <div className="min-w-0">
-              <p className="dashboard-kicker">{t('Library')}</p>
-              <div className="mt-1 flex min-w-0 items-center gap-2.5">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[color-mix(in_srgb,var(--studio-warning)_28%,var(--studio-border))] bg-[var(--studio-warning-soft)] text-[var(--studio-warning)]">
-                  <StarIcon size={18} filled />
-                </span>
-                <h1 id="favorites-heading" className="truncate text-2xl font-bold tracking-[-0.03em] text-[var(--studio-text)] sm:text-3xl">
-                  {t('Favorites')}
-                </h1>
-              </div>
+              <h1 id="favorites-heading" className="truncate text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">
+                {t('Favorites')}
+              </h1>
               <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('Sites you starred on Explore.')}</p>
             </div>
             <DashboardSearch
@@ -135,7 +129,7 @@ export default function FavoritesPage() {
         ) : items === null ? (
           <div role="status" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-label={t('Loading…')}>
             {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="dashboard-site-card animate-pulse">
+              <div key={item} className="dashboard-site-card">
                 <div className="dashboard-site-card-media"><div className="h-44 rounded-xl bg-[var(--studio-control)]" /></div>
                 <div className="dashboard-site-card-body">
                   <div className="h-4 w-2/3 rounded bg-[var(--studio-control)]" />
@@ -146,7 +140,7 @@ export default function FavoritesPage() {
           </div>
         ) : items.length === 0 ? (
           <div className="dashboard-section-card border-dashed py-16 text-center">
-            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[var(--studio-warning-soft)] text-[var(--studio-warning)]"><StarIcon size={24} filled /></div>
+            <div className="mx-auto mb-3 grid place-items-center text-[var(--studio-text-faint)]"><StarIcon size={24} filled /></div>
             <p className="font-medium text-[var(--studio-text)]">{t('No favorites yet')}</p>
             <p className="mt-1 text-sm text-[var(--studio-text-muted)]">
               {t('Star sites on Explore to keep them here.')}
@@ -154,7 +148,7 @@ export default function FavoritesPage() {
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="dashboard-section-card border-dashed py-16 text-center">
-            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]">
+            <div className="mx-auto mb-3 grid place-items-center text-[var(--studio-text-faint)]">
               <StarIcon size={24} />
             </div>
             <p className="font-medium text-[var(--studio-text)]">{t('No favorites match your search.')}</p>

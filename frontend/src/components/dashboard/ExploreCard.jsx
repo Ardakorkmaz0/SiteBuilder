@@ -42,7 +42,7 @@ export default function ExploreCard({
           className="dashboard-site-card-preview"
           title={t('Open the live site')}
         >
-          <SitePreview site={site} source="public" height={150} />
+          <SitePreview site={site} source="public" height={164} framed={false} />
         </Link>
         <button
           type="button"

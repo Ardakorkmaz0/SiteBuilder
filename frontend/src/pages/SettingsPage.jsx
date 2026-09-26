@@ -20,9 +20,9 @@ const TEXT_FIELDS = [
 function Field({ label, hint, children }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-[#374151]">{label}</span>
+      <span className="mb-1 block text-sm font-medium text-[var(--studio-text)]">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-[#9ca3af]">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs text-[var(--studio-text-faint)]">{hint}</span>}
     </label>
   )
 }
@@ -79,30 +79,27 @@ export default function SettingsPage() {
   }
 
   const input = 'ms-input w-full'
-  const secretPlaceholder = (isSet) => (isSet ? t('•••••••• (configured — type to replace)') : t('Not set'))
+  const secretPlaceholder = (isSet) => (isSet ? t('•••••••• (configured; type to replace)') : t('Not set'))
 
   return (
-    <div className="studio-theme-surface studio-brand-backdrop min-h-screen bg-[var(--studio-shell)] text-[var(--studio-text)]">
+    <div className="studio-theme-surface min-h-screen bg-[var(--studio-shell)] text-[var(--studio-text)]">
       <header className="sticky top-0 z-10 border-b border-[var(--studio-border)] bg-[color-mix(in_srgb,var(--studio-panel-raised)_92%,transparent)] backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2.5">
             <Link to="/" title={t('Sitebuilder home')} className="brand-mark">S</Link>
-            <button type="button" onClick={goBack} className="text-sm font-medium text-[#374151] hover:text-[#111827]">
+            <button type="button" onClick={goBack} className="text-sm font-medium text-[var(--studio-text-muted)] hover:text-[var(--studio-text)]">
               &larr; {t('Back')}
             </button>
           </div>
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
-            <span className="rounded-full border border-[color-mix(in_srgb,var(--studio-accent)_30%,var(--studio-border))] bg-[var(--studio-accent-soft)] px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-[var(--studio-accent-hover)]">
-              {t('Settings')}
-            </span>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-10">
-        <h1 className="text-2xl font-bold tracking-tight text-[#111827]">{t('Server settings')}</h1>
-        <p className="mb-6 mt-1 text-sm text-[#6b7280]">
+        <h1 className="text-2xl font-semibold text-[var(--studio-text)]">{t('Server settings')}</h1>
+        <p className="mb-6 mt-1 text-sm text-[var(--studio-text-muted)]">
           {t("Configure Google sign-in, reCAPTCHA and email here instead of editing the server's env file. A blank field falls back to the server environment. Infrastructure (secret key, database, allowed hosts) stays in env by design.")}
         </p>
 
@@ -111,18 +108,18 @@ export default function SettingsPage() {
         )}
 
         {data === null && !error ? (
-          <p className="text-sm text-[#6b7280]">{t('Loading…')}</p>
+          <p className="text-sm text-[var(--studio-text-muted)]">{t('Loading…')}</p>
         ) : data ? (
           <form onSubmit={onSave} className="space-y-6">
             <section className="ms-card space-y-4 p-6">
-              <h2 className="text-base font-bold text-[#111827]">{t('Google sign-in')}</h2>
+              <h2 className="text-base font-semibold text-[var(--studio-text)]">{t('Google sign-in')}</h2>
               <Field label={t('OAuth Client ID')} hint={t('From Google Cloud Console → Credentials → OAuth client (Web). Leave blank to disable Google sign-in.')}>
                 <input className={input} value={form.google_oauth_client_id} onChange={(e) => set('google_oauth_client_id', e.target.value)} placeholder="1234-abc.apps.googleusercontent.com" />
               </Field>
             </section>
 
             <section className="ms-card space-y-4 p-6">
-              <h2 className="text-base font-bold text-[#111827]">{t(`reCAPTCHA ("I'm not a robot")`)}</h2>
+              <h2 className="text-base font-semibold text-[var(--studio-text)]">{t(`reCAPTCHA ("I'm not a robot")`)}</h2>
               <Field label={t('Site key (public)')}>
                 <input className={input} value={form.recaptcha_site_key} onChange={(e) => set('recaptcha_site_key', e.target.value)} placeholder={t('6Lxxxx… (shown to visitors)')} />
               </Field>
@@ -132,8 +129,8 @@ export default function SettingsPage() {
             </section>
 
             <section className="ms-card space-y-4 p-6">
-              <h2 className="text-base font-bold text-[#111827]">{t('Email (SMTP)')}</h2>
-              <p className="-mt-2 text-xs text-[#9ca3af]">{t('Powers the password-reset email. With no host, the server prints the email (and reset link) to its console.')}</p>
+              <h2 className="text-base font-semibold text-[var(--studio-text)]">{t('Email (SMTP)')}</h2>
+              <p className="-mt-2 text-xs text-[var(--studio-text-faint)]">{t('Powers the password-reset email. With no host, the server prints the email (and reset link) to its console.')}</p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label={t('SMTP host')}><input className={input} value={form.email_host} onChange={(e) => set('email_host', e.target.value)} placeholder="smtp.gmail.com" /></Field>
                 <Field label={t('Port')}><input className={input} value={form.email_port} onChange={(e) => set('email_port', e.target.value)} placeholder="587" /></Field>
@@ -143,14 +140,14 @@ export default function SettingsPage() {
                 </Field>
               </div>
               <Field label={t('From address')}><input className={input} value={form.default_from_email} onChange={(e) => set('default_from_email', e.target.value)} placeholder="Sitebuilder <no-reply@yourdomain.com>" /></Field>
-              <label className="flex items-center gap-2 text-sm text-[#374151]">
-                <input type="checkbox" checked={form.email_use_tls} onChange={(e) => set('email_use_tls', e.target.checked)} className="h-4 w-4 rounded border-[#d1d5db] text-[#4f46e5] focus:ring-[#4f46e5]" />
+              <label className="flex items-center gap-2 text-sm text-[var(--studio-text)]">
+                <input type="checkbox" checked={form.email_use_tls} onChange={(e) => set('email_use_tls', e.target.checked)} className="h-4 w-4 rounded border-[var(--studio-border-strong)] text-[var(--studio-accent-text)] focus:ring-[var(--studio-accent)]" />
                 {t('Use TLS (recommended)')}
               </label>
             </section>
 
             <section className="ms-card space-y-4 p-6">
-              <h2 className="text-base font-bold text-[#111827]">{t('General')}</h2>
+              <h2 className="text-base font-semibold text-[var(--studio-text)]">{t('General')}</h2>
               <Field label={t('Frontend URL')} hint={t('Used to build links in emails (e.g. the password-reset link). Set to your public site origin.')}>
                 <input className={input} value={form.frontend_url} onChange={(e) => set('frontend_url', e.target.value)} placeholder="https://builder.example.com" />
               </Field>
@@ -160,7 +157,7 @@ export default function SettingsPage() {
               <button type="submit" disabled={saving} className="ms-btn ms-btn-primary px-6 py-2.5">
                 {saving ? t('Saving…') : t('Save settings')}
               </button>
-              {saved && <span className="text-sm font-medium text-[#15803d]">{t('Saved — changes are live immediately.')}</span>}
+              {saved && <span className="text-sm font-medium text-[var(--studio-success)]">{t('Saved. Changes are live immediately.')}</span>}
             </div>
           </form>
         ) : null}

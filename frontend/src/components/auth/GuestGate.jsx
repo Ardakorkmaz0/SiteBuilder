@@ -29,7 +29,7 @@ export default function GuestGateDialog({ action, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-label={t('An account is needed')}
-        className="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] shadow-2xl"
+        className="w-full max-w-md overflow-hidden rounded-[var(--studio-radius-2xl)] border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] shadow-[var(--studio-shadow-lg)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="space-y-3 p-6">
@@ -38,7 +38,7 @@ export default function GuestGateDialog({ action, onClose }) {
             {t(REASONS[action] || REASONS.publish)}
           </p>
           <p className="text-sm text-[var(--studio-text-muted)]">
-            {t('Everything you have made so far comes with you — same sites, same drafts.')}
+            {t('Everything you have made so far comes with you: same sites, same drafts.')}
           </p>
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--studio-border)] px-6 py-4">

@@ -97,13 +97,13 @@ function SearchResults({ query, type, onFilter }) {
               {favoriteFailed && <p role="alert" className="studio-status-danger rounded-xl border p-3 text-sm">{t('Could not update favorite. Please try again.')}</p>}
               {type !== 'sites' && (
                 <section className="dashboard-section-card p-4 sm:p-6" aria-labelledby="search-people-heading">
-                  <h2 id="search-people-heading" className="mb-3 text-lg font-bold text-[var(--studio-text)]">{t('People')}</h2>
+                  <h2 id="search-people-heading" className="mb-3 text-lg font-semibold text-[var(--studio-text)]">{t('People')}</h2>
                   {data.users.length ? <SearchPeople users={data.users} /> : <p className="py-4 text-sm text-[var(--studio-text-muted)]">{t('No users found.')}</p>}
                 </section>
               )}
               {type !== 'users' && (
                 <section aria-labelledby="search-sites-heading">
-                  <h2 id="search-sites-heading" className="mb-4 text-lg font-bold text-[var(--studio-text)]">{t('Sites')}</h2>
+                  <h2 id="search-sites-heading" className="mb-4 text-lg font-semibold text-[var(--studio-text)]">{t('Sites')}</h2>
                   {data.sites.length ? (
                     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {data.sites.map((site) => <ExploreCard key={site.id} site={site} onToggleFav={onToggleFav} />)}
@@ -130,7 +130,7 @@ export default function SearchPage() {
       <DashboardHeader showSearch={false} />
       <main className="dashboard-container">
         <div className="mb-6">
-          <h1 className="mb-4 text-2xl font-bold tracking-tight text-[var(--studio-text)] sm:text-3xl">{t('Search results')}</h1>
+          <h1 className="mb-4 text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">{t('Search results')}</h1>
           <DashboardGlobalSearch key={`${query}:${type}`} initialQuery={query} resultType={type} label={t('Search query')} formLabel={t('Search results')} />
         </div>
         <SearchResults key={`${query}:${type}`} query={query} type={type} onFilter={(value) => setParams({ q: query, type: value })} />
