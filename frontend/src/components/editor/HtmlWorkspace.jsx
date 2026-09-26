@@ -1935,15 +1935,6 @@ function HtmlWorkspace({
                   painted over the hint text next to it. */}
               <div className="flex shrink-0 items-center gap-2">
                 {deviceControls}
-                {mode !== 'live' && (
-                  <CanvasZoomControl
-                    zoom={zoom}
-                    fitScale={fitScale}
-                    onZoom={changeZoom}
-                    fullscreen={fullscreen}
-                    onToggleFullscreen={onToggleFullscreen}
-                  />
-                )}
                 {/* Phones get the frame too — a browser runs there as well, and
                     its chrome is exactly what decides how much page fits on
                     screen. Only a landscape phone is left out: there is no
@@ -1966,6 +1957,15 @@ function HtmlWorkspace({
                     <MonitorIcon size={14} />
                     <span className="hidden @[1000px]:inline">{t('Browser')}</span>
                   </button>
+                )}
+                {mode !== 'live' && (
+                  <CanvasZoomControl
+                    zoom={zoom}
+                    fitScale={fitScale}
+                    onZoom={changeZoom}
+                    fullscreen={fullscreen}
+                    onToggleFullscreen={onToggleFullscreen}
+                  />
                 )}
               </div>
             </>
