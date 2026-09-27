@@ -3,20 +3,30 @@
 // variant would show up as a blank/garbled thumbnail in the gallery.
 import { describe, expect, it } from 'vitest'
 import {
+  PACKS,
   TEMPLATE_COUNT,
+  TEMPLATE_LAYOUTS,
   TEMPLATE_LIBRARY,
+  TEMPLATE_LIBRARY_GROUPS,
   TEMPLATE_SITE_CATEGORY_MAP,
   VERTICAL_FAMILY_IDS,
   buildVerticalVariant,
 } from './templateLibrary.js'
-import { FAMILY_DESCRIPTIONS, VERTICAL_CATEGORY_SEEDS } from './templateCatalogData.js'
+import {
+  FAMILY_DESCRIPTIONS,
+  FAMILY_NAMES,
+  TEMPLATE_GROUPS,
+  VERTICAL_CATEGORY_SEEDS,
+} from './templateCatalogData.js'
+import { MORE_VERTICAL_SEEDS } from './templateSeeds/index.js'
+import { onAccent } from './templateKit.js'
 import { SITE_TEMPLATES } from './htmlTemplates.js'
 
 const ALL = TEMPLATE_LIBRARY.flatMap((c) => c.variants.map((v) => ({ cat: c.id, ...v })))
 
 describe('TEMPLATE_LIBRARY', () => {
-  it('ships a 200-template gallery with unique ids', () => {
-    expect(TEMPLATE_COUNT).toBe(200)
+  it('ships a 500-template gallery with unique ids', () => {
+    expect(TEMPLATE_COUNT).toBe(500)
     expect(ALL.length).toBe(TEMPLATE_COUNT)
     const ids = new Set(ALL.map((v) => v.id))
     expect(ids.size).toBe(ALL.length)
@@ -72,6 +82,44 @@ describe('TEMPLATE_LIBRARY', () => {
     }
   })
 
+  it('adds thirty second-wave collections, each starter with its own hero copy', () => {
+    expect(MORE_VERTICAL_SEEDS).toHaveLength(30)
+    for (const seed of MORE_VERTICAL_SEEDS) {
+      const collection = TEMPLATE_LIBRARY.find((category) => category.id === seed.id)
+      expect(collection, seed.id).toBeTruthy()
+      expect(collection.variants, seed.id).toHaveLength(10)
+      // Ten starters that open with the same sentence read as one template.
+      const titles = new Set(seed.variants.map((variant) => variant.hero?.title?.en))
+      expect(titles.size, seed.id).toBe(10)
+      for (const variant of seed.variants) {
+        for (const key of ['badge', 'title', 'lead']) {
+          expect(variant.hero?.[key]?.en, `${seed.id}-${variant.id} ${key}`).toBeTruthy()
+          expect(variant.hero?.[key]?.tr, `${seed.id}-${variant.id} ${key}`).toBeTruthy()
+        }
+      }
+    }
+  })
+
+  it('files every collection under exactly one gallery group', () => {
+    const grouped = TEMPLATE_LIBRARY_GROUPS.flatMap((group) => group.categories.map((category) => category.id))
+    expect(grouped.sort()).toEqual(TEMPLATE_LIBRARY.map((category) => category.id).sort())
+    for (const group of TEMPLATE_LIBRARY_GROUPS) {
+      expect(group.categories.length, group.id).toBeGreaterThan(0)
+    }
+    expect(TEMPLATE_LIBRARY_GROUPS).toHaveLength(TEMPLATE_GROUPS.length)
+  })
+
+  it('names every layout a template uses', () => {
+    const layouts = new Set(TEMPLATE_LAYOUTS.map((layout) => layout.id))
+    for (const tpl of ALL) {
+      expect(layouts.has(tpl.layout), `${tpl.id} uses ${tpl.layout}`).toBe(true)
+      expect(typeof tpl.dark, tpl.id).toBe('boolean')
+    }
+    for (const layout of TEMPLATE_LAYOUTS) {
+      expect(FAMILY_NAMES[layout.id]?.tr, layout.id).toBeTruthy()
+    }
+  })
+
   it('maps every gallery collection to a public site category', () => {
     expect(Object.keys(TEMPLATE_SITE_CATEGORY_MAP)).toHaveLength(TEMPLATE_LIBRARY.length)
     for (const category of TEMPLATE_LIBRARY) {
@@ -96,11 +144,11 @@ describe('shipped templates keep their promises', () => {
     return bad
   }
 
-  // Builds and parses every one of the 200 variants, so it needs more than the
+  // Builds and parses every one of the 500 variants, so it needs more than the
   // 5s default when the machine is busy.
   it('every component template variant', () => {
     expect(ALL.flatMap((tpl) => dead(tpl.build('Smoke Test'), tpl.id))).toEqual([])
-  }, 30000)
+  }, 90000)
 
   it('every HTML site starter', () => {
     expect(SITE_TEMPLATES.flatMap((tpl) => dead(tpl.build('Smoke Test'), tpl.id))).toEqual([])
@@ -119,6 +167,16 @@ describe('the gallery offers real structural choice', () => {
     showcase: '.zig',
     directory: '.rows',
     onepage: '.tiers',
+    bento: '.bento',
+    split: '.split-screen',
+    chronicle: '.chronicle',
+    poster: '.poster',
+    stack: '.stack',
+    letter: '.letter',
+    compare: '.compare',
+    lookbook: '.lookbook',
+    solo: '.solo',
+    appshell: '.appshell',
   }
 
   it('every vertical category spans at least five page architectures', () => {
@@ -169,5 +227,30 @@ describe('the gallery offers real structural choice', () => {
         .filter((n) => n > 360)
       expect(wide, `${family} hard-codes ${wide.join(', ')}px`).toEqual([])
     }
+  })
+})
+
+describe('design packs stay readable', () => {
+  const channel = (value) => {
+    const c = value / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }
+  const luminance = (hex) => {
+    const full = hex.length === 4 ? `#${[...hex.slice(1)].map((c) => c + c).join('')}` : hex
+    const [r, g, b] = [1, 3, 5].map((i) => channel(parseInt(full.slice(i, i + 2), 16)))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  const contrast = (a, b) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+    return (hi + 0.05) / (lo + 0.05)
+  }
+
+  // Every pack paints its button label, body copy and accent text (eyebrows,
+  // chips) on its own surfaces; each pairing has to clear WCAG AA.
+  it.each(Object.values(PACKS).map((pack) => [pack.id, pack]))('%s clears AA', (_, pack) => {
+    expect(contrast(pack.accent, onAccent(pack)), 'button').toBeGreaterThanOrEqual(4.5)
+    expect(contrast(pack.ink, pack.bg), 'ink').toBeGreaterThanOrEqual(4.5)
+    expect(contrast(pack.muted, pack.bg), 'muted').toBeGreaterThanOrEqual(4.5)
+    expect(contrast(pack.accent, pack.bg), 'accent text').toBeGreaterThanOrEqual(4.5)
   })
 })

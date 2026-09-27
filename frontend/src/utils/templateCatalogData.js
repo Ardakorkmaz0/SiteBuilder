@@ -2,23 +2,31 @@
 // one another. Template builders use `.en`; the localization layer consumes the
 // generated map below, so adding another template never silently leaves its
 // Turkish version behind.
-const copy = (en, tr = en) => ({ en, tr })
-const item = (heading, headingTr, text, textTr) => ({
-  heading: copy(heading, headingTr),
-  text: copy(text, textTr),
-})
-const variant = (id, pack, family, name, trName = name) => ({
-  id,
-  pack,
-  family,
-  name: copy(name, trName),
-})
+//
+// The first ten categories live here; the second wave lives in templateSeeds/,
+// one file per theme, and is appended below.
+import { collectTranslations, copy, item, profile, variant } from './templateCopy.js'
+import { MORE_VERTICAL_SEEDS } from './templateSeeds/index.js'
 
-const profile = (data) => data
+export { templateText } from './templateCopy.js'
 
-export const VERTICAL_CATEGORY_SEEDS = [
+// How the gallery groups its categories. Every category (core or vertical)
+// names one of these ids; the picker and the wizard list categories under them.
+export const TEMPLATE_GROUPS = [
+  { id: 'personal', name: copy('Personal & creators', 'Kişisel ve içerik üreticileri') },
+  { id: 'creative', name: copy('Creative & media', 'Yaratıcı işler ve medya') },
+  { id: 'tech', name: copy('Tech & startups', 'Teknoloji ve girişimler') },
+  { id: 'business', name: copy('Business & services', 'İşletme ve hizmetler') },
+  { id: 'industry', name: copy('Trades, industry & mobility', 'Zanaat, sanayi ve mobilite') },
+  { id: 'food', name: copy('Food, travel & hospitality', 'Yeme-içme, seyahat ve konaklama') },
+  { id: 'shops', name: copy('Shops, products & pets', 'Mağazalar, ürünler ve evcil hayvanlar') },
+  { id: 'health', name: copy('Health, beauty & sport', 'Sağlık, güzellik ve spor') },
+  { id: 'community', name: copy('Community, culture & learning', 'Topluluk, kültür ve eğitim') },
+]
+
+const FIRST_WAVE_SEEDS = [
   {
-    id: 'property', siteCategory: 'business', icon: '🏠',
+    id: 'property', siteCategory: 'business', icon: '🏠', group: 'business',
     name: copy('Real Estate & Property', 'Emlak ve Gayrimenkul'),
     desc: copy('Homes, rentals, developments, and property advisors.', 'Evler, kiralıklar, projeler ve gayrimenkul danışmanları.'),
     profile: profile({
@@ -60,7 +68,7 @@ export const VERTICAL_CATEGORY_SEEDS = [
     ],
   },
   {
-    id: 'clinic', siteCategory: 'business', icon: '🩺',
+    id: 'clinic', siteCategory: 'business', icon: '🩺', group: 'health',
     name: copy('Healthcare & Clinic', 'Sağlık ve Klinik'),
     desc: copy('Care practices, clinics, and appointment-led services.', 'Bakım pratikleri, klinikler ve randevu odaklı hizmetler.'),
     profile: profile({
@@ -103,7 +111,7 @@ export const VERTICAL_CATEGORY_SEEDS = [
     ],
   },
   {
-    id: 'education', siteCategory: 'business', icon: '🎓',
+    id: 'education', siteCategory: 'business', icon: '🎓', group: 'community',
     name: copy('Education & Courses', 'Eğitim ve Kurslar'),
     desc: copy('Academies, workshops, lessons, and cohort-based learning.', 'Akademiler, atölyeler, dersler ve kohort tabanlı öğrenme.'),
     profile: profile({
@@ -146,7 +154,7 @@ export const VERTICAL_CATEGORY_SEEDS = [
     ],
   },
   {
-    id: 'travel', siteCategory: 'business', icon: '✈️',
+    id: 'travel', siteCategory: 'business', icon: '✈️', group: 'food',
     name: copy('Travel & Hospitality', 'Seyahat ve Konaklama'),
     desc: copy('Stays, guides, tours, and hospitality brands.', 'Konaklamalar, rehberler, turlar ve misafirperverlik markaları.'),
     profile: profile({
@@ -189,7 +197,7 @@ export const VERTICAL_CATEGORY_SEEDS = [
     ],
   },
   {
-    id: 'beauty', siteCategory: 'business', icon: '✨',
+    id: 'beauty', siteCategory: 'business', icon: '✨', group: 'health',
     name: copy('Beauty & Salon', 'Güzellik ve Salon'),
     desc: copy('Studios, rituals, artists, and appointment-led beauty brands.', 'Stüdyolar, ritüeller, sanatçılar ve randevu odaklı güzellik markaları.'),
     profile: profile({
@@ -232,7 +240,7 @@ export const VERTICAL_CATEGORY_SEEDS = [
     ],
   },
   {
-    id: 'legal-finance', siteCategory: 'business', icon: '⚖️',
+    id: 'legal-finance', siteCategory: 'business', icon: '⚖️', group: 'business',
     name: copy('Legal & Finance', 'Hukuk ve Finans'),
     desc: copy('Advisors, firms, planning practices, and trusted specialists.', 'Danışmanlar, firmalar, planlama pratikleri ve güvenilen uzmanlar.'),
     profile: profile({
@@ -275,7 +283,7 @@ export const VERTICAL_CATEGORY_SEEDS = [
     ],
   },
   {
-    id: 'home-services', siteCategory: 'business', icon: '🛠️',
+    id: 'home-services', siteCategory: 'business', icon: '🛠️', group: 'industry',
     name: copy('Home Services', 'Ev Hizmetleri'),
     desc: copy('Trusted teams for homes, repairs, upgrades, and everyday care.', 'Evler, onarımlar, iyileştirmeler ve günlük bakım için güvenilen ekipler.'),
     profile: profile({
@@ -318,7 +326,7 @@ export const VERTICAL_CATEGORY_SEEDS = [
     ],
   },
   {
-    id: 'community', siteCategory: 'other', icon: '🤝',
+    id: 'community', siteCategory: 'other', icon: '🤝', group: 'community',
     name: copy('Nonprofit & Community', 'Topluluk ve STK'),
     desc: copy('Clubs, causes, local groups, and community initiatives.', 'Kulüpler, amaçlar, yerel gruplar ve topluluk girişimleri.'),
     profile: profile({
@@ -360,7 +368,7 @@ export const VERTICAL_CATEGORY_SEEDS = [
     ],
   },
   {
-    id: 'entertainment', siteCategory: 'other', icon: '🎵',
+    id: 'entertainment', siteCategory: 'other', icon: '🎵', group: 'creative',
     name: copy('Music & Entertainment', 'Müzik ve Eğlence'),
     desc: copy('Artists, venues, events, labels, and culture-led projects.', 'Sanatçılar, mekânlar, etkinlikler, plak şirketleri ve kültür odaklı projeler.'),
     profile: profile({
@@ -402,7 +410,7 @@ export const VERTICAL_CATEGORY_SEEDS = [
     ],
   },
   {
-    id: 'mobility', siteCategory: 'business', icon: '🚗',
+    id: 'mobility', siteCategory: 'business', icon: '🚗', group: 'industry',
     name: copy('Automotive & Mobility', 'Otomotiv ve Mobilite'),
     desc: copy('Vehicles, garages, rental fleets, and movement-led brands.', 'Araçlar, garajlar, kiralık filolar ve hareket odaklı markalar.'),
     profile: profile({
@@ -446,6 +454,8 @@ export const VERTICAL_CATEGORY_SEEDS = [
   },
 ]
 
+export const VERTICAL_CATEGORY_SEEDS = [...FIRST_WAVE_SEEDS, ...MORE_VERTICAL_SEEDS]
+
 // One description per structural family, used when a category does not phrase
 // it in its own words. These describe the LAYOUT rather than the trade, because
 // the layout is what the reader is actually choosing between once palette and
@@ -487,25 +497,90 @@ export const FAMILY_DESCRIPTIONS = {
     'One long scroll: numbered sections, pricing tiers and an FAQ.',
     'Tek uzun kaydırma: numaralı bölümler, fiyat paketleri ve SSS.',
   ),
+  bento: copy(
+    'A bento grid: hero, figures and highlights share one tiled canvas.',
+    'Bento ızgarası: hero, rakamlar ve öne çıkanlar tek bir karo düzeninde.',
+  ),
+  split: copy(
+    'Split screen: a fixed visual half beside a scrolling column of content.',
+    'Bölünmüş ekran: sabit görsel yarım ve yanında kayan içerik sütunu.',
+  ),
+  chronicle: copy(
+    'A centred timeline that tells the offer as a sequence of moments.',
+    'Teklifi anlar dizisi olarak anlatan ortalanmış zaman çizelgesi.',
+  ),
+  poster: copy(
+    'Poster type: an oversized headline, a moving ticker and big numbers.',
+    'Afiş tipografisi: dev başlık, kayan şerit ve büyük numaralar.',
+  ),
+  stack: copy(
+    'Stacked cards that pile up as you scroll, one idea per card.',
+    'Kaydırdıkça üst üste binen kartlar; her kartta bir fikir.',
+  ),
+  letter: copy(
+    'A personal letter: one narrow column of well-set type, no decoration.',
+    'Kişisel bir mektup: tek dar sütunda özenli tipografi, süs yok.',
+  ),
+  compare: copy(
+    'A comparison table that lays three options side by side.',
+    'Üç seçeneği yan yana koyan karşılaştırma tablosu.',
+  ),
+  lookbook: copy(
+    'A lookbook: large captioned visuals in an editorial grid.',
+    'Lookbook: editoryal ızgarada büyük, açıklamalı görseller.',
+  ),
+  solo: copy(
+    'One focused card on a quiet background: the sign-up is the page.',
+    'Sakin bir arka plan üzerinde tek odaklı kart: kayıt formu sayfanın kendisi.',
+  ),
+  appshell: copy(
+    'An app-style dashboard with a side menu, key figures and panels.',
+    'Yan menü, temel rakamlar ve panellerle uygulama tarzı pano.',
+  ),
 }
 
-export const templateText = (value) => value?.en ?? String(value || '')
+// The short name the gallery shows for each layout. "classic" covers the
+// hand-written core pages (CV, portfolio, landing, …).
+export const FAMILY_NAMES = {
+  classic: copy('Classic', 'Klasik'),
+  catalog: copy('Catalogue', 'Katalog'),
+  service: copy('Service', 'Hizmet'),
+  editorial: copy('Editorial', 'Editoryal'),
+  booking: copy('Booking', 'Rezervasyon'),
+  sidebar: copy('Side rail', 'Yan menü'),
+  magazine: copy('Magazine', 'Dergi'),
+  showcase: copy('Showcase', 'Vitrin'),
+  directory: copy('Directory', 'Dizin'),
+  onepage: copy('One page', 'Tek sayfa'),
+  bento: copy('Bento grid', 'Bento ızgara'),
+  split: copy('Split screen', 'Bölünmüş ekran'),
+  chronicle: copy('Timeline', 'Zaman çizelgesi'),
+  poster: copy('Poster', 'Afiş'),
+  stack: copy('Card stack', 'Kart yığını'),
+  letter: copy('Letter', 'Mektup'),
+  compare: copy('Comparison', 'Karşılaştırma'),
+  lookbook: copy('Lookbook', 'Lookbook'),
+  solo: copy('Single card', 'Tek kart'),
+  appshell: copy('App dashboard', 'Uygulama paneli'),
+}
 
-function collectTranslations(value, output = {}) {
-  if (Array.isArray(value)) {
-    value.forEach((item) => collectTranslations(item, output))
-    return output
-  }
-  if (!value || typeof value !== 'object') return output
-  if (typeof value.en === 'string' && typeof value.tr === 'string') {
-    output[value.en] = value.tr
-    return output
-  }
-  Object.values(value).forEach((item) => collectTranslations(item, output))
-  return output
+// Interface words a family prints on its own, outside the category copy.
+export const FAMILY_LABELS = {
+  recommended: copy('Recommended', 'Önerilen'),
+  whatYouGet: copy('What you get', 'Neler dahil'),
+  investment: copy('Price level', 'Fiyat seviyesi'),
+  emailPlaceholder: copy('Your email address', 'E-posta adresiniz'),
+  search: copy('Search…', 'Ara…'),
+  overview: copy('Overview', 'Genel bakış'),
+  statusReady: copy('Ready', 'Hazır'),
+  statusPopular: copy('Popular', 'Popüler'),
+  statusNew: copy('New', 'Yeni'),
 }
 
 export const VERTICAL_TEMPLATE_TRANSLATIONS = collectTranslations([
   VERTICAL_CATEGORY_SEEDS,
   FAMILY_DESCRIPTIONS,
+  FAMILY_LABELS,
+  FAMILY_NAMES,
+  TEMPLATE_GROUPS,
 ])

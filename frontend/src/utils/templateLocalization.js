@@ -592,7 +592,9 @@ export function localizeTemplateHtml(html, language = 'en') {
   const doc = new DOMParser().parseFromString(source, 'text/html')
   doc.documentElement.lang = language
   if (language === 'tr') {
-    if (doc.title) doc.title = translateText(doc.title)
+    // Titles are built as "Site | Section" or "Site — Role": translate each
+    // part, since the whole string is never a dictionary entry.
+    if (doc.title) doc.title = doc.title.split(/(\s[|—·]\s)/).map(translateText).join('')
     const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
     let node = walker.nextNode()
     while (node) {
