@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createSite } from '../../api/sites.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
-import { TEMPLATE_LIBRARY, TEMPLATE_SITE_CATEGORY_MAP } from '../../utils/templateLibrary.js'
+import { TEMPLATE_LAYOUTS, TEMPLATE_LIBRARY, TEMPLATE_LIBRARY_GROUPS, TEMPLATE_SITE_CATEGORY_MAP } from '../../utils/templateLibrary.js'
 import { localizeTemplateHtml } from '../../utils/templateLocalization.js'
 import { DEFAULT_THEME } from '../../utils/theme.js'
 import { apiError } from '../../utils/errors.js'
@@ -23,6 +23,9 @@ const OTHER_CATEGORY = {
   desc: 'Anything else: start from a blank canvas or bring your own HTML.',
   variants: [],
 }
+
+const LAYOUT_NAMES = Object.fromEntries(TEMPLATE_LAYOUTS.map((layout) => [layout.id, layout.name]))
+const RECOMMENDED_TEMPLATES = 4
 
 // Every type also offers these alternative starting points besides the
 // recommended templates: an empty drag-and-drop canvas, or the user's own
@@ -71,6 +74,7 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
   const [categoryId, setCategoryId] = useState('portfolio')
   const [contentLanguage, setContentLanguage] = useState('tr')
   const [templateId, setTemplateId] = useState('')
+  const [showAllTemplates, setShowAllTemplates] = useState(false)
   const [startMode, setStartMode] = useState('template') // template | blank | import
   const [importHtml, setImportHtml] = useState('')
   const [importName, setImportName] = useState('')
@@ -94,7 +98,9 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
     categoryId === 'other'
       ? OTHER_CATEGORY
       : TEMPLATE_LIBRARY.find((item) => item.id === categoryId) || TEMPLATE_LIBRARY[0]
-  const recommended = category.variants.slice(0, 4)
+  // The first few are the recommendation; the rest of the category is one
+  // click away instead of hidden until the editor's gallery.
+  const recommended = showAllTemplates ? category.variants : category.variants.slice(0, RECOMMENDED_TEMPLATES)
   const selectedTemplate = category.variants.find((item) => item.id === templateId) || recommended[0]
   const previewTitle = title.trim() || t('My Site')
   // The "Other" type has no templates — its start choices are blank / import.
@@ -222,22 +228,30 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
               </label>
               <fieldset>
                 <legend className="mb-2 text-sm font-semibold text-[var(--studio-text)]">{t('What kind of site is this?')}</legend>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {[...TEMPLATE_LIBRARY, OTHER_CATEGORY].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setCategoryId(item.id)
-                        setTemplateId(item.variants[0]?.id || '')
-                        if (!item.variants.length && startMode === 'template') setStartMode('blank')
-                      }}
-                      aria-pressed={categoryId === item.id}
-                      className={`studio-create-choice relative flex min-h-20 items-center gap-3 rounded-xl border p-3 text-left transition ${categoryId === item.id ? 'border-[var(--studio-accent)] bg-[var(--studio-accent-soft)] shadow-sm' : 'border-[var(--studio-border)] bg-[var(--studio-panel-muted)] hover:border-[var(--studio-border-strong)] hover:bg-[var(--studio-control-hover)]'}`}
-                    >
-                      <span className="min-w-0 pr-5"><strong className="block text-sm text-[var(--studio-text)]">{t(item.name)}</strong><span className="mt-0.5 line-clamp-2 text-xs leading-4 text-[var(--studio-text-muted)]">{t(item.desc)}</span></span>
-                      {categoryId === item.id && <span className="absolute right-2.5 top-2.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--studio-accent)] text-[var(--studio-on-accent)]"><CheckIcon size={12} /></span>}
-                    </button>
+                <div className="space-y-4">
+                  {[...TEMPLATE_LIBRARY_GROUPS, { id: 'other', name: '', categories: [OTHER_CATEGORY] }].map((group) => (
+                    <div key={group.id} role="group" aria-label={group.name ? t(group.name) : t(OTHER_CATEGORY.name)}>
+                      {group.name && <p className="mb-1.5 text-xs font-semibold text-[var(--studio-text-faint)]">{t(group.name)}</p>}
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {group.categories.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setCategoryId(item.id)
+                              setTemplateId(item.variants[0]?.id || '')
+                              setShowAllTemplates(false)
+                              if (!item.variants.length && startMode === 'template') setStartMode('blank')
+                            }}
+                            aria-pressed={categoryId === item.id}
+                            className={`studio-create-choice relative flex min-h-20 items-center gap-3 rounded-xl border p-3 text-left transition ${categoryId === item.id ? 'border-[var(--studio-accent)] bg-[var(--studio-accent-soft)] shadow-sm' : 'border-[var(--studio-border)] bg-[var(--studio-panel-muted)] hover:border-[var(--studio-border-strong)] hover:bg-[var(--studio-control-hover)]'}`}
+                          >
+                            <span className="min-w-0 pr-5"><strong className="block text-sm text-[var(--studio-text)]">{t(item.name)}</strong><span className="mt-0.5 line-clamp-2 text-xs leading-4 text-[var(--studio-text-muted)]">{t(item.desc)}</span></span>
+                            {categoryId === item.id && <span className="absolute right-2.5 top-2.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--studio-accent)] text-[var(--studio-on-accent)]"><CheckIcon size={12} /></span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </fieldset>
@@ -287,11 +301,19 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
                         return (
                           <button key={item.id} type="button" onClick={() => setTemplateId(item.id)} aria-pressed={selected} className={`studio-create-choice overflow-hidden rounded-xl border bg-[var(--studio-panel-muted)] text-left transition ${selected ? 'border-[var(--studio-accent)] ring-2 ring-[var(--studio-focus-ring)]' : 'border-[var(--studio-border)] hover:border-[var(--studio-border-strong)]'}`}>
                             <MiniPreview html={sample} title={t('{name} preview', { name: t(item.name) })} />
-                            <span className="flex items-center justify-between gap-2 p-3 text-sm font-semibold text-[var(--studio-text)]">{t(item.name)}{selected && <CheckIcon size={14} className="text-[var(--studio-accent-hover)]" />}</span>
+                            <span className="flex items-center justify-between gap-2 p-3 text-sm font-semibold text-[var(--studio-text)]">
+                              <span className="min-w-0">{t(item.name)}{item.layout && <span className="ml-2 text-[11px] font-medium text-[var(--studio-text-faint)]">{t(LAYOUT_NAMES[item.layout])}</span>}</span>
+                              {selected && <CheckIcon size={14} className="shrink-0 text-[var(--studio-accent-hover)]" />}
+                            </span>
                           </button>
                         )
                       })}
                     </div>
+                    {!showAllTemplates && category.variants.length > RECOMMENDED_TEMPLATES && (
+                      <button type="button" onClick={() => setShowAllTemplates(true)} className="studio-btn studio-btn-secondary mt-3 min-h-9 px-3 text-xs">
+                        {t('Show all {count}', { count: category.variants.length })}
+                      </button>
+                    )}
                   </fieldset>
                 </>
               )}
