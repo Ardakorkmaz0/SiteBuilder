@@ -51,6 +51,7 @@ import { tourWasSeen } from '../utils/editorTour.js'
 import { applyHtmlPageSettings, readHtmlPageSettings } from '../utils/htmlPageSettings.js'
 import { publishedPagesFor } from '../utils/publishedPages.js'
 import CanvasZoomControl from '../components/editor/CanvasZoomControl.jsx'
+import FullscreenStage from '../components/editor/FullscreenStage.jsx'
 import useFullscreenEditing from '../components/editor/useFullscreenEditing.js'
 import { readZoom, writeZoom } from '../components/editor/canvasZoom.js'
 import CanvasPreview from '../components/editor/CanvasPreview.jsx'
@@ -70,7 +71,7 @@ import ShareComponentDialog from '../components/editor/ShareComponentDialog.jsx'
 import { toggleSpotlightTarget } from '../components/editor/spotlight.js'
 import PageFilesPanel from '../components/editor/PageFilesPanel.jsx'
 import { pageFileName } from '../utils/pageFiles.js'
-import { DEVICES, isMobileDevice } from '../utils/htmlDevices.js'
+import { DEVICES, devicesFor, isMobileDevice } from '../utils/htmlDevices.js'
 import { applyThemeToDocument } from '../utils/htmlTheme.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
@@ -133,6 +134,7 @@ const LIVE_CODE_HOLD_KEY = 'pwb_live_code_hold'
 // or the next edit replaces it.
 const LIVE_CODE_HOLDS = [[1500, '1.5s'], [3000, '3s'], [6000, '6s'], [0, 'Until dismissed']]
 const CANVAS_ZOOM_KEY = 'pwb_canvas_zoom'
+const AUTO_SAVE_KEY = 'pwb_autosave_on_'
 const HTML_DEVICE_KEYS = {
   pc: 'pwb_last_html_pc_device',
   mobile: 'pwb_last_html_mobile_device',
@@ -426,9 +428,12 @@ export default function EditorPage() {
   const [autoSaveState, setAutoSaveState] = useState('idle')
   const saveQueueRef = useRef(createSaveQueue())
   const manualSaveCountRef = useRef(0)
+  // On unless this site was switched off. A new key on purpose: the old one
+  // was written as '0' for every site ever opened, so honouring it would keep
+  // auto-save off for everyone who never touched the switch.
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(() => {
-    try { return localStorage.getItem('pwb_autosave_' + id) === '1' }
-    catch { return false }
+    try { return localStorage.getItem(AUTO_SAVE_KEY + id) !== '0' }
+    catch { return true }
   })
   // Bumped on every switch INTO View, to force a fresh preview document.
   const [viewNonce, setViewNonce] = useState(0)
@@ -621,11 +626,12 @@ export default function EditorPage() {
     try { return localStorage.getItem('pwb_right_open') !== '0' } catch { return true }
   })
   const [drawer, setDrawer] = useState(null) // 'left' | 'right' | null — narrow only
+  // Full screen takes the page stage alone, so the rails keep their state:
+  // they are simply not on the screen while it is on.
   const { fullscreen, toggleFullscreen } = useFullscreenEditing()
-  // Derived, not written: full screen borrows the rails rather than closing
-  // them, so leaving it restores whatever the user had open.
-  const leftOpen = !fullscreen && (isNarrow ? drawer === 'left' : deskLeftOpen)
-  const rightOpen = !fullscreen && (isNarrow ? drawer === 'right' : deskRightOpen)
+  const canvasStageRef = useRef(null)
+  const leftOpen = isNarrow ? drawer === 'left' : deskLeftOpen
+  const rightOpen = isNarrow ? drawer === 'right' : deskRightOpen
   // How big the component canvas is drawn, and what "fit" currently works out
   // to — the canvas measures it, the toolbar shows it.
   const [canvasZoom, setCanvasZoomState] = useState(() => readZoom(CANVAS_ZOOM_KEY))
@@ -652,7 +658,7 @@ export default function EditorPage() {
     try { localStorage.setItem('pwb_canvasmode_' + id, canvasMode) } catch { /* ignore */ }
   }, [id, canvasMode])
   useEffect(() => {
-    try { localStorage.setItem('pwb_autosave_' + id, autoSaveEnabled ? '1' : '0') } catch { /* ignore */ }
+    try { localStorage.setItem(AUTO_SAVE_KEY + id, autoSaveEnabled ? '1' : '0') } catch { /* ignore */ }
   }, [id, autoSaveEnabled])
   useEffect(() => {
     try { localStorage.setItem('pwb_brushcolor_' + id, brushColor) } catch { /* ignore */ }
@@ -1956,6 +1962,29 @@ export default function EditorPage() {
           <button type="button" onClick={() => save()} disabled={saving} className="studio-btn studio-btn-secondary">
             <SaveIcon size={14} /> <span className="hidden xl:inline">{t('Save')}</span>
           </button>
+          {/* Beside Save because it decides whether Save is needed at all. The
+              History panel keeps the same switch; both drive one setting. */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autoSaveEnabled}
+            onClick={() => setAutoSaveEnabled((on) => !on)}
+            title={autoSaveEnabled ? t('Changes save automatically') : t('Manual save only')}
+            className="studio-btn studio-btn-secondary gap-2"
+          >
+            <span
+              aria-hidden
+              className={`relative h-4 w-7 shrink-0 rounded-full border transition ${
+                autoSaveEnabled
+                  ? 'border-[var(--studio-success)] bg-[var(--studio-success)]'
+                  : 'border-[var(--studio-border-strong)] bg-[var(--studio-panel-raised)]'
+              }`}
+            >
+              <span className={`absolute top-px h-3 w-3 rounded-full bg-white shadow-sm transition-[left] ${autoSaveEnabled ? 'left-[13px]' : 'left-px'}`} />
+            </span>
+            <span className="hidden xl:inline">{t('Auto-save')}</span>
+            <span className="sr-only xl:hidden">{t('Auto-save')}</span>
+          </button>
           <button type="button" data-tour="publish" onClick={() => { if (!published && guestGate('publish')) return; save(!published) }} disabled={saving} className={published ? 'studio-btn studio-btn-secondary' : 'studio-btn studio-btn-primary'} title={published ? t('Unpublish') : t('Publish')}>
             {published ? t('Published') : t('Publish')}
           </button>
@@ -2582,7 +2611,7 @@ export default function EditorPage() {
                         title={t('Screen / device width')}
                         className="studio-input hidden max-w-[190px] shrink-0 truncate px-2 py-1.5 text-xs font-medium @[980px]:block"
                       >
-                        {DEVICES.map((d) => (
+                        {devicesFor(isMobileDevice(htmlDevice) ? 'mobile' : 'pc').map((d) => (
                           <option key={d.id} value={d.id}>
                             {t(d.label)}
                           </option>
@@ -2936,7 +2965,7 @@ export default function EditorPage() {
                       fitScale={canvasFitScale}
                       onZoom={setCanvasZoom}
                       fullscreen={fullscreen}
-                      onToggleFullscreen={toggleFullscreen}
+                      onToggleFullscreen={() => toggleFullscreen(canvasStageRef.current)}
                     />
                   )}
                   <div className="relative shrink-0">
@@ -3042,7 +3071,10 @@ export default function EditorPage() {
                     </button>
                   </div>
                 )}
-                {canvasMode === 'edit' ? (
+                {/* Full screen shows the page as visitors get it, in the chosen
+                    PC or phone size: the preview, not the editing canvas. */}
+                <FullscreenStage ref={canvasStageRef} active={fullscreen} onExit={() => toggleFullscreen()}>
+                {canvasMode === 'edit' && !fullscreen ? (
                   <Canvas
                     zoom={canvasZoom}
                     onFitScale={setCanvasFitScale}
@@ -3064,7 +3096,7 @@ export default function EditorPage() {
                     onBrowserAddressChange={changeBrowserAddress}
                     onSpotlight={(id) => setSpotlightComponentId((current) => toggleSpotlightTarget(current, id))}
                   />
-                ) : canvasMode === 'view' ? (
+                ) : canvasMode === 'view' || fullscreen ? (
                   <CanvasPreview
                     // viewNonce is part of the key so every switch into View
                     // rebuilds the preview from scratch — that is what replays
@@ -3105,6 +3137,7 @@ export default function EditorPage() {
                     </Suspense>
                   </div>
                 )}
+                </FullscreenStage>
                 {/* Same overlay as HTML mode, drawing a component instead of a
                     DOM element — the properties panel inside it is the rail's
                     own, so an edit here is an edit there. */}

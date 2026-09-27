@@ -14,7 +14,7 @@ import {
   supportsProjectFolder,
 } from '../utils/projectFs.js'
 import { assemblePreviewHtml, needsBuildToRender } from '../utils/htmlFiles.js'
-import { DEVICES, isMobileDevice } from '../utils/htmlDevices.js'
+import { devicesFor, isMobileDevice } from '../utils/htmlDevices.js'
 import Sidebar from '../components/editor/Sidebar.jsx'
 import ProjectFilesPanel from '../components/editor/ProjectFilesPanel.jsx'
 import { FolderOpenIcon, CogIcon, LightbulbIcon, PaletteIcon } from '../components/icons.jsx'
@@ -537,7 +537,7 @@ export default function CodeProjectPage() {
                 title={t('Screen / device width')}
                 className="max-w-[140px] truncate rounded-lg border border-[#d1d5db] px-2 py-1 text-xs font-medium text-[#374151] focus:border-[#4f46e5] focus:outline-none"
               >
-                {DEVICES.map((d) => (
+                {devicesFor(isMobileDevice(htmlDevice) ? 'mobile' : 'pc').map((d) => (
                   <option key={d.id} value={d.id}>
                     {t(d.label)}
                   </option>

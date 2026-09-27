@@ -57,6 +57,7 @@ from .models import (
     UploadedImage,
 )
 from .validators import (
+    sanitize_theme,
     sanitize_shared_component,
     shared_component_oversized,
     shared_component_problems,
@@ -500,6 +501,52 @@ class ProfileView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+SAVED_THEME_LIMIT = 24
+
+
+def _clean_saved_themes(value):
+    """The list as the theme panel sends it, reduced to what may be stored."""
+    if not isinstance(value, list) or len(value) > SAVED_THEME_LIMIT:
+        return None
+    cleaned, seen = [], set()
+    for item in value:
+        if not isinstance(item, dict):
+            return None
+        theme_id = str(item.get('id') or '').strip()[:40]
+        name = ' '.join(str(item.get('name') or '').split())[:60]
+        if not theme_id or not name or theme_id in seen or not isinstance(item.get('theme'), dict):
+            return None
+        seen.add(theme_id)
+        cleaned.append({'id': theme_id, 'name': name, 'theme': sanitize_theme(item['theme'])})
+    return cleaned
+
+
+class SavedThemesView(APIView):
+    """The themes this person saved: GET the list, PUT the whole new list.
+
+    Whole-list writes keep saving, renaming and deleting one call each, and
+    the list is short (SAVED_THEME_LIMIT) by design.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        prof, _ = Profile.objects.get_or_create(user=request.user)
+        return Response({'themes': prof.saved_themes or [], 'limit': SAVED_THEME_LIMIT})
+
+    def put(self, request):
+        themes = _clean_saved_themes(request.data.get('themes') if isinstance(request.data, dict) else None)
+        if themes is None:
+            return error_response(
+                'invalid_themes',
+                f'Send up to {SAVED_THEME_LIMIT} themes, each with an id, a name and its colors.',
+            )
+        prof, _ = Profile.objects.get_or_create(user=request.user)
+        prof.saved_themes = themes
+        prof.save(update_fields=['saved_themes', 'updated_at'])
+        return Response({'themes': themes, 'limit': SAVED_THEME_LIMIT})
 
 
 class SiteViewSet(viewsets.ModelViewSet):

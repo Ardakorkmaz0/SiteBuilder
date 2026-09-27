@@ -7,7 +7,7 @@
 // uploaded page IS its document — so publishing just has to hand those over.
 
 import { schemaToSingleHtml } from './schemaToFiles.js'
-import { pageSeoTitle } from './seoTags.js'
+import { pageSeoTitle, withPageSeoTags } from './seoTags.js'
 
 // The address of a page under /s/<slug>/. The home page has none: it IS the
 // site. The server slugifies and de-duplicates again, so this is the wish, not
@@ -61,11 +61,12 @@ export function withPublishedLinks(schema, links) {
   return { ...schema, pages }
 }
 
-// One page's document: its own file when it was uploaded, otherwise the export
-// the viewer already shows.
+// One page's document: its own file when it was uploaded, with what its Page
+// settings say about search and sharing, otherwise the export the viewer
+// already shows (which writes those tags itself).
 export function pageDocument(page, schema, siteTitle, htmlMap = {}) {
   const authored = htmlMap[page?.id]
-  if (typeof authored === 'string' && authored.trim()) return authored
+  if (typeof authored === 'string' && authored.trim()) return withPageSeoTags(authored, page)
   const title = pageSeoTitle(page, page?.name || siteTitle || 'My Site')
   try {
     return schemaToSingleHtml({ ...schema, pages: [page] }, title)

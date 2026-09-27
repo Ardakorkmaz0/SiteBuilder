@@ -15,6 +15,7 @@ import { analyzeSiteReadiness } from '../../utils/siteReadiness.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import SharePanel from './SharePanel.jsx'
 import DomainPanel from './DomainPanel.jsx'
+import { LabeledImage } from './controls.jsx'
 import { siteAddress, siteAddressUrl } from '../../utils/siteAddress.js'
 import { useGuestGate } from '../../utils/useGuestGate.jsx'
 
@@ -207,7 +208,13 @@ export default function SiteControlCenter({
                 <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold text-[#111827]">{t('Search and sharing')}</h3><button type="button" onClick={() => setSeo((value) => ({ ...value, title: `${site.title} | Official Site`.slice(0, 60), description: `${site.title} presents its work, services and latest updates. Explore the site and get in touch for more information.`.slice(0, 160) }))} className="rounded-xl border border-[#c7d2fe] px-3 py-2 text-xs font-semibold text-[#4f46e5]">{t('Suggest SEO text')}</button></div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="text-sm font-medium text-[#374151]">{t('SEO title')}<input className="ms-input mt-1" value={seo.title} maxLength={60} onChange={(e) => setSeo({ ...seo, title: e.target.value })} /></label>
-                  <label className="text-sm font-medium text-[#374151]">{t('Social image URL')}<input className="ms-input mt-1" value={seo.socialImage} onChange={(e) => setSeo({ ...seo, socialImage: e.target.value })} /></label>
+                  {/* An upload, not only a pasted address: a scraper needs a
+                      public URL, and an upload is one. Shown on shared links
+                      and on the site's cards in the app. */}
+                  <div className="text-sm font-medium text-[#374151]">
+                    <LabeledImage label={t('Sharing image')} value={seo.socialImage} onChange={(value) => setSeo({ ...seo, socialImage: value })} />
+                    <p className="mt-1 text-xs font-normal text-[#6b7280]">{t('Shown on shared links and on this site\'s cards. 1200x630 works best.')}</p>
+                  </div>
                   <label className="text-sm font-medium text-[#374151] md:col-span-2">{t('SEO description')}<textarea className="ms-input mt-1 min-h-24" value={seo.description} maxLength={160} onChange={(e) => setSeo({ ...seo, description: e.target.value })} /></label>
                   <label className="text-sm font-medium text-[#374151]">{t('Favicon URL')}<input ref={faviconInputRef} className="ms-input mt-1" value={seo.favicon} onChange={(e) => setSeo({ ...seo, favicon: e.target.value })} /></label>
                 </div>

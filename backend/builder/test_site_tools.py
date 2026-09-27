@@ -65,7 +65,8 @@ class TestSiteWorkflowTools:
 
     def test_private_review_link_and_resolution(self, client, owner):
         user, token = owner
-        site = Site.objects.create(owner=user, title='Draft review', published=False)
+        # Shared on purpose: a new site starts unshared (test_sharing.py).
+        site = Site.objects.create(owner=user, title='Draft review', published=False, share_mode='link')
         public = client.get(f'/api/public/reviews/{site.review_token}/')
         assert public.status_code == 200
         posted = client.post(f'/api/public/reviews/{site.review_token}/', {

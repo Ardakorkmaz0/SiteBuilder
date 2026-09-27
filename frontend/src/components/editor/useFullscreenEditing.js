@@ -1,13 +1,12 @@
-// Full-screen editing: the rails go away and the window goes with them.
+// Full screen shows the page, not the editor: the element the caller hands in
+// (the stage with the page in its PC or phone frame) is what the browser puts
+// on the whole screen. Taking the document full screen instead kept the header,
+// the toolbars and the rails on screen, which is the editor, only bigger.
 //
-// Two things happen together on purpose. Hiding the side panels alone still
-// leaves the browser's own chrome eating a couple of hundred pixels; asking for
-// real full screen alone leaves the rails taking a third of it back. Doing both
-// is what actually turns a laptop into a canvas.
-//
-// The rail preferences are NOT written while this is on — the editor derives
-// "closed" from this flag instead, so leaving full screen puts the panels back
-// exactly as they were rather than as whatever they happened to be.
+// The browser can refuse (an embedding iframe without the permission, or a
+// phone browser that only allows video full screen). The flag is set either
+// way, and the caller pins the same element over the window with CSS, so the
+// page still covers the editor and Esc or the exit button still ends it.
 
 import { useCallback, useEffect, useState } from 'react'
 
@@ -15,17 +14,15 @@ export default function useFullscreenEditing() {
   const [fullscreen, setFullscreen] = useState(false)
 
   // The browser is the authority: Esc, F11 and the window chrome can all end
-  // full screen without going through us, and the rails have to follow.
+  // full screen without going through us.
   useEffect(() => {
     const sync = () => { if (!document.fullscreenElement) setFullscreen(false) }
     document.addEventListener('fullscreenchange', sync)
     return () => document.removeEventListener('fullscreenchange', sync)
   }, [])
 
-  // Real full screen can be refused — an iframe without the permission, a
-  // browser that wants a different gesture. The rails-hidden half still worked,
-  // so Esc has to be able to undo it even when there is no fullscreenchange
-  // event coming.
+  // With the request refused there is no fullscreenchange coming, so Esc has
+  // to end the CSS version itself.
   useEffect(() => {
     if (!fullscreen) return undefined
     const onKey = (event) => {
@@ -37,18 +34,18 @@ export default function useFullscreenEditing() {
   }, [fullscreen])
 
   // The browser calls happen here, in the click itself, not inside a state
-  // updater: updaters must be pure — StrictMode runs them twice, which asked for
-  // full screen twice — and a request made later than the click can lose the
+  // updater: updaters must be pure (StrictMode runs them twice, which asked for
+  // full screen twice) and a request made later than the click can lose the
   // user activation the browser demands for it.
-  const toggleFullscreen = useCallback(() => {
+  const toggleFullscreen = useCallback((target) => {
     if (fullscreen) {
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
       setFullscreen(false)
       return
     }
-    // Requested, not awaited: if the browser refuses, the panels still get
-    // out of the way, which is most of the value.
-    document.documentElement?.requestFullscreen?.().catch(() => {})
+    // Requested, not awaited: a refusal leaves the CSS version in place.
+    const element = target && typeof target.requestFullscreen === 'function' ? target : null
+    element?.requestFullscreen().catch(() => {})
     setFullscreen(true)
   }, [fullscreen])
 

@@ -50,10 +50,15 @@ def open_link(user, site):
 
 
 class TestTheOwnersChoice:
-    def test_a_link_is_open_to_anyone_holding_it(self, site):
-        # What the review link has always done, and still the default: links
-        # already sent keep working.
-        assert site.share_mode == 'link'
+    def test_a_new_project_starts_unshared(self, site):
+        # Sharing is something the owner turns on, not something they have to
+        # remember to turn off before the link travels.
+        assert site.share_mode == 'off'
+        assert open_link(None, site).status_code == 404
+
+    def test_a_link_is_open_to_anyone_holding_it(self, api, site):
+        api.post(f'/api/sites/{site.pk}/share/', {'mode': 'link'}, format='json')
+
         assert open_link(None, site).status_code == 200
 
     def test_naming_people_closes_it_to_everyone_else(self, api, site, friend):
@@ -147,11 +152,11 @@ class TestCommenting:
 
 class TestWhoMayChangeIt:
     def test_only_the_owner_sees_or_sets_the_sharing(self, site, friend):
-        response = as_user(friend).post(f'/api/sites/{site.pk}/share/', {'mode': 'off'}, format='json')
+        response = as_user(friend).post(f'/api/sites/{site.pk}/share/', {'mode': 'link'}, format='json')
 
         assert response.status_code == 404  # not even the existence is confirmed
         site.refresh_from_db()
-        assert site.share_mode == 'link'
+        assert site.share_mode == 'off'
 
     def test_a_guest_identity_cannot_hand_out_a_link(self, db, site):
         guest = APIClient()

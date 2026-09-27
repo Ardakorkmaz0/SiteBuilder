@@ -129,3 +129,38 @@ describe('injectThemeFont', () => {
     expect(b).not.toContain('data-pwb-theme-font')
   })
 })
+
+describe('the theme typography and accent on an HTML page', () => {
+  const PAGE = '<html><head><style>:root{--accent:#111111;--secondary:#222222}</style></head><body><h1>Hi</h1></body></html>'
+
+  it('writes only the typography the theme chose', () => {
+    const out = applyThemeToDocument(PAGE, { primaryColor: '#c2410c', fontFamily: 'Arial', headingWeight: '800', bodyLineHeight: '1.7' })
+
+    expect(out).toContain('h1,h2,h3,h4,h5,h6{font-weight:800}')
+    expect(out).toContain('body{line-height:1.7}')
+    expect(out).not.toContain('letter-spacing')
+  })
+
+  it('leaves the page alone where the theme chose nothing', () => {
+    const out = applyThemeToDocument(PAGE, { primaryColor: '#c2410c', fontFamily: 'Arial' })
+
+    expect(out).not.toContain('font-weight')
+    expect(out).not.toContain('line-height')
+  })
+
+  it('makes the accent the page\'s second brand color', () => {
+    const out = applyThemeToDocument(PAGE, { primaryColor: '#c2410c', accentColor: '#0f766e', fontFamily: 'Arial' })
+
+    expect(out).toContain('--accent:#c2410c')
+    expect(out).toContain('--secondary:#0f766e')
+  })
+
+  it('cannot be used to close the rule and start another', () => {
+    const out = applyThemeToDocument(PAGE, { fontFamily: 'Arial', headingWeight: '700}body{display:none' })
+
+    // The braces are gone, so the value stays one (invalid) declaration
+    // inside the heading rule instead of opening a rule of its own.
+    expect(out).toContain('h1,h2,h3,h4,h5,h6{font-weight:700bodydisplay:none}')
+    expect(out).not.toMatch(/\}\s*body\s*\{\s*display/)
+  })
+})

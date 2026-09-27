@@ -4,7 +4,7 @@
 // page's own script runs, so resting it there would replace the animation with
 // its ending.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import HtmlWorkspace from './HtmlWorkspace.jsx'
@@ -16,6 +16,7 @@ vi.mock('../../utils/htmlMotion.js', async (importOriginal) => ({
   clearMotionRest: vi.fn(),
 }))
 
+const MODE_KEY = 'pwb_htmlmode_fs-test'
 const PAGE = '<html><head></head><body><section data-aos="fade-up">Hero</section></body></html>'
 
 function mount(mode) {
@@ -111,20 +112,40 @@ describe('how big the page is drawn', () => {
     expect(chosen).not.toBe('fit')
   })
 
-  it('hands the full-screen switch to the editor rather than acting alone', async () => {
+  it('hands the editor the page stage alone, and shows the page as visitors see it', async () => {
     const user = userEvent.setup()
     const onToggleFullscreen = vi.fn()
     localStorage.setItem('pwb_language', 'en')
-    localStorage.setItem('pwb_htmlmode_fs-test', 'edit')
-    render(
+    localStorage.setItem(MODE_KEY, 'edit')
+    const html = '<html><body><h1>Hi</h1></body></html>'
+    const { rerender } = render(
       <LanguageProvider>
-        <HtmlWorkspace persistKey="fs-test" html="<html><body><h1>Hi</h1></body></html>" deviceId="fhd" onToggleFullscreen={onToggleFullscreen} />
+        <HtmlWorkspace persistKey="fs-test" html={html} deviceId="fhd" onToggleFullscreen={onToggleFullscreen} />
       </LanguageProvider>,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Full screen editing' }))
+    await user.click(screen.getByRole('button', { name: 'Full screen preview' }))
 
-    // Only the editor knows about the rails, so the workspace must not try.
-    expect(onToggleFullscreen).toHaveBeenCalled()
+    // The element that goes full screen holds the stage, not the toolbar.
+    const stage = onToggleFullscreen.mock.calls[0][0]
+    expect(stage).toBeInstanceOf(HTMLElement)
+    expect(stage.contains(screen.getByRole('button', { name: 'Full screen preview' }))).toBe(false)
+    // Edit steps aside to View for the duration...
+    await waitFor(() => expect(localStorage.getItem(MODE_KEY)).toBe('view'))
+
+    rerender(
+      <LanguageProvider>
+        <HtmlWorkspace persistKey="fs-test" html={html} deviceId="fhd" fullscreen onToggleFullscreen={onToggleFullscreen} />
+      </LanguageProvider>,
+    )
+    expect(document.querySelector('[data-fullscreen-stage="on"]')).toBe(stage)
+
+    // ...and comes back when full screen ends, however it ended.
+    rerender(
+      <LanguageProvider>
+        <HtmlWorkspace persistKey="fs-test" html={html} deviceId="fhd" fullscreen={false} onToggleFullscreen={onToggleFullscreen} />
+      </LanguageProvider>,
+    )
+    await waitFor(() => expect(localStorage.getItem(MODE_KEY)).toBe('edit'))
   })
 })

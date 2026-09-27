@@ -120,11 +120,26 @@ const FONT_MARK = 'data-pwb-theme-font'
 const swapVar = (html, name, value) =>
   html.replace(new RegExp(`(--${name}\\s*:\\s*)[^;}{]+`, 'gi'), (m, p1) => `${p1}${value}`)
 
+// The theme's optional typography, as rules for a document's own headings and
+// body. Only what was chosen: an empty field writes nothing, so the page's own
+// weights and spacing stand. Values are stripped of anything that could close
+// the rule.
+function typographyRules(typography = {}) {
+  const clean = (value) => String(value || '').replace(/[<>{};]/g, '').trim()
+  const heading = [
+    clean(typography.headingWeight) && `font-weight:${clean(typography.headingWeight)}`,
+    clean(typography.headingLetterSpacing) && `letter-spacing:${clean(typography.headingLetterSpacing)}`,
+  ].filter(Boolean).join(';')
+  const lineHeight = clean(typography.bodyLineHeight)
+  return `${heading ? `h1,h2,h3,h4,h5,h6{${heading}}` : ''}${lineHeight ? `body{line-height:${lineHeight}}` : ''}`
+}
+
 // Inject (or refresh) a font override: a Google Fonts <link> when the family
-// is a curated font + a body/:root font rule. Stripped-then-re-added so it
-// never piles up across re-applies. Display-time concern only — stored HTML
-// keeps whatever the user authored plus this one tidy block.
-export function injectThemeFont(html, fontFamily, headingFontFamily = fontFamily) {
+// is a curated font + a body/:root font rule, plus any typography the theme
+// sets. Stripped-then-re-added so it never piles up across re-applies.
+// Display-time concern only — stored HTML keeps whatever the user authored
+// plus this one tidy block.
+export function injectThemeFont(html, fontFamily, headingFontFamily = fontFamily, typography = {}) {
   let out = String(html || '')
   out = out
     .replace(new RegExp(`<style ${FONT_MARK}[^>]*>[\\s\\S]*?</style>`, 'gi'), '')
@@ -134,7 +149,7 @@ export function injectThemeFont(html, fontFamily, headingFontFamily = fontFamily
     .replace(/<link /g, `<link ${FONT_MARK} `)
   const safeFont = String(fontFamily).replace(/[<{}]/g, '')
   const safeHeadingFont = String(headingFontFamily || fontFamily).replace(/[<{}]/g, '')
-  const style = `<style ${FONT_MARK}>:root{--site-font:${safeFont};--site-heading-font:${safeHeadingFont}}body{font-family:${safeFont}}h1,h2,h3,h4,h5,h6{font-family:${safeHeadingFont}}</style>`
+  const style = `<style ${FONT_MARK}>:root{--site-font:${safeFont};--site-heading-font:${safeHeadingFont}}body{font-family:${safeFont}}h1,h2,h3,h4,h5,h6{font-family:${safeHeadingFont}}${typographyRules(typography)}</style>`
   const inject = link + style
   const headed = insertBeforeClosingTag(out, 'head', inject)
   if (headed) return headed
@@ -166,6 +181,10 @@ export function applyThemeToDocument(html, theme) {
       colorTouched = true
     }
   }
+  // The accent is the documents' second brand color, where they have one.
+  if (theme.accentColor && theme.accentColor !== theme.primaryColor) {
+    for (const n of SECONDARY_VARS) out = swapVar(out, n, theme.accentColor)
+  }
   if (theme.fontFamily) {
     for (const n of FONT_VARS) out = swapVar(out, n, theme.fontFamily)
   }
@@ -178,7 +197,7 @@ export function applyThemeToDocument(html, theme) {
     const recolored = replaceDominantColors(out, [theme.primaryColor])
     if (recolored) out = recolored
   }
-  return injectThemeFont(out, theme.fontFamily, theme.headingFontFamily)
+  return injectThemeFont(out, theme.fontFamily, theme.headingFontFamily, theme)
 }
 
 // Curated swatches for the quick-action palette — first selection becomes the

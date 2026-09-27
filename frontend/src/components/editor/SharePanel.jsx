@@ -10,10 +10,11 @@ import { useLanguage } from '../../i18n/useLanguage.js'
 // emailed once and wrong for a draft you want three named people to see. So
 // there are three states, and they all live behind the same address —
 // narrowing or closing sharing never means sending everybody a new link.
+// A new project starts on "Not shared", so it comes first.
 const MODES = [
+  ['off', 'Not shared', 'The link stops working for everyone but you. Turning it back on uses the same address.'],
   ['link', 'Anyone with the link', 'They can open it without an account. Good for a client or a quick look.'],
   ['people', 'Only people you name', 'They have to be signed in as an account you added. Taking a name off closes it for them at once.'],
-  ['off', 'Not shared', 'The link stops working for everyone but you. Turning it back on uses the same address.'],
 ]
 
 export default function SharePanel({ siteId, reviewUrl, onCopy, copied }) {
@@ -45,7 +46,7 @@ export default function SharePanel({ siteId, reviewUrl, onCopy, copied }) {
     }
   }
 
-  const mode = state?.mode || 'link'
+  const mode = state?.mode || 'off'
 
   return (
     <div className="space-y-4 rounded-3xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-5">
@@ -64,6 +65,11 @@ export default function SharePanel({ siteId, reviewUrl, onCopy, copied }) {
           {t(copied === 'review' ? 'Copied' : 'Copy')}
         </button>
       </div>
+      {state && mode === 'off' && (
+        <p className="text-xs text-[var(--studio-text-muted)]">
+          {t('Only you can open this link until you choose who may see it below.')}
+        </p>
+      )}
 
       <div className="space-y-2">
         {MODES.map(([id, label, hint]) => (

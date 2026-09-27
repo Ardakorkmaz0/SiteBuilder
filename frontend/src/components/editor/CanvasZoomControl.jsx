@@ -1,5 +1,5 @@
-// The zoom control both edit canvases share, plus the button that gets the
-// chrome out of the way.
+// The zoom control both edit canvases share, plus the button that shows the
+// page alone on the whole screen.
 //
 // One component rather than one per surface: the HTML canvas and the component
 // canvas are different worlds internally, but "how big is this drawn" is the
@@ -60,8 +60,8 @@ export default function CanvasZoomControl({
           type="button"
           onClick={onToggleFullscreen}
           aria-pressed={fullscreen}
-          title={t(fullscreen ? 'Leave full screen (Esc)' : 'Full screen editing')}
-          aria-label={t(fullscreen ? 'Leave full screen (Esc)' : 'Full screen editing')}
+          title={t(fullscreen ? 'Leave full screen (Esc)' : 'Full screen preview')}
+          aria-label={t(fullscreen ? 'Leave full screen (Esc)' : 'Full screen preview')}
           className={`studio-btn inline-flex items-center gap-1.5 px-2 py-1.5 text-xs ${
             fullscreen
               ? 'border-[var(--studio-accent)] bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]'
