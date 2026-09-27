@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { TEMPLATE_COUNT, TEMPLATE_LIBRARY } from '../../utils/templateLibrary.js'
+import {
+  TEMPLATE_COUNT,
+  TEMPLATE_LAYOUTS,
+  TEMPLATE_LIBRARY,
+  TEMPLATE_LIBRARY_GROUPS,
+} from '../../utils/templateLibrary.js'
 import { localizeTemplateHtml } from '../../utils/templateLocalization.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { EyeIcon, SearchIcon, StarIcon } from '../icons.jsx'
@@ -12,6 +17,10 @@ const INITIAL_VISIBLE_TEMPLATES = 18
 const ALL_TEMPLATES = TEMPLATE_LIBRARY.flatMap((category) => (
   category.variants.map((template) => ({ category, template }))
 ))
+const LAYOUT_NAMES = Object.fromEntries(TEMPLATE_LAYOUTS.map((layout) => [layout.id, layout.name]))
+const GROUP_NAMES = Object.fromEntries(TEMPLATE_LIBRARY_GROUPS.flatMap((group) => (
+  group.categories.map((category) => [category.id, group.name])
+)))
 
 function readIds(key) {
   try {
@@ -63,6 +72,8 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
   const [recents, setRecents] = useState(() => readIds(RECENTS_KEY))
   const [preview, setPreview] = useState(null)
   const [contentLanguage, setContentLanguage] = useState(language)
+  const [layout, setLayout] = useState('all')
+  const [tone, setTone] = useState('all') // all | light | dark
   const [pagination, setPagination] = useState({ key: '', count: INITIAL_VISIBLE_TEMPLATES })
 
   if (!open) return null
@@ -72,16 +83,23 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
   const normalizedQuery = query.trim().toLocaleLowerCase(language === 'tr' ? 'tr-TR' : 'en-US')
   // When the result set changes, derive a fresh first page instead of
   // synchronously resetting state in an effect.
-  const resultSetKey = [language, activeId, normalizedQuery, view, favorites.join(','), recents.join(',')].join('|')
+  const resultSetKey = [language, activeId, normalizedQuery, view, layout, tone, favorites.join(','), recents.join(',')].join('|')
   const visibleCount = pagination.key === resultSetKey ? pagination.count : INITIAL_VISIBLE_TEMPLATES
   const order = view === 'recent' ? recents : null
+  // Layout and light/dark narrow whatever view is showing, so "bento grids in
+  // Restaurants" and "every dark page" are both one choice away.
+  const matchesStyle = (template) => (
+    (layout === 'all' || template.layout === layout)
+    && (tone === 'all' || (tone === 'dark') === Boolean(template.dark))
+  )
   let entries = view === 'category' && !normalizedQuery
-    ? active.variants.map((template) => ({ category: active, template }))
+    ? active.variants.filter(matchesStyle).map((template) => ({ category: active, template }))
     : ALL_TEMPLATES.filter(({ category, template }) => {
         if (view === 'favorites' && !favorites.includes(template.id)) return false
         if (view === 'recent' && !recents.includes(template.id)) return false
+        if (!matchesStyle(template)) return false
         if (!normalizedQuery) return true
-        return [t(category.name), t(template.name), t(template.desc)]
+        return [t(category.name), t(template.name), t(template.desc), t(LAYOUT_NAMES[template.layout] || ''), t(GROUP_NAMES[category.id] || '')]
           .join(' ')
           .toLocaleLowerCase(language === 'tr' ? 'tr-TR' : 'en-US')
           .includes(normalizedQuery)
@@ -113,6 +131,13 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
     setRecents(nextRecents)
     writeIds(RECENTS_KEY, nextRecents)
     onPick(template, contentLanguage)
+  }
+
+  // Five hundred thumbnails are too many to scroll through looking for an
+  // idea; a random pick from the current view is a faster way in.
+  function surprise() {
+    const pool = entries.length ? entries : ALL_TEMPLATES
+    setPreview(pool[Math.floor(Math.random() * pool.length)])
   }
 
   function localizedHtml(template) {
@@ -154,6 +179,26 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
                 <button key={id} type="button" onClick={() => setView(id)} aria-pressed={view === id} className={view === id ? 'studio-segment-btn studio-segment-btn-active' : 'studio-segment-btn'}>{t(label)}</button>
               ))}
             </div>
+          </div>
+          {/* Style filters and content language: one row that scrolls sideways
+              on a phone instead of stacking four rows above the results. */}
+          <div className="flex items-center gap-2 overflow-x-auto px-4 pb-3.5 sm:flex-wrap sm:overflow-visible sm:px-5 [&>*]:shrink-0">
+            <label className="flex min-h-10 items-center gap-2 rounded-[var(--studio-radius)] border border-[var(--studio-border)] bg-[var(--studio-control)] px-2.5 text-xs font-semibold text-[var(--studio-text-muted)]">
+              <span>{t('Layout')}</span>
+              <select value={layout} onChange={(event) => setLayout(event.target.value)} aria-label={t('Template layout')} className="max-w-[9.5rem] rounded-md border-0 bg-[var(--studio-panel-raised)] px-2 py-1 text-[var(--studio-text)] outline-none">
+                <option value="all">{t('All layouts')}</option>
+                {TEMPLATE_LAYOUTS.map((option) => <option key={option.id} value={option.id}>{t(option.name)}</option>)}
+              </select>
+            </label>
+            <label className="flex min-h-10 items-center gap-2 rounded-[var(--studio-radius)] border border-[var(--studio-border)] bg-[var(--studio-control)] px-2.5 text-xs font-semibold text-[var(--studio-text-muted)]">
+              <span>{t('Tone')}</span>
+              <select value={tone} onChange={(event) => setTone(event.target.value)} aria-label={t('Light or dark pages')} className="rounded-md border-0 bg-[var(--studio-panel-raised)] px-2 py-1 text-[var(--studio-text)] outline-none">
+                <option value="all">{t('Light and dark')}</option>
+                <option value="light">{t('Light pages')}</option>
+                <option value="dark">{t('Dark pages')}</option>
+              </select>
+            </label>
+            <button type="button" onClick={surprise} className="studio-btn studio-btn-secondary min-h-10 px-3 text-xs">{t('Surprise me')}</button>
             <label className="flex min-h-10 items-center gap-2 rounded-[var(--studio-radius)] border border-[var(--studio-border)] bg-[var(--studio-control)] px-2.5 text-xs font-semibold text-[var(--studio-text-muted)]">
               <span>{t('Content')}</span>
               <select value={contentLanguage} onChange={(event) => setContentLanguage(event.target.value)} aria-label={t('Content language')} className="rounded-md border-0 bg-[var(--studio-panel-raised)] px-2 py-1 text-[var(--studio-text)] outline-none">
@@ -166,18 +211,23 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <aside aria-label={t('Template categories')} className="flex w-full shrink-0 gap-1 overflow-x-auto border-b border-[var(--studio-border)] bg-[var(--studio-panel-muted)] p-2 md:block md:w-56 md:overflow-y-auto md:border-b-0 md:border-r">
-            {TEMPLATE_LIBRARY.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                onClick={() => { setActiveId(category.id); setView('category'); setQuery('') }}
-                aria-pressed={view === 'category' && category.id === activeId}
-                className={`flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition md:mb-1 md:w-full ${view === 'category' && category.id === activeId ? 'bg-[var(--studio-accent)] text-white shadow-sm' : 'text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]'}`}
-              >
-                <span className="text-base">{category.icon}</span>
-                <span className="min-w-0 flex-1 whitespace-nowrap font-medium md:truncate">{t(category.name)}</span>
-                <span className="rounded-full bg-[color-mix(in_srgb,currentColor_10%,transparent)] px-1.5 py-0.5 text-[10px] font-bold">{category.variants.length}</span>
-              </button>
+            {TEMPLATE_LIBRARY_GROUPS.map((group) => (
+              <div key={group.id} role="group" aria-label={t(group.name)} className="contents md:mb-3 md:block">
+                <p aria-hidden="true" className="hidden px-3 pb-1 pt-2 text-[11px] font-semibold text-[var(--studio-text-faint)] md:block">{t(group.name)}</p>
+                {group.categories.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() => { setActiveId(category.id); setView('category'); setQuery('') }}
+                    aria-pressed={view === 'category' && category.id === activeId}
+                    className={`flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition md:mb-1 md:w-full ${view === 'category' && category.id === activeId ? 'bg-[var(--studio-accent)] text-white shadow-sm' : 'text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]'}`}
+                  >
+                    <span className="text-base">{category.icon}</span>
+                    <span className="min-w-0 flex-1 whitespace-nowrap font-medium md:truncate">{t(category.name)}</span>
+                    <span className="rounded-full bg-[color-mix(in_srgb,currentColor_10%,transparent)] px-1.5 py-0.5 text-[10px] font-bold">{category.variants.length}</span>
+                  </button>
+                ))}
+              </div>
             ))}
           </aside>
 
@@ -189,7 +239,12 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
               </h3>
             </div>
             {entries.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[var(--studio-border-strong)] bg-[var(--studio-panel-muted)] py-16 text-center text-sm text-[var(--studio-text-muted)]">{t('No templates match this view.')}</div>
+              <div className="rounded-2xl border border-dashed border-[var(--studio-border-strong)] bg-[var(--studio-panel-muted)] py-16 text-center text-sm text-[var(--studio-text-muted)]">
+                <p className="m-0">{t('No templates match this view.')}</p>
+                {(layout !== 'all' || tone !== 'all') && (
+                  <button type="button" onClick={() => { setLayout('all'); setTone('all') }} className="studio-btn studio-btn-secondary mt-4 min-h-9 px-3 text-xs">{t('Clear filters')}</button>
+                )}
+              </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {visibleEntries.map(({ category, template }) => {
@@ -201,7 +256,10 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
                         <button type="button" onClick={() => toggleFavorite(template.id)} aria-label={t(favorite ? 'Remove from favorites' : 'Add to favorites')} aria-pressed={favorite} className={`absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] shadow-[var(--studio-shadow-sm)] transition hover:scale-105 ${favorite ? 'text-amber-500' : 'text-[var(--studio-text-muted)]'}`}><StarIcon size={16} filled={favorite} /></button>
                       </div>
                       <div className="flex flex-1 flex-col p-3">
-                        {(view !== 'category' || normalizedQuery) && <span className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[var(--studio-accent-hover)]">{t(category.name)}</span>}
+                        <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                          {(view !== 'category' || normalizedQuery) && <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--studio-accent-hover)]">{t(category.name)}</span>}
+                          {template.layout && <span className="rounded-full border border-[var(--studio-border)] px-1.5 py-px text-[10px] font-semibold text-[var(--studio-text-muted)]">{t(LAYOUT_NAMES[template.layout])}</span>}
+                        </div>
                         <div className="text-sm font-semibold text-[var(--studio-text)]">{t(template.name)}</div>
                         <p className="mt-0.5 flex-1 text-xs leading-relaxed text-[var(--studio-text-muted)]">{t(template.desc)}</p>
                         <div className="mt-3 flex gap-2">
