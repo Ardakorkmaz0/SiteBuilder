@@ -295,6 +295,9 @@ CORS_ALLOWED_ORIGINS = _env_list(
     ['http://localhost:5173', 'http://127.0.0.1:5173'],
 )
 CORS_ALLOW_HEADERS = (*default_headers, 'x-site-save-source')
+# Only the API: a published page's inbox (/s/<slug>/__sitebuilder/form/)
+# answers its own preflight, for pages that run in an opaque origin.
+CORS_URLS_REGEX = r'^/api/.*$'
 
 
 # ---------------------------------------------------------------------------

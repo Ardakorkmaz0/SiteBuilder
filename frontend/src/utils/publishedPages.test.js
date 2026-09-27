@@ -51,11 +51,20 @@ describe('publishedPagesFor', () => {
 
   // An uploaded page is already a document; re-rendering it from the schema
   // would publish an empty canvas instead of the user's own markup.
-  it('publishes an uploaded page as the file it is', () => {
+  it('publishes an uploaded page as the file it is, plus the runtime its forms need', () => {
     const uploaded = '<!DOCTYPE html><html><head><title>Mine</title></head><body>hi</body></html>'
     const pages = publishedPagesFor(schema, { about: uploaded }, 'Ada')
 
-    expect(pages[1].html).toBe(uploaded)
+    // Without the runtime a form published as-is submitted to nowhere.
+    expect(pages[1].html).toContain('data-builder-interactive')
+    expect(pages[1].html.startsWith('<!DOCTYPE html><html><head><title>Mine</title></head><body>hi')).toBe(true)
+  })
+
+  it('does not add the runtime twice to a page that already carries it', () => {
+    const once = publishedPagesFor(schema, { about: '<html><head></head><body>hi</body></html>' }, 'Ada')[1].html
+    const twice = publishedPagesFor(schema, { about: once }, 'Ada')[1].html
+
+    expect(twice.match(/data-builder-interactive/g)).toHaveLength(once.match(/data-builder-interactive/g).length)
   })
 
   it("gives an uploaded page the sharing image set in its Page settings", () => {

@@ -8,6 +8,7 @@
 
 import { schemaToSingleHtml } from './schemaToFiles.js'
 import { pageSeoTitle, withPageSeoTags } from './seoTags.js'
+import { withBuilderInteractiveHtml } from './htmlRuntime.js'
 
 // The address of a page under /s/<slug>/. The home page has none: it IS the
 // site. The server slugifies and de-duplicates again, so this is the wish, not
@@ -62,11 +63,13 @@ export function withPublishedLinks(schema, links) {
 }
 
 // One page's document: its own file when it was uploaded, with what its Page
-// settings say about search and sharing, otherwise the export the viewer
-// already shows (which writes those tags itself).
+// settings say about search and sharing and the runtime the in-app viewer
+// adds (its forms go to the owner's inbox; without it a form published as-is
+// submitted to nowhere), otherwise the export the viewer already shows, which
+// writes both itself.
 export function pageDocument(page, schema, siteTitle, htmlMap = {}) {
   const authored = htmlMap[page?.id]
-  if (typeof authored === 'string' && authored.trim()) return withPageSeoTags(authored, page)
+  if (typeof authored === 'string' && authored.trim()) return withBuilderInteractiveHtml(withPageSeoTags(authored, page))
   const title = pageSeoTitle(page, page?.name || siteTitle || 'My Site')
   try {
     return schemaToSingleHtml({ ...schema, pages: [page] }, title)

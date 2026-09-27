@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.urls import include, path, re_path
 
 from builder.media import serve_media
-from builder.published import published_sitemap, serve_published_page
+from builder.published import published_form, published_sitemap, serve_published_page
 
 urlpatterns = [
     # settings.ADMIN_PATH, not 'admin/': the SPA's own admin panel lives at
@@ -14,6 +14,7 @@ urlpatterns = [
     # the address a visitor sees, a crawler indexes and a scraper reads. The
     # in-app showcase page keeps /site/<slug> (see builder/published.py).
     path('s/<slug:slug>/sitemap.xml', published_sitemap, name='published-sitemap'),
+    path('s/<slug:slug>/__sitebuilder/form/', published_form, name='published-form'),
     path('s/<slug:slug>/', serve_published_page, name='published-home'),
     path('s/<slug:slug>/<slug:path>/', serve_published_page, name='published-page'),
     # Uploaded images. Always routed; serve_media answers only while

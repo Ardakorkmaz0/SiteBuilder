@@ -4,7 +4,8 @@ import { builderInteractiveJs, withBuilderRuntimeHtml } from './htmlRuntime.js'
 
 const documents = []
 function page(body, { preview = false, endpoint = true, readonly = false } = {}) {
-  const metadata = endpoint ? '<meta name="pwb-form-endpoint" content="/__sitebuilder/form/">' : ''
+  const path = endpoint === true ? '/__sitebuilder/form/' : endpoint
+  const metadata = path ? `<meta name="pwb-form-endpoint" content="${path}">` : ''
   const source = `<html><head>${metadata}</head><body>${body}</body></html>`
   const dom = new JSDOM(readonly ? withBuilderRuntimeHtml(source) : source, {
     url: preview ? 'about:blank' : 'https://portfolio.example/about/', runScripts: 'outside-only',
@@ -78,7 +79,9 @@ describe('standalone published inbox', () => {
     expect(win.fetch).toHaveBeenCalledTimes(1)
     const [url, request] = win.fetch.mock.calls[0]
     expect(url).toBe('https://portfolio.example/__sitebuilder/form/')
-    expect(request).toMatchObject({ method: 'POST', credentials: 'omit', mode: 'same-origin' })
+    // cors, not same-origin: the /s/ page runs in an opaque origin, where a
+    // same-origin request to its own host is refused. Still no credentials.
+    expect(request).toMatchObject({ method: 'POST', credentials: 'omit', mode: 'cors' })
     expect(JSON.parse(request.body)).toEqual({ data: { name: 'Ada' }, page: '/about/', website: '' })
     await vi.waitFor(() => expect(form.textContent).toContain('Message sent.'))
     expect(form.hasAttribute('data-pwb-submitting')).toBe(false)
@@ -94,6 +97,26 @@ describe('standalone published inbox', () => {
     await vi.waitFor(() => expect(form.textContent).toContain('Message sent.'))
     expect(win.fetch).toHaveBeenCalledTimes(2)
   })
+
+  it('sends a page on the shared address to that site\'s inbox', async () => {
+    const { win, doc } = page(formMarkup, { endpoint: '/s/ada-studio/__sitebuilder/form/' })
+    const form = doc.querySelector('form')
+    submit(win, form)
+    const [url, request] = win.fetch.mock.calls[0]
+    expect(url).toBe('https://portfolio.example/s/ada-studio/__sitebuilder/form/')
+    expect(request).toMatchObject({ credentials: 'omit', mode: 'cors' })
+    await vi.waitFor(() => expect(form.textContent).toContain('Message sent.'))
+  })
+
+  it.each(['https://collector.example/__sitebuilder/form/', '//collector.example/__sitebuilder/form/', '/api/public/anything/', '/s/../__sitebuilder/form/'])(
+    'never sends form contents to an address an imported tag names: %s', (endpoint) => {
+      const { win, doc } = page(formMarkup, { endpoint })
+      const form = doc.querySelector('form')
+      submit(win, form)
+      expect(win.fetch).not.toHaveBeenCalled()
+      expect(form.textContent).toContain('Message could not be sent.')
+    },
+  )
 
   it('never claims success for a downloaded export with no inbox configuration', () => {
     const { win, doc } = page(formMarkup, { endpoint: false })
