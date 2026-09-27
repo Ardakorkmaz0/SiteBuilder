@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import BlockLibrary from './BlockLibrary.jsx'
 import { HTML_BLOCKS } from '../../utils/htmlVariants.js'
+import { WIDGETS } from '../../utils/componentVariants/index.js'
 
 function renderLibrary(props = {}) {
   return render(
@@ -72,6 +73,20 @@ describe('BlockLibrary', () => {
     await user.type(screen.getByPlaceholderText('Search blocks'), 'copyable code')
     expect(cards()).toHaveLength(1)
     expect(cards()[0]).toHaveTextContent('Offer with code')
+  })
+
+  it('lists widgets by group and places them as widget embeds', async () => {
+    localStorage.setItem('pwb_language', 'en')
+    const user = userEvent.setup()
+    const onArm = vi.fn()
+    renderLibrary({ onArmPlacement: onArm })
+    await user.click(rail().getByText('Ratings and reviews'))
+    const ratings = WIDGETS.filter((widget) => widget.group === 'rating')
+    expect(cards()).toHaveLength(ratings.length)
+    await user.click(screen.getByText('Rating summary'))
+    const armed = onArm.mock.calls[0][0]
+    expect(armed).toMatchObject({ type: 'widget', preset: 'rating-summary', w: 340 })
+    expect(armed.html).toContain('from 1,284 reviews')
   })
 
   it('drops the Turkish build of a section when the editor is in Turkish', async () => {

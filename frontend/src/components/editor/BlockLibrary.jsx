@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { HTML_BLOCKS } from '../../utils/htmlVariants.js'
+import { WIDGETS, WIDGET_CATEGORIES, WIDGET_TYPE } from '../../utils/componentVariants/index.js'
 import { SECTION_CATEGORIES } from '../../utils/sectionBlocks/index.js'
 import { LayersIcon, SearchIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
@@ -10,6 +11,7 @@ import {
   WIDE_HTML,
   blockSize,
   htmlSize,
+  localizedHtml,
   previewSrcDoc,
   variantsForType,
 } from './paletteData.js'
@@ -22,14 +24,22 @@ import {
 
 // Larger sibling of the sidebar's HtmlPreview — same trusted template HTML,
 // scaled to a roomier card.
-function BigPreview({ html, wide }) {
+// A snippet with a known frame (the widgets) is scaled to fit the card whole.
+function fitStyle([w, h]) {
+  const scale = Math.max(0.3, Math.min(0.9, 156 / w, 92 / h))
+  return { width: w, transform: `scale(${scale.toFixed(3)})`, transformOrigin: 'center', flexShrink: 0, pointerEvents: 'none' }
+}
+
+function BigPreview({ html, wide, fit }) {
   return (
     <div className="flex h-[104px] w-full items-center justify-center overflow-hidden rounded-lg bg-[#f8fafc]">
       <div
         style={
-          wide
-            ? { width: 560, transform: 'scale(0.34)', transformOrigin: 'center', flexShrink: 0, pointerEvents: 'none' }
-            : { transform: 'scale(0.9)', transformOrigin: 'center', pointerEvents: 'none' }
+          fit
+            ? fitStyle(fit)
+            : wide
+              ? { width: 560, transform: 'scale(0.34)', transformOrigin: 'center', flexShrink: 0, pointerEvents: 'none' }
+              : { transform: 'scale(0.9)', transformOrigin: 'center', pointerEvents: 'none' }
         }
         dangerouslySetInnerHTML={{ __html: html }}
       />
@@ -52,14 +62,10 @@ function SectionPreview({ html }) {
   )
 }
 
-// Section entries built from the section library carry a Turkish build; the
-// rest are language-neutral markup.
-const entryHtml = (entry, language) => (language === 'tr' && entry.htmlTr ? entry.htmlTr : entry.html)
-
 function LibraryCard({ entry, onUse }) {
   const { language, t } = useLanguage()
   const label = t(entry.label)
-  const html = entryHtml(entry, language)
+  const html = localizedHtml(entry, language)
   return (
     <button
       type="button"
@@ -69,7 +75,7 @@ function LibraryCard({ entry, onUse }) {
     >
       {entry.kind === 'section'
         ? <SectionPreview html={html} />
-        : <BigPreview html={html} wide={entry.wide} />}
+        : <BigPreview html={html} wide={entry.wide} fit={entry.fit} />}
       <span className="mt-2 truncate text-xs font-semibold text-[var(--studio-text,#374151)]">{label}</span>
       <span className="truncate text-[11px] text-[var(--studio-text-faint,#9ca3af)]">
         {t(entry.categoryLabel)}
@@ -79,10 +85,11 @@ function LibraryCard({ entry, onUse }) {
 }
 
 const SECTION_CATEGORY_NAMES = new Map(SECTION_CATEGORIES.map((category) => [category.id, category.name.en]))
+const WIDGET_CATEGORY_NAMES = new Map(WIDGET_CATEGORIES.map((category) => [category.id, category.name.en]))
 
 // Flatten the whole palette into searchable entries once per open. Sections
 // are filed by their library category (`section:hero`, `section:footer`…),
-// components by palette type.
+// widgets by their group (`widget:rating`…), components by palette type.
 function buildEntries() {
   const entries = []
   for (const block of HTML_BLOCKS) {
@@ -100,6 +107,21 @@ function buildEntries() {
       use: { type: 'section', preset: block.id, w, h, label: block.label },
     })
   }
+  for (const widget of WIDGETS) {
+    const [w, h] = htmlSize(WIDGET_TYPE, widget)
+    entries.push({
+      kind: 'variant',
+      key: `widget-${widget.id}`,
+      categoryId: `widget:${widget.group}`,
+      categoryLabel: WIDGET_CATEGORY_NAMES.get(widget.group),
+      label: widget.label,
+      desc: widget.label,
+      html: widget.html,
+      htmlTr: widget.htmlTr,
+      fit: [w, h],
+      use: { type: WIDGET_TYPE, preset: widget.id, w, h, label: widget.label },
+    })
+  }
   for (const item of ADDABLE_PALETTE_ITEMS) {
     for (const variant of variantsForType(item.type)) {
       const [w, h] = htmlSize(item.type, variant)
@@ -112,6 +134,7 @@ function buildEntries() {
         label: variant.label === 'Default' ? item.label : variant.label,
         desc: item.label,
         html: variant.html,
+        htmlTr: variant.htmlTr,
         wide: WIDE_HTML.has(item.type),
         native,
         use: { type: item.type, preset: variant.id === 'default' ? null : variant.id, w, h, label: variant.label },
@@ -128,6 +151,7 @@ const PAGE_SIZE = 36
 function matchesCategory(entry, category) {
   if (category === 'all') return true
   if (category === 'sections') return entry.kind === 'section'
+  if (category === 'widgets') return entry.categoryId.startsWith('widget:')
   return entry.categoryId === category
 }
 
@@ -150,6 +174,14 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
           ...SECTION_CATEGORIES
             .map((item) => ({ id: `section:${item.id}`, label: item.name.en, count: count(`section:${item.id}`), nested: true }))
             .filter((item) => item.count > 0),
+        ],
+      },
+      {
+        id: 'widgets',
+        label: 'Widgets',
+        items: [
+          { id: 'widgets', label: 'All widgets', count: count('widgets') },
+          ...WIDGET_CATEGORIES.map((item) => ({ id: `widget:${item.id}`, label: item.name.en, count: count(`widget:${item.id}`), nested: true })),
         ],
       },
       {
@@ -181,7 +213,7 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
   }
 
   const use = (entry) => {
-    const html = entryHtml(entry, language)
+    const html = localizedHtml(entry, language)
     if (onPickComponent) {
       onPickComponent(entry.use.type, html)
     } else {

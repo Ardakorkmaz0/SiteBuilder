@@ -1,4 +1,3 @@
-import { SECTION_TRANSLATIONS } from '../utils/sectionBlocks/index.js'
 import { VERTICAL_TEMPLATE_TRANSLATIONS } from '../utils/templateCatalogData.js'
 
 export const TURKISH_TRANSLATIONS = {
@@ -58,7 +57,6 @@ export const TURKISH_TRANSLATIONS = {
   "Early version. Use Chrome or Edge and keep a backup of important projects.": "Deneme aşamasında. Chrome veya Edge kullan; önemli projelerinin yedeğini al.",
   "Use New site or Open local project on the home page to get started.": "Başlamak için ana sayfadaki “Yeni site oluştur” veya “Yerel proje aç” düğmesini kullan.",
   ...VERTICAL_TEMPLATE_TRANSLATIONS,
-  ...SECTION_TRANSLATIONS,
   // Common
   'Language': 'Dil',
   'Skip to content': 'İçeriğe geç',
@@ -703,6 +701,8 @@ export const TURKISH_TRANSLATIONS = {
   'Large pill': 'Büyük hap',
   'Block library': 'Blok kütüphanesi',
   'All sections': 'Tüm bölümler',
+  'Widgets': 'Widget’lar',
+  'All widgets': 'Tüm widget’lar',
   'Block category': 'Blok kategorisi',
   'Show more': 'Daha fazla göster',
   'Showing {shown} of {total}': '{total} bloktan {shown} tanesi gösteriliyor',
@@ -2859,4 +2859,13 @@ export const TURKISH_TRANSLATIONS = {
   '{count} visits': '{count} ziyaret',
   '{count} visits in 30 days': '30 günde {count} ziyaret',
   '{sites} site reports and {blocks} block reports are waiting for review.': '{sites} site şikâyeti ve {blocks} blok şikâyeti inceleme bekliyor.',
+}
+
+// Editor-only libraries (the section blocks and component variants) carry
+// their own bilingual labels. They add them here when they load, so their
+// markup stays out of the bundle every page needs. Existing entries win.
+export function extendTranslations(dictionary) {
+  for (const [english, turkish] of Object.entries(dictionary)) {
+    if (!Object.prototype.hasOwnProperty.call(TURKISH_TRANSLATIONS, english)) TURKISH_TRANSLATIONS[english] = turkish
+  }
 }

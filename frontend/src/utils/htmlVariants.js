@@ -4,6 +4,7 @@
 // variety per type — especially buttons — so the palette feels like a real
 // component library, not one bland default.
 
+import { EXTRA_VARIANTS } from './componentVariants/index.js'
 import { SECTION_BLOCKS } from './sectionBlocks/index.js'
 
 const B = (style, label = 'Button') =>
@@ -256,7 +257,7 @@ function withBootstrap(type, list) {
   return toEntries(recommended ? [recommended, ...list] : list)
 }
 
-export const HTML_VARIANTS = {
+const CORE_VARIANTS = {
   button: withBootstrap('button', buttons),
   linkbutton: withBootstrap('linkbutton', linkbuttons),
   navbar: withBootstrap('navbar', navbars),
@@ -279,6 +280,12 @@ export const HTML_VARIANTS = {
   section: withBootstrap('section', sections),
   divider: withBootstrap('divider', dividers),
 }
+
+// The curated variants first, then the bilingual extras (componentVariants/),
+// which also carry a Turkish build (`htmlTr`) and their natural `size`.
+export const HTML_VARIANTS = Object.fromEntries(
+  Object.entries(CORE_VARIANTS).map(([type, variants]) => [type, [...variants, ...(EXTRA_VARIANTS[type] || [])]]),
+)
 
 export function htmlVariantsFor(type) {
   return HTML_VARIANTS[type] || []

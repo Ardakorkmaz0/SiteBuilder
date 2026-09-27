@@ -12,6 +12,7 @@ import {
   WIDE_HTML,
   blockSize,
   htmlSize,
+  localizedHtml,
   previewSrcDoc,
   variantsForType,
 } from './paletteData.js'
@@ -112,7 +113,8 @@ function PalettePreviewPanel({ preview, onClose }) {
 //  - Free canvas (no `onPick`): most variants carry HTML + size and become an
 //    editable HtmlEmbed; structural widgets can carry native component data.
 function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
+  const html = localizedHtml(variant, language)
   const [w, h] = htmlSize(type, variant)
   const nativeCanvas = !onPick && NATIVE_CANVAS_TYPES.has(type)
   const preset = variant.id === 'default' ? null : variant.id
@@ -120,7 +122,7 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
   const inspect = () => onInspect?.({
     type,
     label: variantLabel,
-    html: variant.html,
+    html,
     wide,
     size: `${w} x ${h}`,
   })
@@ -129,11 +131,11 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
     id: `palette-${type}-${variant.id}`,
     data: nativeCanvas
       ? { from: 'palette', type, preset, w, h, label: variantLabel }
-      : { from: 'palette', type, preset, html: variant.html, w, h, label: variantLabel },
+      : { from: 'palette', type, preset, html, w, h, label: variantLabel },
   })
   const preview = (
     <>
-      <HtmlPreview html={variant.html} wide={wide} />
+      <HtmlPreview html={html} wide={wide} />
       <div className="mt-1 min-h-6 break-words text-center text-[10px] leading-3 text-[#6b7280]">{variantLabel}</div>
       {variant.recommended && (
         <div
@@ -154,12 +156,12 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
           e.dataTransfer.setData(DRAG_MIME, type)
           e.dataTransfer.setData('text/plain', variantLabel)
           e.dataTransfer.effectAllowed = 'copy'
-          window.setTimeout(() => onPick(type, variant.html), 0)
+          window.setTimeout(() => onPick(type, html), 0)
         }}
         onMouseEnter={inspect}
         onClick={() => {
           inspect()
-          onPick(type, variant.html)
+          onPick(type, html)
         }}
         title={`Click to place, or drag onto the page — ${variantLabel}`}
         className={`cursor-pointer rounded-lg border p-1.5 transition select-none hover:border-[var(--studio-accent)] hover:bg-[var(--studio-control-hover)] active:cursor-grabbing ${variant.recommended ? 'border-[var(--studio-accent)] bg-[var(--studio-control)]' : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)]'}`}
@@ -181,7 +183,7 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
         onArm?.(
           nativeCanvas
             ? { type, preset, w, h, label: variantLabel }
-            : { type, preset, html: variant.html, w, h, label: variantLabel },
+            : { type, preset, html, w, h, label: variantLabel },
         )
       }}
       title={`Click to place, or drag onto the canvas — ${variantLabel}`}
@@ -195,7 +197,7 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
 
 // A component category: click the row to reveal its variants. Same in both modes.
 function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle }) {
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
   const variants = variantsForType(item.type)
   const wide = WIDE_HTML.has(item.type)
   const firstVariant = variants[0]
@@ -211,7 +213,7 @@ function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle }) {
               type: item.label,
               label: firstVariant.label,
               desc: item.label,
-              html: firstVariant.html,
+              html: localizedHtml(firstVariant, language),
               wide,
               size: `${w} x ${h}`,
             })

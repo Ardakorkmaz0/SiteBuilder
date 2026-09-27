@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DndContext } from '@dnd-kit/core'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
@@ -128,3 +128,26 @@ describe('Sidebar component recommendations', () => {
     expect(JSON.parse(localStorage.getItem('pwb_custom_blocks'))).toHaveLength(1)
   })
 })
+
+describe('Sidebar variants in Turkish', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    localStorage.setItem('pwb_language', 'tr')
+  })
+
+  it('previews and places the Turkish build of a bilingual variant', async () => {
+    const user = userEvent.setup()
+    const armed = []
+    renderSidebar({ onArmPlacement: (data) => armed.push(data) })
+    await user.click(screen.getByRole('button', { name: /^■Düğme\d+▸$/ }))
+    const variant = HTML_VARIANTS.button.find((item) => item.id === 'arrow-dark-pill')
+    const swatch = screen.getByText('Oklu koyu hap').closest('[title]')
+    expect(swatch.innerHTML).toContain('Sonraki adım')
+    expect(swatch.innerHTML).not.toContain('Next step')
+    // A plain click: the test DndContext has no activation distance, so a
+    // pointer-driven click would start a drag instead.
+    fireEvent.click(swatch)
+    expect(armed.at(-1)).toMatchObject({ type: 'button', preset: 'arrow-dark-pill', html: variant.htmlTr })
+  })
+})
+
