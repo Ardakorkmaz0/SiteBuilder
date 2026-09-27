@@ -345,9 +345,10 @@ export default function ProfilePage() {
             {!loading && (
               <form onSubmit={onSave} className="mt-5 space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Display name')}</label>
+                  <label htmlFor="profile-display-name" className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Display name')}</label>
                   <input
                     className="studio-input w-full px-3 py-2 text-sm"
+                    id="profile-display-name"
                     placeholder={profile?.username}
                     value={displayName}
                     maxLength={80}
@@ -355,9 +356,10 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Headline')}</label>
+                  <label htmlFor="profile-headline" className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Headline')}</label>
                   <input
                     className="studio-input w-full px-3 py-2 text-sm"
+                    id="profile-headline"
                     placeholder={t('e.g. Product designer')}
                     value={meta.headline}
                     maxLength={80}
@@ -366,12 +368,13 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <div className="mb-1.5 flex items-center justify-between gap-2">
-                    <label className="text-xs font-semibold text-[var(--studio-text-muted)]">{t('Bio')}</label>
+                    <label htmlFor="profile-bio" className="text-xs font-semibold text-[var(--studio-text-muted)]">{t('Bio')}</label>
                     <span className="text-[10px] text-[var(--studio-text-faint)]">{bio.length}/300</span>
                   </div>
                   <textarea
                     className="studio-input min-h-28 w-full resize-y px-3 py-2 text-sm"
                     maxLength={300}
+                    id="profile-bio"
                     placeholder={t('A line or two about you…')}
                     value={bio}
                     onChange={(event) => setBio(event.target.value)}
@@ -379,9 +382,10 @@ export default function ProfilePage() {
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Location')}</label>
+                    <label htmlFor="profile-location" className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Location')}</label>
                     <input
                       className="studio-input w-full px-3 py-2 text-sm"
+                      id="profile-location"
                       placeholder={t('e.g. Istanbul')}
                       value={meta.location}
                       maxLength={80}
@@ -389,9 +393,10 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Website')}</label>
+                    <label htmlFor="profile-website" className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Website')}</label>
                     <input
                       className="studio-input w-full px-3 py-2 text-sm"
+                      id="profile-website"
                       placeholder="yoursite.com"
                       value={meta.website}
                       maxLength={200}
@@ -482,6 +487,7 @@ export default function ProfilePage() {
                 <input
                   className="studio-input min-w-0 flex-1 px-3 py-2 text-sm sm:w-44"
                   placeholder={t('New site title')}
+                  aria-label={t('New site title')}
                   value={newTitle}
                   onChange={(event) => setNewTitle(event.target.value)}
                 />
@@ -498,6 +504,7 @@ export default function ProfilePage() {
                   <input
                     className="studio-input w-full py-2 pl-9 pr-3 text-sm"
                     placeholder={t('Search your sites…')}
+                    aria-label={t('Search your sites…')}
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                   />
