@@ -37,7 +37,9 @@ describe('template localization', () => {
       links: 'Son podcast bölümü',
       wellness: 'Daha güçlü bir rutine hazır mısınız?',
       ...Object.fromEntries(
-        VERTICAL_CATEGORY_SEEDS.map((category) => [category.id, category.profile.title.tr]),
+        // A second-wave starter opens with its own hero, layered over the
+        // category profile.
+        VERTICAL_CATEGORY_SEEDS.map((category) => [category.id, (category.variants[0].hero || category.profile).title.tr]),
       ),
     }
 
@@ -89,4 +91,58 @@ describe('template localization', () => {
       expect(localizedText, english).toContain(turkish)
     }
   })
+})
+
+describe('the bilingual catalogue', () => {
+  // One English phrase can only have one Turkish rendering: the localiser maps
+  // text by exact match, so a second meaning would silently overwrite the first
+  // in every template that uses the phrase.
+  it('never gives one English phrase two Turkish translations', () => {
+    const seen = new Map()
+    const conflicts = []
+    const walk = (value, where) => {
+      if (Array.isArray(value)) return value.forEach((entry) => walk(entry, where))
+      if (!value || typeof value !== 'object') return
+      if (typeof value.en === 'string' && typeof value.tr === 'string') {
+        const earlier = seen.get(value.en)
+        if (earlier && earlier.tr !== value.tr) conflicts.push(`${value.en}: ${earlier.where} vs ${where}`)
+        else seen.set(value.en, { tr: value.tr, where })
+        return
+      }
+      Object.values(value).forEach((entry) => walk(entry, where))
+    }
+    VERTICAL_CATEGORY_SEEDS.forEach((seed) => walk(seed, seed.id))
+    expect(conflicts).toEqual([])
+  })
+
+  // The localiser translates whole text nodes. A builder that glues two
+  // catalogue strings into one node (a joined list, say) ships English into a
+  // Turkish page; this catches it for every vertical starter.
+  it('leaves no catalogue text in English on a Turkish page', () => {
+    const untranslated = []
+    const vertical = new Set(VERTICAL_CATEGORY_SEEDS.map((seed) => seed.id))
+    for (const category of TEMPLATE_LIBRARY.filter((entry) => vertical.has(entry.id))) {
+      for (const template of category.variants) {
+        const turkish = localizeTemplateHtml(template.build('Example'), 'tr')
+        const doc = new DOMParser().parseFromString(turkish, 'text/html')
+        const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if (node.parentElement?.closest('style,script')) continue
+          // A node joined from several strings ("a · b · c") is checked part
+          // by part, which is exactly how such a slip shows up.
+          for (const part of node.nodeValue.split(/\s[·|]\s/)) {
+            const text = part.trim()
+            const turkishText = VERTICAL_TEMPLATE_TRANSLATIONS[text]
+            if (turkishText && turkishText !== text) untranslated.push(`${template.id}: ${text}`)
+          }
+        }
+        for (const part of doc.title.split(/\s[·|—]\s/)) {
+          const text = part.trim()
+          const turkishText = VERTICAL_TEMPLATE_TRANSLATIONS[text]
+          if (turkishText && turkishText !== text) untranslated.push(`${template.id} <title>: ${text}`)
+        }
+      }
+    }
+    expect(untranslated).toEqual([])
+  }, 120000)
 })
