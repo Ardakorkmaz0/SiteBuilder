@@ -1,3 +1,4 @@
+import { SECTION_TRANSLATIONS } from '../utils/sectionBlocks/index.js'
 import { VERTICAL_TEMPLATE_TRANSLATIONS } from '../utils/templateCatalogData.js'
 
 export const TURKISH_TRANSLATIONS = {
@@ -57,6 +58,7 @@ export const TURKISH_TRANSLATIONS = {
   "Early version. Use Chrome or Edge and keep a backup of important projects.": "Deneme aşamasında. Chrome veya Edge kullan; önemli projelerinin yedeğini al.",
   "Use New site or Open local project on the home page to get started.": "Başlamak için ana sayfadaki “Yeni site oluştur” veya “Yerel proje aç” düğmesini kullan.",
   ...VERTICAL_TEMPLATE_TRANSLATIONS,
+  ...SECTION_TRANSLATIONS,
   // Common
   'Language': 'Dil',
   'Skip to content': 'İçeriğe geç',
@@ -700,6 +702,10 @@ export const TURKISH_TRANSLATIONS = {
   'Success state': 'Başarı durumu',
   'Large pill': 'Büyük hap',
   'Block library': 'Blok kütüphanesi',
+  'All sections': 'Tüm bölümler',
+  'Block category': 'Blok kategorisi',
+  'Show more': 'Daha fazla göster',
+  'Showing {shown} of {total}': '{total} bloktan {shown} tanesi gösteriliyor',
   'Browse all blocks': 'Tüm blokları keşfet',
   'Search blocks': 'Blok ara',
   'All blocks': 'Tüm bloklar',

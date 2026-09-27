@@ -3,7 +3,7 @@
 // ONE visual library powers both editor modes. Pure data/helpers — components
 // stay in their own files so react-refresh keeps working.
 import { paletteItems } from '../registry.jsx'
-import { htmlVariantsFor } from '../../utils/htmlVariants.js'
+import { HTML_BLOCKS, htmlVariantsFor } from '../../utils/htmlVariants.js'
 import { htmlSnippetSize } from '../../utils/htmlSnippetSizing.js'
 import { componentToHtml } from '../../utils/componentToHtml.js'
 
@@ -43,8 +43,10 @@ const BLOCK_SIZE = {
   pricing: [1000, 380], logos: [1000, 140], testimonial: [1000, 220], faq: [1000, 360],
   contact: [1000, 460], cta: [1000, 220], footer: [1000, 150],
 }
+// Section-library blocks carry their own measured size.
+const LIBRARY_BLOCK_SIZE = new Map(HTML_BLOCKS.filter((block) => block.size).map((block) => [block.id, block.size]))
 export function blockSize(id) {
-  return BLOCK_SIZE[id] || [1000, 360]
+  return BLOCK_SIZE[id] || LIBRARY_BLOCK_SIZE.get(id) || [1000, 360]
 }
 
 export function previewSrcDoc(html, wide) {

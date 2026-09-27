@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { HTML_BLOCKS } from '../../utils/htmlVariants.js'
+import { SECTION_CATEGORIES } from '../../utils/sectionBlocks/index.js'
 import { LayersIcon, SearchIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import {
@@ -51,19 +52,24 @@ function SectionPreview({ html }) {
   )
 }
 
+// Section entries built from the section library carry a Turkish build; the
+// rest are language-neutral markup.
+const entryHtml = (entry, language) => (language === 'tr' && entry.htmlTr ? entry.htmlTr : entry.html)
+
 function LibraryCard({ entry, onUse }) {
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
   const label = t(entry.label)
+  const html = entryHtml(entry, language)
   return (
     <button
       type="button"
       onClick={() => onUse(entry)}
-      title={`${label} — ${t('Click a block, then click on the canvas to place it.')}`}
+      title={`${label} — ${t(entry.desc || entry.label)}`}
       className="group flex flex-col rounded-xl border border-[var(--studio-border,#e5e7eb)] bg-[var(--studio-panel-raised,#ffffff)] p-2 text-left transition hover:border-[var(--studio-accent,#4f46e5)] hover:shadow-md"
     >
       {entry.kind === 'section'
-        ? <SectionPreview html={entry.html} />
-        : <BigPreview html={entry.html} wide={entry.wide} />}
+        ? <SectionPreview html={html} />
+        : <BigPreview html={html} wide={entry.wide} />}
       <span className="mt-2 truncate text-xs font-semibold text-[var(--studio-text,#374151)]">{label}</span>
       <span className="truncate text-[11px] text-[var(--studio-text-faint,#9ca3af)]">
         {t(entry.categoryLabel)}
@@ -72,7 +78,11 @@ function LibraryCard({ entry, onUse }) {
   )
 }
 
-// Flatten the whole palette into searchable entries once per open.
+const SECTION_CATEGORY_NAMES = new Map(SECTION_CATEGORIES.map((category) => [category.id, category.name.en]))
+
+// Flatten the whole palette into searchable entries once per open. Sections
+// are filed by their library category (`section:hero`, `section:footer`…),
+// components by palette type.
 function buildEntries() {
   const entries = []
   for (const block of HTML_BLOCKS) {
@@ -80,13 +90,14 @@ function buildEntries() {
     entries.push({
       kind: 'section',
       key: `section-${block.id}`,
-      categoryId: 'sections',
-      categoryLabel: 'Sections',
+      categoryId: `section:${block.category}`,
+      categoryLabel: SECTION_CATEGORY_NAMES.get(block.category) || 'Sections',
       label: block.label,
       desc: block.desc || '',
       html: block.html,
+      htmlTr: block.htmlTr,
       wide: true,
-      use: { type: 'section', preset: block.id, html: block.html, w, h, label: block.label },
+      use: { type: 'section', preset: block.id, w, h, label: block.label },
     })
   }
   for (const item of ADDABLE_PALETTE_ITEMS) {
@@ -102,52 +113,79 @@ function buildEntries() {
         desc: item.label,
         html: variant.html,
         wide: WIDE_HTML.has(item.type),
-        use: native
-          ? { type: item.type, preset: variant.id === 'default' ? null : variant.id, w, h, label: variant.label }
-          : { type: item.type, preset: variant.id === 'default' ? null : variant.id, html: variant.html, w, h, label: variant.label },
+        native,
+        use: { type: item.type, preset: variant.id === 'default' ? null : variant.id, w, h, label: variant.label },
       })
     }
   }
   return entries
 }
 
+// Hundreds of live previews would be slow to mount at once; the grid shows a
+// page at a time and grows on request.
+const PAGE_SIZE = 36
+
+function matchesCategory(entry, category) {
+  if (category === 'all') return true
+  if (category === 'sections') return entry.kind === 'section'
+  return entry.categoryId === category
+}
+
 export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlacement }) {
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
   const [category, setCategory] = useState('all')
   const [query, setQuery] = useState('')
+  const [limit, setLimit] = useState(PAGE_SIZE)
   const entries = useMemo(() => buildEntries(), [])
-  const categories = useMemo(
-    () => [
-      { id: 'all', label: 'All blocks', count: entries.length },
-      { id: 'sections', label: 'Sections', count: HTML_BLOCKS.length },
-      ...ADDABLE_PALETTE_ITEMS.map((item) => ({
-        id: item.type,
-        label: item.label,
-        count: entries.filter((e) => e.categoryId === item.type).length,
-      })),
-    ],
-    [entries],
-  )
+  // The rail: everything, then sections by what they do, then components.
+  const groups = useMemo(() => {
+    const count = (id) => entries.filter((entry) => matchesCategory(entry, id)).length
+    return [
+      { id: 'top', label: null, items: [{ id: 'all', label: 'All blocks', count: entries.length }] },
+      {
+        id: 'sections',
+        label: 'Sections',
+        items: [
+          { id: 'sections', label: 'All sections', count: count('sections') },
+          ...SECTION_CATEGORIES
+            .map((item) => ({ id: `section:${item.id}`, label: item.name.en, count: count(`section:${item.id}`), nested: true }))
+            .filter((item) => item.count > 0),
+        ],
+      },
+      {
+        id: 'components',
+        label: 'Components',
+        items: ADDABLE_PALETTE_ITEMS.map((item) => ({ id: item.type, label: item.label, count: count(item.type) })),
+      },
+    ]
+  }, [entries])
 
   if (!open) return null
 
   const q = query.trim().toLocaleLowerCase('tr')
   const visible = entries.filter((entry) => {
-    if (!q && category !== 'all' && entry.categoryId !== category) return false
-    if (!q) return true
-    // Search spans EVERYTHING (ignores the active category) and matches both
-    // the raw English label and its Turkish translation.
-    const haystack = [entry.label, t(entry.label), entry.categoryLabel, t(entry.categoryLabel)]
+    if (!q) return matchesCategory(entry, category)
+    // Search spans EVERYTHING (ignores the active category) and matches the
+    // English label, description and category and their Turkish translations.
+    const haystack = [entry.label, t(entry.label), entry.desc, t(entry.desc), entry.categoryLabel, t(entry.categoryLabel)]
       .join(' ')
       .toLocaleLowerCase('tr')
     return haystack.includes(q)
   })
+  const shown = visible.slice(0, limit)
+
+  const chooseCategory = (id) => {
+    setCategory(id)
+    setQuery('')
+    setLimit(PAGE_SIZE)
+  }
 
   const use = (entry) => {
+    const html = entryHtml(entry, language)
     if (onPickComponent) {
-      onPickComponent(entry.use.type, entry.use.html ?? entry.html)
+      onPickComponent(entry.use.type, html)
     } else {
-      onArmPlacement?.(entry.use)
+      onArmPlacement?.(entry.native ? entry.use : { ...entry.use, html })
     }
     onClose()
   }
@@ -175,7 +213,10 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
             <input
               autoFocus
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value)
+                setLimit(PAGE_SIZE)
+              }}
               placeholder={t('Search blocks')}
               className="w-full rounded-lg border border-[var(--studio-border,#d1d5db)] bg-[var(--studio-control,#f9fafb)] py-1.5 pl-8 pr-3 text-sm text-[var(--studio-text,#111827)] outline-none focus:border-[var(--studio-accent,#4f46e5)]"
             />
@@ -192,47 +233,55 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
 
         <div className="flex min-h-0 flex-1">
           {/* Category rail (desktop) */}
-          <nav className="hidden w-48 shrink-0 overflow-y-auto border-r border-[var(--studio-border,#e5e7eb)] p-2 sm:block">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => {
-                  setCategory(cat.id)
-                  setQuery('')
-                }}
-                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition ${
-                  category === cat.id && !q
-                    ? 'bg-[var(--studio-control,#eef2ff)] font-semibold text-[var(--studio-accent,#4f46e5)]'
-                    : 'text-[var(--studio-text-muted,#6b7280)] hover:bg-[var(--studio-control-hover,#f3f4f6)] hover:text-[var(--studio-text,#374151)]'
-                }`}
-              >
-                <span className="min-w-0 flex-1 truncate">{t(cat.label)}</span>
-                <span className="text-[10px] text-[var(--studio-text-faint,#9ca3af)]">{cat.count}</span>
-              </button>
+          <nav className="hidden w-52 shrink-0 overflow-y-auto border-r border-[var(--studio-border,#e5e7eb)] p-2 sm:block">
+            {groups.map((group) => (
+              <div key={group.id} className={group.label ? 'mt-3' : ''}>
+                {group.label && (
+                  <div className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--studio-text-faint,#9ca3af)]">
+                    {t(group.label)}
+                  </div>
+                )}
+                {group.items.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => chooseCategory(cat.id)}
+                    aria-current={category === cat.id && !q ? 'true' : undefined}
+                    className={`flex w-full items-center gap-2 rounded-lg py-1.5 pr-2.5 text-left text-xs font-medium transition ${
+                      cat.nested ? 'pl-5' : 'pl-2.5'
+                    } ${
+                      category === cat.id && !q
+                        ? 'bg-[var(--studio-control,#eef2ff)] font-semibold text-[var(--studio-accent,#4f46e5)]'
+                        : 'text-[var(--studio-text-muted,#6b7280)] hover:bg-[var(--studio-control-hover,#f3f4f6)] hover:text-[var(--studio-text,#374151)]'
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{t(cat.label)}</span>
+                    <span className="text-[10px] text-[var(--studio-text-faint,#9ca3af)]">{cat.count}</span>
+                  </button>
+                ))}
+              </div>
             ))}
           </nav>
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            {/* Category chips (mobile) */}
-            <div className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-[var(--studio-border,#f1f1f4)] p-2 sm:hidden">
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => {
-                    setCategory(cat.id)
-                    setQuery('')
-                  }}
-                  className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-medium ${
-                    category === cat.id && !q
-                      ? 'border-[var(--studio-accent,#4f46e5)] bg-[var(--studio-control,#eef2ff)] text-[var(--studio-accent,#4f46e5)]'
-                      : 'border-[var(--studio-border,#e5e7eb)] text-[var(--studio-text-muted,#6b7280)]'
-                  }`}
-                >
-                  {t(cat.label)}
-                </button>
-              ))}
+            {/* Category picker (mobile): a native select, since the rail has
+                dozens of entries in groups. */}
+            <div className="shrink-0 border-b border-[var(--studio-border,#f1f1f4)] p-2 sm:hidden">
+              <select
+                value={category}
+                onChange={(e) => chooseCategory(e.target.value)}
+                aria-label={t('Block category')}
+                className="w-full rounded-lg border border-[var(--studio-border,#d1d5db)] bg-[var(--studio-control,#f9fafb)] px-2.5 py-1.5 text-sm text-[var(--studio-text,#111827)] outline-none focus:border-[var(--studio-accent,#4f46e5)]"
+              >
+                {groups.map((group) => {
+                  const options = group.items.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{`${t(cat.label)} (${cat.count})`}</option>
+                  ))
+                  return group.label
+                    ? <optgroup key={group.id} label={t(group.label)}>{options}</optgroup>
+                    : options
+                })}
+              </select>
             </div>
 
             {/* Cards */}
@@ -242,11 +291,27 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
                   {t('No blocks match your search')}
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                  {visible.map((entry) => (
-                    <LibraryCard key={entry.key} entry={entry} onUse={use} />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                    {shown.map((entry) => (
+                      <LibraryCard key={entry.key} entry={entry} onUse={use} />
+                    ))}
+                  </div>
+                  {visible.length > shown.length && (
+                    <div className="mt-4 flex flex-col items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setLimit((current) => current + PAGE_SIZE)}
+                        className="rounded-lg border border-[var(--studio-border,#e5e7eb)] bg-[var(--studio-panel-raised,#ffffff)] px-4 py-1.5 text-xs font-semibold text-[var(--studio-text,#374151)] transition hover:border-[var(--studio-accent,#4f46e5)]"
+                      >
+                        {t('Show more')}
+                      </button>
+                      <span className="text-[11px] text-[var(--studio-text-faint,#9ca3af)]">
+                        {t('Showing {shown} of {total}', { shown: shown.length, total: visible.length })}
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

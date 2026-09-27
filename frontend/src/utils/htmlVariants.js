@@ -4,6 +4,8 @@
 // variety per type — especially buttons — so the palette feels like a real
 // component library, not one bland default.
 
+import { SECTION_BLOCKS } from './sectionBlocks/index.js'
+
 const B = (style, label = 'Button') =>
   `<a href="#" style="${style}">${label}</a>`
 
@@ -324,25 +326,31 @@ const blogPosts = `<section style="padding:72px 32px;max-width:1080px;margin:0 a
 
 const video = `<section style="padding:72px 32px;background:#0f172a;color:#fff;font-family:inherit;"><div style="max-width:1000px;margin:0 auto;text-align:center;"><p style="margin:0 0 10px;color:#93c5fd;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;font-size:13px;">Watch</p><h2 style="margin:0 0 24px;font-size:38px;">Show the product in motion</h2><div style="aspect-ratio:16/9;border-radius:22px;background:linear-gradient(135deg,#1e293b,#4338ca);display:grid;place-items:center;box-shadow:0 28px 70px rgba(0,0,0,0.35);"><span style="display:grid;place-items:center;width:74px;height:74px;border-radius:999px;background:#fff;color:#0f172a;font-size:22px;font-weight:900;">Play</span></div></div></section>`
 
-export const HTML_BLOCKS = [
-  { id: 'hero', label: 'Hero', desc: 'Headline, subtitle & buttons', html: hero },
-  { id: 'hero-split', label: 'Split hero', desc: 'Text + image side by side', html: heroSplit },
-  { id: 'about', label: 'About', desc: 'Story + visual block', html: about },
-  { id: 'features', label: 'Features', desc: '3-column feature row', html: features },
-  { id: 'services', label: 'Services', desc: '4 service cards', html: services },
-  { id: 'process', label: 'Process', desc: 'Step-by-step timeline', html: process },
-  { id: 'stats', label: 'Stats', desc: 'Row of key numbers', html: stats },
-  { id: 'pricing', label: 'Pricing', desc: '3 pricing cards', html: pricing },
-  { id: 'portfolio', label: 'Portfolio', desc: 'Project grid', html: portfolio },
-  { id: 'gallery', label: 'Gallery', desc: 'Masonry image wall', html: gallery },
-  { id: 'team', label: 'Team', desc: 'People cards', html: team },
-  { id: 'logos', label: 'Logo cloud', desc: 'Trusted-by logos', html: logos },
-  { id: 'testimonial', label: 'Testimonial', desc: 'Quote + author', html: testimonial },
-  { id: 'blog', label: 'Blog posts', desc: 'Article cards', html: blogPosts },
-  { id: 'faq', label: 'FAQ', desc: 'Expandable questions', html: faq },
-  { id: 'newsletter', label: 'Newsletter', desc: 'Email signup', html: newsletter },
-  { id: 'video', label: 'Video', desc: 'Media feature block', html: video },
-  { id: 'contact', label: 'Contact', desc: 'Contact form', html: contact },
-  { id: 'cta', label: 'Call to action', desc: 'Gradient banner', html: cta },
-  { id: 'footer', label: 'Footer', desc: 'Links + copyright', html: footer },
+// The original section blocks, filed into the section library's categories.
+const CORE_BLOCKS = [
+  { id: 'hero', category: 'hero', label: 'Hero', desc: 'Headline, subtitle & buttons', html: hero },
+  { id: 'hero-split', category: 'hero', label: 'Split hero', desc: 'Text + image side by side', html: heroSplit },
+  { id: 'about', category: 'about', label: 'About', desc: 'Story + visual block', html: about },
+  { id: 'features', category: 'features', label: 'Features', desc: '3-column feature row', html: features },
+  { id: 'services', category: 'services', label: 'Services', desc: '4 service cards', html: services },
+  { id: 'process', category: 'process', label: 'Process', desc: 'Step-by-step timeline', html: process },
+  { id: 'stats', category: 'stats', label: 'Stats', desc: 'Row of key numbers', html: stats },
+  { id: 'pricing', category: 'pricing', label: 'Pricing', desc: '3 pricing cards', html: pricing },
+  { id: 'portfolio', category: 'portfolio', label: 'Portfolio', desc: 'Project grid', html: portfolio },
+  { id: 'gallery', category: 'portfolio', label: 'Gallery', desc: 'Masonry image wall', html: gallery },
+  { id: 'team', category: 'team', label: 'Team', desc: 'People cards', html: team },
+  { id: 'logos', category: 'logos', label: 'Logo cloud', desc: 'Trusted-by logos', html: logos },
+  { id: 'testimonial', category: 'testimonials', label: 'Testimonial', desc: 'Quote + author', html: testimonial },
+  { id: 'blog', category: 'blog', label: 'Blog posts', desc: 'Article cards', html: blogPosts },
+  { id: 'faq', category: 'faq', label: 'FAQ', desc: 'Expandable questions', html: faq },
+  { id: 'newsletter', category: 'newsletter', label: 'Newsletter', desc: 'Email signup', html: newsletter },
+  { id: 'video', category: 'media', label: 'Video', desc: 'Media feature block', html: video },
+  { id: 'contact', category: 'contact', label: 'Contact', desc: 'Contact form', html: contact },
+  { id: 'cta', category: 'cta', label: 'Call to action', desc: 'Gradient banner', html: cta },
+  { id: 'footer', category: 'footer', label: 'Footer', desc: 'Links + copyright', html: footer },
 ]
+
+// Every ready-made section: the originals first, then the section library
+// (sectionBlocks/), whose entries also carry a Turkish build (`htmlTr`) and
+// their natural `size` on a 1000px canvas.
+export const HTML_BLOCKS = [...CORE_BLOCKS, ...SECTION_BLOCKS]
