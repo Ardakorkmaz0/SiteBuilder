@@ -54,7 +54,7 @@ describe('the theme scope', () => {
     renderThemeTab()
     const noir = THEME_PRESETS.find((p) => p.id === 'noir')
 
-    fireEvent.click(screen.getByRole('radio', { name: 'This page only' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'This page' }))
     fireEvent.click(screen.getByRole('button', { name: /Noir Gold/ }))
 
     const { schema } = useEditorStore.getState()

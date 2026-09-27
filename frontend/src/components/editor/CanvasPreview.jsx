@@ -10,6 +10,7 @@ import BrowserFrame from './BrowserFrame.jsx'
 import MobileBrowserChrome from './MobileBrowserChrome.jsx'
 import { browserFrameH, browserFrameW, mobileBrowserChromeH } from './browserFrameMetrics.js'
 import PreviewScrollIndicator from './PreviewScrollIndicator.jsx'
+import { previewScaleStyle } from './previewScale.js'
 
 const WORKSPACE_PADDING = 64
 // Edit keeps this strip free for the device caption below the phone. View has
@@ -258,8 +259,7 @@ export default function CanvasPreview({
           <div
             style={{
               width: frameW,
-              transform: scale < 1 ? `scale(${scale})` : undefined,
-              transformOrigin: 'top left',
+              ...previewScaleStyle(scale < 1 ? scale : 1),
             }}
           >
             {mobile ? (
@@ -400,8 +400,7 @@ export default function CanvasPreview({
         <div
           style={{
             width: frameWidth,
-            transform: scale < 1 ? `scale(${scale})` : undefined,
-            transformOrigin: 'top left',
+            ...previewScaleStyle(scale < 1 ? scale : 1),
           }}
         >
           {mobile ? (
