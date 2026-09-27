@@ -28,6 +28,9 @@ const API_CODE_MESSAGES = {
 }
 
 const VALIDATION_CODE_MESSAGES = {
+  // DRF's sign-in serializer: wrong username or password. Without this the
+  // Turkish screen showed its English sentence.
+  authorization: 'Invalid username or password.',
   required: 'This field is required.',
   blank: 'This field cannot be blank.',
   invalid: 'Please enter a valid value.',

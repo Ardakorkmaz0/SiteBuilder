@@ -17,6 +17,15 @@ describe('apiError', () => {
     } } })).toBe('Bu alan zorunludur.')
   })
 
+  it('says a failed sign-in in Turkish, not DRF\'s English sentence', () => {
+    // What the sign-in endpoint actually returns for a wrong password.
+    expect(apiError({ response: { data: {
+      code: 'validation_error',
+      non_field_errors: ['Unable to log in with provided credentials.'],
+      error_codes: { non_field_errors: ['authorization'] },
+    } } })).toBe('Kullanıcı adı veya şifre hatalı.')
+  })
+
   it('keeps English messages when English is selected', () => {
     localStorage.setItem('pwb_language', 'en')
     expect(apiError({ response: { data: { code: 'permission_denied', detail: 'Forbidden' } } }))
