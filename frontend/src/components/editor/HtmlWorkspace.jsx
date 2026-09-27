@@ -1014,6 +1014,8 @@ function HtmlWorkspace({
   // the mode swap follows in the same handler.
   const fullscreenStageRef = useRef(null)
   const modeBeforeFullscreenRef = useRef(null)
+  const wasFullscreenRef = useRef(fullscreen)
+  const restoreModeRef = useRef(false)
   const toggleStageFullscreen = () => {
     const entering = !fullscreen
     onToggleFullscreen?.(fullscreenStageRef.current)
@@ -1023,12 +1025,23 @@ function HtmlWorkspace({
     }
   }
   // Esc, the exit button and the browser's own chrome all end it, so the way
-  // back is keyed on the flag rather than on this component's own button.
+  // back is keyed on the flag rather than on this component's own button, and
+  // on the flag going from on to off: "off with a mode remembered" is also the
+  // moment between the click and the editor turning full screen on, and
+  // restoring then undid the switch to View at once. The pending restore
+  // survives a re-render that cancels its timer, until it has happened.
   useEffect(() => {
-    if (fullscreen || !modeBeforeFullscreenRef.current) return undefined
-    const previous = modeBeforeFullscreenRef.current
-    modeBeforeFullscreenRef.current = null
-    const timer = window.setTimeout(() => switchMode(previous), 0)
+    if (wasFullscreenRef.current && !fullscreen && modeBeforeFullscreenRef.current) {
+      restoreModeRef.current = true
+    }
+    wasFullscreenRef.current = fullscreen
+    if (!restoreModeRef.current) return undefined
+    const timer = window.setTimeout(() => {
+      const previous = modeBeforeFullscreenRef.current
+      modeBeforeFullscreenRef.current = null
+      restoreModeRef.current = false
+      if (previous) switchMode(previous)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [fullscreen, switchMode])
 

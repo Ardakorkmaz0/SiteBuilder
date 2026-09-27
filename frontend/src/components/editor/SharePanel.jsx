@@ -46,7 +46,7 @@ export default function SharePanel({ siteId, reviewUrl, onCopy, copied }) {
     }
   }
 
-  const mode = state?.mode || 'off'
+  const mode = state?.mode
 
   return (
     <div className="space-y-4 rounded-3xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-5">
