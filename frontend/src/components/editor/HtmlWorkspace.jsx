@@ -632,7 +632,9 @@ function HtmlWorkspace({
   // is ready — needed when edit/link is restored on mount (the first effect run
   // happens before the iframe body exists).
   const [loadTick, setLoadTick] = useState(0)
-  const [linkHint, setLinkHint] = useState(null) // link-tool guidance text
+  // Link-tool guidance as [message, values], translated where it is shown:
+  // the listeners that set it outlive a language switch.
+  const [linkHint, setLinkHint] = useState(null)
   // How big the page is drawn, remembered across sessions. Picking a device
   // wider than the editor area used to shrink everything to fit, so the size
   // you set was never the size you saw.
@@ -1274,7 +1276,7 @@ function HtmlWorkspace({
       setHoverTarget(doc, null)
       onCommit?.(serializeDocument(doc))
       paintConnections(doc) // the source's old in-doc line (if any) disappears
-      setLinkHint(`Linked → page (#${pageId}). Click another element to connect more.`)
+      setLinkHint(['Linked to the page #{id}. Click another element to connect more.', { id: pageId }])
       flashNode(doc, anchor)
       return true
     },
@@ -1525,18 +1527,18 @@ function HtmlWorkspace({
         // real pages wrap everything in one container, and using that container
         // made source and target collapse to the same node (link never bound).
         const src = nearestAnchor(e.target, doc.body) || resolveSelectableElement(e.target, doc.body)
-        if (!src) { setLinkHint('Click any element to start the link, then click its target.'); return }
+        if (!src) { setLinkHint(['Click any element to start the link, then click its target.']); return }
         linkSourceRef.current = src
         onLinkArmedChange?.(true)
         setLinkSource(doc, src) // persistent blue highlight until the next click
         setHoverTarget(doc, null)
-        setLinkHint('Now click the target element — or click a PAGE in the left Files panel to link to another page.')
+        setLinkHint(['Now click the target element, or a page in the Files panel on the left to link to that page.'])
         return
       }
       const source = linkSourceRef.current
       const target = resolveSelectableElement(e.target, doc.body)
       if (!target || target === source || source.contains?.(target)) {
-        setLinkHint('Pick a DIFFERENT element as the target.')
+        setLinkHint(['Pick a different element as the target.'])
         return
       }
       const anchor = ensureAnchor(source)
@@ -1548,7 +1550,7 @@ function HtmlWorkspace({
       if (href) {
         onCommitRef.current?.(serializeDocument(doc))
         paintConnections(doc)
-        setLinkHint(`Linked → ${href}. Click another element to connect more.`)
+        setLinkHint(['Linked to {href}. Click another element to connect more.', { href }])
         flashNode(doc, anchor)
       }
     }
@@ -1933,7 +1935,7 @@ function HtmlWorkspace({
                             key={id}
                             type="button"
                             title={t(title)}
-                            onClick={() => { setEditTool(id); setToolMenuOpen(false); setLinkHint(id === 'link' ? t('Click a LINK (nav item / button-link), then click its target.') : null) }}
+                            onClick={() => { setEditTool(id); setToolMenuOpen(false); setLinkHint(id === 'link' ? ['Click a LINK (nav item / button-link), then click its target.'] : null) }}
                             className={`studio-menu-item ${editTool === id ? 'bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]' : ''}`}
                           >
                             <ToolIcon size={13} /> {t(label)}
@@ -2120,7 +2122,7 @@ function HtmlWorkspace({
         {mode === 'edit' && editTool === 'link' && !placing && (
           <div className="flex items-center gap-2 border-b border-[#bfdbfe] bg-[#eff6ff] px-4 py-1.5 text-xs text-[#1e40af]">
             <LinkIcon size={13} aria-hidden />
-            <span>{linkHint || t('Click a LINK (nav item / button-link), then click the element it should jump to.')}</span>
+            <span>{linkHint ? t(...linkHint) : t('Click a LINK (nav item / button-link), then click the element it should jump to.')}</span>
           </div>
         )}
 

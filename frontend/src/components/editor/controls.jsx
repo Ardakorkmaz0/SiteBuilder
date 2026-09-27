@@ -408,15 +408,31 @@ export function LabeledPx({ label, value, onChange }) {
   )
 }
 
-export function LabeledNumber({ label, value, onChange }) {
+// Whole numbers unless `step` is a fraction. A line height of 1.2 and letter
+// spacing of 0.05em used to be rounded on the way in and out: they read as 1
+// and 0, and typing 1.5 turned into 2 under the cursor.
+export function LabeledNumber({ label, value, onChange, step = 1 }) {
+  const fractional = step < 1
+  // What the person is typing ("1.", "0.0") until they leave the field; the
+  // value that comes back from the page would otherwise overwrite it.
+  const [draft, setDraft] = useState(null)
+  const shown = fractional ? String(Number(value) || 0) : Math.round(value ?? 0)
   return (
     <label className="block">
       <span className={labelCls}>{label}</span>
       <input
         type="number"
+        step={step}
         className={inputCls}
-        value={Math.round(value ?? 0)}
-        onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+        value={draft ?? shown}
+        onChange={(e) => {
+          const raw = e.target.value
+          if (fractional) setDraft(raw)
+          // An emptied fraction field clears the style (on a phone: back to the
+          // desktop value); 0 would be a value of its own for letter spacing.
+          onChange(raw === '' ? (fractional ? '' : 0) : Number(raw))
+        }}
+        onBlur={() => setDraft(null)}
       />
     </label>
   )
