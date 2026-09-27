@@ -71,6 +71,13 @@ summary.md
 summary
 TODO.md
 
+# Tool leftovers and one-off reports: useful on the machine that made them,
+# noise in the repository.
+tempCodeRunnerFile.*
+.hallmark/
+docs/verification/
+docs/TEST-RAPORU-*.md
+
 # Misc
 *.iml
 npm-debug.log*
