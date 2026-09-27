@@ -35,6 +35,7 @@ const VALIDATION_CODE_MESSAGES = {
   blank: 'This field cannot be blank.',
   invalid: 'Please enter a valid value.',
   unique: 'This value is already in use.',
+  reserved: 'That username is reserved.',
   min_length: 'This value is too short.',
   max_length: 'This value is too long.',
   password_too_common: 'This password is too common.',
@@ -105,14 +106,20 @@ export function apiError(err, fallback = 'Something went wrong.') {
   const localizedDetail = translatedIfKnown(language, detail)
   if (localizedDetail) return localizedDetail
 
+  const fieldMessage = firstLeaf(Object.fromEntries(
+    Object.entries(data).filter(([key]) => !['code', 'detail', 'error_codes'].includes(key)),
+  ))
+
   if (data.code === 'validation_error') {
+    // The server's own sentence first, when it can be said in this language:
+    // "This username is already taken." tells the person what to change;
+    // the code's generic line ("Please enter a valid value.") does not.
+    const specific = translatedIfKnown(language, fieldMessage)
+    if (specific) return specific
     const validationCode = firstLeaf(data.error_codes)
     const validationMessage = VALIDATION_CODE_MESSAGES[validationCode]
     if (validationMessage) return translate(language, validationMessage)
   }
 
-  const fieldMessage = firstLeaf(Object.fromEntries(
-    Object.entries(data).filter(([key]) => !['code', 'detail', 'error_codes'].includes(key)),
-  ))
   return translatedIfKnown(language, fieldMessage) || fieldMessage || detail || translate(language, fallback)
 }

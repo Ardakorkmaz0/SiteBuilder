@@ -61,9 +61,11 @@ export default function ResetPasswordPage() {
               {error}
             </div>
           )}
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-[var(--studio-text-muted)]">{t('New password')}</span>
+          <div className="block">
+            <label htmlFor="reset-password" className="mb-1.5 block text-sm font-medium text-[var(--studio-text-muted)]">{t('New password')}</label>
             <input
+              id="reset-password"
+              aria-describedby="reset-password-hint"
               type="password"
               className="ms-input"
               value={password}
@@ -78,11 +80,13 @@ export default function ResetPasswordPage() {
                 style={{ width: `${password ? strength.percent : 0}%`, background: strength.color }}
               />
             </div>
-            <span className="mt-1 flex flex-wrap items-center justify-between gap-1 text-xs text-[var(--studio-text-muted)]">
+            {/* Outside the label: the hint and the strength describe the field,
+                they are not its name. A screen reader reads them after it. */}
+            <span id="reset-password-hint" className="mt-1 flex flex-wrap items-center justify-between gap-1 text-xs text-[var(--studio-text-muted)]">
               <span>{t('8+ chars, mix letters, numbers & symbols.')}</span>
               {password && <span style={{ color: strength.color }}>{t(strength.label)}</span>}
             </span>
-          </label>
+          </div>
           <button type="submit" disabled={loading} className="ms-btn ms-btn-primary w-full py-2.5">
             {loading ? t('Saving…') : t('Reset password')}
           </button>
