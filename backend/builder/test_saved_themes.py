@@ -69,3 +69,26 @@ class TestTheNewThemeFields:
     def test_the_accent_follows_the_primary_for_older_themes(self):
         assert sanitize_theme({'primaryColor': '#111111'})['accentColor'] == '#111111'
         assert sanitize_theme({'primaryColor': '#111111', 'accentColor': '#e8543f'})['accentColor'] == '#e8543f'
+
+
+class TestAPageWithItsOwnTheme:
+    def test_the_theme_survives_a_save(self):
+        from .validators import validate_and_clean_schema
+
+        cleaned = validate_and_clean_schema({'pages': [
+            {'id': 'home', 'name': 'Home', 'components': []},
+            {'id': 'about', 'name': 'About', 'components': [], 'theme': {'textColor': '#c2410c'}},
+        ]})
+
+        assert 'theme' not in cleaned['pages'][0]
+        assert cleaned['pages'][1]['theme']['textColor'] == '#c2410c'
+        assert cleaned['pages'][1]['theme']['primaryColor']  # filled in, like the site theme
+
+    def test_it_is_cleaned_like_the_site_theme(self):
+        from .validators import validate_and_clean_schema
+
+        cleaned = validate_and_clean_schema({'pages': [
+            {'id': 'p', 'name': 'P', 'components': [], 'theme': {'textColor': 'red;}</style>'}},
+        ]})
+
+        assert not any(c in cleaned['pages'][0]['theme']['textColor'] for c in ';}<>')

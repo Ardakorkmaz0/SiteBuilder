@@ -79,6 +79,7 @@ import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
 import { emptyHtmlDocument } from '../utils/htmlTemplates.js'
 import { apiError } from '../utils/errors.js'
 import { googleFontHrefForTheme } from '../utils/googleFonts.js'
+import { hasOwnTheme } from '../utils/theme.js'
 import { MOBILE_EDITOR_QUERY, NARROW_EDITOR_QUERY, useMediaQuery } from '../utils/useMediaQuery.js'
 import { fitHtmlEmbedLayout } from '../utils/htmlEmbedMeasure.js'
 import { pageHasMotion } from '../utils/motion.js'
@@ -374,6 +375,8 @@ export default function EditorPage() {
   // is what the page list is for — this button is the way out.
   const goBack = useCallback(() => navigate(lastPageOutside('/profile')), [navigate])
   const theme = useEditorStore((s) => s.schema.theme)
+  // The open page's own theme, when it keeps one ("This page only").
+  const openPageTheme = useEditorStore((s) => s.schema.pages.find((p) => p.id === s.currentPageId)?.theme)
   const editorSchema = useEditorStore((s) => s.schema)
   const customCss = useEditorStore((s) => s.schema.customCss)
   const customJs = useEditorStore((s) => s.schema.customJs)
@@ -746,7 +749,7 @@ export default function EditorPage() {
   // attach the stylesheet to the editor's <head> so the canvas preview
   // renders the same font the published page will. Keyed by the resolved
   // href, so a colour-only theme tweak doesn't re-request the file.
-  const themeFontHref = googleFontHrefForTheme(theme)
+  const themeFontHref = googleFontHrefForTheme(openPageTheme || theme)
   useEffect(() => {
     let link = document.getElementById('pwb-google-font')
     if (!themeFontHref) {
@@ -1328,17 +1331,24 @@ export default function EditorPage() {
   // Theme presets / Apply, on an HTML site: rewrite EVERY page's document
   // with the new palette + font. The current page rides commitHtml (undo +
   // live reseed); the others are merged into the map in the same batch.
-  function applyThemeToAllHtmlPages(theme) {
+  // The site theme goes to every page that follows it; a page with its own
+  // theme is skipped. `pageOnly` ("This page only") touches the open page alone.
+  function applyThemeToAllHtmlPages(theme, { pageOnly = false } = {}) {
     const liveCur = workspaceRef.current?.getHtml?.() ?? pageHtmlMap[currentPageId] ?? ''
-    setPageHtmlMap((prev) => {
-      const next = { ...prev }
-      for (const [pid, h] of Object.entries(prev)) {
-        if (pid === currentPageId || !h || !h.trim()) continue
-        const applied = applyThemeToDocument(h, theme)
-        if (applied) next[pid] = applied
-      }
-      return next
-    })
+    const pages = useEditorStore.getState().schema.pages
+    const ownTheme = new Set(pages.filter(hasOwnTheme).map((p) => p.id))
+    if (!pageOnly) {
+      setPageHtmlMap((prev) => {
+        const next = { ...prev }
+        for (const [pid, h] of Object.entries(prev)) {
+          if (pid === currentPageId || ownTheme.has(pid) || !h || !h.trim()) continue
+          const applied = applyThemeToDocument(h, theme)
+          if (applied) next[pid] = applied
+        }
+        return next
+      })
+    }
+    if (!pageOnly && ownTheme.has(currentPageId)) return
     if (liveCur && liveCur.trim()) {
       const appliedCur = applyThemeToDocument(liveCur, theme)
       if (appliedCur) commitHtml(appliedCur, { reseedWorkspace: true })
