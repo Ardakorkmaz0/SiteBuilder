@@ -23,7 +23,7 @@ from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import ErrorDetail, PermissionDenied, ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -225,10 +225,7 @@ class GoogleLoginView(APIView):
             return error_response('google_email_unverified', 'Email address is not verified.', status.HTTP_400_BAD_REQUEST)
         user = self._get_or_create_user(email, info)
         if not user.is_active:
-            return Response(
-                {'detail': 'Account suspended.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+            return error_response('account_suspended', ACCOUNT_SUSPENDED, status.HTTP_403_FORBIDDEN)
         token, _ = Token.objects.get_or_create(user=user)
         _signed_in(user)
         return Response(
@@ -258,6 +255,11 @@ class GoogleLoginView(APIView):
         return user
 
 
+ACCOUNT_SUSPENDED = 'This account is suspended. Contact support if you think this is a mistake.'
+# DRF's own sentence and code for a failed sign-in (AuthTokenSerializer).
+BAD_CREDENTIALS = 'Unable to log in with provided credentials.'
+
+
 class LoginView(ObtainAuthToken):
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
@@ -270,6 +272,17 @@ class LoginView(ObtainAuthToken):
         data = request.data
         if data.get('username'):
             data = {**data, 'username': normalise_username(data['username'])}
+        # A suspended account was told "wrong username or password" even with
+        # the right password, and a reset email never comes for it, so the
+        # person could not find out why. With the right password they are
+        # told. With a wrong one the answer is the usual one, after the same
+        # single password check, so without the password neither the reply
+        # nor its timing gives the suspension away.
+        suspended = User.objects.filter(username=data.get('username') or '', is_active=False).first()
+        if suspended is not None:
+            if suspended.check_password(data.get('password') or ''):
+                return error_response('account_suspended', ACCOUNT_SUSPENDED, status.HTTP_403_FORBIDDEN)
+            raise ValidationError({'non_field_errors': [ErrorDetail(BAD_CREDENTIALS, code='authorization')]})
         serializer = self.serializer_class(
             data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)

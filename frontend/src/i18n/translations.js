@@ -329,6 +329,7 @@ export const TURKISH_TRANSLATIONS = {
   'Sign in': 'Giriş yap',
   'No account?': 'Hesabınız yok mu?',
   'Create one free': 'Ücretsiz hesap oluşturun',
+  'This account is suspended. Contact support if you think this is a mistake.': 'Bu hesap askıya alındı. Bir hata olduğunu düşünüyorsanız destekle iletişime geçin.',
   'Invalid username or password.': 'Kullanıcı adı veya şifre hatalı.',
   'This username is already taken.': 'Bu kullanıcı adı zaten alınmış.',
   'That username is reserved.': 'Bu kullanıcı adı ayrılmış, başka bir tane seç.',

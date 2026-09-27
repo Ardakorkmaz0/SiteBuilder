@@ -26,6 +26,12 @@ describe('apiError', () => {
     } } })).toBe('Kullanıcı adı veya şifre hatalı.')
   })
 
+  it('tells a suspended account why it cannot sign in', () => {
+    expect(apiError({ response: { status: 403, data: {
+      code: 'account_suspended', detail: 'This account is suspended. Contact support if you think this is a mistake.',
+    } } })).toBe('Bu hesap askıya alındı. Bir hata olduğunu düşünüyorsanız destekle iletişime geçin.')
+  })
+
   it('says which sign-up rule failed rather than "enter a valid value"', () => {
     // The register endpoint's own answers.
     expect(apiError({ response: { data: {

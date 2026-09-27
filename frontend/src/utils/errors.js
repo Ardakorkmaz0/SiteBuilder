@@ -22,6 +22,7 @@ const API_CODE_MESSAGES = {
   admin_suspend_forbidden: 'Another administrator cannot be suspended.',
   invalid_site_action: 'The selected site action is invalid.',
   site_moderated: 'This site was taken down by a moderator.',
+  account_suspended: 'This account is suspended. Contact support if you think this is a mistake.',
   // Development only: runserver kept going while a migration was added.
   database_outdated: 'The database is behind the code. Run "python manage.py migrate" in backend/ and reload the page.',
   api_error: 'The server could not complete the request.',
