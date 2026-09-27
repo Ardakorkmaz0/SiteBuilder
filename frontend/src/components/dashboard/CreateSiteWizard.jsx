@@ -67,12 +67,15 @@ function MiniPreview({ html, title }) {
 }
 
 export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
   const [step, setStep] = useState(0)
   const [stepDirection, setStepDirection] = useState('forward')
   const [title, setTitle] = useState('')
   const [categoryId, setCategoryId] = useState('portfolio')
-  const [contentLanguage, setContentLanguage] = useState('tr')
+  // The site's copy starts in the language the person is using the app in,
+  // as the editor's template picker does; it was fixed to Turkish, so an
+  // English user's new site came out with Turkish text and a Turkish page.
+  const [contentLanguage, setContentLanguage] = useState(language === 'tr' ? 'tr' : 'en')
   const [templateId, setTemplateId] = useState('')
   const [showAllTemplates, setShowAllTemplates] = useState(false)
   const [startMode, setStartMode] = useState('template') // template | blank | import

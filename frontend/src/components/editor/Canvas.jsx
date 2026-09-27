@@ -18,7 +18,8 @@ import { elementIdFor } from '../../utils/anchors.js'
 import { CANVAS_SELECTION_Z } from './spotlight.js'
 import { zoomScale } from './canvasZoom.js'
 import { browserFrameH, browserFrameW, mobileBrowserChromeH } from './browserFrameMetrics.js'
-import { DEFAULT_THEME } from '../../utils/theme.js'
+import { canvasFontFamily } from '../../utils/theme.js'
+import { EmbedFontContext } from '../renderer/embedFont.js'
 import { BRUSH_CURSOR } from './brushCursor.js'
 import PreviewScrollIndicator from './PreviewScrollIndicator.jsx'
 import CanvasSelectionActions from './CanvasSelectionActions.jsx'
@@ -112,7 +113,7 @@ export default function Canvas({
   // affects descendants that don't override fontFamily themselves — the
   // existing per-component baked-in fonts still win, which is the contract
   // the "Apply to design" button operates on.
-  const themeFontFamily = useEditorStore((s) => s.schema?.theme?.fontFamily) || DEFAULT_THEME.fontFamily
+  const themeFontFamily = useEditorStore((s) => canvasFontFamily(s.schema))
 
   const isMobile = viewport === 'mobile'
   const flowMode = !!page.flowMode
@@ -313,15 +314,21 @@ export default function Canvas({
     })
     .filter(Boolean)
 
+  // An armed palette item places itself where the user taps/clicks, and that
+  // must win over everything else while armed. It runs in the capture phase:
+  // components stop their own pointerdown to select and drag, so a tap on a
+  // spot that already held a component used to select that component and
+  // leave the item armed.
+  function placeArmedItem(e) {
+    if (!pendingPlace || e.button !== 0) return
+    e.stopPropagation()
+    e.preventDefault()
+    const rect = canvasElRef.current.getBoundingClientRect()
+    onPlaceAt((e.clientX - rect.left) / canvasScale, (e.clientY - rect.top) / canvasScale)
+  }
+
   function startMarquee(e) {
-    // An armed palette item places itself where the user taps/clicks —
-    // before marquee/deselect logic so placement always wins while armed.
-    if (pendingPlace) {
-      if (e.button !== 0) return
-      const rect = canvasElRef.current.getBoundingClientRect()
-      onPlaceAt((e.clientX - rect.left) / canvasScale, (e.clientY - rect.top) / canvasScale)
-      return
-    }
+    if (pendingPlace) return // placeArmedItem owns the pointer while armed
     if (brushMode) {
       if (e.button !== 0) return
       if (e.target === canvasElRef.current && (brushTarget === 'smart' || brushTarget === 'fill')) {
@@ -393,230 +400,235 @@ export default function Canvas({
   }
 
   const canvas = (
-    <div
-      id="free-canvas"
-      data-builder-canvas-scale={canvasScale}
-      ref={setCanvasRef}
-      onPointerDown={startMarquee}
-      // The artboard reads the way the published page will: an Arabic or Hebrew
-      // page is right-to-left while you design it, not only after export.
-      dir={pageDirection(page)}
-      lang={pageLanguage(page)}
-      style={{
-        position: 'relative',
-        width: canvasW,
-        minHeight,
-        // backgroundColor (not the `background` shorthand) so it can coexist with
-        // the grid overlay's backgroundImage/backgroundSize without React warning.
-        backgroundColor: background,
-        cursor: pendingPlace ? 'crosshair' : brushMode ? BRUSH_CURSOR : undefined,
-        fontFamily: themeFontFamily,
-        // Clip selection chrome (resize handles, outline) and any off-artboard
-        // content at the canvas edge so you can't scroll into empty space beside
-        // the page. Vertical content is unaffected (clip is X-only).
-        overflowX: 'clip',
-        ...(flowMode
-          ? {
-              display: 'flex',
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              alignItems: 'stretch',
-              alignContent: 'flex-start',
-              justifyContent: 'flex-start',
-              gap: flowGap(viewport),
-              padding: `0 ${sidePad}px`,
-              boxSizing: 'border-box',
-            }
-          : {}),
-        // Grid overlay (free canvas only) — drawn over the background colour so
-        // the snap-to-grid step is visible while arranging.
-        ...(!flowMode && gridStep > 0
-          ? {
-              backgroundImage:
-                'linear-gradient(to right, rgba(79,70,229,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(79,70,229,0.08) 1px, transparent 1px)',
-              backgroundSize: `${gridStep}px ${gridStep}px`,
-            }
-          : {}),
-        // Page sheet shadow (desktop artboard only — the phone frame supplies
-        // its own on mobile) so Edit frames the page exactly like View does.
-        ...(isMobile ? {} : { boxShadow: PAGE_SHEET_SHADOW }),
-      }}
-      className={`${isOver ? 'ring-2 ring-[#4f46e5]' : ''}`}
-    >
-      {components.length === 0 && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 px-4 text-center text-gray-400">
-          <p className="text-lg font-medium">{t('Your canvas is empty')}</p>
-          <p className="text-sm">
-            {t('Drag a component from the left onto the canvas.')}
-          </p>
-        </div>
-      )}
-      {components.map((component) =>
-        flowMode ? (
-          <FlowCanvasItem
-            key={component.id}
-            component={component}
-            canvasWidth={canvasW}
-            brushMode={brushMode}
-            brushColor={brushColor}
-            brushTarget={brushTarget}
-            onBrushUse={onBrushUse}
-            canvasScale={canvasScale}
-          />
-        ) : (
-          <FreeCanvasItem
-            key={component.id}
-            component={component}
-            brushMode={brushMode}
-            brushColor={brushColor}
-            brushTarget={brushTarget}
-            onBrushUse={onBrushUse}
-            canvasScale={canvasScale}
-          />
-        ),
-      )}
-
-      {showSelectionActions && selectionActionPosition?.componentId === selectedId && !marquee && (
-        <CanvasSelectionActions
-          componentId={selectedId}
-          canvasScale={canvasScale}
-          onSpotlight={onSpotlight}
-          style={{
-            left: selectionActionPosition.left,
-            top: selectionActionPosition.top,
-            // Free-canvas selections lift their wrapper to z-index 1000. Keep
-            // the shared overlay above that wrapper so it stays clickable when
-            // the safe top-edge fallback places it below the selected item.
-            zIndex: CANVAS_SELECTION_Z,
-          }}
-        />
-      )}
-
-      {/* Rubber-band selection box. */}
-      {marquee && (
-        <div
-          className="pointer-events-none absolute rounded-sm border border-[#4f46e5]"
-          style={{
-            left: marquee.x1,
-            top: marquee.y1,
-            width: marquee.x2 - marquee.x1,
-            height: marquee.y2 - marquee.y1,
-            borderWidth: chrome.hairline,
-            backgroundColor: 'rgba(79,70,229,0.12)',
-            zIndex: 50,
-          }}
-        />
-      )}
-
-      {/* Group toolbar for a multi selection — align, distribute, group delete.
-          Sits above the group's bounding box; when the group hugs the top of
-          the artboard it drops just inside instead, so it can never be pushed
-          off-canvas out of reach (same rule as the single-item toolbar). */}
-      {multiBox && !marquee && (
-        <CanvasMultiActions
-          count={selectedIds.length}
-          canvasScale={canvasScale}
-          style={
-            multiBox.y >= 48
-              ? { left: multiBox.x, top: multiBox.y, transform: 'translateY(calc(-100% - 8px))' }
-              : { left: multiBox.x, top: multiBox.y + 8 }
-          }
-        />
-      )}
-
-      {/* The fold guide only has something to say where the artboard is taller
-          than the screen it will be seen on. On the phone the screen IS the
-          fold now — its bottom edge is the line — so drawing it again just puts
-          a dashed rule across the design. */}
-      {fold > 0 && !isMobile && (
-        <div
-          className="pointer-events-none absolute inset-x-0"
-          style={{ top: fold, zIndex: 40 }}
-        >
-          <div className="border-t-2 border-dashed border-amber-500" style={{ borderTopWidth: chrome.frame }} />
-          <span
-            className="rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-medium text-white shadow"
-            style={{ ...chromeBadgeStyle(chrome, 'top-right'), top: 4 * chrome.hairline, right: 4 * chrome.hairline }}
-          >
-            {t('Visible screen limit')} · {fold}px
-          </span>
-        </div>
-      )}
-
-      {/* Link-tool connector arrows (component → in-page target). */}
-      {linkMode && linkPairs.length > 0 && (
-        <svg
-          className="pointer-events-none absolute inset-0"
-          width={canvasW}
-          height={minHeight}
-          style={{ zIndex: 46, overflow: 'visible' }}
-        >
-          <defs>
-            <marker
-              id="canvas-arrowhead"
-              viewBox="0 0 10 10"
-              refX="9"
-              refY="5"
-              markerWidth="7"
-              markerHeight="7"
-              orient="auto-start-reverse"
-            >
-              <path d="M0,0 L10,5 L0,10 z" fill="#4f46e5" />
-            </marker>
-          </defs>
-          {linkPairs.map((p) => (
-            <g key={p.id}>
-              <line
-                x1={p.x1}
-                y1={p.y1}
-                x2={p.x2}
-                y2={p.y2}
-                stroke="#4f46e5"
-                strokeWidth={2.5 * chrome.hairline}
-                strokeDasharray={`${6 * chrome.hairline} ${4 * chrome.hairline}`}
-                opacity="0.9"
-                markerEnd="url(#canvas-arrowhead)"
-              />
-              <circle cx={p.x1} cy={p.y1} r={4.5 * chrome.hairline} fill="#4f46e5" />
-            </g>
-          ))}
-        </svg>
-      )}
-
-      {/* Live snap guides rendered during free-canvas drags. Each guide is a
-          dashed magenta line at the snapped edge/centre coordinate, extending
-          across the whole artboard so the alignment is obvious. */}
-      {!flowMode && dragGuides && dragGuides.length > 0 &&
-        dragGuides.map((g, i) =>
-          g.type === 'v' ? (
-            <div
-              key={`v${i}`}
-              className="pointer-events-none absolute"
-              style={{
-                left: g.pos,
-                top: 0,
-                bottom: 0,
-                width: 0,
-                borderLeft: `${chrome.hairline}px dashed #ec4899`,
-                zIndex: 45,
-              }}
+    <EmbedFontContext.Provider value={themeFontFamily}>
+      <div
+        id="free-canvas"
+        data-builder-canvas-scale={canvasScale}
+        ref={setCanvasRef}
+        onPointerDownCapture={placeArmedItem}
+        onPointerDown={startMarquee}
+        // The artboard reads the way the published page will: an Arabic or Hebrew
+        // page is right-to-left while you design it, not only after export.
+        dir={pageDirection(page)}
+        lang={pageLanguage(page)}
+        style={{
+          position: 'relative',
+          width: canvasW,
+          minHeight,
+          // backgroundColor (not the `background` shorthand) so it can coexist with
+          // the grid overlay's backgroundImage/backgroundSize without React warning.
+          backgroundColor: background,
+          cursor: pendingPlace ? 'crosshair' : brushMode ? BRUSH_CURSOR : undefined,
+          fontFamily: themeFontFamily,
+          // Clip selection chrome (resize handles, outline) and any off-artboard
+          // content at the canvas edge so you can't scroll into empty space beside
+          // the page. Vertical content is unaffected (clip is X-only).
+          overflowX: 'clip',
+          ...(flowMode
+            ? {
+                display: 'flex',
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                alignItems: 'stretch',
+                alignContent: 'flex-start',
+                justifyContent: 'flex-start',
+                gap: flowGap(viewport),
+                padding: `0 ${sidePad}px`,
+                boxSizing: 'border-box',
+              }
+            : {}),
+          // Grid overlay (free canvas only) — drawn over the background colour so
+          // the snap-to-grid step is visible while arranging.
+          ...(!flowMode && gridStep > 0
+            ? {
+                backgroundImage:
+                  'linear-gradient(to right, rgba(79,70,229,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(79,70,229,0.08) 1px, transparent 1px)',
+                backgroundSize: `${gridStep}px ${gridStep}px`,
+              }
+            : {}),
+          // Page sheet shadow (desktop artboard only — the phone frame supplies
+          // its own on mobile) so Edit frames the page exactly like View does.
+          ...(isMobile ? {} : { boxShadow: PAGE_SHEET_SHADOW }),
+        }}
+        // site-surface keeps the published site's light scheme under a dark
+        // editor, so embeds stay see-through (see index.css).
+        className={`site-surface${isOver ? ' ring-2 ring-[#4f46e5]' : ''}`}
+      >
+        {components.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 px-4 text-center text-gray-400">
+            <p className="text-lg font-medium">{t('Your canvas is empty')}</p>
+            <p className="text-sm">
+              {t('Drag a component from the left onto the canvas.')}
+            </p>
+          </div>
+        )}
+        {components.map((component) =>
+          flowMode ? (
+            <FlowCanvasItem
+              key={component.id}
+              component={component}
+              canvasWidth={canvasW}
+              brushMode={brushMode}
+              brushColor={brushColor}
+              brushTarget={brushTarget}
+              onBrushUse={onBrushUse}
+              canvasScale={canvasScale}
             />
           ) : (
-            <div
-              key={`h${i}`}
-              className="pointer-events-none absolute"
-              style={{
-                top: g.pos,
-                left: 0,
-                right: 0,
-                height: 0,
-                borderTop: `${chrome.hairline}px dashed #ec4899`,
-                zIndex: 45,
-              }}
+            <FreeCanvasItem
+              key={component.id}
+              component={component}
+              brushMode={brushMode}
+              brushColor={brushColor}
+              brushTarget={brushTarget}
+              onBrushUse={onBrushUse}
+              canvasScale={canvasScale}
             />
           ),
         )}
-    </div>
+
+        {showSelectionActions && selectionActionPosition?.componentId === selectedId && !marquee && (
+          <CanvasSelectionActions
+            componentId={selectedId}
+            canvasScale={canvasScale}
+            onSpotlight={onSpotlight}
+            style={{
+              left: selectionActionPosition.left,
+              top: selectionActionPosition.top,
+              // Free-canvas selections lift their wrapper to z-index 1000. Keep
+              // the shared overlay above that wrapper so it stays clickable when
+              // the safe top-edge fallback places it below the selected item.
+              zIndex: CANVAS_SELECTION_Z,
+            }}
+          />
+        )}
+
+        {/* Rubber-band selection box. */}
+        {marquee && (
+          <div
+            className="pointer-events-none absolute rounded-sm border border-[#4f46e5]"
+            style={{
+              left: marquee.x1,
+              top: marquee.y1,
+              width: marquee.x2 - marquee.x1,
+              height: marquee.y2 - marquee.y1,
+              borderWidth: chrome.hairline,
+              backgroundColor: 'rgba(79,70,229,0.12)',
+              zIndex: 50,
+            }}
+          />
+        )}
+
+        {/* Group toolbar for a multi selection — align, distribute, group delete.
+            Sits above the group's bounding box; when the group hugs the top of
+            the artboard it drops just inside instead, so it can never be pushed
+            off-canvas out of reach (same rule as the single-item toolbar). */}
+        {multiBox && !marquee && (
+          <CanvasMultiActions
+            count={selectedIds.length}
+            canvasScale={canvasScale}
+            style={
+              multiBox.y >= 48
+                ? { left: multiBox.x, top: multiBox.y, transform: 'translateY(calc(-100% - 8px))' }
+                : { left: multiBox.x, top: multiBox.y + 8 }
+            }
+          />
+        )}
+
+        {/* The fold guide only has something to say where the artboard is taller
+            than the screen it will be seen on. On the phone the screen IS the
+            fold now — its bottom edge is the line — so drawing it again just puts
+            a dashed rule across the design. */}
+        {fold > 0 && !isMobile && (
+          <div
+            className="pointer-events-none absolute inset-x-0"
+            style={{ top: fold, zIndex: 40 }}
+          >
+            <div className="border-t-2 border-dashed border-amber-500" style={{ borderTopWidth: chrome.frame }} />
+            <span
+              className="rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-medium text-white shadow"
+              style={{ ...chromeBadgeStyle(chrome, 'top-right'), top: 4 * chrome.hairline, right: 4 * chrome.hairline }}
+            >
+              {t('Visible screen limit')} · {fold}px
+            </span>
+          </div>
+        )}
+
+        {/* Link-tool connector arrows (component → in-page target). */}
+        {linkMode && linkPairs.length > 0 && (
+          <svg
+            className="pointer-events-none absolute inset-0"
+            width={canvasW}
+            height={minHeight}
+            style={{ zIndex: 46, overflow: 'visible' }}
+          >
+            <defs>
+              <marker
+                id="canvas-arrowhead"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="7"
+                markerHeight="7"
+                orient="auto-start-reverse"
+              >
+                <path d="M0,0 L10,5 L0,10 z" fill="#4f46e5" />
+              </marker>
+            </defs>
+            {linkPairs.map((p) => (
+              <g key={p.id}>
+                <line
+                  x1={p.x1}
+                  y1={p.y1}
+                  x2={p.x2}
+                  y2={p.y2}
+                  stroke="#4f46e5"
+                  strokeWidth={2.5 * chrome.hairline}
+                  strokeDasharray={`${6 * chrome.hairline} ${4 * chrome.hairline}`}
+                  opacity="0.9"
+                  markerEnd="url(#canvas-arrowhead)"
+                />
+                <circle cx={p.x1} cy={p.y1} r={4.5 * chrome.hairline} fill="#4f46e5" />
+              </g>
+            ))}
+          </svg>
+        )}
+
+        {/* Live snap guides rendered during free-canvas drags. Each guide is a
+            dashed magenta line at the snapped edge/centre coordinate, extending
+            across the whole artboard so the alignment is obvious. */}
+        {!flowMode && dragGuides && dragGuides.length > 0 &&
+          dragGuides.map((g, i) =>
+            g.type === 'v' ? (
+              <div
+                key={`v${i}`}
+                className="pointer-events-none absolute"
+                style={{
+                  left: g.pos,
+                  top: 0,
+                  bottom: 0,
+                  width: 0,
+                  borderLeft: `${chrome.hairline}px dashed #ec4899`,
+                  zIndex: 45,
+                }}
+              />
+            ) : (
+              <div
+                key={`h${i}`}
+                className="pointer-events-none absolute"
+                style={{
+                  top: g.pos,
+                  left: 0,
+                  right: 0,
+                  height: 0,
+                  borderTop: `${chrome.hairline}px dashed #ec4899`,
+                  zIndex: 45,
+                }}
+              />
+            ),
+          )}
+      </div>
+    </EmbedFontContext.Provider>
   )
 
   // Canvas anchor clicks would navigate the EDITOR away (e.g. # adds a hash to

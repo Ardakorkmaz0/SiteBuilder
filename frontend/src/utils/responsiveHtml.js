@@ -7,7 +7,7 @@ import { iconSvg } from './icons.js'
 import { ALERT_VARIANTS } from '../components/renderer/constants.js'
 import { customCssBlock, customJsBlock, pageTheme, themeVariablesCss } from './theme.js'
 import { builderInteractiveTags, withBuilderInteractiveHtml } from './htmlRuntime.js'
-import { htmlEmbedDocument } from './htmlEmbedDocument.js'
+import { htmlEmbedDocument, withEmbedFont } from './htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from './htmlSnippetSizing.js'
 import { googleFontLinkTag } from './googleFonts.js'
 import { navLinkLabel, navbarLinkGap, navbarPlacement } from './navbarLayout.js'
@@ -447,31 +447,34 @@ export function schemaToResponsiveHtml(schema, title = 'My Site') {
     body += `\n    <div class="rh-container"><div class="rh-wrap">${buffer.join('')}</div></div>`
     buffer = []
   }
-  for (const row of rows) {
-    let inline = []
-    const flushInline = () => {
-      if (!inline.length) return
-      const multi = inline.length > 1
-      buffer.push(`<div class="rh-row">${inline.map((c) => item(c, multi)).join('')}</div>`)
-      inline = []
-    }
-    for (const c of row) {
-      if (!isFullWidthComponent(c)) {
-        inline.push(c)
-        continue
+  // HTML embeds are documents of their own: they start in the page's font.
+  withEmbedFont(pageTheme(schema, page).fontFamily, () => {
+    for (const row of rows) {
+      let inline = []
+      const flushInline = () => {
+        if (!inline.length) return
+        const multi = inline.length > 1
+        buffer.push(`<div class="rh-row">${inline.map((c) => item(c, multi)).join('')}</div>`)
+        inline = []
+      }
+      for (const c of row) {
+        if (!isFullWidthComponent(c)) {
+          inline.push(c)
+          continue
+        }
+        flushInline()
+        flush()
+        // Full-width bands never pass through itemEl, so they fold in their own
+        // hover motion — the reveal attribute already rides along in styleAttr.
+        if (c.type === 'navbar') body += '\n    ' + withHoverMotion(navbar(c), c.props)
+        else if (c.type === 'section') body += '\n    ' + withHoverMotion(section(c), c.props)
+        else if (c.type === 'region') body += '\n    ' + withHoverMotion(regionBand(c), c.props)
+        else body += `\n    ${withHoverMotion(`<hr class="rh-divider"${styleAttr(c)} />`, c.props)}`
       }
       flushInline()
-      flush()
-      // Full-width bands never pass through itemEl, so they fold in their own
-      // hover motion — the reveal attribute already rides along in styleAttr.
-      if (c.type === 'navbar') body += '\n    ' + withHoverMotion(navbar(c), c.props)
-      else if (c.type === 'section') body += '\n    ' + withHoverMotion(section(c), c.props)
-      else if (c.type === 'region') body += '\n    ' + withHoverMotion(regionBand(c), c.props)
-      else body += `\n    ${withHoverMotion(`<hr class="rh-divider"${styleAttr(c)} />`, c.props)}`
     }
-    flushInline()
-  }
-  flush()
+    flush()
+  })
 
   return `<!DOCTYPE html>
 <html lang="${pageLanguage(page)}"${pageDirAttr(page)}>

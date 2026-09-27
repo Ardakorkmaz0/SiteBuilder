@@ -66,6 +66,9 @@ export default function CodeActivityOverlay({
   holdMs = HOLD_MS,
   // Given, the card becomes a button that opens this change in the source.
   onOpenSource,
+  // A new value starts the baseline over, like a page switch: the HTML
+  // workspace passes its mode, since Edit reads the file as a DOM round-trip.
+  resetKey,
 }) {
   const { t } = useLanguage()
   const [hovered, setHovered] = useState(false)
@@ -89,7 +92,7 @@ export default function CodeActivityOverlay({
   // we came from is dropped at render, below.
   useEffect(() => {
     lastFiles.current = new Map()
-  }, [pageId])
+  }, [pageId, resetKey])
 
   useEffect(() => {
     if (!authored && !page) return undefined

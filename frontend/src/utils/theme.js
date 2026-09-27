@@ -327,6 +327,12 @@ export function hasOwnTheme(page) {
   return !!page?.theme && typeof page.theme === 'object'
 }
 
+// The font the free canvas sets its page in (and that opted-in HTML embeds are
+// measured and drawn with, see baseFontTag in htmlEmbedDocument.js).
+export function canvasFontFamily(schema) {
+  return schema?.theme?.fontFamily || DEFAULT_THEME.fontFamily
+}
+
 export function pageTheme(schema, page) {
   return normalizeTheme(hasOwnTheme(page) ? page.theme : schema?.theme)
 }

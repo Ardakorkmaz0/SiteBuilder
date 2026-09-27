@@ -23,7 +23,7 @@ import {
   builderInteractiveTags,
   withBuilderInteractiveHtml,
 } from './htmlRuntime.js'
-import { htmlEmbedDocument } from './htmlEmbedDocument.js'
+import { htmlEmbedDocument, withEmbedFont } from './htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from './htmlSnippetSizing.js'
 import { googleFontLinkTag } from './googleFonts.js'
 import {
@@ -628,14 +628,20 @@ function pageHtml(
   </head>
   <body>
     <div class="page p-${page.id}">
-${pageBody(page)}
+${pageBody(page, { font: theme?.fontFamily })}
     </div>
     ${runtimeBody}
   </body>
 </html>`
 }
 
-function pageBody(page, { fixed = 'all' } = {}) {
+// `font` is the page's theme font: HTML embeds are documents of their own and
+// start in it (see withEmbedFont).
+function pageBody(page, { fixed = 'all', font = '' } = {}) {
+  return withEmbedFont(font, () => pageBodyHtml(page, fixed))
+}
+
+function pageBodyHtml(page, fixed) {
   const comps = Array.isArray(page.components) ? page.components : []
   return comps
     .filter((c) => {
@@ -898,7 +904,8 @@ function schemaToScaledHtml(page, title = 'My Site', schema = {}, options = {}) 
     },
     { includeCustomCss: false },
   )
-  const fixedBody = pageBody(page, { fixed: 'only' })
+  const font = pageTheme(schema, page).fontFamily
+  const fixedBody = pageBody(page, { fixed: 'only', font })
 
   return `<!DOCTYPE html>
 <html lang="${pageLanguage(page)}"${pageDirAttr(page)}>
@@ -925,7 +932,7 @@ ${overlayScrollbarCss(options)}${customCssBlock(schema?.customCss)}
     <div class="export-viewport">
       <div class="export-stage">
         <div class="page p-${page.id}">
-${pageBody(page, { fixed: 'exclude' })}
+${pageBody(page, { fixed: 'exclude', font })}
         </div>
       </div>
 ${fixedBody ? `      <div class="export-fixed">\n${fixedBody}\n      </div>` : ''}

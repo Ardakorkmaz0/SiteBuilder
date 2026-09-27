@@ -330,6 +330,11 @@ def sanitize_props(ctype, props):
         # snap back to hugging the content on the next reload.
         if props.get('_boxManual') is True:
             out['_boxManual'] = True
+        # Embeds placed since the site font existed start in it; older boxes
+        # were sized around the browser's default font and keep it. Must
+        # survive a save or a reloaded embed would switch fonts and re-wrap.
+        if props.get('_siteFont') is True:
+            out['_siteFont'] = True
         base = props.get('_baseSize')
         if isinstance(base, dict):
             w = _num(base.get('w'), 0, 0, 4000)

@@ -79,7 +79,7 @@ import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
 import { emptyHtmlDocument } from '../utils/htmlTemplates.js'
 import { apiError } from '../utils/errors.js'
 import { googleFontHrefForTheme } from '../utils/googleFonts.js'
-import { hasOwnTheme } from '../utils/theme.js'
+import { canvasFontFamily, hasOwnTheme } from '../utils/theme.js'
 import { MOBILE_EDITOR_QUERY, NARROW_EDITOR_QUERY, useMediaQuery } from '../utils/useMediaQuery.js'
 import { fitHtmlEmbedLayout } from '../utils/htmlEmbedMeasure.js'
 import { pageHasMotion } from '../utils/motion.js'
@@ -1091,6 +1091,7 @@ export default function EditorPage() {
         props: {
           code: data.html,
           _paletteType: data.type || '',
+          _siteFont: true,
           _paletteVariant: data.preset || '',
           _baseSize: { w: data.w || 360, h: data.h || 120 },
         },
@@ -1124,6 +1125,7 @@ export default function EditorPage() {
         props: {
           code: d.html,
           _paletteType: d.type || '',
+          _siteFont: true,
           _paletteVariant: d.preset || '',
           _baseSize: { w, h },
         },
@@ -1166,7 +1168,7 @@ export default function EditorPage() {
       if (fresh.some((c) => c.id === componentId)) {
         useEditorStore.getState().fitEmbedBox(componentId, patch, { record: false })
       }
-    })
+    }, { font: canvasFontFamily(useEditorStore.getState().schema) })
   }
 
   function autoFitDroppedEmbed() {

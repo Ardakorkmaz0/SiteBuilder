@@ -48,4 +48,12 @@ describe('dark theme color contract', () => {
     expect(legacyDarkSurface).toContain('var(--studio-panel-raised)')
     expect(legacyDarkSurface).not.toContain('var(--studio-accent)')
   })
+
+  it('keeps the page being designed in the light scheme the published site has', () => {
+    // Under a dark scheme every embed iframe on the canvas is painted opaque.
+    const siteSurface = themeCss.match(/\n\.site-surface\s*\{([\s\S]*?)\n\}/)?.[1] || ''
+    expect(siteSurface).toContain('color-scheme: light;')
+    // The dark app's native select styling stays off the page's own selects.
+    expect(themeCss).toContain(':root[data-ui-theme="dark"] select:not(.site-surface *) {')
+  })
 })
