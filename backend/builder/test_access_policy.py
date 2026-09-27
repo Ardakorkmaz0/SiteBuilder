@@ -30,7 +30,8 @@ def world(db):
     owner, owner_token = _user('owner')
     other, other_token = _user('other')
     admin, admin_token = _user('boss', is_staff=True)
-    site = Site.objects.create(owner=owner, title='Public', published=True)
+    # Its review link is shared, so a suspension has something to close.
+    site = Site.objects.create(owner=owner, title='Public', published=True, share_mode='link')
     return {
         'owner': owner, 'site': site,
         'as_owner': _client(owner_token),

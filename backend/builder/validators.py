@@ -70,7 +70,14 @@ DEFAULT_THEME = {
     'radius': '18px',
     'buttonRadius': '980px',
     'shadow': '0 4px 20px rgba(0,0,0,0.08)',
+    # Optional typography overrides: empty leaves each block as designed.
+    'accentColor': '',
+    'headingWeight': '',
+    'headingLetterSpacing': '',
+    'bodyLineHeight': '',
 }
+# Filled from another field when missing, so an older theme keeps its look.
+_THEME_FALLBACKS = {'headingFontFamily': 'fontFamily', 'accentColor': 'primaryColor'}
 
 
 def _str(value, default=''):
@@ -564,13 +571,14 @@ def sanitize_theme_value(value, default):
 def sanitize_theme(theme):
     if not isinstance(theme, dict):
         theme = {}
-    return {
-        key: sanitize_theme_value(
-            theme.get('fontFamily') if key == 'headingFontFamily' and not theme.get(key) else theme.get(key),
-            default,
-        )
+    cleaned = {
+        key: sanitize_theme_value(theme.get(key), default)
         for key, default in DEFAULT_THEME.items()
     }
+    for key, source in _THEME_FALLBACKS.items():
+        if not str(theme.get(key) or '').strip():
+            cleaned[key] = cleaned[source]
+    return cleaned
 
 
 def sanitize_custom_css(value):

@@ -20,6 +20,7 @@ from .models import (
     SiteVersion,
     UploadedImage,
 )
+from .site_meta import share_image
 from .validators import clean_published_pages, validate_and_clean_schema
 
 
@@ -389,13 +390,19 @@ class ExploreSiteSerializer(serializers.ModelSerializer):
     # A flag, not the timestamp: the feed only needs to know whether to draw
     # the badge, and when a superuser pinned something is nobody else's read.
     pinned = serializers.SerializerMethodField()
+    # The owner's chosen sharing image: the card shows it instead of a live
+    # thumbnail, as a shared link does.
+    share_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Site
         fields = ('id', 'title', 'slug', 'owner_id', 'owner_username',
                   'owner_display_name', 'owner_avatar_url', 'category', 'tags',
                   'view_count', 'favorite_count', 'is_favorited', 'pinned',
-                  'updated_at')
+                  'share_image', 'updated_at')
+
+    def get_share_image(self, obj):
+        return share_image(obj)
 
     def get_pinned(self, obj):
         return obj.pinned_at is not None
@@ -454,12 +461,16 @@ class SiteListSerializer(serializers.ModelSerializer):
 
     favorite_count = serializers.IntegerField(read_only=True, default=0)
     project_health = serializers.SerializerMethodField()
+    share_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Site
         fields = ('id', 'title', 'slug', 'published', 'category', 'view_count',
                   'favorite_count', 'custom_domain', 'domain_status',
-                  'project_health', 'created_at', 'updated_at')
+                  'project_health', 'share_image', 'created_at', 'updated_at')
+
+    def get_share_image(self, obj):
+        return share_image(obj)
 
     @staticmethod
     def _component_count(components):

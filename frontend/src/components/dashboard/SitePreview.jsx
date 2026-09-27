@@ -20,6 +20,13 @@ function buildDoc(site) {
   return withoutExecutableScripts(raw)
 }
 
+// The owner's sharing image, when they chose one: the card shows what a shared
+// link shows. Only a web address or a site path; the server sends nothing else.
+function shareImage(site) {
+  const value = String(site?.share_image || '').trim()
+  return /^(https?:\/\/|\/(?!\/))/i.test(value) ? value : ''
+}
+
 // `framed={false}` drops the thumbnail's own border and rounding, for a card
 // that already frames it — a frame inside a frame reads as nesting for its
 // own sake.
@@ -30,6 +37,9 @@ export default function SitePreview({ site, height = 150, source = 'owner', fram
   const [visible, setVisible] = useState(false)
   const [width, setWidth] = useState(360)
   const [failed, setFailed] = useState(false)
+  // A broken image falls back to the live thumbnail rather than an empty box.
+  const [imageFailed, setImageFailed] = useState(false)
+  const image = imageFailed ? '' : shareImage(site)
 
   // Reveal when scrolled near the viewport.
   useEffect(() => {
@@ -62,7 +72,7 @@ export default function SitePreview({ site, height = 150, source = 'owner', fram
   // Fetch + build the document once revealed (the mount initializer already
   // served any cached doc, so a hit never reaches here).
   useEffect(() => {
-    if (!visible || doc) return undefined
+    if (!visible || doc || image) return undefined
     let alive = true
     const fetcher = source === 'public' ? getPublicSite(site.slug) : getSite(site.id)
     fetcher
@@ -73,7 +83,7 @@ export default function SitePreview({ site, height = 150, source = 'owner', fram
       })
       .catch(() => alive && setFailed(true))
     return () => { alive = false }
-  }, [visible, doc, site.id, site.slug, source])
+  }, [visible, doc, image, site.id, site.slug, source])
 
   const scale = width / LOGICAL_W
 
@@ -83,7 +93,16 @@ export default function SitePreview({ site, height = 150, source = 'owner', fram
       className={`relative w-full overflow-hidden bg-[var(--studio-control)] ${framed ? 'rounded-xl border border-[var(--studio-border)]' : ''}`}
       style={{ height }}
     >
-      {doc ? (
+      {image ? (
+        <img
+          src={image}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setImageFailed(true)}
+          className="h-full w-full object-cover"
+        />
+      ) : doc ? (
         <iframe
           title={`preview-${site.id}`}
           srcDoc={doc}

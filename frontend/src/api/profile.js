@@ -7,6 +7,12 @@ export const getProfile = () => client.get('/profile/').then((r) => r.data)
 export const updateProfile = (patch) =>
   client.patch('/profile/', patch).then((r) => r.data)
 
+// Themes saved to the account, for every site. The whole list is written at
+// once: saving, replacing and deleting are each one call. { themes, limit }.
+export const getSavedThemes = () => client.get('/profile/themes/').then((r) => r.data)
+export const putSavedThemes = (themes) =>
+  client.put('/profile/themes/', { themes }).then((r) => r.data)
+
 // Multipart patch for the avatar (axios sets the multipart boundary for FormData).
 export const uploadAvatar = (file) => {
   const form = new FormData()

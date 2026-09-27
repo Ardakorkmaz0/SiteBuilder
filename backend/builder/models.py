@@ -109,17 +109,18 @@ class Site(models.Model):
     # receiving an editor account or access to the owner's dashboard.
     review_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     # Who the share link lets in. The link itself has always existed; what was
-    # missing is the owner's say over it. "link" is what it has always done —
-    # anyone holding it gets in — and stays the default so links already sent
-    # keep working. "people" narrows it to named accounts, and "off" closes it
-    # without changing the address, so turning sharing back on does not force
-    # everyone to be sent a new link.
+    # missing is the owner's say over it. "link" lets anyone holding it in,
+    # "people" narrows it to named accounts, and "off" closes it without
+    # changing the address, so turning sharing back on does not force everyone
+    # to be sent a new link. A new site starts closed: sharing is something the
+    # owner turns on. Sites made before that keep "link", so links already
+    # sent keep working.
     SHARE_CHOICES = (
         ('off', 'Not shared'),
         ('link', 'Anyone with the link'),
         ('people', 'Only invited people'),
     )
-    share_mode = models.CharField(max_length=8, choices=SHARE_CHOICES, default='link')
+    share_mode = models.CharField(max_length=8, choices=SHARE_CHOICES, default='off')
     custom_domain = models.CharField(max_length=253, blank=True, default='', db_index=True)
     domain_status = models.CharField(
         max_length=16,
@@ -528,6 +529,10 @@ class Profile(models.Model):
     github = models.CharField(max_length=100, blank=True, default='')
     twitter = models.CharField(max_length=100, blank=True, default='')
     instagram = models.CharField(max_length=100, blank=True, default='')
+    # Themes this person saved from the theme panel: [{id, name, theme}]. On
+    # the account rather than a site, so a theme made for one site can dress
+    # the next. Cleaned on the way in (views.SavedThemesView).
+    saved_themes = models.JSONField(default=list, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

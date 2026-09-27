@@ -60,6 +60,7 @@ import { brushElementPatch } from '../../utils/htmlRecolor.js'
 import { hasUnsavedSourceDraft } from '../../utils/htmlSourceDraft.js'
 import { applyElementMotion, applyMotionRest } from '../../utils/htmlMotion.js'
 import CanvasZoomControl from './CanvasZoomControl.jsx'
+import FullscreenStage from './FullscreenStage.jsx'
 import { readZoom, writeZoom, zoomScale } from './canvasZoom.js'
 import BrushControls from './BrushControls.jsx'
 import { EditIcon, MoveIcon, LinkIcon, PinIcon, LightbulbIcon, FileCodeIcon, WarningIcon, PaletteIcon, MoreHorizontalIcon, MonitorIcon, ChevronDownIcon } from '../icons.jsx'
@@ -1008,6 +1009,30 @@ function HtmlWorkspace({
     setNonce((n) => n + 1)
     setMode(next)
   }, [assemble, clearSelection, mode, onCommit, readHtml])
+
+  // Full screen is the page as a visitor sees it, in the chosen PC or phone
+  // frame: Edit and Source step aside to View for its duration and return
+  // after. The request goes out in the click (the browser needs the gesture);
+  // the mode swap follows in the same handler.
+  const fullscreenStageRef = useRef(null)
+  const modeBeforeFullscreenRef = useRef(null)
+  const toggleStageFullscreen = () => {
+    const entering = !fullscreen
+    onToggleFullscreen?.(fullscreenStageRef.current)
+    if (entering && (mode === 'edit' || mode === 'source')) {
+      modeBeforeFullscreenRef.current = mode
+      switchMode('view')
+    }
+  }
+  // Esc, the exit button and the browser's own chrome all end it, so the way
+  // back is keyed on the flag rather than on this component's own button.
+  useEffect(() => {
+    if (fullscreen || !modeBeforeFullscreenRef.current) return undefined
+    const previous = modeBeforeFullscreenRef.current
+    modeBeforeFullscreenRef.current = null
+    const timer = window.setTimeout(() => switchMode(previous), 0)
+    return () => window.clearTimeout(timer)
+  }, [fullscreen, switchMode])
 
   // When a palette component is picked (click or drag), force the iframe into
   // edit mode so its document is same-origin + mutable for placement.
@@ -1964,7 +1989,7 @@ function HtmlWorkspace({
                     fitScale={fitScale}
                     onZoom={changeZoom}
                     fullscreen={fullscreen}
-                    onToggleFullscreen={onToggleFullscreen}
+                    onToggleFullscreen={onToggleFullscreen ? toggleStageFullscreen : undefined}
                   />
                 )}
               </div>
@@ -2090,6 +2115,7 @@ function HtmlWorkspace({
           </div>
         )}
 
+        <FullscreenStage ref={fullscreenStageRef} active={fullscreen} onExit={toggleStageFullscreen}>
         {mode === 'live' ? (
           liveUrl ? (
             <main className="relative flex min-h-0 flex-1 flex-col bg-[#0b0b0b]">
@@ -2162,7 +2188,7 @@ function HtmlWorkspace({
             // scaled box centres itself with auto margins rather than
             // justify-center, which would push its left edge past the scroll
             // origin where no scrollbar can reach it.
-            className={`relative flex flex-1 items-start ${zoom === 'fit' ? 'overflow-hidden' : 'overflow-auto'} bg-[var(--studio-shell)] p-3`}
+            className={`relative flex flex-1 items-start ${zoom === 'fit' ? 'overflow-hidden' : 'overflow-auto'} bg-[var(--studio-shell)] ${fullscreen && isFit && !desktopBrowser && zoom === 'fit' ? 'p-0' : 'p-3'}`}
           >
             {isFit && !desktopBrowser && zoom === 'fit' ? (
               // Responsive ("area width") preview: the iframe simply FILLS the
@@ -2245,6 +2271,7 @@ function HtmlWorkspace({
             )}
           </main>
         )}
+        </FullscreenStage>
       </div>
     </div>
   )

@@ -22,3 +22,9 @@ export const isMobileDevice = (id) => {
   const d = DEVICES.find((x) => x.id === id)
   return !!d && d.w > 0 && d.w < 768
 }
+
+// The sizes one side of that toggle offers: phones under Mobile, everything
+// else (the area width, desktops, tablets) under PC. One list for both would
+// put an iPhone under PC and flip the toggle the moment it was picked.
+export const devicesFor = (viewport) =>
+  DEVICES.filter((d) => isMobileDevice(d.id) === (viewport === 'mobile'))

@@ -2315,13 +2315,19 @@ export const useEditorStore = create((set, get) => ({
 
   updateTheme: (patch) => {
     get().record('theme')
-    set((state) => ({
-      schema: {
-        ...state.schema,
-        theme: normalizeTheme({ ...(state.schema.theme || {}), ...patch }),
-      },
-      dirty: true,
-    }))
+    set((state) => {
+      const before = normalizeTheme(state.schema.theme)
+      const next = { ...(state.schema.theme || {}), ...patch }
+      // An accent nobody chose follows the primary color, so changing the
+      // primary does not leave the badges in the old one.
+      if (patch?.primaryColor && !('accentColor' in patch) && before.accentColor === before.primaryColor) {
+        next.accentColor = patch.primaryColor
+      }
+      return {
+        schema: { ...state.schema, theme: normalizeTheme(next) },
+        dirty: true,
+      }
+    })
   },
 
   applyTheme: () => {

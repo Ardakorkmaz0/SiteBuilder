@@ -66,7 +66,7 @@ describe('changing it', () => {
 describe('the full-screen switch', () => {
   it('is only offered when the editor can act on it', () => {
     renderControl()
-    expect(screen.queryByRole('button', { name: 'Full screen editing' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Full screen preview' })).toBeNull()
   })
 
   it('says which way it goes', async () => {
@@ -74,7 +74,7 @@ describe('the full-screen switch', () => {
     const onToggleFullscreen = vi.fn()
     const { rerender } = renderControl({ onToggleFullscreen })
 
-    await user.click(screen.getByRole('button', { name: 'Full screen editing' }))
+    await user.click(screen.getByRole('button', { name: 'Full screen preview' }))
     expect(onToggleFullscreen).toHaveBeenCalled()
 
     rerender(
@@ -86,35 +86,40 @@ describe('the full-screen switch', () => {
   })
 })
 
-describe('full-screen editing', () => {
+describe('full-screen preview', () => {
+  let stage
   beforeEach(() => {
+    stage = document.createElement('div')
+    stage.requestFullscreen = vi.fn(() => Promise.resolve())
     document.documentElement.requestFullscreen = vi.fn(() => Promise.resolve())
     document.exitFullscreen = vi.fn(() => Promise.resolve())
     Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null, writable: true })
   })
 
-  it('asks the browser for real full screen, not just a layout change', () => {
+  it('puts the page stage on the screen, not the whole editor', () => {
     const { result } = renderHook(() => useFullscreenEditing())
 
-    act(() => result.current.toggleFullscreen())
+    act(() => result.current.toggleFullscreen(stage))
 
     expect(result.current.fullscreen).toBe(true)
-    expect(document.documentElement.requestFullscreen).toHaveBeenCalled()
+    expect(stage.requestFullscreen).toHaveBeenCalled()
+    // The document going full screen is what kept the toolbars and rails.
+    expect(document.documentElement.requestFullscreen).not.toHaveBeenCalled()
   })
 
-  it('still hides the panels when the browser refuses', () => {
+  it('still turns on when the browser refuses, so the stage can cover the window', () => {
     // A refused request must not leave the button doing nothing at all.
-    document.documentElement.requestFullscreen = vi.fn(() => Promise.reject(new Error('denied')))
+    stage.requestFullscreen = vi.fn(() => Promise.reject(new Error('denied')))
     const { result } = renderHook(() => useFullscreenEditing())
 
-    act(() => result.current.toggleFullscreen())
+    act(() => result.current.toggleFullscreen(stage))
 
     expect(result.current.fullscreen).toBe(true)
   })
 
   it('follows the browser out when it leaves full screen on its own', () => {
     const { result } = renderHook(() => useFullscreenEditing())
-    act(() => result.current.toggleFullscreen())
+    act(() => result.current.toggleFullscreen(stage))
 
     // Esc / F11 / the window chrome — none of them go through our button.
     act(() => { document.dispatchEvent(new Event('fullscreenchange')) })
@@ -123,9 +128,9 @@ describe('full-screen editing', () => {
   })
 
   it('leaves on Escape even when there is no real full screen to exit', () => {
-    document.documentElement.requestFullscreen = vi.fn(() => Promise.reject(new Error('denied')))
+    stage.requestFullscreen = vi.fn(() => Promise.reject(new Error('denied')))
     const { result } = renderHook(() => useFullscreenEditing())
-    act(() => result.current.toggleFullscreen())
+    act(() => result.current.toggleFullscreen(stage))
 
     act(() => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
 

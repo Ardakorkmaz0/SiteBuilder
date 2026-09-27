@@ -10,6 +10,7 @@
 // blank description is worse than none, because scrapers show the empty result.
 import { sanitizeImageSrc, sanitizeUrl } from './sanitize.js'
 import { isRtlLanguage, normalizeLanguageTag } from './languages.js'
+import { closingTagIndex } from './htmlInsert.js'
 
 function esc(s) {
   return String(s ?? '').replace(
@@ -98,4 +99,50 @@ export function pageBehaviourCss(page) {
 export function pageBehaviourStyleTag(page) {
   const css = pageBehaviourCss(page)
   return css ? `\n    <style>${css}</style>` : ''
+}
+
+// The key a head tag answers to: its property/name, or rel=canonical.
+function headTagKey(tag) {
+  const meta = /\b(?:property|name)\s*=\s*["']?([^"'\s>]+)/i.exec(tag)
+  if (/^<meta\b/i.test(tag) && meta) return meta[1].toLowerCase()
+  if (/^<link\b/i.test(tag) && /\brel\s*=\s*["']?canonical\b/i.test(tag)) return 'canonical'
+  return ''
+}
+
+// An uploaded page is published as its own document, so the sharing fields
+// in its Page settings never reached it: the sharing image set there did
+// nothing. What the owner set replaces the document's own tag of the same
+// name; a field left empty leaves the document alone. og:type is only added
+// when missing (an author's "article" is more specific), and twitter:card
+// only changes when an image is set, so a large card is not shrunk.
+export function withPageSeoTags(html, page) {
+  const source = String(html || '')
+  const tags = seoHeadTags(page, '').split('\n').map((line) => line.trim()).filter(Boolean)
+  if (!tags.length) return source
+  const headEnd = closingTagIndex(source, 'head')
+  let head = headEnd === -1 ? '' : source.slice(0, headEnd)
+  const present = new Set()
+  for (const match of head.matchAll(/<(?:meta|link)\b[^>]*>/gi)) {
+    const key = headTagKey(match[0])
+    if (key) present.add(key)
+  }
+  const setsImage = tags.some((tag) => headTagKey(tag) === 'og:image')
+  const keep = tags.filter((tag) => {
+    const key = headTagKey(tag)
+    if (key === 'og:type') return !present.has(key)
+    if (key === 'twitter:card') return setsImage || !present.has(key)
+    return true
+  })
+  const replacing = new Set(keep.map(headTagKey).filter(Boolean))
+  if (headEnd !== -1) {
+    head = head.replace(/<(?:meta|link)\b[^>]*>\s*/gi, (tag) => (
+      replacing.has(headTagKey(tag.trim())) ? '' : tag
+    ))
+    return head + keep.join('\n    ') + '\n  ' + source.slice(headEnd)
+  }
+  // No </head>: after <head>, else after <html>, else after the doctype, so
+  // the tags never precede it and push the page into quirks mode.
+  const anchor = /<head\b[^>]*>/i.exec(source) || /<html\b[^>]*>/i.exec(source) || /<!doctype[^>]*>/i.exec(source)
+  const at = anchor ? anchor.index + anchor[0].length : 0
+  return source.slice(0, at) + keep.join('') + source.slice(at)
 }

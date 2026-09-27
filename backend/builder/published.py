@@ -35,6 +35,7 @@ from django.utils.xmlutils import SimplerXMLGenerator
 from django.views.decorators.http import require_safe
 from io import StringIO
 
+from .site_meta import with_site_meta
 from .access import public_sites
 from .visits import record_served_view
 
@@ -82,7 +83,8 @@ def serve_published_page(request, slug, path=''):
     # has no app JavaScript to do that, so the address people actually share
     # was the one nobody counted.
     record_served_view(site, request, wanted)
-    return _harden(HttpResponse(page.html, content_type='text/html; charset=utf-8'))
+    html = with_site_meta(page.html, site, request.build_absolute_uri('/'))
+    return _harden(HttpResponse(html, content_type='text/html; charset=utf-8'))
 
 
 @require_safe
@@ -297,12 +299,20 @@ def serve_for_host(site, path, request=None):
     if request is not None:
         record_served_view(site, request, wanted)
     response = _harden(
-        HttpResponse(_DomainDocument(page.html, site).render(), content_type='text/html; charset=utf-8'),
+        HttpResponse(
+            _DomainDocument(with_site_meta(page.html, site, _media_origin()), site).render(),
+            content_type='text/html; charset=utf-8',
+        ),
         sandbox=False,
     )
     if page.no_index:
         response['X-Robots-Tag'] = 'noindex'
     return response
+
+
+def _media_origin():
+    # Where the platform's uploads are served from, as the rewrite above uses.
+    return (getattr(settings, 'CUSTOM_DOMAIN_MEDIA_ORIGIN', '') or settings.FRONTEND_URL).rstrip('/')
 
 
 def serve_domain_form(site, request):

@@ -58,6 +58,36 @@ describe('publishedPagesFor', () => {
     expect(pages[1].html).toBe(uploaded)
   })
 
+  it("gives an uploaded page the sharing image set in its Page settings", () => {
+    const uploaded = '<!DOCTYPE html><html><head><title>Mine</title>'
+      + '<meta property="og:image" content="https://old.example/a.png"><meta property="og:type" content="article">'
+      + '</head><body>hi</body></html>'
+    const withImage = {
+      ...schema,
+      pages: [schema.pages[0], { ...schema.pages[1], seoImage: 'https://cdn.example/card.png' }],
+    }
+
+    const html = publishedPagesFor(withImage, { about: uploaded }, 'Ada')[1].html
+
+    // The setting replaces the file's own tag rather than adding a second one.
+    expect(html.match(/og:image/g)).toHaveLength(1)
+    expect(html).toContain('<meta property="og:image" content="https://cdn.example/card.png" />')
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image" />')
+    // What the author wrote and the settings leave alone stays.
+    expect(html).toContain('<meta property="og:type" content="article">')
+    expect(html).toContain('<title>Mine</title>')
+    expect(html.indexOf('og:image')).toBeLessThan(html.indexOf('</head>'))
+  })
+
+  it('never puts the tags in front of the doctype of a page with no head', () => {
+    const uploaded = '<!doctype html><p>hi</p>'
+    const withImage = { ...schema, pages: [{ ...schema.pages[0], seoImage: 'https://cdn.example/card.png' }] }
+
+    const html = publishedPagesFor(withImage, { home: uploaded }, 'Ada')[0].html
+
+    expect(html.startsWith('<!doctype html><meta')).toBe(true)
+  })
+
   it('leaves out a page that cannot be rendered rather than failing the publish', () => {
     const broken = { theme: {}, pages: [page('home', 'Home'), { id: 'bad', name: 'Bad', components: 'not-a-list' }] }
     const pages = publishedPagesFor(broken, {}, 'Ada')

@@ -5,7 +5,8 @@ import PanelTabs from './PanelTabs.jsx'
 import PanelGroup from './PanelGroup.jsx'
 import AiComponentEdit from './AiComponentEdit.jsx'
 import { LINKABLE_TYPES } from '../renderer/constants.js'
-import { DEFAULT_THEME, FONT_OPTIONS, THEME_PRESETS, normalizeTheme } from '../../utils/theme.js'
+import { DEFAULT_THEME, FONT_OPTIONS, THEME_PRESETS, normalizeTheme, presetTheme, sameTheme } from '../../utils/theme.js'
+import SavedThemes, { ThemeSwatchButton } from './SavedThemes.jsx'
 import { hiddenByPinnedBar } from '../../utils/pinnedCover.js'
 import { presetOptions, presetsForType } from '../../utils/componentPresets.js'
 import {
@@ -236,6 +237,20 @@ const THEME_SHAPES = [
   ['soft', 'Soft', '8px', '8px'],
   ['rounded', 'Rounded', '16px', '12px'],
   ['pill', 'Pill buttons', '18px', '999px'],
+]
+
+// Typography choices. The empty value leaves every block as designed; picking
+// one sets it on every heading or paragraph when the theme is applied.
+const HEADING_WEIGHTS = [
+  ['', 'As designed'], ['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'],
+  ['700', 'Bold'], ['800', 'Extra bold'], ['900', 'Black'],
+]
+const HEADING_TRACKING = [
+  ['', 'As designed'], ['-0.03em', 'Tight'], ['-0.015em', 'Slightly tight'],
+  ['0em', 'Normal'], ['0.02em', 'Wide'], ['0.06em', 'Extra wide'],
+]
+const BODY_LINE_HEIGHTS = [
+  ['', 'As designed'], ['1.4', 'Compact'], ['1.55', 'Comfortable'], ['1.7', 'Relaxed'], ['1.9', 'Airy'],
 ]
 
 const THEME_SHADOWS = [
@@ -714,7 +729,15 @@ export default function PropertiesPanel({
     }
     if (Object.keys(updates).length) setLayoutMany(updates)
   }
-  const theme = schema.theme || DEFAULT_THEME
+  // Normalized so a theme saved before a field existed still shows a value.
+  const theme = normalizeTheme(schema.theme || DEFAULT_THEME)
+  // A whole theme at once (a preset or a saved one): set it, then restyle the
+  // design (components) or every page's document (HTML), as presets always did.
+  const applyWholeTheme = (next) => {
+    updateTheme(next)
+    if (htmlMode) onApplyThemeToHtml?.(normalizeTheme(next))
+    else applyTheme()
+  }
   // Extra hints and the X/Y fields used to hide behind a Basic/Extended switch
   // in this panel. That switch is gone — collapsible groups do that job — so
   // they now follow the app-wide Simple mode alone.
@@ -1024,38 +1047,26 @@ export default function PropertiesPanel({
             {/* One-click presets: set the palette AND restyle everything —
                 the component schema (component mode) or every HTML page's
                 document (HTML mode). New components inherit the active theme. */}
-            <div className="grid grid-cols-2 gap-1.5">
-              {THEME_PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  title={t('Use the "{name}" theme and apply it to the whole site', { name: t(p.name) })}
-                  onClick={() => {
-                    const presetTheme = {
-                      ...p.theme,
-                      headingFontFamily: p.theme.fontFamily,
-                      buttonTextColor: p.id === 'noir' ? '#121110' : '#ffffff',
-                      borderColor: p.theme.mutedColor,
-                    }
-                    updateTheme(presetTheme)
-                    if (htmlMode) onApplyThemeToHtml?.(normalizeTheme(presetTheme))
-                    else applyTheme()
-                  }}
-                  className="flex min-w-0 items-center gap-1.5 rounded-lg border border-[#e5e7eb] bg-white px-2 py-1.5 text-left text-[11px] font-medium text-[#374151] transition hover:border-[#4f46e5] hover:bg-[#eef2ff]"
-                >
-                  <span className="flex shrink-0 -space-x-1">
-                    {[p.theme.primaryColor, p.theme.headerColor, p.theme.softColor].map((c, i) => (
-                      <span
-                        key={i}
-                        className="h-3.5 w-3.5 rounded-full border border-black/10"
-                        style={{ background: c }}
-                      />
-                    ))}
-                  </span>
-                  <span className="truncate">{t(p.name)}</span>
-                </button>
-              ))}
-            </div>
+            {[
+              ['light', t('Light'), THEME_PRESETS.filter((p) => !p.dark)],
+              ['dark', t('Dark'), THEME_PRESETS.filter((p) => p.dark)],
+            ].map(([group, heading, presets]) => (
+              <div key={group} className="space-y-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--studio-text-muted)]">{heading}</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {presets.map((p) => (
+                    <ThemeSwatchButton
+                      key={p.id}
+                      theme={p.theme}
+                      name={t(p.name)}
+                      active={sameTheme(presetTheme(p), theme)}
+                      title={t('Use the "{name}" theme and apply it to the whole site', { name: t(p.name) })}
+                      onClick={() => applyWholeTheme(presetTheme(p))}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
             <LabeledColor
               label={t('Primary color')}
               value={theme.primaryColor}
@@ -1096,6 +1107,10 @@ export default function PropertiesPanel({
                 </span>
               </div>
             </div>
+        </PanelGroup>
+
+        <PanelGroup id="theme-mine" title={t('My themes')} defaultOpen>
+          <SavedThemes theme={theme} onApply={(item) => applyWholeTheme(item.theme)} />
         </PanelGroup>
 
         {!simpleMode && (
@@ -1146,6 +1161,14 @@ export default function PropertiesPanel({
               value={theme.headerTextColor}
               onChange={(v) => updateTheme({ headerTextColor: v })}
             />
+            <LabeledColor
+              label={t('Accent color')}
+              value={theme.accentColor}
+              onChange={(v) => updateTheme({ accentColor: v })}
+            />
+            <p className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
+              {t('Badges and icons use the accent; HTML pages get it as their second brand color.')}
+            </p>
             </PanelGroup>
             <PanelGroup id="theme-type" title={t('Type & corners')}>
             <LabeledSelect
@@ -1159,6 +1182,24 @@ export default function PropertiesPanel({
               value={theme.headingFontFamily}
               onChange={(v) => updateTheme({ headingFontFamily: v })}
               options={FONT_OPTIONS.map(([value, label]) => [value, t(label)])}
+            />
+            <LabeledSelect
+              label={t('Heading weight')}
+              value={theme.headingWeight}
+              onChange={(v) => updateTheme({ headingWeight: v })}
+              options={HEADING_WEIGHTS.map(([value, label]) => [value, t(label)])}
+            />
+            <LabeledSelect
+              label={t('Heading letter spacing')}
+              value={theme.headingLetterSpacing}
+              onChange={(v) => updateTheme({ headingLetterSpacing: v })}
+              options={HEADING_TRACKING.map(([value, label]) => [value, t(label)])}
+            />
+            <LabeledSelect
+              label={t('Text line height')}
+              value={theme.bodyLineHeight}
+              onChange={(v) => updateTheme({ bodyLineHeight: v })}
+              options={BODY_LINE_HEIGHTS.map(([value, label]) => [value, t(label)])}
             />
             <LabeledSelect
               label={t('Corner style')}
