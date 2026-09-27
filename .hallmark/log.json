@@ -1,0 +1,4 @@
+[
+  { "date": "2026-09-26", "macrostructure": "Narrative Workflow", "theme": "design.md (logo indigo)", "enrichment": "none (live editable block)", "nav": "N1", "footer": "Ft2", "brief": "Sitebuilder promo page (standalone HTML, Desktop/sitebuilder-tanitim.html)" },
+  { "date": "2026-09-26", "scope": "app", "macrostructure": "Split Studio (front door) · Ecosystem Index (home) · Portfolio Grid (lists)", "theme": "design.md (logo indigo)", "enrichment": "none", "brief": "App redesign, every screen except the editor" }
+]
