@@ -27,6 +27,15 @@ function shareImage(site) {
   return /^(https?:\/\/|\/(?!\/))/i.test(value) ? value : ''
 }
 
+// A sharing card (1200x630 and the like) fills the thumbnail. Anything closer
+// to square, a logo above all, is shown whole instead: filling a wide, short
+// box with it blows up its middle and cuts the rest away.
+const COVER_MIN_RATIO = 1.6
+
+function imageFit(width, height) {
+  return width > 0 && height > 0 && width / height >= COVER_MIN_RATIO ? 'cover' : 'contain'
+}
+
 // `framed={false}` drops the thumbnail's own border and rounding, for a card
 // that already frames it — a frame inside a frame reads as nesting for its
 // own sake.
@@ -40,6 +49,8 @@ export default function SitePreview({ site, height = 150, source = 'owner', fram
   // A broken image falls back to the live thumbnail rather than an empty box.
   const [imageFailed, setImageFailed] = useState(false)
   const image = imageFailed ? '' : shareImage(site)
+  // Whole until measured: a wrong guess then shows a margin, never a crop.
+  const [fit, setFit] = useState('contain')
 
   // Reveal when scrolled near the viewport.
   useEffect(() => {
@@ -88,9 +99,12 @@ export default function SitePreview({ site, height = 150, source = 'owner', fram
   const scale = width / LOGICAL_W
 
   return (
+    // contain: inline-size keeps the thumbnail at the width it is given. A
+    // 1200px image or page inside it otherwise sets the minimum width of a
+    // grid track sized by content, and the card and page overflow with it.
     <div
       ref={boxRef}
-      className={`relative w-full overflow-hidden bg-[var(--studio-control)] ${framed ? 'rounded-xl border border-[var(--studio-border)]' : ''}`}
+      className={`relative w-full overflow-hidden bg-[var(--studio-control)] [contain:inline-size] ${framed ? 'rounded-xl border border-[var(--studio-border)]' : ''}`}
       style={{ height }}
     >
       {image ? (
@@ -100,7 +114,9 @@ export default function SitePreview({ site, height = 150, source = 'owner', fram
           loading="lazy"
           decoding="async"
           onError={() => setImageFailed(true)}
-          className="h-full w-full object-cover"
+          onLoad={(event) => setFit(imageFit(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight))}
+          data-fit={fit}
+          className={fit === 'cover' ? 'h-full w-full object-cover' : 'h-full w-full object-contain p-3'}
         />
       ) : doc ? (
         <iframe

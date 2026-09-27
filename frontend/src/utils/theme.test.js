@@ -23,17 +23,17 @@ describe('the presets', () => {
 
   it('keep button text readable on the button', () => {
     // WCAG's 4.5:1 for normal text, measured on each preset's own pair.
-    const luminance = (hex) => {
+    const luminance = (color) => {
+      const hex = color.replace('#', '')
       const channel = (i) => {
         const v = parseInt(hex.slice(i, i + 2), 16) / 255
         return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
       }
-      const h = hex.replace('#', '')
       return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4)
     }
     for (const preset of THEME_PRESETS) {
       const theme = presetTheme(preset)
-      const [a, b] = [luminance(theme.primaryColor.replace('#', '')), luminance(theme.buttonTextColor.replace('#', ''))]
+      const [a, b] = [luminance(theme.primaryColor), luminance(theme.buttonTextColor)]
       const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
       expect(ratio, preset.id).toBeGreaterThanOrEqual(4.5)
     }

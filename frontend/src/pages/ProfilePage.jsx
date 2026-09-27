@@ -336,7 +336,7 @@ export default function ProfilePage() {
           </section>
         )}
 
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(17rem,0.72fr)_minmax(0,1.55fr)]">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(17rem,0.72fr)_minmax(0,1.55fr)]">
           <div className="space-y-6">
           <section className="dashboard-section-card p-5 sm:p-6" aria-labelledby="profile-details-heading">
             <h2 id="profile-details-heading" className="text-lg font-semibold text-[var(--studio-text)]">{t('Profile details')}</h2>
@@ -527,7 +527,7 @@ export default function ProfilePage() {
             ) : visibleSites.length === 0 ? (
               <p className="mt-6 text-sm text-[var(--studio-text-muted)]">{t('No sites match “{query}”.', { query })}</p>
             ) : (
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
                 {visibleSites.map((site) => (
                   <OwnerSiteCard
                     key={site.id}

@@ -52,6 +52,30 @@ describe('SitePreview', () => {
     expect(screen.getByText('Loading preview…')).toBeInTheDocument()
   })
 
+  it('shows a logo whole instead of blowing up its middle', () => {
+    const { container } = renderPreview({ share_image: 'https://cdn.example/logo.png' })
+    const img = container.querySelector('img')
+    Object.defineProperty(img, 'naturalWidth', { value: 800 })
+    Object.defineProperty(img, 'naturalHeight', { value: 800 })
+
+    fireEvent.load(img)
+
+    expect(img).toHaveAttribute('data-fit', 'contain')
+    expect(img.className).toContain('object-contain')
+  })
+
+  it('lets a sharing card fill the thumbnail', () => {
+    const { container } = renderPreview({ share_image: 'https://cdn.example/card.png' })
+    const img = container.querySelector('img')
+    Object.defineProperty(img, 'naturalWidth', { value: 1200 })
+    Object.defineProperty(img, 'naturalHeight', { value: 630 })
+
+    fireEvent.load(img)
+
+    expect(img).toHaveAttribute('data-fit', 'cover')
+    expect(img.className).toContain('object-cover')
+  })
+
   it('ignores anything that is not a web address or a site path', () => {
     const { container } = renderPreview({ share_image: 'javascript:alert(1)' })
 
