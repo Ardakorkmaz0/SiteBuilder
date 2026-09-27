@@ -67,8 +67,8 @@ export const setShareState = (siteId, payload) =>
 export const getDomainSetup = (siteId) =>
   client.get(`/sites/${siteId}/domain/`).then((r) => r.data)
 
-// Does the domain point at us yet? The answer also decides whether the TLS
-// layer may ask for a certificate for it.
+// Verify account-bound TXT ownership and routing to this host. DNS verification
+// allows the TLS layer to request a certificate; it does not prove HTTPS readiness.
 export const verifyDomain = (siteId) =>
   client.post(`/sites/${siteId}/domain/verify/`).then((r) => r.data)
 

@@ -32,7 +32,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q
 from django.db.models.functions import TruncDate
 
@@ -41,6 +41,7 @@ from .api_errors import error_response
 from .access import SHARE_OPEN, SHARE_PRIVATE, is_public, is_reachable, public_sites, share_access
 from .accounts import normalise_username
 from .models import (
+    _domain_verification_token,
     Favorite,
     FormSubmission,
     Profile,
@@ -61,7 +62,7 @@ from .validators import (
     shared_component_problems,
     validate_and_clean_schema,
 )
-from .domains import check_domain, dns_records, domain_allowed
+from .domains import DomainVerificationThrottle, check_domain, dns_records, domain_allowed, is_platform_host, normalize_domain, target_configured
 from .guests import (
     GUEST_SITE_LIMIT,
     adopt_guest_work,
@@ -763,66 +764,69 @@ class SiteViewSet(viewsets.ModelViewSet):
             return guest_blocked('domain')
         site = self.get_object()
         if request.method == 'POST':
-            raw = str(request.data.get('domain') or '').strip().lower()
-            raw = re.sub(r'^https?://', '', raw).strip().strip('/')
-            domain = raw.split('/')[0].split(':')[0]
-            if domain and not re.fullmatch(r'(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}', domain):
+            if not isinstance(request.data, dict) or 'domain' not in request.data:
                 return error_response('invalid_domain', 'Enter a valid domain name.')
-            if domain and Site.objects.exclude(pk=site.pk).filter(custom_domain=domain).exists():
-                return error_response('domain_in_use', 'This domain is already connected to another site.')
-            # Never let a site claim a name this platform answers on: the
-            # custom-domain middleware runs before host validation, so a site
-            # holding our own hostname would be serving the app's address.
-            if domain and domain in _platform_hosts():
+            try:
+                domain = normalize_domain(request.data['domain'])
+            except (ValueError, TypeError):
+                return error_response('invalid_domain', 'Enter a valid domain name.')
+            if domain and is_platform_host(domain):
                 return error_response('domain_reserved', 'That domain belongs to this platform.')
-            site.custom_domain = domain
-            site.domain_status = 'pending' if domain else 'not_connected'
-            site.save(update_fields=['custom_domain', 'domain_status', 'updated_at'])
+            try:
+                with transaction.atomic():
+                    # Lock the site and let the unique index arbitrate claims
+                    # on the same domain from different sites/accounts.
+                    site = Site.objects.select_for_update().get(pk=site.pk)
+                    if site.custom_domain != domain:
+                        site.custom_domain = domain
+                        site.domain_status = 'pending' if domain else 'not_connected'
+                        site.domain_verified_at = None
+                        site.domain_verification_token = _domain_verification_token()
+                        site.save(update_fields=[
+                            'custom_domain', 'domain_status', 'domain_verified_at',
+                            'domain_verification_token', 'updated_at',
+                        ])
+            except IntegrityError:
+                return error_response('domain_in_use', 'This domain is already connected to another site.')
         return Response(self._domain_state(site))
 
     def _domain_state(self, site, checked=None):
+        verified = site.domain_status == 'connected' and site.domain_verified_at is not None
         return {
             'domain': site.custom_domain,
             'status': site.domain_status,
-            # What to put in the DNS panel. Both shapes, because `www` takes a
-            # CNAME and an apex domain cannot.
-            'records': dns_records(site) if site.custom_domain else [],
-            'ssl_status': 'active' if site.domain_status == 'connected' else 'waiting_for_dns',
-            # Why the last check said no, when it did.
+            'records': dns_records(site),
+            'target_configured': target_configured(),
+            'is_published': is_public(site),
+            # A successful DNS lookup is not evidence that TLS issuance
+            # succeeded. The proxy obtains the certificate on first visit.
+            'ssl_status': 'pending_certificate' if verified else (
+                'waiting_for_dns' if site.custom_domain else 'not_connected'
+            ),
             'checked': checked,
         }
 
-    @action(detail=True, methods=['post'], url_path='domain/verify')
+    @action(detail=True, methods=['post'], url_path='domain/verify', throttle_classes=[DomainVerificationThrottle])
     def verify_domain(self, request, pk=None):
-        """Does the domain point at us yet?
-
-        Nothing used to ask this, so the status said "waiting for DNS" forever
-        and a correctly configured domain still served nothing. DNS pointing
-        here is itself the proof of control — only the holder of a domain can
-        do it — so this is both the check and the permission to serve.
-        """
         if is_guest(request.user):
             return guest_blocked('domain')
         site = self.get_object()
         if not site.custom_domain:
             return error_response('no_domain', 'Add a domain first.')
-        ok, detail = check_domain(site.custom_domain)
-        site.domain_status = 'connected' if ok else 'pending'
-        site.save(update_fields=['domain_status', 'updated_at'])
-        return Response(self._domain_state(site, checked=detail))
-
-
-def _platform_hosts():
-    """Every hostname this platform answers on itself."""
-    hosts = {str(h).strip().lower().lstrip('.') for h in getattr(settings, 'ALLOWED_HOSTS', []) if h and h != '*'}
-    frontend = urllib.parse.urlparse(getattr(settings, 'FRONTEND_URL', '') or '').hostname
-    if frontend:
-        hosts.add(frontend.lower())
-    for name in ('CUSTOM_DOMAIN_TARGET',):
-        value = (getattr(settings, name, '') or '').strip().lower()
-        if value:
-            hosts.add(value)
-    return hosts
+        domain, token = site.custom_domain, site.domain_verification_token
+        ok, detail = check_domain(domain, token)
+        # Do not hold a DB lock across DNS. Compare the challenge on update:
+        # a concurrent change/disconnect must never verify a different name.
+        with transaction.atomic():
+            current = Site.objects.select_for_update().get(pk=site.pk)
+            if current.custom_domain != domain or current.domain_verification_token != token:
+                return Response(self._domain_state(current, checked='domain_changed'), status=409)
+            # A resolver timeout does not prove ownership was lost.
+            if detail != 'dns_error':
+                current.domain_status = 'connected' if ok else 'pending'
+                current.domain_verified_at = timezone.now() if ok else None
+                current.save(update_fields=['domain_status', 'domain_verified_at', 'updated_at'])
+        return Response(self._domain_state(current, checked=detail))
 
 
 class DomainAllowedView(APIView):
@@ -835,6 +839,8 @@ class DomainAllowedView(APIView):
     """
 
     permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = []
 
     def get(self, request):
         host = request.query_params.get('host') or request.query_params.get('domain') or ''

@@ -95,11 +95,11 @@ class TestSiteWorkflowTools:
         domain = client.post(f'/api/sites/{site.id}/domain/', {'domain': 'www.example.com'}, format='json')
         assert domain.status_code == 200
         assert domain.data['status'] == 'pending'
-        # The TXT record is gone on purpose: nothing ever read it, and DNS
-        # pointing here is itself the proof of control. What is offered now is
-        # what verification actually checks — a CNAME for www, an A for an
-        # apex (only when the platform publishes an IP).
-        assert {record['type'] for record in domain.data['records']} <= {'CNAME', 'A'}
-        assert 'TXT' not in {record['type'] for record in domain.data['records']}
+        # A shared IP cannot identify the account that owns the domain.
+        txt = next(record for record in domain.data['records'] if record['type'] == 'TXT')
+        assert txt['name'] == '_sitebuilder.www.example.com'
+        assert txt['purpose'] == 'ownership'
+        site.refresh_from_db()
+        assert txt['value'] == 'sitebuilder-verification=' + site.domain_verification_token
         invalid = client.post(f'/api/sites/{site.id}/domain/', {'domain': 'not a domain'}, format='json')
         assert invalid.status_code == 400

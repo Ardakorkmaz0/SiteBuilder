@@ -130,6 +130,7 @@ class Site(models.Model):
         ),
         default='not_connected',
     )
+    domain_verified_at = models.DateTimeField(null=True, blank=True)
     domain_verification_token = models.CharField(
         max_length=64,
         default=_domain_verification_token,
@@ -154,6 +155,13 @@ class Site(models.Model):
     class Meta:
         ordering = ['-updated_at']
         indexes = [models.Index(fields=['published', '-hot_score'])]
+        constraints = [
+            models.UniqueConstraint(
+                models.functions.Lower('custom_domain'),
+                condition=~models.Q(custom_domain=''),
+                name='site_custom_domain_ci_unique',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.title} ({self.slug})'

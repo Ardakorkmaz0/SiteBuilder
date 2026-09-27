@@ -1,0 +1,61 @@
+# Complete single-app-host example. Merge with the existing Caddyfile;
+# do not replace production configuration without retaining its other sites.
+# See DEPLOY.md section 8b. Environment is inherited by the Caddy service.
+{
+    servers {
+        strict_sni_host on
+    }
+    on_demand_tls {
+        ask http://127.0.0.1:8000/api/public/domain-allowed/
+    }
+}
+
+{$SITEBUILDER_APP_HOST:app.example.com} {
+    encode zstd gzip
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        X-Frame-Options SAMEORIGIN
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+    # A handle, before @backend: a top-level respond sorts after handle, so
+    # the proxy would answer first and the endpoint would stay public.
+    @privateAsk path /api/public/domain-allowed /api/public/domain-allowed/*
+    handle @privateAsk {
+        respond 404
+    }
+
+    @backend path /api/* /s/* /media/* /static/* /django-admin /django-admin/*
+    handle @backend {
+        reverse_proxy 127.0.0.1:8000
+    }
+    handle {
+        root * {$SITEBUILDER_WEB_ROOT:/srv/sitebuilder/dist}
+        try_files {path} /index.html
+        file_server
+    }
+}
+
+# Explicit HTTP catch-all for customer hosts (ACME challenges remain Caddy's).
+http:// {
+    redir https://{host}{uri} 308
+}
+
+https:// {
+    tls {
+        on_demand
+    }
+    encode zstd gzip
+    @privateAsk path /api/public/domain-allowed /api/public/domain-allowed/*
+    handle @privateAsk {
+        respond 404
+    }
+    # Preserve Host. Do not send any customer domain to the SPA file server.
+    # No credentials/cookies are forwarded into application authentication.
+    handle {
+        reverse_proxy 127.0.0.1:8000 {
+            header_up -Authorization
+            header_up -Cookie
+        }
+    }
+}
