@@ -12,6 +12,7 @@ import {
 } from '../../utils/aiWizard.js'
 import { HTML_ALLOW, PUBLIC_HTML_SANDBOX, withViewportMeta } from '../../utils/htmlRuntime.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 const STEPS = ['Type', 'About', 'Style', 'Sections']
 
@@ -93,6 +94,9 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
     return () => clearInterval(timer)
   }, [phase])
 
+  // `close` also abandons a generation in flight, so Esc does what ✕ does.
+  useEscapeToClose(open, () => close())
+
   if (!open) return null
 
   const patch = (p) => setAnswers((a) => ({ ...a, ...p }))
@@ -156,7 +160,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
 
   return (
     <div className="studio-theme-surface studio-overlay fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6">
-      <div className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--studio-border)] bg-[var(--studio-panel)] text-[var(--studio-text)] shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="ai-wizard-title" className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--studio-border)] bg-[var(--studio-panel)] text-[var(--studio-text)] shadow-2xl">
         {/* Header */}
         <div className="flex shrink-0 items-center gap-3 border-b border-[#e5e7eb] px-5 py-3">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--studio-accent)] text-white">
@@ -165,7 +169,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
             </svg>
           </span>
           <div className="min-w-0">
-            <h2 className="text-sm font-bold text-[#111827]">{t('AI Site Wizard')}</h2>
+            <h2 id="ai-wizard-title" className="text-sm font-bold text-[#111827]">{t('AI Site Wizard')}</h2>
             <p className="truncate text-xs text-[#6b7280]">
               {t('Answer a few questions — get a complete, responsive site.')}
             </p>
@@ -187,6 +191,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
             type="button"
             onClick={close}
             title={t('Close')}
+            aria-label={t('Close')}
             className={`${phase === 'form' ? '' : 'ml-auto '}rounded-lg px-2 py-1 text-sm text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#374151]`}
           >
             ✕

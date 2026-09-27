@@ -5,6 +5,7 @@ import { WIDGETS, WIDGET_CATEGORIES, WIDGET_TYPE } from '../../utils/componentVa
 import { SECTION_CATEGORIES } from '../../utils/sectionBlocks/index.js'
 import { LayersIcon, SearchIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import {
   ADDABLE_PALETTE_ITEMS,
   NATIVE_CANVAS_TYPES,
@@ -191,6 +192,7 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
       },
     ]
   }, [entries])
+  useEscapeToClose(open, onClose)
 
   if (!open) return null
 
@@ -229,6 +231,9 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
       data-block-library=""
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="block-library-title"
         onClick={(e) => e.stopPropagation()}
         className="flex h-[min(760px,94vh)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-[var(--studio-panel,#ffffff)] shadow-2xl"
       >
@@ -237,7 +242,7 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--studio-accent)] text-white">
             <LayersIcon size={15} />
           </span>
-          <h2 className="text-sm font-bold text-[var(--studio-text,#111827)]">{t('Block library')}</h2>
+          <h2 id="block-library-title" className="text-sm font-bold text-[var(--studio-text,#111827)]">{t('Block library')}</h2>
           <label className="relative ml-auto min-w-0 flex-1 sm:max-w-xs">
             <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--studio-text-faint,#9ca3af)]">
               <SearchIcon size={14} />

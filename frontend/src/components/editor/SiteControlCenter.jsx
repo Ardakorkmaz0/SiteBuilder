@@ -18,6 +18,7 @@ import DomainPanel from './DomainPanel.jsx'
 import { LabeledImage } from './controls.jsx'
 import { siteAddress, siteAddressUrl } from '../../utils/siteAddress.js'
 import { useGuestGate } from '../../utils/useGuestGate.jsx'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 // Tab → why it needs an account, for the gate dialog.
 const GUEST_TABS = { inbox: 'inbox', analytics: 'analytics', domain: 'domain' }
@@ -103,6 +104,7 @@ export default function SiteControlCenter({
   const reviewUrl = site.review_token ? `${window.location.origin}/review/${site.review_token}` : ''
   const liveAddress = siteAddress(site)
   const liveAddressUrl = siteAddressUrl(site)
+  useEscapeToClose(open, onClose)
 
   if (!open) return null
 

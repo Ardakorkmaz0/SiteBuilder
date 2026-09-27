@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 export default function HtmlModal({ html, onClose }) {
   const { t } = useLanguage()
   const [copied, setCopied] = useState(false)
+  useEscapeToClose(true, onClose)
 
   function copy() {
     navigator.clipboard.writeText(html).then(() => {
@@ -28,11 +30,14 @@ export default function HtmlModal({ html, onClose }) {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="generated-html-title"
         className="ms-card flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--studio-border)] bg-[var(--studio-panel-raised)] px-4 py-3">
-          <h2 className="text-sm font-semibold text-[var(--studio-text)]">{t('Generated HTML')}</h2>
+          <h2 id="generated-html-title" className="text-sm font-semibold text-[var(--studio-text)]">{t('Generated HTML')}</h2>
           <div className="flex items-center gap-2">
             <button onClick={copy} className="ms-btn ms-btn-primary">
               {copied ? t('Copied ✓') : t('Copy')}
