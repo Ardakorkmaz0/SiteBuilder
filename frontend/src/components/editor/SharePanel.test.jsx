@@ -18,6 +18,19 @@ vi.mock('../../api/sites.js', () => ({
 
 const LINK = 'https://sitebuilder.test/review/abc'
 
+// The answer arrives after the panel draws; until then no choice is shown as
+// made, so a slow network cannot show "Not shared" for a shared project.
+it('shows no choice as made until the sharing state has loaded', async () => {
+  let resolve
+  getShareState.mockReturnValue(new Promise((done) => { resolve = done }))
+  renderPanel()
+
+  expect(screen.getAllByRole('radio').filter((radio) => radio.checked)).toHaveLength(0)
+
+  resolve({ mode: 'link', review_token: 'abc', people: [] })
+  await waitFor(() => expect(screen.getByRole('radio', { name: /Anyone with the link/ })).toBeChecked())
+})
+
 function renderPanel() {
   return render(
     <UiThemeProvider>
@@ -45,12 +58,12 @@ describe('the owner choosing who gets in', () => {
     renderPanel()
 
     expect(await screen.findByLabelText('Share link')).toHaveValue(LINK)
-    expect(screen.getByRole('radio', { name: /Anyone with the link/ })).toBeChecked()
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Anyone with the link/ })).toBeChecked())
   })
 
   it('narrows it to named people, and only then asks for names', async () => {
     renderPanel()
-    await screen.findByLabelText('Share link')
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Anyone with the link/ })).toBeChecked())
 
     // The invite box belongs to that mode; showing it earlier would suggest
     // the names mean something while the link is open to everyone.
@@ -86,7 +99,8 @@ describe('the owner choosing who gets in', () => {
 
   it('closes sharing without touching the address', async () => {
     renderPanel()
-    await screen.findByLabelText('Share link')
+    // The link field is there at once; the choice is only real once loaded.
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Anyone with the link/ })).toBeChecked())
 
     fireEvent.click(screen.getByRole('radio', { name: /Not shared/ }))
 
