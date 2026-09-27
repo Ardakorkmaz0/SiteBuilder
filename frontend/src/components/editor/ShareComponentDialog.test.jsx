@@ -139,3 +139,78 @@ describe('when the server refuses too', () => {
     expect(screen.getByText('Second reason.')).toBeInTheDocument()
   })
 })
+
+// It opens from the element's toolbar, which lives inside the page's iframe.
+// Focus stayed in there, so Esc did nothing and Tab walked the page.
+describe('focus and Esc', () => {
+  it('puts the cursor in the name, where the author starts', () => {
+    renderDialog(mount('<div class="card">Pro</div>'))
+    expect(screen.getByRole('textbox', { name: /Name/i })).toHaveFocus()
+  })
+
+  it('takes focus itself when there is nothing to fill in', () => {
+    renderDialog(mount('<div class="card"><script>steal()</script></div>'))
+    expect(screen.getByRole('dialog', { name: 'Share to the community' })).toHaveFocus()
+  })
+
+  it('closes on Esc', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    renderDialog(mount('<div class="card">Pro</div>'), { onClose })
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+})
+
+// A dialog that vanished on success read exactly like one that failed.
+describe('after sharing', () => {
+  it('says where the block went instead of just closing', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    renderDialog(mount('<div class="card">Pro</div>'), { onClose })
+
+    await user.type(screen.getByRole('textbox', { name: /Name/i }), 'Pricing card')
+    await user.click(screen.getByRole('button', { name: 'Share' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('“Pricing card” is in the community library.')
+    expect(onClose).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('starts from an empty form for the next block', async () => {
+    const user = userEvent.setup()
+    const first = mount('<div class="card">Pro</div>')
+    const view = renderDialog(first)
+    await user.type(screen.getByRole('textbox', { name: /Name/i }), 'Pricing card')
+    await user.click(screen.getByRole('button', { name: 'Share' }))
+    await screen.findByRole('status')
+
+    const second = document.createElement('div')
+    second.className = 'card'
+    second.textContent = 'Team'
+    document.getElementById('root').appendChild(second)
+    view.rerender(
+      <LanguageProvider>
+        <ShareComponentDialog open element={second} onClose={vi.fn()} />
+      </LanguageProvider>,
+    )
+    expect(screen.getByRole('textbox', { name: /Name/i })).toHaveValue('')
+  })
+})
+
+describe('on the Turkish screen', () => {
+  it('says the server refusal in Turkish', async () => {
+    const user = userEvent.setup()
+    shareComponent.mockRejectedValue({ response: { status: 403, data: {
+      code: 'no_published_site', detail: 'Publish one of your own sites before sharing components.',
+    } } })
+    renderDialog(mount('<div class="card">Pro</div>'))
+    localStorage.setItem('pwb_language', 'tr')
+
+    await user.type(screen.getByRole('textbox', { name: /Name/i }), 'Kart')
+    await user.click(screen.getByRole('button', { name: 'Share' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Blok paylaşmadan önce kendi sitelerinizden birini yayınlayın.')
+  })
+})

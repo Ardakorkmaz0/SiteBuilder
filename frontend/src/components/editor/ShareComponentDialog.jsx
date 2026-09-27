@@ -10,11 +10,13 @@
 // as it sits on the page: what you see here is what the person who takes it
 // gets, which is the only preview worth showing.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { exportComponent, sharedBlockHtml } from '../../utils/componentExport.js'
 import { shareComponent } from '../../api/community.js'
 import { STATIC_HTML_SANDBOX } from '../../utils/htmlRuntime.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { apiError } from '../../utils/errors.js'
 import { SPOTLIGHT_Z } from './spotlight.js'
 
 const CATEGORIES = [
@@ -37,6 +39,12 @@ const REFUSAL_TEXT = {
   empty: 'There is nothing here to share.',
 }
 
+// What may not travel with a block. The counts and addresses come with them.
+const WARNING_TEXT = {
+  'blocked-stylesheet': '{count} stylesheet(s) could not be read (cross-origin); fonts are carried by name instead.',
+  asset: 'An image could not travel: {src}',
+}
+
 export default function ShareComponentDialog({ open, element, sourceSiteId, onClose, onShared }) {
   const { t } = useLanguage()
   const [title, setTitle] = useState('')
@@ -46,6 +54,11 @@ export default function ShareComponentDialog({ open, element, sourceSiteId, onCl
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [serverProblems, setServerProblems] = useState([])
+  // The block that was just shared. Closing on success used to be the only
+  // answer, and a dialog that vanishes reads the same as one that failed.
+  const [shared, setShared] = useState(null)
+  const dialogRef = useRef(null)
+  const nameRef = useRef(null)
 
   // Extraction is pure and cheap, but it walks every stylesheet — no reason to
   // repeat it on each keystroke in the title field.
@@ -54,18 +67,35 @@ export default function ShareComponentDialog({ open, element, sourceSiteId, onCl
     [open, element],
   )
 
-  useEffect(() => {
-    if (!open) return undefined
-    const onKey = (event) => {
-      if (event.key === 'Escape') { event.stopPropagation(); onClose?.() }
+  useEscapeToClose(open, onClose)
+
+  // Each opening is a new block: start from an empty form, not the last one's.
+  const [openedFor, setOpenedFor] = useState(null)
+  const current = open ? element : null
+  if (current !== openedFor) {
+    setOpenedFor(current)
+    if (current) {
+      setTitle('')
+      setDescription('')
+      setCategory('other')
+      setVisibility('public')
+      setError('')
+      setServerProblems([])
+      setShared(null)
     }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [open, onClose])
+  }
+
+  const refused = !artefact?.ok
+  // The dialog opens from the element's toolbar, inside the page's iframe, and
+  // focus stayed there: Esc and Tab never reached the dialog. The name is the
+  // first thing to fill in; a refused block has nothing to fill in.
+  useEffect(() => {
+    if (!open || !artefact) return
+    const target = refused ? dialogRef.current : nameRef.current
+    target?.focus({ preventScroll: true })
+  }, [open, artefact, refused])
 
   if (!open || !artefact) return null
-
-  const refused = !artefact.ok
 
   const publish = async () => {
     if (busy || refused) return
@@ -85,14 +115,14 @@ export default function ShareComponentDialog({ open, element, sourceSiteId, onCl
         natural_height: artefact.size?.height || 0,
         source_site_id: sourceSiteId || undefined,
       })
+      setShared(created || { title: title.trim(), visibility })
       onShared?.(created)
-      onClose?.()
     } catch (e) {
       const data = e?.response?.data
       // The server answers with EVERY reason, not just the first — showing one
       // at a time would make this a guessing game.
       if (Array.isArray(data?.problems) && data.problems.length) setServerProblems(data.problems)
-      setError(data?.detail || t('Could not share this component.'))
+      setError(apiError(e, t('Could not share this component.')))
     } finally {
       setBusy(false)
     }
@@ -100,7 +130,9 @@ export default function ShareComponentDialog({ open, element, sourceSiteId, onCl
 
   return (
     <div
-      className="studio-theme-surface fixed inset-0 flex items-center justify-center p-4"
+      ref={dialogRef}
+      tabIndex={-1}
+      className="studio-theme-surface fixed inset-0 flex items-center justify-center p-4 outline-none"
       style={{ zIndex: SPOTLIGHT_Z }}
       role="dialog"
       aria-modal="true"
@@ -129,6 +161,20 @@ export default function ShareComponentDialog({ open, element, sourceSiteId, onCl
           </button>
         </div>
 
+        {shared ? (
+          <div className="space-y-2 p-6 text-sm">
+            <p role="status" className="font-semibold text-[var(--studio-text)]">
+              {shared.visibility === 'private'
+                ? t('“{title}” is on your own shelf.', { title: shared.title })
+                : t('“{title}” is in the community library.', { title: shared.title })}
+            </p>
+            <p className="text-[var(--studio-text-muted)]">
+              {shared.visibility === 'private'
+                ? t('Only you can see it: Community, then My blocks. You can make it public there.')
+                : t('Anyone can add it to their own site now. Community, then My blocks, is where you make it private or withdraw it.')}
+            </p>
+          </div>
+        ) : (
         <div className="grid min-h-0 flex-1 gap-4 overflow-auto p-4 md:grid-cols-2">
           {/* What the person who takes it will get — the extracted artefact on
               its own, not the element as it sits on your page. */}
@@ -158,7 +204,9 @@ export default function ShareComponentDialog({ open, element, sourceSiteId, onCl
 
             {artefact.warnings?.length > 0 && (
               <ul className="studio-status-warning mt-2 space-y-1 rounded-lg border px-3 py-2 text-[11px] leading-relaxed">
-                {artefact.warnings.map((warning, i) => <li key={i}>{warning.detail}</li>)}
+                {artefact.warnings.map((warning, i) => (
+                  <li key={i}>{WARNING_TEXT[warning.kind] ? t(WARNING_TEXT[warning.kind], warning) : warning.detail}</li>
+                ))}
               </ul>
             )}
             {!refused && (
@@ -172,6 +220,7 @@ export default function ShareComponentDialog({ open, element, sourceSiteId, onCl
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-[var(--studio-text-muted)]">{t('Name')}</span>
               <input
+                ref={nameRef}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 maxLength={80}
@@ -243,7 +292,7 @@ export default function ShareComponentDialog({ open, element, sourceSiteId, onCl
 
             {serverProblems.length > 0 && (
               <ul className="studio-status-danger space-y-1 rounded-lg border px-3 py-2 text-[11px]">
-                {serverProblems.map((problem, i) => <li key={i}>{problem}</li>)}
+                {serverProblems.map((problem, i) => <li key={i}>{t(problem)}</li>)}
               </ul>
             )}
             {error && !serverProblems.length && (
@@ -252,6 +301,19 @@ export default function ShareComponentDialog({ open, element, sourceSiteId, onCl
           </div>
         </div>
 
+        )}
+
+        {shared ? (
+          <div className="flex gap-2 border-t border-[var(--studio-border)] p-3">
+            {/* A new tab: the editor behind this dialog may hold unsaved work. */}
+            <a href="/community" target="_blank" rel="noopener" className="studio-btn studio-btn-secondary px-4 py-2 text-sm">
+              {t('Open Community')}
+            </a>
+            <button type="button" onClick={onClose} className="studio-btn studio-btn-accent ms-auto px-4 py-2 text-sm">
+              {t('Done')}
+            </button>
+          </div>
+        ) : (
         <div className="flex gap-2 border-t border-[var(--studio-border)] p-3">
           <button type="button" onClick={onClose} className="studio-btn studio-btn-secondary px-4 py-2 text-sm">
             {t('Cancel')}
@@ -265,6 +327,7 @@ export default function ShareComponentDialog({ open, element, sourceSiteId, onCl
             {busy ? t('Sharing…') : t('Share')}
           </button>
         </div>
+        )}
       </div>
     </div>
   )
