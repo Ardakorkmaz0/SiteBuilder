@@ -172,9 +172,11 @@ const INTERACTIVE_SCRIPT = `
       if (standalone()) {
         var config = document.querySelector('meta[name="pwb-form-endpoint"]');
         var endpoint = config && config.getAttribute('content');
-        // The serving layer provides one same-origin endpoint. Never turn an
-        // imported meta tag into a destination for arbitrary form contents.
-        if (endpoint !== '/__sitebuilder/form/' || typeof window.fetch !== 'function') {
+        // The serving layer names the inbox: /__sitebuilder/form/ on the
+        // owner's domain, /s/<slug>/__sitebuilder/form/ on the shared address.
+        // Only those two shapes, on this host: an imported meta tag must never
+        // become a destination for arbitrary form contents.
+        if (!/^\\/(?:s\\/[a-z0-9-]+\\/)?__sitebuilder\\/form\\/$/.test(endpoint || '') || typeof window.fetch !== 'function') {
           showFormResult(form, false);
           return;
         }
@@ -182,7 +184,7 @@ const INTERACTIVE_SCRIPT = `
         form.setAttribute('data-pwb-submitting', 'true');
         var honeypot = form.querySelector('input[type="hidden"][name="website"]');
         window.fetch(new URL(endpoint, location.href).href, {
-          method: 'POST', credentials: 'omit', mode: 'same-origin',
+          method: 'POST', credentials: 'omit', mode: 'cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: formPayload(form), page: location.pathname.slice(0, 140), website: honeypot ? honeypot.value : '' })
         }).then(function (response) {

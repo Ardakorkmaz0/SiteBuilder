@@ -75,7 +75,10 @@ class TestTheServedPage:
         assert '<title>Ada</title>' in html
 
     def test_nothing_set_leaves_the_document_byte_for_byte(self, owner):
-        assert served(published_site(owner)) == PLAIN
+        site = published_site(owner)
+        endpoint = f'<meta name="pwb-form-endpoint" content="/s/{site.slug}/__sitebuilder/form/">'
+        # Only the inbox tag is added (test_published_forms.py), nothing for sharing.
+        assert served(site).replace(endpoint, '') == PLAIN
 
     def test_values_are_escaped_and_unsafe_addresses_dropped(self, owner):
         site = published_site(owner, seo={

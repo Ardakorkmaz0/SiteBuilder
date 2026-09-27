@@ -29,7 +29,8 @@ import re
 from urllib.parse import urlsplit, urlunsplit
 
 from django.conf import settings
-from django.http import Http404, HttpResponse, HttpResponsePermanentRedirect
+from django.http import Http404, HttpResponse, HttpResponseNotAllowed, HttpResponsePermanentRedirect, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.urls import reverse
 from django.utils.xmlutils import SimplerXMLGenerator
 from django.views.decorators.http import require_safe
@@ -84,7 +85,57 @@ def serve_published_page(request, slug, path=''):
     # was the one nobody counted.
     record_served_view(site, request, wanted)
     html = with_site_meta(page.html, site, request.build_absolute_uri('/'))
+    html = _with_form_endpoint(html, published_form_path(site.slug))
     return _harden(HttpResponse(html, content_type='text/html; charset=utf-8'))
+
+
+def published_form_path(slug):
+    return reverse('published-form', kwargs={'slug': slug})
+
+
+_HEAD_OPEN = re.compile(r'<head(?:\s[^>]*)?>', re.IGNORECASE)
+
+
+def _with_form_endpoint(html, path):
+    """Tell the page's runtime where its forms go: first in the head, so a tag
+    an imported page brought along cannot take its place."""
+    tag = f'<meta name="pwb-form-endpoint" content="{escape(path, quote=True)}">'
+    match = _HEAD_OPEN.search(html or '')
+    if match:
+        return html[:match.end()] + tag + html[match.end():]
+    return tag + (html or '')
+
+
+_FORM_CORS = {
+    # The page at /s/<slug>/ runs in an opaque origin (the sandbox CSP), so its
+    # request arrives cross-origin even from this host. Nothing it sends is a
+    # credential: anyone may post, as to the public inbox endpoint.
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '600',
+}
+
+
+@csrf_exempt
+def published_form(request, slug):
+    """The inbox of a site served at /s/<slug>/: a published form's messages.
+
+    Same rules as the owner's domain (serve_domain_form): the public-site gate,
+    the honeypot and the anonymous rate cap of the public inbox endpoint.
+    """
+    if request.method == 'OPTIONS':
+        response = HttpResponse(status=204)
+    elif request.method != 'POST':
+        response = HttpResponseNotAllowed(['POST', 'OPTIONS'])
+    else:
+        try:
+            response = serve_domain_form(_published_site(slug), request)
+        except Http404:
+            response = JsonResponse({'detail': 'Site not found.'}, status=404)
+    for header, value in _FORM_CORS.items():
+        response[header] = value
+    return response
 
 
 @require_safe

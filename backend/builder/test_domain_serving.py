@@ -110,7 +110,9 @@ class TestDomainDocuments:
     def test_shared_origin_keeps_sandbox_and_original_document(self, connected):
         source = connected.published_pages.get(path='').html
         response = get(f'/s/{connected.slug}/', host='testserver')
-        assert response.content.decode() == source
+        # The document as published, plus the tag naming its inbox.
+        endpoint = f'<meta name="pwb-form-endpoint" content="/s/{connected.slug}/__sitebuilder/form/">'
+        assert response.content.decode().replace(endpoint, '') == source
         assert 'sandbox' in response['Content-Security-Policy']
         assert 'allow-same-origin' not in response['Content-Security-Policy']
 
