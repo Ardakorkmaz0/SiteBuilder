@@ -320,6 +320,29 @@ function isTextEditable(el) {
 // Snapshot of the editable facts about an element, shaped for the panel.
 // Style values come from getComputedStyle so the panel shows what the user
 // SEES, while writes go to the element's inline style (the persistent bit).
+const EDITOR_CHROME_SELECTOR = '[data-pwb-chrome], [data-pwb-injected], [data-pwb-selection-toolbar], [data-pwb-resize-overlay], [data-pwb-dropline]'
+const NOT_A_PLACE = new Set(['SCRIPT', 'STYLE', 'TEMPLATE'])
+
+// Where a link on this page can jump to: every element with an id, in page
+// order, named by the id and the start of its text. Without this list "Section
+// on this page" meant knowing the id and typing it; canvas pages had a list.
+export function linkSectionsInDocument(doc, exclude = null) {
+  if (!doc?.body) return []
+  const seen = new Set()
+  const sections = []
+  for (const node of doc.body.querySelectorAll('[id]')) {
+    if (!node.id || seen.has(node.id) || NOT_A_PLACE.has(node.tagName)) continue
+    // A link to itself, or into itself, goes nowhere.
+    if (exclude && (node === exclude || exclude.contains(node))) continue
+    if (node.closest(EDITOR_CHROME_SELECTOR)) continue
+    seen.add(node.id)
+    const text = (node.textContent || '').replace(/\s+/g, ' ').trim()
+    const hint = text.length > 40 ? `${text.slice(0, 39)}…` : text
+    sections.push({ id: node.id, label: hint ? `#${node.id} · ${hint}` : `#${node.id}` })
+  }
+  return sections
+}
+
 export function describeElement(el, win = el?.ownerDocument?.defaultView) {
   if (!el || el.nodeType !== 1) return null
   const tag = el.tagName.toLowerCase()
@@ -342,6 +365,7 @@ export function describeElement(el, win = el?.ownerDocument?.defaultView) {
     // Every element can carry a link (wrapped in <a> when needed), so the panel
     // always offers the link picker — not just for existing anchors.
     href: elementLinkHref(el),
+    sections: linkSectionsInDocument(el.ownerDocument, el),
     src: tag === 'img' ? el.getAttribute('src') || '' : null,
     alt: tag === 'img' ? el.getAttribute('alt') || '' : null,
     // A navigation is a SET of links, and editing them one click at a time was

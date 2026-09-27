@@ -13,6 +13,7 @@ import {
   elementLinkHref,
   ensureAnchor,
   ensureElementId,
+  linkSectionsInDocument,
   moveElement,
   nearestAnchor,
   reorderToPoint,
@@ -800,5 +801,35 @@ describe('menu links', () => {
     // Menus do not differ per breakpoint — no override attribute for this.
     expect(nav.querySelectorAll('a')).toHaveLength(1)
     expect(nav.getAttribute('data-pwb-mobile-links')).toBeNull()
+  })
+})
+
+// "Section on this page" in the HTML editor offered a text box for an id the
+// person had to know; canvas pages list their blocks.
+describe('linkSectionsInDocument', () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <nav id="menu"><a id="to-contact" href="#">Contact us</a></nav>
+      <section id="about"><h2>About   the   team</h2></section>
+      <section id="contact"><h2>Contact</h2></section>
+      <div data-pwb-selection-toolbar id="pwb-toolbar"></div>
+      <style id="theme"></style>
+      <p id="about">a second "about" is the same place</p>`
+  })
+
+  it('lists every place a link can jump to, in page order, named by id and text', () => {
+    const sections = linkSectionsInDocument(document)
+    expect(sections.map((s) => s.id)).toEqual(['menu', 'to-contact', 'about', 'contact'])
+    expect(sections.find((s) => s.id === 'about').label).toBe('#about · About the team')
+  })
+
+  it('leaves out the link itself and what it contains', () => {
+    const menu = document.getElementById('menu')
+    expect(linkSectionsInDocument(document, menu).map((s) => s.id)).toEqual(['about', 'contact'])
+  })
+
+  it('reaches the panel through describeElement', () => {
+    const link = document.getElementById('to-contact')
+    expect(describeElement(link).sections.map((s) => s.id)).toEqual(['menu', 'about', 'contact'])
   })
 })

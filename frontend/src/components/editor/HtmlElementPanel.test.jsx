@@ -81,4 +81,41 @@ describe('HtmlElementPanel', () => {
     await user.click(screen.getByRole('button', { name: /Reset mobile styles/ }))
     expect(props.onResetMobile).toHaveBeenCalledOnce()
   })
+
+  // Both were rounded to whole numbers: 1.2 read as 1, 0.05 as 0, and typing
+  // 1.5 turned into 2 under the cursor.
+  it('shows and takes fractions for line height and letter spacing', async () => {
+    const props = renderPanel({ info: { lineHeight: 1.2, letterSpacing: 0.05 } })
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('tab', { name: 'Design' }))
+    const lineHeight = screen.getByLabelText('Line height (×)')
+    expect(lineHeight).toHaveValue(1.2)
+    expect(screen.getByLabelText('Letter spacing (em)')).toHaveValue(0.05)
+
+    await user.clear(lineHeight)
+    await user.type(lineHeight, '1.5')
+    expect(lineHeight).toHaveValue(1.5)
+    expect(props.onChange).toHaveBeenLastCalledWith({ lineHeight: 1.5 })
+  })
+
+  it('lists the sections of the page for a link', async () => {
+    const props = renderPanel({ info: {
+      href: 'https://example.com',
+      sections: [{ id: 'about', label: '#about · About' }, { id: 'contact', label: '#contact · Contact' }],
+    } })
+    const user = userEvent.setup()
+
+    await user.selectOptions(screen.getByLabelText('Link (href)'), 'section')
+    expect(props.onChange).toHaveBeenLastCalledWith({ href: '#about' })
+  })
+
+  it('clears a fraction field instead of writing 0', async () => {
+    const props = renderPanel({ info: { letterSpacing: 0.05 } })
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('tab', { name: 'Design' }))
+    await user.clear(screen.getByLabelText('Letter spacing (em)'))
+    expect(props.onChange).toHaveBeenLastCalledWith({ letterSpacing: '' })
+  })
 })

@@ -362,6 +362,7 @@ export default function HtmlElementPanel({
                     value={info.href}
                     onChange={(value) => onChange({ href: value })}
                     pages={pages}
+                    sections={info.sections}
                   />
                 )}
                 {info.src !== null && (
@@ -425,8 +426,8 @@ export default function HtmlElementPanel({
               />
               <LabeledNumber label={t('Font size (px)')} value={info.fontSize} onChange={(value) => onChange({ fontSize: value })} />
               <LabeledSelect label={t('Font weight')} value={info.fontWeight} onChange={(value) => onChange({ fontWeight: value })} options={translatedOptions(WEIGHT_OPTIONS)} />
-              <LabeledNumber label={t('Line height (×)')} value={info.lineHeight} onChange={(value) => onChange({ lineHeight: value })} />
-              <LabeledNumber label={t('Letter spacing (em)')} value={info.letterSpacing} onChange={(value) => onChange({ letterSpacing: value })} />
+              <LabeledNumber label={t('Line height (×)')} step={0.05} value={info.lineHeight} onChange={(value) => onChange({ lineHeight: value })} />
+              <LabeledNumber label={t('Letter spacing (em)')} step={0.01} value={info.letterSpacing} onChange={(value) => onChange({ letterSpacing: value })} />
               <LabeledSelect label={t('Capitalisation')} value={info.textTransform} onChange={(value) => onChange({ textTransform: value })} options={translatedOptions(TEXT_TRANSFORM_OPTIONS)} />
               <LabeledSelect label={t('Text align')} value={info.textAlign} onChange={(value) => onChange({ textAlign: value })} options={translatedOptions(ALIGN_OPTIONS)} />
               <div className="flex gap-2">
