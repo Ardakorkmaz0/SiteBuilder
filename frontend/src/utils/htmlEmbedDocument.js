@@ -1,7 +1,11 @@
+import { googleFontLinkTag } from './googleFonts.js'
 import { closingTagIndex, insertBeforeClosingTag } from './htmlInsert.js'
 
 const HTML_EMBED_RESET_CSS = [
   'html,body{margin:0!important;padding:0!important;background:transparent;font-family:inherit;color:inherit;width:100%;height:100%;min-height:100%;overflow:hidden!important;}',
+  // The embed starts in the site's font when one is given (baseFontTag).
+  // Unset, the var() falls back to inheriting, exactly as before.
+  'html{font-family:var(--pwb-embed-font,inherit);}',
   '*,*::before,*::after{box-sizing:border-box;scrollbar-width:none;}',
   '*::-webkit-scrollbar{width:0!important;height:0!important;display:none!important;}',
   'body{display:block;overflow-wrap:anywhere;}',
@@ -103,6 +107,35 @@ function tweaksTag(tweaks) {
   return css.length ? `<style data-pwb-embed-tweaks>${css.join('')}</style>` : ''
 }
 
+// The site's font, as the embed's starting font. An embed is its own document,
+// so nothing inherits into it: a snippet written with `font-family:inherit`
+// (every palette variant and library section) fell back to the browser's
+// Times New Roman on a page set in the site font. It only fills the variable
+// the reset reads for <html>, so any font the snippet sets itself still wins;
+// a curated Google font is linked the same way the page links it.
+//
+// Only embeds placed since this existed opt in (`siteFont`, from the
+// component's `_siteFont` prop): older boxes were sized around Times New
+// Roman, and a wider font would overflow and clip them.
+function baseFontTag(font) {
+  const value = String(font || '').replace(/[<>{};]/g, '').trim()
+  if (!value) return ''
+  return `${googleFontLinkTag(value)}<style data-pwb-embed-font>:root{--pwb-embed-font:${value};}</style>`
+}
+
+// Exporters render embeds deep inside their page walk, where the page's theme
+// is not at hand. They set it here for the length of one synchronous render.
+let scopedFont = ''
+export function withEmbedFont(font, render) {
+  const previous = scopedFont
+  scopedFont = font || ''
+  try {
+    return render()
+  } finally {
+    scopedFont = previous
+  }
+}
+
 function hasReset(html) {
   return /<style[^>]*data-pwb-embed-reset/i.test(html)
 }
@@ -122,7 +155,8 @@ function wrapBodyForOptions(html, options = {}) {
 }
 
 function injectReset(html, options = {}) {
-  const extra = `${scaleTag(options.scale)}${tweaksTag(options.tweaks)}`
+  const font = options.siteFont ? options.font || scopedFont : ''
+  const extra = `${baseFontTag(font)}${scaleTag(options.scale)}${tweaksTag(options.tweaks)}`
   const tags = `${hasReset(html) ? '' : resetTag}${extra}`
   if (!tags && !fillAttr(options.fill)) return html
   if (hasReset(html)) {

@@ -235,4 +235,28 @@ describe('CodeActivityOverlay', () => {
 
     expect(card()).toBeNull()
   })
+
+  it('starts over when the reset key changes, so a reformatted document is no edit', async () => {
+    const doc = (heading) => `<!DOCTYPE html>\n<html>\n<body>\n<h1>${heading}</h1>\n</body>\n</html>`
+    const view = (document, resetKey) => (
+      <UiThemeProvider>
+        <LanguageProvider>
+          <CodeActivityOverlay document={document} resetKey={resetKey} fileName="index.html" />
+        </LanguageProvider>
+      </UiThemeProvider>
+    )
+    const { rerender } = render(view('<!doctype html><html><body><h1>Hi</h1></body></html>', 'view'))
+    await new Promise((resolve) => window.setTimeout(resolve, 220))
+
+    // Entering Edit hands over the same page as a DOM round-trip.
+    rerender(view(doc('Hi'), 'edit'))
+    await new Promise((resolve) => window.setTimeout(resolve, 260))
+    expect(card()).toBeNull()
+
+    // A real edit is reported on its own line, not on the doctype.
+    rerender(view(doc('Hi there'), 'edit'))
+    await waitFor(() => expect(codeText()).toContain('Hi there'), { timeout: 2000 })
+    expect(codeText()).not.toContain('DOCTYPE')
+  })
 })
+

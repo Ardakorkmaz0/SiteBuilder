@@ -110,3 +110,21 @@ describe('schemaToResponsiveHtml navbar phone behaviour', () => {
     expect(render([nav(undefined)])).toContain('rh-nav-mobile-menu')
   })
 })
+
+describe('schemaToResponsiveHtml embed font', () => {
+  it('starts an opted-in embed in the page font', () => {
+    const html = schemaToResponsiveHtml({
+      theme: { fontFamily: '"Lora", Georgia, serif' },
+      pages: [{
+        id: 'p1', name: 'Home',
+        components: [{
+          id: 'html_1', type: 'html',
+          props: { code: '<p>Hello</p>', _siteFont: true },
+          styles: {},
+          layout: { x: 0, y: 0, w: 300, h: 60 },
+        }],
+      }],
+    })
+    expect(html).toContain(':root{--pwb-embed-font:&quot;Lora&quot;, Georgia, serif;}')
+  })
+})

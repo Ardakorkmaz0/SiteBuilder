@@ -2,7 +2,7 @@
 // Each receives { props, style }. The passed `style` already includes
 // width/height 100% so the component fills its free-canvas box. They never use
 // dangerouslySetInnerHTML, so React escapes all text. URLs go through sanitizeUrl.
-import { useContext, useState } from 'react'
+import { useContext, useLayoutEffect, useRef, useState } from 'react'
 import { sanitizeUrl, sanitizeImageSrc } from '../../utils/sanitize.js'
 import { ICONS } from '../../utils/icons.js'
 import { ALERT_VARIANTS } from './constants.js'
@@ -18,6 +18,7 @@ import {
   navbarPlacement,
 } from '../../utils/navbarLayout.js'
 import { LanguageContext } from '../../i18n/context.js'
+import { EmbedFontContext } from './embedFont.js'
 
 function linkAttrs(href) {
   return /^https?:\/\//i.test(href)
@@ -568,16 +569,31 @@ export function Tabs({ style }) {
 // `allow-scripts` keeps an opaque origin so the embed can't read parent storage.
 export function HtmlEmbed({ props, style, boxScale = 1, editorPreview = false }) {
   const language = useContext(LanguageContext)
+  // The embed is its own document and inherits nothing, so an embed that opts
+  // in (`_siteFont`, see baseFontTag) is handed the font of the page around it:
+  // from the canvas when it provides one, else read once from the element the
+  // embed sits in. Until that read, no srcdoc, so the frame never loads twice.
+  const siteFont = props._siteFont === true
+  const contextFont = useContext(EmbedFontContext)
+  const frameRef = useRef(null)
+  const [pageFont, setPageFont] = useState(null)
+  useLayoutEffect(() => {
+    if (!siteFont || contextFont) return
+    const parent = frameRef.current?.parentElement
+    setPageFont(parent ? window.getComputedStyle(parent).fontFamily || '' : '')
+  }, [siteFont, contextFont])
+  const font = siteFont ? contextFont || pageFont : ''
   const code = typeof props.code === 'string' ? props.code : ''
-  const baseHtml = htmlEmbedDocument(code, htmlEmbedDocumentOptions({ type: 'html', props }, boxScale))
+  const baseHtml = htmlEmbedDocument(code, { ...htmlEmbedDocumentOptions({ type: 'html', props }, boxScale), font })
   // Inject the same anchor-interceptor / tabs handler the rest of the site
   // uses. Without it, an `<a href="#">` inside the user's snippet navigates the
   // sandboxed iframe to `about:srcdoc#` — which, in an iframe sandboxed without
   // `allow-same-origin`, can blank the iframe out and leave the user staring
   // at a white box.
-  const srcDoc = withBuilderInteractiveHtml(baseHtml)
+  const srcDoc = font === null ? undefined : withBuilderInteractiveHtml(baseHtml)
   return (
     <iframe
+      ref={frameRef}
       title={language?.t('Embedded HTML') || 'Embedded HTML'}
       srcDoc={srcDoc}
       scrolling="no"

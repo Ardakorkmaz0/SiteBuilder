@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { htmlEmbedDocument } from './htmlEmbedDocument.js'
+import { htmlEmbedDocument, withEmbedFont } from './htmlEmbedDocument.js'
 
 describe('htmlEmbedDocument', () => {
   it('wraps fragments with the embed reset', () => {
@@ -108,5 +108,34 @@ describe('appearance tweaks tag', () => {
     const doc = htmlEmbedDocument('<img src="/a.png">', { tweaks: { shape: 'circle' } })
     expect(doc).toContain('object-fit:cover!important')
     expect(doc).toContain('border-radius:999px!important')
+  })
+
+  describe('site font', () => {
+    const snippet = '<a href="#" style="font-family:inherit">Go</a>'
+
+    it('starts an opted-in embed in the site font, through the variable the reset reads', () => {
+      const doc = htmlEmbedDocument(snippet, { siteFont: true, font: '"Inter", system-ui, sans-serif' })
+      expect(doc).toContain('html{font-family:var(--pwb-embed-font,inherit);}')
+      expect(doc).toContain(':root{--pwb-embed-font:"Inter", system-ui, sans-serif;}')
+      // A curated Google font is linked, like the page links it.
+      expect(doc).toContain('https://fonts.googleapis.com/css2?family=Inter')
+    })
+
+    it('leaves older embeds in the font they were sized around', () => {
+      const doc = htmlEmbedDocument(snippet, { font: '"Inter", system-ui, sans-serif' })
+      expect(doc).not.toContain('--pwb-embed-font:')
+    })
+
+    it('takes the exporter\'s scoped font when none is passed', () => {
+      const doc = withEmbedFont('Georgia, serif', () => htmlEmbedDocument(snippet, { siteFont: true }))
+      expect(doc).toContain(':root{--pwb-embed-font:Georgia, serif;}')
+      expect(htmlEmbedDocument(snippet, { siteFont: true })).not.toContain('--pwb-embed-font:')
+    })
+
+    it('cannot be used to break out of the style tag', () => {
+      const doc = htmlEmbedDocument(snippet, { siteFont: true, font: 'x;}</style><script>alert(1)</script>' })
+      expect(doc).not.toContain('<script>alert(1)')
+      expect(doc).not.toMatch(/--pwb-embed-font:[^;]*[{}<>]/)
+    })
   })
 })

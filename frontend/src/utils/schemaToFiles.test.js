@@ -602,3 +602,32 @@ describe('nested children keep per-breakpoint visibility', () => {
     expect(desktopBlock(html)).toContain('.n-k5 { display:none; }')
   })
 })
+
+describe('schemaToSingleHtml embed font', () => {
+  // An embed is its own document: without the page's font it fell back to the
+  // browser's Times New Roman on the published site too.
+  const site = (props, flowMode = false) => ({
+    theme: { fontFamily: '"Lora", Georgia, serif' },
+    pages: [{
+      id: 'p1', name: 'Home', flowMode,
+      components: [{
+        id: 'html_1', type: 'html',
+        props: { code: '<p style="font-family:inherit">Hello</p>', ...props },
+        styles: {},
+        layout: { x: 0, y: 0, w: 300, h: 60 },
+      }],
+    }],
+  })
+
+  it('starts an opted-in embed in the page font, on both page layouts', () => {
+    for (const flowMode of [false, true]) {
+      const html = schemaToSingleHtml(site({ _siteFont: true }, flowMode), 'Font test')
+      expect(html).toContain(':root{--pwb-embed-font:&quot;Lora&quot;, Georgia, serif;}')
+    }
+  })
+
+  it('leaves an older embed in the font it was sized around', () => {
+    const html = schemaToSingleHtml(site({}), 'Font test')
+    expect(html).not.toContain('--pwb-embed-font:')
+  })
+})

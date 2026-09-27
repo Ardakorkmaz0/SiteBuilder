@@ -7,6 +7,7 @@ import {
 import { fitHtmlEmbedLayout } from '../../utils/htmlEmbedMeasure.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { selectionActionsScaleStyle } from './canvasSelectionActionsLayout.js'
+import { canvasFontFamily } from '../../utils/theme.js'
 
 function findById(components, id) {
   for (const c of components || []) {
@@ -138,7 +139,7 @@ export default function CanvasSelectionActions({ componentId, canvasScale = 1, s
     // the hand-sized flag so the box tracks the content again from here on.
     fitHtmlEmbedLayout(comp, Math.round(comp.layout?.w || 360), (patch) =>
       fitEmbedBox(componentId, patch, { releaseManual: true }),
-    )
+    { font: canvasFontFamily(useEditorStore.getState().schema) })
   }
   const actions = [
     ['parent', <ParentIcon key="parent-icon" />, t('Select parent'), () => selectParent(componentId), !parent],

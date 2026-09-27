@@ -24,7 +24,9 @@ const PAD = 6
 // width (what a button/badge/card actually needs — paragraphs report wider
 // than the box and are ignored by the caller), paintedW = how much room the
 // content ACTUALLY takes up at this box width. Resolves null on failure.
-export function measureHtmlSnippet(component, width, { timeout = 2500 } = {}) {
+// `font` is the site font an opted-in embed renders in (see baseFontTag), so the
+// box is measured around the text the page will actually show.
+export function measureHtmlSnippet(component, width, { timeout = 2500, font = '' } = {}) {
   return new Promise((resolve) => {
     let frame
     let settled = false
@@ -44,6 +46,7 @@ export function measureHtmlSnippet(component, width, { timeout = 2500 } = {}) {
         ...base,
         fill: '',
         tweaks: base.tweaks ? { ...base.tweaks, shape: undefined } : base.tweaks,
+        font,
       }
       const doc = withoutExecutableScripts(
         htmlEmbedDocument(component?.props?.code || '', opts),
@@ -164,8 +167,8 @@ export function decideFitSize({
 // real content. `apply(patch)` is the caller's setLayout binding. Re-measures
 // once when the width tightened, since height changes with width.
 // Sections are designed full-width — only their height ever adjusts.
-export async function fitHtmlEmbedLayout(component, width, apply) {
-  const first = await measureHtmlSnippet(component, width)
+export async function fitHtmlEmbedLayout(component, width, apply, { font = '' } = {}) {
+  const first = await measureHtmlSnippet(component, width, { font })
   if (!first) return false
   const paletteType = component?.props?._paletteType
   // Sections and form fields are designed at a chosen width (you type into an
@@ -191,7 +194,7 @@ export async function fitHtmlEmbedLayout(component, width, apply) {
     return true
   }
   if (w !== Math.round(width)) {
-    const second = await measureHtmlSnippet(component, w)
+    const second = await measureHtmlSnippet(component, w, { font })
     if (second) h = decideFitSize({ boxW: w, measuredH: second.h, naturalW: 0 }).h
   }
   apply({ w, h })

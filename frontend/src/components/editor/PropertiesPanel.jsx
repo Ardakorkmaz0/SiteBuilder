@@ -5,7 +5,7 @@ import PanelTabs from './PanelTabs.jsx'
 import PanelGroup from './PanelGroup.jsx'
 import AiComponentEdit from './AiComponentEdit.jsx'
 import { LINKABLE_TYPES } from '../renderer/constants.js'
-import { DEFAULT_THEME, FONT_OPTIONS, THEME_PRESETS, hasOwnTheme, normalizeTheme, presetTheme, sameTheme } from '../../utils/theme.js'
+import { DEFAULT_THEME, FONT_OPTIONS, THEME_PRESETS, canvasFontFamily, hasOwnTheme, normalizeTheme, presetTheme, sameTheme } from '../../utils/theme.js'
 import SavedThemes, { ThemeSwatchButton } from './SavedThemes.jsx'
 import { hiddenByPinnedBar } from '../../utils/pinnedCover.js'
 import { presetOptions, presetsForType } from '../../utils/componentPresets.js'
@@ -1771,7 +1771,7 @@ export default function PropertiesPanel({
               onClick={() =>
                 fitHtmlEmbedLayout(component, Math.round(component.layout?.w || 360), (patch) =>
                   fitEmbedBox(component.id, patch),
-                )
+                { font: canvasFontFamily(useEditorStore.getState().schema) })
               }
               title={t('Measure the block and snap the box to its real size')}
               className="w-full rounded-lg border border-[var(--studio-border,#d1d5db)] px-3 py-1.5 text-xs font-semibold text-[var(--studio-text,#374151)] hover:bg-[var(--studio-control-hover,#f3f4f6)]"

@@ -248,6 +248,30 @@ class TestValidateAndCleanSchema:
         assert '_paletteType' not in bad['props']
         assert '_baseSize' not in bad['props']
 
+    def test_html_embed_site_font_flag_round_trips(self):
+        """_siteFont marks an embed that starts in the site's font. Only a real
+        True survives; anything else would switch an older embed's font."""
+        clean = validate_and_clean_schema({
+            'pages': [{
+                'id': 'home', 'name': 'Home',
+                'components': [
+                    {
+                        'id': 'h1', 'type': 'html',
+                        'props': {'code': '<div>x</div>', '_siteFont': True},
+                        'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 200, 'h': 80},
+                    },
+                    {
+                        'id': 'h2', 'type': 'html',
+                        'props': {'code': '<div>y</div>', '_siteFont': 'yes'},
+                        'styles': {}, 'layout': {'x': 0, 'y': 100, 'w': 200, 'h': 80},
+                    },
+                ],
+            }],
+        })
+        flagged, junk = clean['pages'][0]['components']
+        assert flagged['props']['_siteFont'] is True
+        assert '_siteFont' not in junk['props']
+
     def test_html_embed_appearance_tweaks_round_trip(self):
         """Appearance overrides survive as sanitized CSS values; markup and
         junk enums are dropped."""

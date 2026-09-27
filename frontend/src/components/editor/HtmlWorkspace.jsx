@@ -616,9 +616,6 @@ function HtmlWorkspace({
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const clearGlow = useCallback(() => setGlow(null), [])
   const sourceDraftDirty = hasUnsavedSourceDraft(mode, sourceDraft, html)
-  useEffect(() => {
-    onDraftDirtyChange?.(sourceDraftDirty)
-  }, [onDraftDirtyChange, sourceDraftDirty])
   useEffect(() => () => onDraftDirtyChange?.(false), [onDraftDirtyChange])
   // Code-project mode only: the resolved View document (CSS/JS inlined from the
   // sibling files). Recomputed by an effect whenever the file or a linked file
@@ -697,8 +694,9 @@ function HtmlWorkspace({
   const selectedRef = useRef(null)
   const selectRefreshTimer = useRef(null)
   // Typing in the iframe does not commit (that would be an undo entry per
-  // keystroke), so the live code ticker would never see text edits. This is a
-  // read-only heartbeat: it re-reads the document, it does not save it.
+  // keystroke; while the caret is in text, undo is the browser's own). This
+  // read-only heartbeat re-reads the document for the live code ticker and for
+  // the unsaved-draft signal below. It does not save anything.
   const docPulseTimer = useRef(null)
   // The committed document, readable from the listener without re-binding it.
   const htmlRef = useRef(html)
@@ -1166,7 +1164,20 @@ function HtmlWorkspace({
   // committed html IS the document. The pulse carries the html it was taken
   // from, so a commit landing in between falls straight back to the committed
   // document instead of diffing against a snapshot that is already behind it.
-  const tickerDocument = mode === 'edit' && docPulse?.base === html ? docPulse.doc : html
+  // In Edit the live document is a DOM round-trip of the file, so it is
+  // compared with the file put through the same round-trip — against the raw
+  // text, the first difference was the doctype line, not the edit.
+  const normalizedHtml = useMemo(() => (mode === 'edit' ? normalizeDocument(html) : html), [html, mode])
+  const tickerDocument = mode === 'edit' && docPulse?.base === html ? docPulse.doc : normalizedHtml
+
+  // Text typed into the page runs ahead of the committed html until Save or a
+  // mode switch picks it up. Report it as an unsaved draft, like a Source
+  // edit: without this, auto-save never ran for typing, the leave-page guard
+  // stayed quiet and a reload silently dropped what was typed.
+  const editDraftDirty = mode === 'edit' && docPulse?.base === html && docPulse.doc !== normalizedHtml
+  useEffect(() => {
+    onDraftDirtyChange?.(sourceDraftDirty || editDraftDirty)
+  }, [onDraftDirtyChange, sourceDraftDirty, editDraftDirty])
 
   // Runs once Source is actually showing, so the field holds the document.
   useEffect(() => {
@@ -1692,7 +1703,7 @@ function HtmlWorkspace({
     doc.addEventListener('input', () => {
       if (docPulseTimer.current) window.clearTimeout(docPulseTimer.current)
       docPulseTimer.current = window.setTimeout(
-        () => setDocPulse({ base: htmlRef.current, doc: readHtml() }),
+        () => setDocPulse({ base: htmlRef.current, doc: serializeDocument(doc) }),
         300,
       )
     })
@@ -1838,6 +1849,7 @@ function HtmlWorkspace({
       {liveCode && mode !== 'source' && (
         <CodeActivityOverlay
           document={tickerDocument}
+          resetKey={mode}
           fileName={fileName}
           holdMs={liveCodeHold}
           onOpenSource={(target) => { switchMode('source'); setPendingReveal({ ...target, at: Date.now() }) }}

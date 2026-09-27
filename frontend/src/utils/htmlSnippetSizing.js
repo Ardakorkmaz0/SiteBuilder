@@ -148,6 +148,8 @@ export function htmlEmbedDocumentOptions(component, scale = 1) {
     fill,
     scale: (fill || shaped) ? 1 : scale,
     tweaks,
+    // Starts in the site's font (see baseFontTag in htmlEmbedDocument.js).
+    siteFont: component?.props?._siteFont === true,
   }
 }
 

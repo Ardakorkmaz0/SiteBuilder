@@ -1930,12 +1930,21 @@ button:not(:disabled),
 
 /* Native dropdown lists follow the element's own scheme, and a transparent
    select renders a white popup over a black app. */
-:root[data-ui-theme="dark"] select {
+:root[data-ui-theme="dark"] select:not(.site-surface *) {
   color-scheme: dark;
 }
-:root[data-ui-theme="dark"] select option {
+:root[data-ui-theme="dark"] select:not(.site-surface *) option {
   background-color: var(--studio-panel-raised);
   color: var(--studio-text);
+}
+
+/* The page being designed, on the canvas or in a preview, renders the way the
+   published site does, whatever the app's theme. A dark scheme here would also
+   paint every HTML embed's iframe an opaque white (its document is light), so
+   an embed laid over a photo or another block would hide it in the editor
+   while the live page shows it through. */
+.site-surface {
+  color-scheme: light;
 }
 
 /* The editor walkthrough: a dim page, a ring around what the card is talking

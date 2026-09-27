@@ -594,7 +594,7 @@ ${customCssBlock(site?.schema?.customCss)}`
       )}
       <style>{siteCss}</style>
       <PreviewStage device={device}>
-        <div ref={siteCanvasRef} data-public-site-canvas>
+        <div ref={siteCanvasRef} data-public-site-canvas className="site-surface">
           <ResponsiveSite key={current.id} page={current} />
         </div>
       </PreviewStage>
