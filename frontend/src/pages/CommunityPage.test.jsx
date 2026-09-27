@@ -156,10 +156,44 @@ describe('who may do what to a block', () => {
     await screen.findByTitle('Pricing card')
 
     expect(screen.queryByRole('button', { name: 'Report this block' })).toBeNull()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     await user.click(screen.getByRole('button', { name: 'Withdraw' }))
 
+    expect(confirm).toHaveBeenCalledOnce()
     expect(withdrawComponent).toHaveBeenCalledWith(3)
     await waitFor(() => expect(screen.queryByTitle('Pricing card')).toBeNull())
+    confirm.mockRestore()
+  })
+
+  // The author cannot put a withdrawn block back, so one stray click on a
+  // trash icon must not be enough.
+  it('asks before withdrawing, and a no keeps the block', async () => {
+    const user = userEvent.setup()
+    useAuthStore.setState({ user: { id: 9, username: 'ada' } })
+    renderPage()
+    await screen.findByTitle('Pricing card')
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    await user.click(screen.getByRole('button', { name: 'Withdraw' }))
+
+    expect(withdrawComponent).not.toHaveBeenCalled()
+    expect(screen.getByTitle('Pricing card')).toBeInTheDocument()
+    confirm.mockRestore()
+  })
+
+  it('keeps the card and says so when the withdrawal fails', async () => {
+    const user = userEvent.setup()
+    useAuthStore.setState({ user: { id: 9, username: 'ada' } })
+    withdrawComponent.mockRejectedValueOnce({ response: { status: 500, data: 'boom' } })
+    renderPage()
+    await screen.findByTitle('Pricing card')
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    await user.click(screen.getByRole('button', { name: 'Withdraw' }))
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.getByTitle('Pricing card')).toBeInTheDocument()
+    confirm.mockRestore()
   })
 })
 

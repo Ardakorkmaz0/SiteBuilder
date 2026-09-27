@@ -300,6 +300,7 @@ export function exportComponent(doc, el, { allowScripts = false, scope = nextSco
   if (blocked.length) {
     warnings.push({
       kind: 'blocked-stylesheet',
+      count: blocked.length,
       detail: `${blocked.length} stylesheet(s) could not be read (cross-origin); fonts are carried by name instead.`,
     })
   }
@@ -346,7 +347,7 @@ export function exportComponent(doc, el, { allowScripts = false, scope = nextSco
     if (src) {
       const abs = absoluteAssetUrl(src, baseUrl)
       if (abs) { node.setAttribute('src', abs); assets.push(abs) }
-      else warnings.push({ kind: 'asset', detail: `An image could not travel: ${src.slice(0, 60)}` })
+      else warnings.push({ kind: 'asset', src: src.slice(0, 60), detail: `An image could not travel: ${src.slice(0, 60)}` })
     }
     const srcset = node.getAttribute?.('srcset')
     // A srcset resolved against the wrong origin is worse than none at all.

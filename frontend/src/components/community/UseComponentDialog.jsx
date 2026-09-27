@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom'
 import { listSites, getSite, createSite } from '../../api/sites.js'
 import { takeComponent } from '../../api/community.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { apiError } from '../../utils/errors.js'
 import { sharedBlockHtml } from '../../utils/componentExport.js'
 import { STATIC_HTML_SANDBOX } from '../../utils/htmlRuntime.js'
 import { SPOTLIGHT_Z } from '../editor/spotlight.js'
@@ -96,7 +97,7 @@ export default function UseComponentDialog({ component, onClose, onUsed }) {
       // with a silent "done" is how people lose track of what happened.
       navigate(`/editor/${result.site_id}`)
     } catch (e) {
-      setError(e?.response?.data?.detail || t('Could not add this component.'))
+      setError(apiError(e, t('Could not add this component.')))
     } finally {
       setBusy(false)
     }

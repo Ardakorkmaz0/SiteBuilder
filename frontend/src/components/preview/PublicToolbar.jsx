@@ -17,6 +17,7 @@ import {
 import LanguageSwitcher from '../LanguageSwitcher.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useGuestGate } from '../../utils/useGuestGate.jsx'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 // Below this the bar has no room for the two segments next to the page tabs,
 // so they move into the ⋯ menu — one copy of each either way.
@@ -101,6 +102,7 @@ export default function PublicToolbar({
   const [cloning, setCloning] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  useEscapeToClose(showReport, () => setShowReport(false))
   const [reason, setReason] = useState('spam')
   const [detail, setDetail] = useState('')
   const [reporting, setReporting] = useState(false)
@@ -341,14 +343,18 @@ export default function PublicToolbar({
           onClick={() => setShowReport(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="report-site-title"
             className="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-[#e5e7eb] px-5 py-3">
-              <span className="text-sm font-semibold text-[#111827]">{t('Report this site')}</span>
+              <h2 id="report-site-title" className="text-sm font-semibold text-[#111827]">{t('Report this site')}</h2>
               <button
                 type="button"
                 onClick={() => setShowReport(false)}
+                aria-label={t('Close')}
                 className="rounded-md px-2 py-1 text-sm text-[#6b7280] hover:bg-[#f3f4f6]"
               >
                 ×
@@ -360,7 +366,7 @@ export default function PublicToolbar({
                 <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-800">
                   {t('Thanks — our team will review this site.')}
                 </div>
-                <button onClick={() => setShowReport(false)} className="ms-btn ms-btn-primary w-full py-2.5">
+                <button autoFocus onClick={() => setShowReport(false)} className="ms-btn ms-btn-primary w-full py-2.5">
                   {t('Done')}
                 </button>
               </div>
@@ -373,7 +379,8 @@ export default function PublicToolbar({
                 )}
                 <label className="block">
                   <span className="mb-1.5 block text-sm font-medium text-[#374151]">{t('Reason')}</span>
-                  <select className="ms-input" value={reason} onChange={(e) => setReason(e.target.value)}>
+                  {/* Focus comes here from the menu, so the dialog is where the keyboard is. */}
+                  <select autoFocus className="ms-input" value={reason} onChange={(e) => setReason(e.target.value)}>
                     {REPORT_REASONS.map(([id, label]) => (
                       <option key={id} value={id}>{t(label)}</option>
                     ))}

@@ -6,8 +6,9 @@
 // share is everything around the preview, so that lives here once. A second
 // copy of this chrome would drift from the first within a week.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { SPOTLIGHT_WIDTHS, SPOTLIGHT_Z } from './spotlight.js'
 
 export default function SpotlightShell({
@@ -31,17 +32,13 @@ export default function SpotlightShell({
     onClose?.()
   }, [onClose])
 
+  useEscapeToClose(open, close)
+  // Opened from the element's toolbar, which lives inside the page's iframe:
+  // focus stayed in there, so Esc and Tab never reached this dialog.
+  const dialogRef = useRef(null)
   useEffect(() => {
-    if (!open) return undefined
-    const onKey = (event) => {
-      if (event.key === 'Escape') {
-        event.stopPropagation()
-        close()
-      }
-    }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [open, close])
+    if (open) dialogRef.current?.focus({ preventScroll: true })
+  }, [open])
 
   if (!open) return null
 
@@ -50,7 +47,9 @@ export default function SpotlightShell({
 
   return (
     <div
-      className="studio-theme-surface fixed inset-0 flex"
+      ref={dialogRef}
+      tabIndex={-1}
+      className="studio-theme-surface fixed inset-0 flex outline-none"
       style={{ zIndex: SPOTLIGHT_Z }}
       role="dialog"
       aria-modal="true"

@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { reportComponent } from '../../api/community.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { apiError } from '../../utils/errors.js'
 import { SPOTLIGHT_Z } from '../editor/spotlight.js'
 
 const REPORT_REASONS = [
@@ -34,7 +35,7 @@ export default function ReportComponentDialog({ component, onClose }) {
       await reportComponent(component.id, { reason, detail: detail.trim() })
       setDone(true)
     } catch (e) {
-      setError(e?.response?.data?.detail || t('Could not submit the report.'))
+      setError(apiError(e, t('Could not submit the report.')))
     } finally {
       setBusy(false)
     }

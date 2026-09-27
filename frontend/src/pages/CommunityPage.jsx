@@ -27,6 +27,7 @@ import { sharedBlockHtml } from '../utils/componentExport.js'
 import { STATIC_HTML_SANDBOX } from '../utils/htmlRuntime.js'
 import { useAuthStore } from '../store/authStore.js'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { apiError } from '../utils/errors.js'
 
 const CATEGORIES = [
   ['', 'All'],
@@ -148,6 +149,9 @@ export default function CommunityPage() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // A withdraw or visibility change that failed. Separate from `error`, which
+  // means the library itself did not load and hides the grid.
+  const [actionError, setActionError] = useState('')
   const [using, setUsing] = useState(null)
   const [reporting, setReporting] = useState(null)
   const [previewing, setPreviewing] = useState(null)
@@ -170,13 +174,29 @@ export default function CommunityPage() {
     return () => clearTimeout(timer)
   }, [load, query])
 
+  // A failed request used to be swallowed and the card changed anyway, so the
+  // page said a block was gone (or private) while the library still offered it.
   const withdraw = async (component) => {
-    await withdrawComponent(component.id).catch(() => {})
+    // The author cannot undo this one: there is no way back into the library.
+    if (!window.confirm(t('Withdraw “{title}”? It stops being offered, copies already taken stay where they are, and it cannot be put back.', { title: component.title }))) return
+    setActionError('')
+    try {
+      await withdrawComponent(component.id)
+    } catch (e) {
+      setActionError(apiError(e, t('Could not withdraw this block.')))
+      return
+    }
     setItems((rows) => rows.filter((row) => row.id !== component.id))
   }
 
   const changeVisibility = async (component, visibility) => {
-    await setComponentVisibility(component.id, visibility).catch(() => {})
+    setActionError('')
+    try {
+      await setComponentVisibility(component.id, visibility)
+    } catch (e) {
+      setActionError(apiError(e, t('Could not change who can see this block.')))
+      return
+    }
     // On the community grid a block that just went private no longer belongs
     // there; on your own shelf it stays, wearing the badge.
     setItems((rows) => (scope === 'mine'
@@ -250,6 +270,7 @@ export default function CommunityPage() {
           </div>
 
         {error && <p role="alert" className="studio-status-danger mb-4 rounded-xl border px-4 py-3 text-sm">{error}</p>}
+        {actionError && <p role="alert" className="studio-status-danger mb-4 rounded-xl border px-4 py-3 text-sm">{actionError}</p>}
 
         {loading ? (
           <div role="status" aria-label={t('Loading…')} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
