@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import BlockLibrary from './BlockLibrary.jsx'
+import { HTML_BLOCKS } from '../../utils/htmlVariants.js'
 
 function renderLibrary(props = {}) {
   return render(
@@ -23,8 +24,8 @@ describe('BlockLibrary', () => {
     expect(document.querySelector('[data-block-library]')).toBeNull()
   })
 
-  // The All view mounts the ENTIRE library (~140 cards, sections in iframes);
-  // under a loaded parallel test run that render can exceed the default 5s.
+  // Building the entry list touches the whole library (hundreds of sections
+  // and variants); under a loaded parallel test run that can exceed 5s.
   it('lists categories with counts and shows every entry under All blocks', { timeout: 20000 }, () => {
     localStorage.setItem('pwb_language', 'en')
     renderLibrary()
@@ -37,6 +38,54 @@ describe('BlockLibrary', () => {
     expect(screen.getAllByText('Sections').length).toBeGreaterThan(0)
     // A known section block card is present by default (All).
     expect(screen.getAllByText(/Hero/i).length).toBeGreaterThan(0)
+  })
+
+  const cards = () => document.querySelectorAll('[data-block-library] .grid > button')
+  const rail = () => within(document.querySelector('[data-block-library] nav'))
+
+  it('files sections by category in the rail and filters to one', async () => {
+    localStorage.setItem('pwb_language', 'en')
+    const user = userEvent.setup()
+    renderLibrary()
+    await user.click(rail().getByText('Footers'))
+    const footers = HTML_BLOCKS.filter((block) => block.category === 'footer')
+    expect(cards()).toHaveLength(footers.length)
+    for (const card of cards()) expect(card).toHaveTextContent('Footers')
+    expect(screen.queryByText('Show more')).toBeNull()
+  })
+
+  it('shows a page of cards at a time and grows on request', async () => {
+    localStorage.setItem('pwb_language', 'en')
+    const user = userEvent.setup()
+    renderLibrary()
+    await user.click(rail().getByText('All sections'))
+    expect(cards()).toHaveLength(36)
+    expect(screen.getByText(`Showing 36 of ${HTML_BLOCKS.length}`)).toBeInTheDocument()
+    await user.click(screen.getByText('Show more'))
+    expect(cards()).toHaveLength(72)
+  })
+
+  it('search matches block descriptions too', async () => {
+    localStorage.setItem('pwb_language', 'en')
+    const user = userEvent.setup()
+    renderLibrary()
+    await user.type(screen.getByPlaceholderText('Search blocks'), 'copyable code')
+    expect(cards()).toHaveLength(1)
+    expect(cards()[0]).toHaveTextContent('Offer with code')
+  })
+
+  it('drops the Turkish build of a section when the editor is in Turkish', async () => {
+    localStorage.setItem('pwb_language', 'tr')
+    const user = userEvent.setup()
+    const onArm = vi.fn()
+    renderLibrary({ onArmPlacement: onArm })
+    await user.click(rail().getByText('Yardımcı sayfalar'))
+    await user.click(screen.getByText('Sayfa bulunamadı'))
+    const armed = onArm.mock.calls[0][0]
+    expect(armed.type).toBe('section')
+    expect(armed.html).toContain('Bu sayfa kaybolmuş.')
+    expect(armed.html).not.toContain('This page has wandered off.')
+    expect(armed.h).toBe(HTML_BLOCKS.find((block) => block.id === 'utility-404').size[1])
   })
 
   it('search filters across every category and ignores the active one', async () => {
