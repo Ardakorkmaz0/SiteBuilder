@@ -1,3 +1,5 @@
+import { VARIANT_SIZES } from './componentVariants/sizes.js'
+
 const HTML_SNIPPET_FALLBACK = { w: 380, h: 110 }
 
 const HTML_SNIPPET_SIZE = {
@@ -22,6 +24,7 @@ const HTML_SNIPPET_SIZE = {
   icon: { w: 90, h: 90 },
   html: { w: 560, h: 150 },
   spacer: { w: 560, h: 60 },
+  widget: { w: 380, h: 140 },
 }
 
 const HTML_SNIPPET_VARIANT_SIZE = {
@@ -57,10 +60,15 @@ function numericSize(size) {
     : null
 }
 
+function pairSize(pair) {
+  return Array.isArray(pair) ? numericSize({ w: pair[0], h: pair[1] }) : null
+}
+
 export function htmlSnippetSize(type, variant, fallback = HTML_SNIPPET_FALLBACK) {
   const id = typeof variant === 'string' ? variant : variant?.id
   return (
     numericSize(HTML_SNIPPET_VARIANT_SIZE[type]?.[id])
+    || pairSize(VARIANT_SIZES[type]?.[id])
     || numericSize(HTML_SNIPPET_SIZE[type])
     || numericSize(fallback)
     || HTML_SNIPPET_FALLBACK

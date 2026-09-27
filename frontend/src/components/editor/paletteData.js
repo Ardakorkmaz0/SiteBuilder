@@ -49,6 +49,12 @@ export function blockSize(id) {
   return BLOCK_SIZE[id] || LIBRARY_BLOCK_SIZE.get(id) || [1000, 360]
 }
 
+// Library snippets built from bilingual data carry a Turkish build; everything
+// else is language-neutral markup.
+export function localizedHtml(item, language) {
+  return language === 'tr' && item?.htmlTr ? item.htmlTr : item?.html
+}
+
 export function previewSrcDoc(html, wide) {
   const body = wide
     ? `<div class="stage stage-wide">${html}</div>`
