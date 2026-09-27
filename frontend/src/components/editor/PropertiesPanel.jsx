@@ -1049,14 +1049,15 @@ export default function PropertiesPanel({
               theme: the site theme skips it, and its changes skip the site. */}
           <div className="space-y-1.5">
             <div role="radiogroup" aria-label={t('Where the theme applies')} className="studio-segment flex w-full">
-              {[['site', t('Whole site')], ['page', t('This page only')]].map(([scope, label]) => (
+              {[['site', t('Whole site'), t('Whole site')], ['page', t('This page'), t('This page only')]].map(([scope, label, hint]) => (
                 <button
                   key={scope}
                   type="button"
+                  title={hint}
                   role="radio"
                   aria-checked={(scope === 'page') === ownTheme}
                   onClick={() => { if ((scope === 'page') !== ownTheme) setPageThemeScope(page.id, scope) }}
-                  className={`studio-segment-btn flex-1 ${(scope === 'page') === ownTheme ? 'studio-segment-btn-active' : ''}`}
+                  className={`studio-segment-btn flex-1 whitespace-nowrap ${(scope === 'page') === ownTheme ? 'studio-segment-btn-active' : ''}`}
                 >
                   {label}
                 </button>

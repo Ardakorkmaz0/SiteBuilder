@@ -24,7 +24,9 @@ export function ThemeSwatchButton({ theme, name, active = false, title, onClick 
           <span key={index} className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ background: color }} />
         ))}
       </span>
-      <span className="truncate">{name}</span>
+      {/* Two lines rather than an ellipsis: in a narrow rail a truncated
+          name read "Sıca…", which names nothing. */}
+      <span className="line-clamp-2 min-w-0 leading-tight">{name}</span>
     </button>
   )
 }

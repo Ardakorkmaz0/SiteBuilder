@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import Favicon from './BrowserFavicon.jsx'
+import { previewScaleStyle } from './previewScale.js'
 import { pageTitle, visiblePageAddress } from './browserPageAddress.js'
 import {
   BROWSER_FRAME_BOTTOM,
@@ -367,8 +368,7 @@ export default function BrowserFrame({
             style={{
               width: screenWidth,
               height: screenHeight,
-              transform: fullscreenScale !== 1 && fullscreen ? `scale(${fullscreenScale})` : undefined,
-              transformOrigin: 'top left',
+              ...previewScaleStyle(fullscreen ? fullscreenScale : 1),
               borderRadius: fullscreen ? 0 : '0 0 8px 8px',
               boxShadow: fullscreen ? 'none' : '0 0 0 1px rgba(0,0,0,.28)',
             }}

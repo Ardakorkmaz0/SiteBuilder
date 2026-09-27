@@ -61,6 +61,7 @@ import { hasUnsavedSourceDraft } from '../../utils/htmlSourceDraft.js'
 import { applyElementMotion, applyMotionRest } from '../../utils/htmlMotion.js'
 import CanvasZoomControl from './CanvasZoomControl.jsx'
 import FullscreenStage from './FullscreenStage.jsx'
+import { previewScaleStyle } from './previewScale.js'
 import { readZoom, writeZoom, zoomScale } from './canvasZoom.js'
 import BrushControls from './BrushControls.jsx'
 import { EditIcon, MoveIcon, LinkIcon, PinIcon, LightbulbIcon, FileCodeIcon, WarningIcon, PaletteIcon, MoreHorizontalIcon, MonitorIcon, ChevronDownIcon } from '../icons.jsx'
@@ -2239,8 +2240,9 @@ function HtmlWorkspace({
                     width: previewW,
                     height: previewH,
                     position: 'relative',
-                    transform: `scale(${scale})`,
-                    transformOrigin: 'top left',
+                    // zoom where it keeps a select's list under the select
+                    // (see previewScale.js), a transform elsewhere.
+                    ...previewScaleStyle(scale),
                     outline: placing ? '2px solid #2563eb' : 'none',
                     outlineOffset: framedPhone || desktopBrowser ? 4 : 0,
                   }}
