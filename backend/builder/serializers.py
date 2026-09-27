@@ -3,6 +3,7 @@ from django.contrib.auth.password_validation import validate_password as dj_vali
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework import serializers
+from rest_framework.exceptions import ErrorDetail
 
 from .access import DAILY_PUBLISH_LIMIT, publish_blocked
 from .accounts import normalise_email, normalise_username
@@ -22,6 +23,19 @@ from .models import (
 )
 from .site_meta import share_image
 from .validators import clean_published_pages, validate_and_clean_schema
+
+
+def password_errors(error):
+    """Django's password messages with their codes (password_too_common, ...).
+
+    list(e.messages) kept the words and dropped the codes, so every refusal
+    reached the client as "invalid" and read as "Please enter a valid value."
+    """
+    return [
+        ErrorDetail(message, code=item.code or 'invalid')
+        for item in error.error_list
+        for message in item.messages
+    ]
 
 
 def replace_published_pages(site, pages):
@@ -73,17 +87,17 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_username(self, value):
         value = normalise_username(value)
         if not value:
-            raise serializers.ValidationError('Choose a username.')
+            raise serializers.ValidationError('Choose a username.', code='required')
         if value.startswith(GUEST_USERNAME_PREFIX):
-            raise serializers.ValidationError('That username is reserved.')
+            raise serializers.ValidationError('That username is reserved.', code='reserved')
         if User.objects.filter(username__iexact=value).exists():
-            raise serializers.ValidationError('This username is already taken.')
+            raise serializers.ValidationError('This username is already taken.', code='unique')
         return value
 
     def validate_email(self, value):
         value = normalise_email(value)
         if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError('An account with this email already exists.')
+            raise serializers.ValidationError('An account with this email already exists.', code='unique')
         return value
 
     def validate_password(self, value):
@@ -92,7 +106,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         try:
             dj_validate_password(value)
         except DjangoValidationError as e:
-            raise serializers.ValidationError(list(e.messages))
+            raise serializers.ValidationError(password_errors(e))
         return value
 
     def create(self, validated_data):
@@ -122,24 +136,24 @@ class GuestUpgradeSerializer(serializers.Serializer):
     def validate_username(self, value):
         value = normalise_username(value)
         if not value:
-            raise serializers.ValidationError('Choose a username.')
+            raise serializers.ValidationError('Choose a username.', code='required')
         if value.startswith(GUEST_USERNAME_PREFIX):
-            raise serializers.ValidationError('That username is reserved.')
+            raise serializers.ValidationError('That username is reserved.', code='reserved')
         if self._others().filter(username__iexact=value).exists():
-            raise serializers.ValidationError('This username is already taken.')
+            raise serializers.ValidationError('This username is already taken.', code='unique')
         return value
 
     def validate_email(self, value):
         value = normalise_email(value)
         if self._others().filter(email__iexact=value).exists():
-            raise serializers.ValidationError('An account with this email already exists.')
+            raise serializers.ValidationError('An account with this email already exists.', code='unique')
         return value
 
     def validate_password(self, value):
         try:
             dj_validate_password(value)
         except DjangoValidationError as e:
-            raise serializers.ValidationError(list(e.messages))
+            raise serializers.ValidationError(password_errors(e))
         return value
 
 

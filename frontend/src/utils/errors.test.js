@@ -26,6 +26,37 @@ describe('apiError', () => {
     } } })).toBe('Kullanıcı adı veya şifre hatalı.')
   })
 
+  it('says which sign-up rule failed rather than "enter a valid value"', () => {
+    // The register endpoint's own answers.
+    expect(apiError({ response: { data: {
+      code: 'validation_error',
+      username: ['This username is already taken.'],
+      error_codes: { username: ['unique'] },
+    } } })).toBe('Bu kullanıcı adı zaten alınmış.')
+    expect(apiError({ response: { data: {
+      code: 'validation_error',
+      password: ['This password is too common.', 'This password is entirely numeric.'],
+      error_codes: { password: ['password_too_common', 'password_entirely_numeric'] },
+    } } })).toBe('Bu şifre çok yaygın.')
+  })
+
+  it('falls back to the code\'s line for a sentence it cannot say in Turkish', () => {
+    expect(apiError({ response: { data: {
+      code: 'validation_error',
+      username: ['Some sentence nobody translated.'],
+      error_codes: { username: ['unique'] },
+    } } })).toBe('Bu değer zaten kullanılıyor.')
+  })
+
+  it('shows the server\'s own sentence in English', () => {
+    localStorage.setItem('pwb_language', 'en')
+    expect(apiError({ response: { data: {
+      code: 'validation_error',
+      username: ['This username is already taken.'],
+      error_codes: { username: ['unique'] },
+    } } })).toBe('This username is already taken.')
+  })
+
   it('keeps English messages when English is selected', () => {
     localStorage.setItem('pwb_language', 'en')
     expect(apiError({ response: { data: { code: 'permission_denied', detail: 'Forbidden' } } }))

@@ -127,9 +127,11 @@ export default function RegisterPage() {
         />
       </label>
 
-      <label className="block">
-        <span className="mb-1.5 block text-sm font-medium text-[var(--studio-text-muted)]">{t('Password')}</span>
+      <div className="block">
+        <label htmlFor="register-password" className="mb-1.5 block text-sm font-medium text-[var(--studio-text-muted)]">{t('Password')}</label>
         <input
+          id="register-password"
+          aria-describedby="register-password-hint"
           type="password"
           className="ms-input"
           value={password}
@@ -145,11 +147,13 @@ export default function RegisterPage() {
             style={{ width: `${password ? strength.percent : 0}%`, background: strength.color }}
           />
         </div>
-        <span className="mt-1 flex flex-wrap items-center justify-between gap-1 text-xs text-[var(--studio-text-muted)]">
+        {/* Outside the label: the hint and the strength describe the field,
+            they are not its name. A screen reader reads them after it. */}
+        <span id="register-password-hint" className="mt-1 flex flex-wrap items-center justify-between gap-1 text-xs text-[var(--studio-text-muted)]">
           <span>{t('8+ chars, mix letters, numbers & symbols.')}</span>
           {password && <span style={{ color: strength.color }}>{t(strength.label)}</span>}
         </span>
-      </label>
+      </div>
 
       <label className="flex items-center gap-2 text-sm text-[var(--studio-text-muted)]">
         <input
