@@ -8,6 +8,7 @@ import {
 import { localizeTemplateHtml } from '../../utils/templateLocalization.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { EyeIcon, SearchIcon, StarIcon } from '../icons.jsx'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 const DESIGN_W = 1200
 const DESIGN_H = 860
@@ -75,6 +76,8 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
   const [layout, setLayout] = useState('all')
   const [tone, setTone] = useState('all') // all | light | dark
   const [pagination, setPagination] = useState({ key: '', count: INITIAL_VISIBLE_TEMPLATES })
+  useEscapeToClose(open, onClose)
+  useEscapeToClose(open && !!preview, () => setPreview(null))
 
   if (!open) return null
 

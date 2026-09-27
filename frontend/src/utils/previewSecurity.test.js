@@ -49,13 +49,15 @@ describe('preview message boundary', () => {
 describe('HTML measurement isolation', () => {
   it('disables execution before mounting a snippet with nested executable HTML', async () => {
     vi.useFakeTimers()
-    // Top-level script removal does not remove scripts stored in srcdoc.
-    // The sandbox must disable execution throughout the document tree.
+    // Two defenses, each enough on its own: scripts stored in a nested srcdoc
+    // are stripped too, and the sandbox disables execution throughout the
+    // document tree for anything a stripper could ever miss.
     const code = '<iframe srcdoc="<script>parent.parent.document.body.dataset.compromised = 1</script>"></iframe>'
     const pending = measureHtmlSnippet({ type: 'html', props: { code } }, 320, { timeout: 100 })
     const measuringFrame = document.querySelector('iframe')
     const documentSource = new DOMParser().parseFromString(measuringFrame.srcdoc, 'text/html')
-    expect(documentSource.querySelector('iframe').getAttribute('srcdoc')).toContain('<script>')
+    const nested = new DOMParser().parseFromString(documentSource.querySelector('iframe').getAttribute('srcdoc'), 'text/html')
+    expect(nested.querySelector('script')).toBeNull()
     expect(measuringFrame.getAttribute('sandbox')).toBe('allow-same-origin')
     expect(measuringFrame.getAttribute('sandbox')).not.toContain('allow-scripts')
     await vi.advanceTimersByTimeAsync(100)

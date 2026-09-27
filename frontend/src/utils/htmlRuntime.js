@@ -557,7 +557,14 @@ export function withGeneratedStylesHtml(html, css) {
     ?? tag + out
 }
 
-export function withoutExecutableScripts(html) {
+// A page can carry a whole second document in an <iframe srcdoc>: an HTML
+// embed block does. Its scripts used to survive, and inside a script-less
+// preview the browser blocked each one and logged it as an error on every
+// dashboard load. Nested documents get the same treatment, a few levels deep.
+const NESTED_DOCUMENT_DEPTH = 3
+const URL_ATTRIBUTES = ['href', 'src', 'action', 'formaction', 'xlink:href']
+
+export function withoutExecutableScripts(html, depth = 0) {
   if (typeof DOMParser === 'undefined') {
     return String(html || '')
       .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
@@ -568,7 +575,17 @@ export function withoutExecutableScripts(html) {
     doc.querySelectorAll('script').forEach((script) => script.remove())
     doc.querySelectorAll('*').forEach((el) => {
       for (const attr of [...el.attributes]) {
-        if (attr.name.toLowerCase().startsWith('on')) el.removeAttribute(attr.name)
+        const name = attr.name.toLowerCase()
+        if (name.startsWith('on')) el.removeAttribute(attr.name)
+        // A javascript: address runs when a frame loads it, or when it is followed.
+        else if (URL_ATTRIBUTES.includes(name) && /^\s*javascript:/i.test(attr.value)) el.removeAttribute(attr.name)
+      }
+    })
+    doc.querySelectorAll('iframe[srcdoc]').forEach((frame) => {
+      if (depth < NESTED_DOCUMENT_DEPTH) {
+        frame.setAttribute('srcdoc', withoutExecutableScripts(frame.getAttribute('srcdoc'), depth + 1))
+      } else {
+        frame.removeAttribute('srcdoc')
       }
     })
     return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML

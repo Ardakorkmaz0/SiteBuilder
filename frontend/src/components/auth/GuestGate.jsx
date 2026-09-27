@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 // What a guest identity cannot do, in the words of the thing they just tried.
 // Kept here rather than at each call site so the answer is the same wherever
@@ -20,6 +21,7 @@ const REASONS = {
 export default function GuestGateDialog({ action, onClose }) {
   const { t } = useLanguage()
   const navigate = useNavigate()
+  useEscapeToClose(true, onClose)
   return (
     <div
       className="studio-theme-surface studio-overlay fixed inset-0 z-[200] flex items-center justify-center p-4"
