@@ -76,7 +76,7 @@ import { applyThemeToDocument } from '../utils/htmlTheme.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
 import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
-import { blankResponsiveSite } from '../utils/htmlTemplates.js'
+import { emptyHtmlDocument } from '../utils/htmlTemplates.js'
 import { apiError } from '../utils/errors.js'
 import { googleFontHrefForTheme } from '../utils/googleFonts.js'
 import { MOBILE_EDITOR_QUERY, NARROW_EDITOR_QUERY, useMediaQuery } from '../utils/useMediaQuery.js'
@@ -1590,18 +1590,22 @@ export default function EditorPage() {
     setPageMode(currentPageId, 'html')
   }
 
-  // Start a fresh, genuinely responsive HTML site from a clean starter.
+  // Start this page as an empty HTML document: nothing on the page, only the
+  // theme's colors and fonts ready for what gets added. The full starter site
+  // is a template and lives in the template picker.
   // No confirm for an EMPTY page — there is nothing to lose there.
   function startBlankHtml() {
     setImportOpen(false)
     if (
       siteHtml.trim() &&
       !window.confirm(
-        t('Start from a blank responsive HTML template? This page current content changes (Undo brings it back). Nothing is saved until you press Save.'),
+        t('Start this page from an empty HTML document? Its current content is replaced (Undo brings it back). Nothing is saved until you press Save.'),
       )
     )
       return
-    commitHtml(blankResponsiveSite(title || 'My Site', useEditorStore.getState().schema.theme), { reseedWorkspace: true })
+    const state = useEditorStore.getState()
+    const page = state.schema.pages.find((p) => p.id === currentPageId)
+    commitHtml(emptyHtmlDocument(title || 'My Site', state.schema.theme, page?.language), { reseedWorkspace: true })
     setPageMode(currentPageId, 'html')
   }
 
