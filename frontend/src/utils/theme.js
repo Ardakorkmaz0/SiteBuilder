@@ -319,18 +319,44 @@ function applyThemeToComponent(component, theme) {
   }
 }
 
-export function applyThemeToSchema(schema) {
-  const theme = normalizeTheme(schema?.theme)
-  const pages = (schema?.pages || []).map((page) => ({
+// A page either follows the site theme or keeps its own ("This page only" in
+// the theme panel), stored on the page as `theme`. Everything that styles or
+// writes a page asks here, so a page's own theme reaches its new blocks, its
+// fonts and its published document.
+export function hasOwnTheme(page) {
+  return !!page?.theme && typeof page.theme === 'object'
+}
+
+export function pageTheme(schema, page) {
+  return normalizeTheme(hasOwnTheme(page) ? page.theme : schema?.theme)
+}
+
+function withPageTheme(page, theme) {
+  return {
     ...page,
     background: theme.backgroundColor,
     backgroundMobile: theme.backgroundColor,
     components: (page.components || []).map((component) => applyThemeToComponent(component, theme)),
-  }))
+  }
+}
+
+// The site theme onto every page that follows it. A page with its own theme
+// is left as it is: that is what choosing "This page only" was for.
+export function applyThemeToSchema(schema) {
+  const theme = normalizeTheme(schema?.theme)
+  const pages = (schema?.pages || []).map((page) => (hasOwnTheme(page) ? page : withPageTheme(page, theme)))
   return {
     ...schema,
     theme,
     customCss: typeof schema?.customCss === 'string' ? schema.customCss : '',
     pages,
   }
+}
+
+// One page's theme (its own, or the site's) onto that page alone.
+export function applyThemeToPage(schema, pageId) {
+  const pages = (schema?.pages || []).map((page) => (
+    page.id === pageId ? withPageTheme(page, pageTheme(schema, page)) : page
+  ))
+  return { ...schema, pages }
 }

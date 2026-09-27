@@ -5,7 +5,7 @@
 import { sanitizeStyles, sanitizeUrl, sanitizeImageSrc } from './sanitize.js'
 import { iconSvg } from './icons.js'
 import { ALERT_VARIANTS } from '../components/renderer/constants.js'
-import { customCssBlock, customJsBlock, themeVariablesCss } from './theme.js'
+import { customCssBlock, customJsBlock, pageTheme, themeVariablesCss } from './theme.js'
 import { builderInteractiveTags, withBuilderInteractiveHtml } from './htmlRuntime.js'
 import { htmlEmbedDocument } from './htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from './htmlSnippetSizing.js'
@@ -480,10 +480,10 @@ export function schemaToResponsiveHtml(schema, title = 'My Site') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${esc(pageSeoTitle(page, title))}</title>
     ${seoHeadTags(page, title)}${pageBehaviourStyleTag(page)}
-    ${googleFontLinkTag(schema?.theme)}
+    ${googleFontLinkTag(pageTheme(schema, page))}
     ${motionHeadTags()}
     <style>
-      ${themeVariablesCss(schema?.theme)}
+      ${themeVariablesCss(pageTheme(schema, page))}
       *{ box-sizing: border-box; }
       html, body { overflow-x: hidden; }
       body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif); color: var(--site-text, #1d1d1f); background: ${bg}; line-height: 1.5; }

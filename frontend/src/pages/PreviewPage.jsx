@@ -519,7 +519,7 @@ export default function PreviewPage() {
     )
   }
 
-  const siteCss = `${themeVariablesCss(site?.schema?.theme)}
+  const siteCss = `${themeVariablesCss(current?.theme || site?.schema?.theme)}
 body { font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, sans-serif); color: var(--site-text, #1d1d1f); background: var(--site-bg, #ffffff); }
 ${customCssBlock(site?.schema?.customCss)}`
 
@@ -573,7 +573,8 @@ ${customCssBlock(site?.schema?.customCss)}`
   // React's `<link>` tag still goes through the document head even in the
   // body since React 19 hoists it. `key` forces a remount when the font
   // changes so stale URLs don't linger.
-  const fontHref = googleFontHrefForTheme(site?.schema?.theme)
+  // The page on screen may keep its own theme ("This page only").
+  const fontHref = googleFontHrefForTheme(current?.theme || site?.schema?.theme)
   return (
     <div className="min-h-screen pt-16">
       <PublicToolbar

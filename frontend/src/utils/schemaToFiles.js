@@ -12,6 +12,7 @@ import { ALERT_VARIANTS } from '../components/renderer/constants.js'
 import {
   customCssBlock,
   customJsBlock,
+  pageTheme,
   safeCustomCss,
   safeCustomJs,
   themeVariablesCss,
@@ -853,12 +854,12 @@ export function schemaToSingleHtml(schema, title = 'My Site', options = {}) {
   const css = schemaToCss(
     {
       pages: [page],
-      theme: schema?.theme,
+      theme: pageTheme(schema, page),
       customCss: schema?.customCss,
     },
     { includeCustomCss: false },
   )
-  const html = pageHtml(page, title, 'styles.css', schema?.customJs, schema?.theme)
+  const html = pageHtml(page, title, 'styles.css', schema?.customJs, pageTheme(schema, page))
   return html.replace(
     '<link rel="stylesheet" href="styles.css" />',
     `<style>\n${css}${customCssBlock(schema?.customCss)}\n    </style>`,
@@ -892,7 +893,7 @@ function schemaToScaledHtml(page, title = 'My Site', schema = {}, options = {}) 
   const css = schemaToCss(
     {
       pages: [page],
-      theme: schema?.theme,
+      theme: pageTheme(schema, page),
       customCss: schema?.customCss,
     },
     { includeCustomCss: false },
@@ -906,7 +907,7 @@ function schemaToScaledHtml(page, title = 'My Site', schema = {}, options = {}) 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${esc(pageSeoTitle(page, title))}</title>
     ${seoHeadTags(page, title)}${pageBehaviourStyleTag(page)}
-    ${googleFontLinkTag(schema?.theme)}
+    ${googleFontLinkTag(pageTheme(schema, page))}
     ${motionHeadTags()}
     <style>
 ${css}
@@ -985,7 +986,7 @@ export function schemaToFiles(schema) {
         page.name || 'My Site',
         'styles.css',
         schema?.customJs,
-        schema?.theme,
+        pageTheme(schema, page),
         { externalRuntime: true },
       ),
     })

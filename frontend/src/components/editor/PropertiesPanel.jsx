@@ -5,7 +5,7 @@ import PanelTabs from './PanelTabs.jsx'
 import PanelGroup from './PanelGroup.jsx'
 import AiComponentEdit from './AiComponentEdit.jsx'
 import { LINKABLE_TYPES } from '../renderer/constants.js'
-import { DEFAULT_THEME, FONT_OPTIONS, THEME_PRESETS, normalizeTheme, presetTheme, sameTheme } from '../../utils/theme.js'
+import { DEFAULT_THEME, FONT_OPTIONS, THEME_PRESETS, hasOwnTheme, normalizeTheme, presetTheme, sameTheme } from '../../utils/theme.js'
 import SavedThemes, { ThemeSwatchButton } from './SavedThemes.jsx'
 import { hiddenByPinnedBar } from '../../utils/pinnedCover.js'
 import { presetOptions, presetsForType } from '../../utils/componentPresets.js'
@@ -605,6 +605,9 @@ export default function PropertiesPanel({
   const clearMobileStyles = useEditorStore((s) => s.clearMobileStyles)
   const updateTheme = useEditorStore((s) => s.updateTheme)
   const applyTheme = useEditorStore((s) => s.applyTheme)
+  const setPageThemeScope = useEditorStore((s) => s.setPageThemeScope)
+  const updatePageTheme = useEditorStore((s) => s.updatePageTheme)
+  const applyPageTheme = useEditorStore((s) => s.applyPageTheme)
   const applyComponentPreset = useEditorStore((s) => s.applyComponentPreset)
   const setLayout = useEditorStore((s) => s.setLayout)
   const setLayoutMany = useEditorStore((s) => s.setLayoutMany)
@@ -729,14 +732,24 @@ export default function PropertiesPanel({
     }
     if (Object.keys(updates).length) setLayoutMany(updates)
   }
+  // "Whole site" edits the site theme and restyles every page that follows it;
+  // "This page only" gives the open page its own theme and touches nothing
+  // else. The panel shows and edits whichever theme the open page wears.
+  const ownTheme = hasOwnTheme(page)
+  const ownThemeElsewhere = (schema.pages || []).filter((p) => p.id !== page?.id && hasOwnTheme(p)).length
   // Normalized so a theme saved before a field existed still shows a value.
-  const theme = normalizeTheme(schema.theme || DEFAULT_THEME)
-  // A whole theme at once (a preset or a saved one): set it, then restyle the
-  // design (components) or every page's document (HTML), as presets always did.
-  const applyWholeTheme = (next) => {
-    updateTheme(next)
-    if (htmlMode) onApplyThemeToHtml?.(normalizeTheme(next))
+  const theme = normalizeTheme(ownTheme ? page.theme : (schema.theme || DEFAULT_THEME))
+  const editTheme = (patch) => (ownTheme ? updatePageTheme(page.id, patch) : updateTheme(patch))
+  const restyleWith = (next) => {
+    if (htmlMode) onApplyThemeToHtml?.(normalizeTheme(next), { pageOnly: ownTheme })
+    else if (ownTheme) applyPageTheme(page.id)
     else applyTheme()
+  }
+  // A whole theme at once (a preset or a saved one): set it, then restyle, as
+  // presets always did, within the chosen scope.
+  const applyWholeTheme = (next) => {
+    editTheme(next)
+    restyleWith(next)
   }
   // Extra hints and the X/Y fields used to hide behind a Basic/Extended switch
   // in this panel. That switch is gone — collapsible groups do that job — so
@@ -1027,21 +1040,48 @@ export default function PropertiesPanel({
           title={
             <>
               {t('Theme')}
-              <span className="ml-1 font-normal normal-case text-[#9ca3af]">({t('whole site')})</span>
+              <span className="ml-1 font-normal normal-case text-[#9ca3af]">({ownTheme ? t('this page') : t('whole site')})</span>
             </>
           }
           defaultOpen
         >
+          {/* Where the theme goes. A page on "This page only" keeps its own
+              theme: the site theme skips it, and its changes skip the site. */}
+          <div className="space-y-1.5">
+            <div role="radiogroup" aria-label={t('Where the theme applies')} className="studio-segment flex w-full">
+              {[['site', t('Whole site')], ['page', t('This page only')]].map(([scope, label]) => (
+                <button
+                  key={scope}
+                  type="button"
+                  role="radio"
+                  aria-checked={(scope === 'page') === ownTheme}
+                  onClick={() => { if ((scope === 'page') !== ownTheme) setPageThemeScope(page.id, scope) }}
+                  className={`studio-segment-btn flex-1 ${(scope === 'page') === ownTheme ? 'studio-segment-btn-active' : ''}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
+              {ownTheme
+                ? t('"{name}" keeps its own theme. Changes here stay on this page, and the site theme does not reach it.', { name: page.name })
+                : ownThemeElsewhere
+                  ? t('Changes here reach every page except {count} that keep their own theme.', { count: ownThemeElsewhere })
+                  : t('Changes here reach every page.')}
+            </p>
+          </div>
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
             <button
               type="button"
-              onClick={() => (htmlMode ? onApplyThemeToHtml?.(theme) : applyTheme())}
-              title={htmlMode
-                ? t('Apply this palette + font to every HTML page')
-                : t('Apply the theme to every component')}
+              onClick={() => restyleWith(theme)}
+              title={ownTheme
+                ? t('Apply this theme to this page only')
+                : htmlMode
+                  ? t('Apply this palette + font to every HTML page')
+                  : t('Apply the theme to every component')}
               className="shrink-0 rounded-lg border border-[var(--studio-accent)] px-2 py-1 text-xs font-semibold text-[var(--studio-accent-hover)] hover:bg-[var(--studio-accent-soft)]"
             >
-              {htmlMode ? t('Apply to pages') : t('Apply to design')}
+              {ownTheme ? t('Apply to this page') : htmlMode ? t('Apply to pages') : t('Apply to design')}
             </button>
           </div>
             {/* One-click presets: set the palette AND restyle everything —
@@ -1060,7 +1100,9 @@ export default function PropertiesPanel({
                       theme={p.theme}
                       name={t(p.name)}
                       active={sameTheme(presetTheme(p), theme)}
-                      title={t('Use the "{name}" theme and apply it to the whole site', { name: t(p.name) })}
+                      title={ownTheme
+                        ? t('Use the "{name}" theme on this page only', { name: t(p.name) })
+                        : t('Use the "{name}" theme and apply it to the whole site', { name: t(p.name) })}
                       onClick={() => applyWholeTheme(presetTheme(p))}
                     />
                   ))}
@@ -1070,7 +1112,7 @@ export default function PropertiesPanel({
             <LabeledColor
               label={t('Primary color')}
               value={theme.primaryColor}
-              onChange={(v) => updateTheme({ primaryColor: v })}
+              onChange={(v) => editTheme({ primaryColor: v })}
             />
             <div
               aria-label={t('Theme preview')}
@@ -1119,52 +1161,52 @@ export default function PropertiesPanel({
             <LabeledColor
               label={t('Text color')}
               value={theme.textColor}
-              onChange={(v) => updateTheme({ textColor: v })}
+              onChange={(v) => editTheme({ textColor: v })}
             />
             <LabeledColor
               label={t('Muted color')}
               value={theme.mutedColor}
-              onChange={(v) => updateTheme({ mutedColor: v })}
+              onChange={(v) => editTheme({ mutedColor: v })}
             />
             <LabeledColor
               label={t('Border color')}
               value={theme.borderColor}
-              onChange={(v) => updateTheme({ borderColor: v })}
+              onChange={(v) => editTheme({ borderColor: v })}
             />
             <LabeledColor
               label={t('Button text color')}
               value={theme.buttonTextColor}
-              onChange={(v) => updateTheme({ buttonTextColor: v })}
+              onChange={(v) => editTheme({ buttonTextColor: v })}
             />
             <LabeledColor
               label={t('Site background')}
               value={theme.backgroundColor}
-              onChange={(v) => updateTheme({ backgroundColor: v })}
+              onChange={(v) => editTheme({ backgroundColor: v })}
             />
             <LabeledColor
               label={t('Surface color')}
               value={theme.surfaceColor}
-              onChange={(v) => updateTheme({ surfaceColor: v })}
+              onChange={(v) => editTheme({ surfaceColor: v })}
             />
             <LabeledColor
               label={t('Soft background')}
               value={theme.softColor}
-              onChange={(v) => updateTheme({ softColor: v })}
+              onChange={(v) => editTheme({ softColor: v })}
             />
             <LabeledColor
               label={t('Header color')}
               value={theme.headerColor}
-              onChange={(v) => updateTheme({ headerColor: v })}
+              onChange={(v) => editTheme({ headerColor: v })}
             />
             <LabeledColor
               label={t('Header text')}
               value={theme.headerTextColor}
-              onChange={(v) => updateTheme({ headerTextColor: v })}
+              onChange={(v) => editTheme({ headerTextColor: v })}
             />
             <LabeledColor
               label={t('Accent color')}
               value={theme.accentColor}
-              onChange={(v) => updateTheme({ accentColor: v })}
+              onChange={(v) => editTheme({ accentColor: v })}
             />
             <p className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
               {t('Badges and icons use the accent; HTML pages get it as their second brand color.')}
@@ -1174,31 +1216,31 @@ export default function PropertiesPanel({
             <LabeledSelect
               label={t('Body font')}
               value={theme.fontFamily}
-              onChange={(v) => updateTheme({ fontFamily: v })}
+              onChange={(v) => editTheme({ fontFamily: v })}
               options={FONT_OPTIONS.map(([value, label]) => [value, t(label)])}
             />
             <LabeledSelect
               label={t('Heading font')}
               value={theme.headingFontFamily}
-              onChange={(v) => updateTheme({ headingFontFamily: v })}
+              onChange={(v) => editTheme({ headingFontFamily: v })}
               options={FONT_OPTIONS.map(([value, label]) => [value, t(label)])}
             />
             <LabeledSelect
               label={t('Heading weight')}
               value={theme.headingWeight}
-              onChange={(v) => updateTheme({ headingWeight: v })}
+              onChange={(v) => editTheme({ headingWeight: v })}
               options={HEADING_WEIGHTS.map(([value, label]) => [value, t(label)])}
             />
             <LabeledSelect
               label={t('Heading letter spacing')}
               value={theme.headingLetterSpacing}
-              onChange={(v) => updateTheme({ headingLetterSpacing: v })}
+              onChange={(v) => editTheme({ headingLetterSpacing: v })}
               options={HEADING_TRACKING.map(([value, label]) => [value, t(label)])}
             />
             <LabeledSelect
               label={t('Text line height')}
               value={theme.bodyLineHeight}
-              onChange={(v) => updateTheme({ bodyLineHeight: v })}
+              onChange={(v) => editTheme({ bodyLineHeight: v })}
               options={BODY_LINE_HEIGHTS.map(([value, label]) => [value, t(label)])}
             />
             <LabeledSelect
@@ -1208,7 +1250,7 @@ export default function PropertiesPanel({
               ))?.[0] || 'custom'}
               onChange={(value) => {
                 const preset = THEME_SHAPES.find(([id]) => id === value)
-                if (preset) updateTheme({ radius: preset[2], buttonRadius: preset[3] })
+                if (preset) editTheme({ radius: preset[2], buttonRadius: preset[3] })
               }}
               options={[
                 ...THEME_SHAPES.map(([id, label]) => [id, t(label)]),
@@ -1218,17 +1260,17 @@ export default function PropertiesPanel({
             <LabeledPx
               label={t('Corner radius')}
               value={theme.radius}
-              onChange={(v) => updateTheme({ radius: v })}
+              onChange={(v) => editTheme({ radius: v })}
             />
             <LabeledPx
               label={t('Button radius')}
               value={theme.buttonRadius}
-              onChange={(v) => updateTheme({ buttonRadius: v })}
+              onChange={(v) => editTheme({ buttonRadius: v })}
             />
             <LabeledText
               label={t('Shadow')}
               value={theme.shadow}
-              onChange={(v) => updateTheme({ shadow: v })}
+              onChange={(v) => editTheme({ shadow: v })}
               placeholder={t('e.g. 0 8px 24px rgba(0,0,0,0.12)')}
             />
             <LabeledSelect
@@ -1236,7 +1278,7 @@ export default function PropertiesPanel({
               value={THEME_SHADOWS.find(([, , value]) => value === theme.shadow)?.[0] || 'custom'}
               onChange={(value) => {
                 const preset = THEME_SHADOWS.find(([id]) => id === value)
-                if (preset) updateTheme({ shadow: preset[2] })
+                if (preset) editTheme({ shadow: preset[2] })
               }}
               options={[
                 ...THEME_SHADOWS.map(([id, label]) => [id, t(label)]),

@@ -627,7 +627,11 @@ def validate_and_clean_schema(schema):
         comps = page.get('components', [])
         if not isinstance(comps, list):
             raise serializers.ValidationError('Page "components" must be an array.')
+        # A page that keeps its own theme ("This page only") carries it here;
+        # one that follows the site theme has no key at all.
+        own_theme = {'theme': sanitize_theme(page['theme'])} if isinstance(page.get('theme'), dict) else {}
         clean_pages.append({
+            **own_theme,
             'id': _str(page.get('id'), 'page'),
             'name': _str(page.get('name'), 'Page')[:80],
             # Optional organizational folder label (shown in the editor's page tree).

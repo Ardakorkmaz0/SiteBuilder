@@ -2,8 +2,10 @@ import { create } from 'zustand'
 import { registry, CANVAS_WIDTH, MOBILE_CANVAS_WIDTH } from '../components/registry.jsx'
 import {
   DEFAULT_THEME,
+  applyThemeToPage,
   applyThemeToSchema,
   normalizeTheme,
+  pageTheme,
   themedStyles,
 } from '../utils/theme.js'
 import { componentPresetStyles, componentPresetProps } from '../utils/componentPresets.js'
@@ -1385,12 +1387,13 @@ export const useEditorStore = create((set, get) => ({
       const comps = page.components
       const mobileWidth = page.mobileWidth || MOBILE_CANVAS_WIDTH
       const id = genId(type)
-      let styles = themedStyles(type, def.defaultStyles, state.schema.theme)
+      const theme = pageTheme(state.schema, page)
+      let styles = themedStyles(type, def.defaultStyles, theme)
       // A palette VARIANT carries a preset id — bake its styles in at creation so
       // the component drops onto the canvas already styled.
       let presetProps = null
       if (presetId) {
-        const ps = componentPresetStyles(type, presetId, state.schema.theme)
+        const ps = componentPresetStyles(type, presetId, theme)
         if (ps) styles = { ...styles, ...ps }
         presetProps = componentPresetProps(type, presetId)
       }
@@ -1594,7 +1597,7 @@ export const useEditorStore = create((set, get) => ({
     get().record('add-block')
     set((state) => {
       const page = selectCurrentPage(state)
-      const theme = state.schema.theme
+      const theme = pageTheme(state.schema, page)
       const pcW = page.canvasWidth || CANVAS_WIDTH
       const mobileWidth = page.mobileWidth || MOBILE_CANVAS_WIDTH
       const baseY = Math.max(0, Math.round(y))
@@ -2338,6 +2341,56 @@ export const useEditorStore = create((set, get) => ({
     }))
   },
 
+  // "This page only" / "Whole site" in the theme panel. Taking a page out
+  // copies the site theme onto it, so nothing changes until it is edited.
+  // Putting it back drops the copy and restyles nothing: the page follows the
+  // site again from the next time the site theme is applied.
+  setPageThemeScope: (pageId, scope) => {
+    get().record('theme-scope')
+    set((state) => ({
+      schema: {
+        ...state.schema,
+        pages: state.schema.pages.map((page) => {
+          if (page.id !== pageId) return page
+          if (scope === 'page') return { ...page, theme: pageTheme(state.schema, page) }
+          const rest = { ...page }
+          delete rest.theme
+          return rest
+        }),
+      },
+      dirty: true,
+    }))
+  },
+
+  // updateTheme for a page with its own theme; the site theme is untouched.
+  updatePageTheme: (pageId, patch) => {
+    get().record('theme')
+    set((state) => ({
+      schema: {
+        ...state.schema,
+        pages: state.schema.pages.map((page) => {
+          if (page.id !== pageId) return page
+          const before = pageTheme(state.schema, page)
+          const next = { ...before, ...patch }
+          if (patch?.primaryColor && !('accentColor' in patch) && before.accentColor === before.primaryColor) {
+            next.accentColor = patch.primaryColor
+          }
+          return { ...page, theme: normalizeTheme(next) }
+        }),
+      },
+      dirty: true,
+    }))
+  },
+
+  // applyTheme for one page: its own theme (or the site's) onto it alone.
+  applyPageTheme: (pageId) => {
+    get().record('apply-theme')
+    set((state) => ({
+      schema: applyThemeToPage(state.schema, pageId),
+      dirty: true,
+    }))
+  },
+
   setCustomCss: (css) => {
     get().record('custom-css')
     set((state) => ({
@@ -2368,7 +2421,7 @@ export const useEditorStore = create((set, get) => ({
       const styles = componentPresetStyles(
         src?.type,
         presetId,
-        state.schema.theme,
+        pageTheme(state.schema, page),
       )
       if (!styles) return {}
       const components = mapTree(page.components, id, (c) =>
@@ -2515,7 +2568,7 @@ export const useEditorStore = create((set, get) => ({
       const retheme = (nodes) =>
         nodes.map((n) => {
           if (n.id === id) {
-            return { ...n, styles: themedStyles(n.type, n.styles, state.schema.theme) }
+            return { ...n, styles: themedStyles(n.type, n.styles, pageTheme(state.schema, page)) }
           }
           if (Array.isArray(n.children)) return { ...n, children: retheme(n.children) }
           return n
