@@ -97,6 +97,8 @@ class TestGoogleIdentityBoundary:
         }):
             response = APIClient().post('/api/auth/google/', {'credential': 'test'}, format='json')
         assert response.status_code == 403
+        # Same code as a password sign-in, so the client says it the same way.
+        assert response.data['code'] == 'account_suspended'
         assert not Token.objects.filter(user=user).exists()
         user.profile.refresh_from_db()
         assert user.profile.display_name == ''
