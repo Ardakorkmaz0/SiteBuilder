@@ -1,6 +1,6 @@
 // Ready-made, genuinely responsive HTML starters for "HTML sites". They use CSS
 // grid/flex + clamp() + @media breakpoints, so they reflow natively on any
-// screen. Used by "Start blank HTML" and the template picker.
+// screen. Used by the template picker; "Start blank HTML" gets emptyHtmlDocument.
 import { normalizeTheme } from './theme.js'
 
 const escTitle = (t) =>
@@ -9,6 +9,33 @@ const escTitle = (t) =>
 function templateVars(theme) {
   const t = normalizeTheme(theme)
   return `--accent:${t.primaryColor}; --button-text:${t.buttonTextColor}; --ink:${t.textColor}; --muted:${t.mutedColor}; --border:${t.borderColor}; --soft:${t.softColor}; --surface:${t.surfaceColor}; --radius:${t.radius}; --button-radius:${t.buttonRadius}; --shadow:${t.shadow}; --font:${t.fontFamily}; --heading-font:${t.headingFontFamily};`
+}
+
+// What "Start blank HTML" gives: a document with nothing on the page. It used
+// to hand over the full starter below (header, hero, features, footer), which
+// is a template, not a blank page; that starter stays in the template picker.
+// Only the theme's variables and a base font come along, so blocks placed on
+// the page match the theme. The body is a screen tall, so there is somewhere
+// to click and drop in the editor.
+export function emptyHtmlDocument(title = 'My Site', theme, language = 'en') {
+  const lang = /^[a-z]{2,3}(-[a-z0-9]{2,8})*$/i.test(String(language || '')) ? language : 'en'
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escTitle(title)}</title>
+    <style>
+      :root { ${templateVars(theme)} }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; font-family: var(--font), system-ui, sans-serif; color: var(--ink); background: var(--surface); line-height: 1.6; }
+      img { max-width: 100%; height: auto; }
+    </style>
+  </head>
+  <body>
+  </body>
+</html>
+`
 }
 
 // Professional, genuinely responsive starter: sticky header with a CSS-only
