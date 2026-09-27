@@ -184,11 +184,20 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Sitebuilder <no-reply@loca
 # Where the SPA is hosted — used to build absolute links in emails (password
 # reset). Defaults to the Vite dev server; set DJANGO_FRONTEND_URL in prod.
 FRONTEND_URL = os.getenv('DJANGO_FRONTEND_URL', 'http://localhost:5173').rstrip('/')
-# What a customer points their DNS at. The hostname is for `www` (a CNAME);
-# the IP is for the domain on its own, which cannot carry a CNAME. Verification
-# resolves the customer's domain and checks it lands on one of these.
-CUSTOM_DOMAIN_TARGET = os.getenv('CUSTOM_DOMAIN_TARGET', 'sites.example.com')
-CUSTOM_DOMAIN_IP = os.getenv('CUSTOM_DOMAIN_IP', '')
+# Customer domains remain unavailable until a real routing target is configured.
+# Ownership is proved separately by the site's account-bound TXT challenge.
+CUSTOM_DOMAIN_TARGET = os.getenv('CUSTOM_DOMAIN_TARGET', '').strip()
+CUSTOM_DOMAIN_IP = os.getenv('CUSTOM_DOMAIN_IP', '').strip()
+CUSTOM_DOMAIN_RESERVED_HOSTS = _env_list('CUSTOM_DOMAIN_RESERVED_HOSTS', [])
+CUSTOM_DOMAIN_MEDIA_ORIGIN = os.getenv('CUSTOM_DOMAIN_MEDIA_ORIGIN', FRONTEND_URL).rstrip('/')
+CUSTOM_DOMAIN_DNS_TIMEOUT = float(os.getenv('CUSTOM_DOMAIN_DNS_TIMEOUT', '2'))
+if not 0 < CUSTOM_DOMAIN_DNS_TIMEOUT <= 5:
+    raise ValueError('CUSTOM_DOMAIN_DNS_TIMEOUT must be greater than 0 and at most 5 seconds.')
+
+# Caddy asks over the private loopback HTTP connection during the TLS handshake.
+# Redirecting this one GET endpoint would prevent certificate approval. The edge
+# must block it publicly; every other application route still requires HTTPS.
+SECURE_REDIRECT_EXEMPT = [r'^api/public/domain-allowed/$']
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
@@ -257,6 +266,7 @@ REST_FRAMEWORK = {
         # Publishing to the community library is the most spam-prone surface
         # there is, and unlike a save it is other people who see the result.
         'share': os.getenv('DJANGO_THROTTLE_SHARE', '20/hour'),
+        'domain_verify': os.getenv('DJANGO_THROTTLE_DOMAIN_VERIFY', '10/min'),
         # "Continue without signing in" is the front door, and it used to
         # share the credential budget above. On one shared address — a
         # school, an office, a carrier's NAT — ten failed logins then closed

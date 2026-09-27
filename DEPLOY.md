@@ -425,58 +425,121 @@ Pick one:
 
 ## 8b. Customer domains (`www.their-company.com`)
 
-A site owner can connect their own domain in the editor: **Share is where the
-link lives; the domain lives in the control centre → Domain**. The app handles
-the checking and the serving; you have to give it somewhere to point at and
-something to terminate TLS.
+The platform's own domain (currently `sitebuilt.app`) and a customer's domain
+are separate. Do not enter the platform address into a customer's Domain panel.
+This feature is optional: leave the routing settings empty until a customer
+needs it. Enabling it in code does not change DNS or deploy this configuration.
 
-**1. Decide what they point at.** Two env vars, either or both:
+### Routing and ownership
+
+Set these in the **backend** environment; at least one routing target is needed:
 
 ```env
-# Hostname for `www` records (a CNAME). Must resolve to this server.
-CUSTOM_DOMAIN_TARGET=sites.example.com
-# IP for apex domains (`their-company.com`), which cannot carry a CNAME.
+CUSTOM_DOMAIN_TARGET=sites.example.net
 CUSTOM_DOMAIN_IP=203.0.113.9
+CUSTOM_DOMAIN_RESERVED_HOSTS=.sitebuilt.app
+CUSTOM_DOMAIN_MEDIA_ORIGIN=https://sitebuilt.app
+CUSTOM_DOMAIN_DNS_TIMEOUT=2
+DJANGO_THROTTLE_DOMAIN_VERIFY=10/min
 ```
 
-Both are shown to the owner as DNS records, and **verification resolves their
-domain and checks it lands on one of them** — no TXT record to chase. Keep the
-target on a **separate registrable domain from the app** (not a subdomain of
-it): the app's cookies must never be reachable from a name a customer's page
-runs on.
+The values above are examples, not a working routing target. `CUSTOM_DOMAIN_TARGET`
+must resolve to the TLS edge. `CUSTOM_DOMAIN_IP` accepts comma-separated IPv4/IPv6
+addresses if both A and AAAA records are offered. The target hostname and every
+name below it are reserved, so it never serves customer HTML: the app host itself
+works as the target, or use a dedicated routing hostname. Reserve every platform
+suffix. Keep Django's session and CSRF cookies host-only. Do not add customer names
+or `*` to `DJANGO_ALLOWED_HOSTS`: verified database records are their separate
+allowlist.
 
-**2. Send the customer's domain to Django.** The custom-domain middleware runs
-before host validation and serves *only published pages* for verified domains —
-no API, no admin, no app. Your proxy needs to pass the `Host` header through
-unchanged.
+Production (`sitebuilt.app`, set in `docker-compose.override.yml` on the server):
 
-**3. TLS on demand, gated by the app.** Caddy asks the app before requesting a
-certificate, so nobody can point a stray name at this server and spend a
-certificate authority's rate limit:
-
-```
-{
-    on_demand_tls {
-        ask http://127.0.0.1:8000/api/public/domain-allowed/
-    }
-}
-
-https:// {
-    tls {
-        on_demand
-    }
-    reverse_proxy 127.0.0.1:8000
-}
+```env
+CUSTOM_DOMAIN_TARGET=sitebuilt.app
+CUSTOM_DOMAIN_IP=144.24.205.170
+CUSTOM_DOMAIN_RESERVED_HOSTS=.sitebuilt.app
+CUSTOM_DOMAIN_MEDIA_ORIGIN=https://sitebuilt.app
+DJANGO_ALLOWED_HOSTS=sitebuilt.app,www.sitebuilt.app,127.0.0.1
 ```
 
-`/api/public/domain-allowed/?host=…` answers 200 only for a domain that is
-verified **and** still allowed to be public — so a takedown or a suspended
-owner stops certificate renewal along with everything else.
+The site owner opens **Control centre → Domain**, saves the exact hostname, then
+adds the records shown there. A required **TXT** record at `_sitebuilder.<hostname>`
+contains a unique value for this site; **CNAME**, or **A/AAAA** records, route traffic.
+The panel shows full DNS names so `portfolio.company.com` is not mistaken for `www`.
+Some providers append the zone automatically; enter the relative label there.
+For an apex, use the displayed A/AAAA option or provider-supported ALIAS/ANAME
+flattening. A and CNAME are alternatives; the TXT proof is always required.
+Remove stale A/AAAA records that route some visitors elsewhere. Initially keep
+proxy/CDN modes off so DNS resolves to the configured edge.
 
-**What the owner sees**, in order: enter the domain → add the record → press
-*Check now* → the site answers on their domain. A failed check says which of
-the two it is ("does not resolve yet" vs "resolves somewhere else"), because
-those need different fixes.
+**Check now** verifies both account-bound ownership and routing. Pointing at the
+same shared server IP alone is insufficient. Missing/mismatched TXT and bad routing
+remain pending; DNS query timeouts have a bounded duration and do not invent a
+successful result. Changing or disconnecting a domain invalidates its old proof.
+The UI distinguishes DNS verification from HTTPS issuance and reminds owners to
+publish before opening a draft on their domain.
+
+### Upgrade existing installations
+
+Install the updated backend requirements (includes `dnspython`) and apply migrations
+before starting the new code. The migration adds a verification timestamp and a
+unique constraint for nonempty domain names. It stops with an actionable error if
+legacy duplicate claims need to be resolved; it never chooses an owner silently.
+Old connections verified only by shared IP return to pending and need their new TXT
+proof checked again. Republish existing sites to embed the latest navigation/form
+runtime; new publishes include it automatically.
+
+### Caddy and HTTPS
+
+A complete, reviewable example is in
+[`deploy/Caddyfile.custom-domains.example`](deploy/Caddyfile.custom-domains.example).
+Merge it with the current Caddyfile, retaining other sites and the real Django admin
+path; it is not automatically applied by `deploy.sh`.
+
+- Set Caddy's `SITEBUILDER_APP_HOST` to the platform hostname, and
+  `SITEBUILDER_WEB_ROOT` to the frontend build directory (default `/srv/sitebuilder/dist`).
+- Keep the backend reachable only through loopback/private networking. The example
+  uses `127.0.0.1:8000`; ensure that address is in `DJANGO_ALLOWED_HOSTS` for the internal
+  permission request. Keep the exact trusted proxy count configured.
+- The global `on_demand_tls` block calls
+  `http://127.0.0.1:8000/api/public/domain-allowed/?domain=<name>`.
+  This one endpoint is exempt from the HTTP-to-HTTPS redirect because it is called
+  inside the TLS handshake. The example blocks it at the public edge. It performs
+  no DNS lookup and permits only verified, currently public, unmoderated sites
+  owned by active accounts.
+- The catch-all HTTPS site preserves the customer's Host and proxies to Django;
+  it never serves the SPA. SNI/Host matching is enabled. Customer requests do not
+  forward app Authorization or Cookie headers. The platform keeps its existing
+  authentication routes on its own host.
+- Open ports 80/443; retain Caddy's certificate storage across upgrades. A DNS check
+  cannot assert that a certificate exists: Caddy obtains it at the first allowed
+  TLS handshake, subject to DNS, network reachability and CA limits.
+
+Validate before reloading:
+
+```bash
+SITEBUILDER_APP_HOST=sitebuilt.app caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+For isolated staging tests use the CA staging endpoint documented by Caddy, then
+switch to the production issuer for the real customer address. Reference:
+[Caddy on-demand TLS](https://caddyserver.com/docs/automatic-https#on-demand-tls),
+[Caddy permission endpoint](https://caddyserver.com/docs/caddyfile/options#on-demand-tls).
+
+### Acceptance check on a real customer domain
+
+1. Save the hostname, add its TXT and routing records, and run **Check now**.
+2. Publish the site. Visit its HTTPS root and an inner page; verify the certificate
+   matches that hostname and the page's own navigation, images and forms work.
+3. Check `/sitemap.xml` and `/robots.txt`. `/api/` and the Django admin must not expose
+   platform routes on this hostname. The reserved `/__sitebuilder/form/` endpoint
+   accepts submissions only for the site bound to that hostname.
+4. Unpublish/disconnect the test site and confirm its custom hostname no longer
+   serves it. A takedown or account suspension uses the same public-access gates.
+
+Until a real customer domain has passed these checks, leave TODO runbook step 7
+unchecked. A successful HTTPS visit to the platform itself is not this test.
 
 ## 9. Post-deploy smoke test (do this before sharing the link)
 

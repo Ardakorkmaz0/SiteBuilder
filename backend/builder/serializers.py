@@ -530,7 +530,7 @@ class SiteListSerializer(serializers.ModelSerializer):
             'seo_ready': seo_ready,
             'seo_pages': seo_total if has_site_seo else seo_pages,
             'seo_total': seo_total,
-            'domain_ready': obj.domain_status == 'connected',
+            'domain_ready': obj.domain_status == 'connected' and obj.domain_verified_at is not None,
         }
 
 

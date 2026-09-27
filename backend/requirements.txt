@@ -6,6 +6,8 @@ google-auth==2.41.1           # verifies Google ID tokens for Google sign-in (en
 requests==2.34.2              # google.auth.transport.requests needs it; without it
                               # Google sign-in fails as "invalid token" at runtime
 
+dnspython==2.8.0             # bounded TXT/CNAME/A/AAAA ownership and routing checks
+
 # Configuration / production
 python-dotenv==1.2.2          # loads backend/.env
 dj-database-url==3.1.2        # parses DATABASE_URL for Postgres / SQLite

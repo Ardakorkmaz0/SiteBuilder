@@ -52,6 +52,18 @@ const RUNTIME_STYLE = `
 // the same `data-builder-action` dispatcher.
 const INTERACTIVE_SCRIPT = `
   (function () {
+    // A real published document has a usable URL. Only srcdoc previews need
+    // the parent to navigate or deliver a message to the owner's inbox.
+    function standalone() {
+      return window.parent === window && location.protocol !== 'about:';
+    }
+    function safeDestination(value) {
+      try {
+        var url = new URL(value, location.href);
+        return /^(https?:|mailto:|tel:)$/.test(url.protocol) ||
+          (location.protocol === 'file:' && url.protocol === 'file:');
+      } catch (e) { return false; }
+    }
     function selectTab(tabsRoot, tabId) {
       var tabs = tabsRoot.querySelectorAll('[role="tab"][data-builder-tab]');
       for (var i = 0; i < tabs.length; i++) {
@@ -92,13 +104,10 @@ const INTERACTIVE_SCRIPT = `
         }
         return;
       }
-      // Intercept anchor links. The site renders inside an about:srcdoc iframe,
-      // so a bare "#" or any relative href has no real base URL and would blank
-      // the iframe out. Hash links scroll smoothly to a matching id (or top);
-      // unknown / relative paths preventDefault. External http(s) links keep
-      // their default behaviour (open in iframe or via target=_blank).
+      // Srcdoc previews have no navigation base; real published documents do.
+      // Hash scrolling and mobile navigation work in both contexts.
       var link = event.target && event.target.closest && event.target.closest('a[href]');
-      if (!link) return;
+      if (!link || event.defaultPrevented) return;
       var openNav = link.closest('[data-builder-mobile-nav]');
       if (openNav) {
         openNav.setAttribute('data-mobile-open', 'false');
@@ -122,17 +131,21 @@ const INTERACTIVE_SCRIPT = `
       }
       if (href.charAt(0) === '#') {
         event.preventDefault();
-        var id = decodeURIComponent(href.slice(1));
+        var id;
+        try { id = decodeURIComponent(href.slice(1)); } catch (e) { return; }
         var target = id && document.getElementById(id);
         if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
         // No matching element in THIS document — it may be a cross-page link
         // (#pageId). The page renders in a sandboxed, opaque-origin iframe, so
         // ask the host to switch pages. Unknown hashes are simply ignored.
-        try { parent.postMessage({ type: 'pwb-navigate', hash: href }, '*'); } catch (e) {}
+        if (!standalone()) {
+          try { parent.postMessage({ type: 'pwb-navigate', hash: href }, '*'); } catch (e) {}
+        }
         return;
       }
-      // Anything else (relative paths, javascript:, etc.) — block to avoid
-      // blanking the srcdoc iframe.
+      // Real documents keep normal relative navigation; srcdoc has no useful
+      // base. Unsafe URL schemes never become a navigation escape hatch.
+      if (standalone() && safeDestination(href)) return;
       event.preventDefault();
     }
     // Forms inside a sandboxed iframe (allow-scripts WITHOUT allow-same-origin)
@@ -156,6 +169,31 @@ const INTERACTIVE_SCRIPT = `
     }
     function sendToInbox(form) {
       lastSubmittedForm = form;
+      if (standalone()) {
+        var config = document.querySelector('meta[name="pwb-form-endpoint"]');
+        var endpoint = config && config.getAttribute('content');
+        // The serving layer provides one same-origin endpoint. Never turn an
+        // imported meta tag into a destination for arbitrary form contents.
+        if (endpoint !== '/__sitebuilder/form/' || typeof window.fetch !== 'function') {
+          showFormResult(form, false);
+          return;
+        }
+        if (form.getAttribute('data-pwb-submitting') === 'true') return;
+        form.setAttribute('data-pwb-submitting', 'true');
+        var honeypot = form.querySelector('input[type="hidden"][name="website"]');
+        window.fetch(new URL(endpoint, location.href).href, {
+          method: 'POST', credentials: 'omit', mode: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: formPayload(form), page: location.pathname.slice(0, 140), website: honeypot ? honeypot.value : '' })
+        }).then(function (response) {
+          showFormResult(form, response.ok);
+        }).catch(function () {
+          showFormResult(form, false);
+        }).finally(function () {
+          form.removeAttribute('data-pwb-submitting');
+        });
+        return;
+      }
       try { parent.postMessage({ type: 'pwb-form-submit', data: formPayload(form), page: location.hash || '' }, '*'); } catch (e) {}
     }
     function showFormResult(form, ok) {
@@ -168,11 +206,12 @@ const INTERACTIVE_SCRIPT = `
         result.style.cssText = 'margin-top:10px;font:500 13px/1.4 system-ui;color:' + (ok ? '#15803d' : '#b91c1c');
         form.appendChild(result);
       }
+      result.style.color = ok ? '#15803d' : '#b91c1c';
       result.textContent = ok ? 'Message sent.' : 'Message could not be sent.';
     }
     function onSubmit(event) {
       var form = event.target;
-      if (!form || form.tagName !== 'FORM') return;
+      if (!form || form.tagName !== 'FORM' || event.defaultPrevented) return;
       var action = String(form.getAttribute('action') || '').trim();
       if (!action || action === '#' || action.charAt(0) === '#') {
         event.preventDefault();
@@ -180,6 +219,10 @@ const INTERACTIVE_SCRIPT = `
         return;
       }
       if (/^https?:\\/\\//i.test(action) || /^mailto:|^tel:/i.test(action)) return;
+      if (standalone()) {
+        if (!safeDestination(action)) event.preventDefault();
+        return;
+      }
       event.preventDefault();
       sendToInbox(form);
     }
@@ -232,7 +275,7 @@ const INTERACTIVE_SCRIPT = `
       document.addEventListener('click', onClick);
       document.addEventListener('submit', onSubmit);
       window.addEventListener('message', function (event) {
-        if (event.data && event.data.type === 'pwb-form-result') {
+        if (!standalone() && event.source === window.parent && event.data && event.data.type === 'pwb-form-result') {
           showFormResult(lastSubmittedForm, !!event.data.ok);
         }
       });
@@ -324,7 +367,9 @@ const RUNTIME_SCRIPT = `
       document.addEventListener('click', function (event) {
         var link = event.target && event.target.closest && event.target.closest('a[href]');
         if (!link) return;
-        var localTarget = localDocumentTarget(link.getAttribute('href'));
+        var rawHref = String(link.getAttribute('href') || '').trim();
+        if (window.parent === window && location.protocol !== 'about:' && rawHref.charAt(0) !== '#') return;
+        var localTarget = localDocumentTarget(rawHref);
         if (!localTarget) return;
         event.preventDefault();
         if (localTarget.top) {
