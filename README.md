@@ -28,22 +28,23 @@ Imported HTML sites can be viewed, lightly edited in-place, tested against commo
 desktop/tablet/phone viewport presets, saved as drafts, and published to a public
 URL.
 
-## Screenshoots
+## Screenshots
+
 <img width="1280" alt="Login" src="docs/screenshots/login.png" />
 <br>
 <img width="1280" alt="Dashboard" src="docs/screenshots/dashboard.png" />
 <br>
-<img width="1280" alt="Editor — Theme" src="docs/screenshots/editor-theme.png" />
+<img width="1280" alt="Editor: blocks" src="docs/screenshots/editor-blocks.png" />
 <br>
-<img width="1280" alt="Editor — Blocks" src="docs/screenshots/editor-blocks.png" />
+<img width="1280" alt="Editor: theme" src="docs/screenshots/editor-theme.png" />
 <br>
-<img width="1280" alt="Editor — Mobile & Animations" src="docs/screenshots/editor-mobile-animation.png" />
-
-
-
-
-
-
+<img width="1280" alt="Editor: mobile layout" src="docs/screenshots/editor-mobile-animation.png" />
+<br>
+<img width="1280" alt="AI design assistant" src="docs/screenshots/ai.png" />
+<br>
+<img width="1280" alt="Site preview" src="docs/screenshots/preview.png" />
+<br>
+<img width="1280" alt="Admin overview" src="docs/screenshots/admin.png" />
 
 ## Tech stack
 
