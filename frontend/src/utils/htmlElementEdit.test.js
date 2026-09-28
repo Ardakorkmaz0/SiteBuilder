@@ -833,3 +833,35 @@ describe('linkSectionsInDocument', () => {
     expect(describeElement(link).sections.map((s) => s.id)).toEqual(['menu', 'about', 'contact'])
   })
 })
+
+// A template's <img> carries alternatives the browser or a lazy-loader prefers
+// over src; the chosen picture has to be the one shown.
+describe('replacing an image', () => {
+  it('drops srcset, sizes and lazy-load sources along with the old src', () => {
+    document.body.innerHTML = '<img id="i" src="old.jpg" srcset="old-800.jpg 800w, old-1600.jpg 1600w" sizes="100vw" data-src="old-lazy.jpg" alt="Old">'
+    const img = document.getElementById('i')
+
+    applyElementPatch(img, { src: 'https://cdn.example/new.jpg' })
+
+    expect(img.getAttribute('src')).toBe('https://cdn.example/new.jpg')
+    for (const name of ['srcset', 'sizes', 'data-src']) expect(img.hasAttribute(name)).toBe(false)
+    expect(img.getAttribute('alt')).toBe('Old')
+  })
+
+  it('drops the <source>s of its <picture>', () => {
+    document.body.innerHTML = '<picture><source srcset="old.webp" type="image/webp"><img id="i" src="old.jpg"></picture>'
+    const img = document.getElementById('i')
+
+    applyElementPatch(img, { src: 'new.jpg' })
+
+    expect(document.querySelectorAll('source')).toHaveLength(0)
+    expect(img.parentElement.tagName).toBe('PICTURE')
+  })
+
+  it('leaves an image without alternatives as it was apart from src', () => {
+    document.body.innerHTML = '<img id="i" src="old.jpg" class="hero" width="400">'
+    const img = document.getElementById('i')
+    applyElementPatch(img, { src: 'new.jpg' })
+    expect(img.outerHTML).toBe('<img id="i" src="new.jpg" class="hero" width="400">')
+  })
+})

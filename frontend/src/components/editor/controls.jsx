@@ -7,6 +7,7 @@ import {
   updateHtmlTextAtPath,
 } from '../../utils/htmlQuickEdit.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { apiError } from '../../utils/errors.js'
 
 // Shared property controls inherit the active Studio theme.
 const inputCls = 'studio-input min-w-0 w-full px-2.5 py-2 text-sm'
@@ -75,12 +76,7 @@ export function LabeledImage({ label, value, onChange }) {
       const result = await uploadImage(file)
       onChange(result.url)
     } catch (e) {
-      const detail = e?.response?.data
-      setErr(
-        typeof detail === 'string'
-          ? detail
-          : detail?.file?.[0] || detail?.detail || t('Upload failed.'),
-      )
+      setErr(apiError(e, t('Upload failed.')))
     } finally {
       setBusy(false)
     }
@@ -133,6 +129,15 @@ export function LabeledImage({ label, value, onChange }) {
         }}
         onDrop={onDrop}
         onClick={() => !busy && fileRef.current?.click()}
+        // Reachable without a mouse: it was a click-only box.
+        role="button"
+        tabIndex={0}
+        aria-label={label ? `${label}: ${t('Upload an image')}` : t('Upload an image')}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          e.preventDefault()
+          if (!busy) fileRef.current?.click()
+        }}
         className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-3 py-4 text-center text-xs transition ${
           dragOver
             ? 'border-[#4f46e5] bg-[#eef2ff] text-[#4f46e5]'

@@ -343,6 +343,19 @@ export function linkSectionsInDocument(doc, exclude = null) {
   return sections
 }
 
+// The picture a person chose has to be the one shown. A template's <img>
+// often carries alternatives: srcset/sizes for the browser to pick from,
+// data-src for a lazy-loader to swap in, <source>s in a <picture>. Any of them
+// won over a new src, so the old photo stayed on the page.
+const IMAGE_ALTERNATIVES = ['srcset', 'sizes', 'data-src', 'data-srcset', 'data-lazy-src', 'data-original']
+
+function setImageSource(img, src) {
+  img.setAttribute('src', src)
+  IMAGE_ALTERNATIVES.forEach((name) => img.removeAttribute(name))
+  const picture = img.parentElement?.tagName === 'PICTURE' ? img.parentElement : null
+  picture?.querySelectorAll(':scope > source').forEach((source) => source.remove())
+}
+
 export function describeElement(el, win = el?.ownerDocument?.defaultView) {
   if (!el || el.nodeType !== 1) return null
   const tag = el.tagName.toLowerCase()
@@ -491,7 +504,7 @@ export function applyElementPatch(el, patch = {}) {
   }
   if (patch.href !== undefined) setElementLink(el, patch.href)
   if (patch.links !== undefined) setElementLinks(el, patch.links)
-  if (patch.src !== undefined && el.tagName === 'IMG') el.setAttribute('src', patch.src)
+  if (patch.src !== undefined && el.tagName === 'IMG') setImageSource(el, patch.src)
   if (patch.alt !== undefined && el.tagName === 'IMG') el.setAttribute('alt', patch.alt)
   const setStyle = (prop, value) => {
     if (value) el.style[prop] = value
