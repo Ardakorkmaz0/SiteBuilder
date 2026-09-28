@@ -1481,6 +1481,7 @@ export const TURKISH_TRANSLATIONS = {
   'Manual save': 'Manuel kayıt',
   'Pin': 'Sabitle',
   'Unpin': 'Sabitlemeyi kaldır',
+  'Save failed. Nothing was loaded.': 'Kaydetme başarısız oldu. Hiçbir şey yüklenmedi.',
   'Save failed. The checkpoint was not created.': 'Kayıt başarısız oldu. Kontrol noktası oluşturulmadı.',
   'Save failed. The checkpoint was not changed.': 'Kayıt başarısız oldu. Kontrol noktası değiştirilmedi.',
   'No saves yet. Press': 'Henüz kayıt yok.',
