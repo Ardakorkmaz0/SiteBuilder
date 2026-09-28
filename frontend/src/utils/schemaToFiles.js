@@ -9,6 +9,8 @@
 import { sanitizeStyles, sanitizeUrl, sanitizeImageSrc } from './sanitize.js'
 import { iconSvg } from './icons.js'
 import { fieldHtml } from './formField.js'
+import { themeToggleAttrs, themeToggleInner } from './themeToggle.js'
+import { colorModeHeadTags, withColorModePage } from './colorMode.js'
 import { ALERT_VARIANTS } from '../components/renderer/constants.js'
 import {
   customCssBlock,
@@ -253,6 +255,7 @@ function baseDisplay(type) {
       return 'flex'
     case 'badge':
     case 'icon':
+    case 'themeToggle':
       return 'inline-flex'
     default:
       return 'block'
@@ -280,6 +283,8 @@ function baseRules(type) {
       return 'display:inline-flex; align-items:center;'
     case 'icon':
       return 'display:inline-flex; align-items:center; line-height:0;'
+    case 'themeToggle':
+      return 'display:inline-flex; align-items:center; justify-content:center; gap:.5em; cursor:pointer;'
     case 'input':
       return 'display:flex; flex-direction:column; gap:6px; min-width:0;'
     default:
@@ -291,7 +296,7 @@ function baseRules(type) {
 // link. ANY component is linkable except anchors/interactive types — mirrors
 // the live renderer's NON_WRAP_LINK_TYPES so export matches preview.
 const NON_WRAP_LINK = new Set([
-  'button', 'linkbutton', 'navbar', 'section', 'region', 'tabs', 'container', 'accordion', 'select', 'input', 'html',
+  'button', 'linkbutton', 'navbar', 'section', 'region', 'tabs', 'container', 'accordion', 'select', 'input', 'html', 'themeToggle',
 ])
 
 // Types whose CONTENT is serialized with inline styles (see inlineNode). Their
@@ -484,6 +489,7 @@ function tagFor(type) {
   if (type === 'region') return 'section'
   if (type === 'quote') return 'blockquote'
   if (type === 'badge' || type === 'icon') return 'span'
+  if (type === 'themeToggle') return 'button'
   return 'div'
 }
 
@@ -540,6 +546,8 @@ function innerHtml(c) {
       return multiline(p.text)
     case 'icon':
       return iconSvg(p.name)
+    case 'themeToggle':
+      return themeToggleInner(p)
     case 'input':
       return fieldHtml('input', p, c.id)
     default:
@@ -569,6 +577,9 @@ function openTag(c, extraAttrs = '') {
   }
   if (c.type === 'icon') {
     return `<${tag}${idAttr} class="${cls}"${iconA11yAttrs(c.props || {})}>`
+  }
+  if (c.type === 'themeToggle') {
+    return `<button${idAttr} class="${cls} pwb-theme-toggle"${themeToggleAttrs(c.props || {})}>`
   }
   return `<${tag}${idAttr} class="${cls}">`
 }
@@ -827,9 +838,18 @@ function slug(name) {
 // as public preview: absolute pages keep their exact PC/mobile designs and scale
 // to the visitor's viewport width; flow pages fill the viewport naturally.
 export function schemaToSingleHtml(schema, title = 'My Site', options = {}) {
-  const page = (schema?.pages || [])[0] || {}
-  if (!page.flowMode) return schemaToScaledHtml(page, title, schema, options)
+  // With a colour mode (a site visitors can switch to its other palette), the
+  // page's theme colours are written as variables and the head says which
+  // palette is on before anything paints.
+  const mode = options.colorMode || null
+  const page = withColorModePage((schema?.pages || [])[0] || {}, mode)
+  const html = page.flowMode
+    ? schemaToFlowHtml(page, title, schema)
+    : schemaToScaledHtml(page, title, schema, options)
+  return mode ? html.replace('</head>', `${colorModeHeadTags(mode)}\n  </head>`) : html
+}
 
+function schemaToFlowHtml(page, title, schema) {
   const css = schemaToCss(
     {
       pages: [page],

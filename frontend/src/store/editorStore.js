@@ -2424,6 +2424,25 @@ export const useEditorStore = create((set, get) => ({
     }))
   },
 
+  // The palette visitors can switch to (utils/colorMode.js). A colour in
+  // `theme` replaces the suggested one; `theme: null` goes back to the
+  // suggestion for all of them.
+  updateColorMode: (patch = {}) => {
+    get().record('color-mode')
+    set((state) => {
+      const before = state.schema.colorMode || {}
+      const theme = !('theme' in patch)
+        ? before.theme || {}
+        : patch.theme === null ? {} : { ...(before.theme || {}), ...patch.theme }
+      const followDevice = 'followDevice' in patch ? !!patch.followDevice : !!before.followDevice
+      return { schema: { ...state.schema, colorMode: { theme, followDevice } }, dirty: true }
+    })
+  },
+
+  // The canvas drawn in the other palette, to see it while editing. Not saved.
+  colorModePreview: false,
+  setColorModePreview: (on) => set({ colorModePreview: !!on }),
+
   setCustomCss: (css) => {
     get().record('custom-css')
     set((state) => ({

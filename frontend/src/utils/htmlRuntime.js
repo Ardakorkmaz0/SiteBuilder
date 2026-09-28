@@ -1,5 +1,6 @@
 import { insertBeforeClosingTag } from './htmlInsert.js'
 import { FORM_FIELD_CSS } from './formField.js'
+import { THEME_TOGGLE_CSS } from './themeToggle.js'
 import { MOTION_ARM_JS, MOTION_CSS, MOTION_OBSERVER_JS } from './motion.js'
 
 const RUNTIME_STYLE = `
@@ -82,7 +83,83 @@ const INTERACTIVE_SCRIPT = `
         }
       }
     }
+    // The site's light/dark switch. The head script (colorMode.js) has put
+    // the palette, and which one the site was designed in, on the root.
+    function syncThemeToggles() {
+      var dark = document.documentElement.getAttribute('data-pwb-theme') === 'dark';
+      var toggles = document.querySelectorAll('[data-pwb-theme-toggle]');
+      for (var i = 0; i < toggles.length; i++) toggles[i].setAttribute('aria-pressed', dark ? 'true' : 'false');
+    }
+    // A sandboxed page (the builder's own /s/ address) has no storage: there
+    // the palette rides in the address, ?pwb-theme=dark, on this page and on
+    // every link to another page of the site.
+    var paletteStorage = true;
+    try { localStorage.getItem('pwb-color-mode'); } catch (e) { paletteStorage = false; }
+    function withPaletteParam(href, mode) {
+      try {
+        var url = new URL(href, location.href);
+        if (url.host !== location.host) return null;
+        // A jump within this page stays a jump: a new address would reload it.
+        if (url.pathname === location.pathname && url.search === location.search && url.hash) return null;
+        var base = document.documentElement.getAttribute('data-pwb-theme-base');
+        if (mode && mode !== base) url.searchParams.set('pwb-theme', mode);
+        else url.searchParams.delete('pwb-theme');
+        return url.href;
+      } catch (e) { return null; }
+    }
+    // HTML blocks are frames of their own: tell each which palette is on,
+    // now and whenever one (re)loads.
+    function sendPalette(frame, mode) {
+      try { frame.contentWindow.postMessage({ type: 'pwb-color-mode-set', mode: mode }, '*'); } catch (e) {}
+    }
+    function broadcastPalette(mode) {
+      var frames = document.querySelectorAll('iframe');
+      for (var i = 0; i < frames.length; i++) sendPalette(frames[i], mode);
+    }
+    function initPalette() {
+      var root = document.documentElement;
+      if (!root.hasAttribute('data-pwb-theme-base')) return;
+      var frames = document.querySelectorAll('iframe');
+      for (var i = 0; i < frames.length; i++) {
+        frames[i].addEventListener('load', function () { sendPalette(this, root.getAttribute('data-pwb-theme')); });
+      }
+      broadcastPalette(root.getAttribute('data-pwb-theme'));
+    }
+    // Inside an HTML block: the page around it says which palette is on.
+    window.addEventListener('message', function (event) {
+      var data = event.data;
+      if (!data || data.type !== 'pwb-color-mode-set' || event.source !== window.parent) return;
+      if (data.mode !== 'light' && data.mode !== 'dark') return;
+      document.documentElement.setAttribute('data-pwb-theme', data.mode);
+      syncThemeToggles();
+      broadcastPalette(data.mode);
+    });
+    function switchPalette() {
+      var root = document.documentElement;
+      var base = root.getAttribute('data-pwb-theme-base');
+      var alt = root.getAttribute('data-pwb-theme-alt');
+      if (!base || !alt) return;
+      var next = root.getAttribute('data-pwb-theme') === alt ? base : alt;
+      root.setAttribute('data-pwb-theme', next);
+      if (paletteStorage) {
+        try { localStorage.setItem('pwb-color-mode', next); } catch (e) {}
+      } else {
+        var here = withPaletteParam(location.href, next);
+        try { if (here) history.replaceState(history.state, '', here); } catch (e) {}
+      }
+      broadcastPalette(next);
+      // Inside the app's viewer each page is a new frame: the viewer keeps
+      // the choice and hands it to the next page.
+      try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'pwb-color-mode', mode: next }, '*'); } catch (e) {}
+      syncThemeToggles();
+    }
     function onClick(event) {
+      var themeToggle = event.target && event.target.closest && event.target.closest('[data-pwb-theme-toggle]');
+      if (themeToggle) {
+        event.preventDefault();
+        switchPalette();
+        return;
+      }
       // A password field's eye: show what was typed, and hide it again.
       var reveal = event.target && event.target.closest && event.target.closest('[data-pwb-reveal]');
       if (reveal) {
@@ -288,6 +365,16 @@ const INTERACTIVE_SCRIPT = `
       if (window.__pwbInteractiveReady) return;
       window.__pwbInteractiveReady = true;
       document.addEventListener('click', onClick);
+      // Before any other click handling: a link to another page of the site
+      // takes the palette along when the address is where it lives.
+      document.addEventListener('click', function (event) {
+        if (paletteStorage || !event.target || !event.target.closest) return;
+        var link = event.target.closest('a[href]');
+        var mode = document.documentElement.getAttribute('data-pwb-theme');
+        if (!link || !mode) return;
+        var next = withPaletteParam(link.href, mode);
+        if (next && next !== link.href) link.href = next;
+      }, true);
       document.addEventListener('submit', onSubmit);
       window.addEventListener('message', function (event) {
         if (!standalone() && event.source === window.parent && event.data && event.data.type === 'pwb-form-result') {
@@ -295,6 +382,8 @@ const INTERACTIVE_SCRIPT = `
         }
       });
       initSticky();
+      syncThemeToggles();
+      initPalette();
       // Ensure each tabs widget has exactly one panel visible on load (the one
       // whose tab is marked aria-selected, falling back to the first tab).
       var roots = document.querySelectorAll('[data-builder-tabs]');
@@ -442,7 +531,7 @@ const INTERACTIVE_STYLE = `[data-builder-tabs] [role="tab"]{appearance:none;back
 // instead of all of them or none.
 const RUNTIME_STYLE_TAG = `<style data-builder-runtime-style>${RUNTIME_STYLE}</style>`
 const MOTION_STYLE_TAG = `<style data-builder-motion-style>${MOTION_CSS}</style>`
-const INTERACTIVE_STYLE_TAG = `<style data-builder-interactive-style>${INTERACTIVE_STYLE}${FORM_FIELD_CSS}</style>`
+const INTERACTIVE_STYLE_TAG = `<style data-builder-interactive-style>${INTERACTIVE_STYLE}${FORM_FIELD_CSS}${THEME_TOGGLE_CSS}</style>`
 const RUNTIME_SCRIPT_TAG = `<script data-builder-runtime-script>${RUNTIME_SCRIPT}${SCRIPT_END}`
 const INTERACTIVE_TAG = `<script data-builder-interactive>${INTERACTIVE_SCRIPT}${SCRIPT_END}`
 const MOTION_OBSERVER_TAG = `<script data-builder-motion>${MOTION_OBSERVER_JS}${SCRIPT_END}`
@@ -463,7 +552,7 @@ export function builderInteractiveTags() {
 // Split-project exports share these assets across every page instead of
 // embedding the same runtime into each HTML document.
 export function builderInteractiveCss() {
-  return `${INTERACTIVE_STYLE}${FORM_FIELD_CSS}\n${MOTION_CSS}`
+  return `${INTERACTIVE_STYLE}${FORM_FIELD_CSS}${THEME_TOGGLE_CSS}\n${MOTION_CSS}`
 }
 
 export function builderInteractiveJs() {

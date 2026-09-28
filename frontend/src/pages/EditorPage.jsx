@@ -76,6 +76,7 @@ import { applyThemeToDocument } from '../utils/htmlTheme.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
 import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
+import { colorModeFor, viewColorMode } from '../utils/colorMode.js'
 import { emptyHtmlDocument } from '../utils/htmlTemplates.js'
 import { apiError } from '../utils/errors.js'
 import { googleFontHrefForTheme } from '../utils/googleFonts.js'
@@ -380,6 +381,8 @@ export default function EditorPage() {
   const editorSchema = useEditorStore((s) => s.schema)
   const customCss = useEditorStore((s) => s.schema.customCss)
   const customJs = useEditorStore((s) => s.schema.customJs)
+  const colorModeSetting = useEditorStore((s) => s.schema.colorMode)
+  const colorModePreview = useEditorStore((s) => s.colorModePreview)
   const setPageMode = useEditorStore((s) => s.setPageMode)
   const setPageSettings = useEditorStore((s) => s.setPageSettings)
   const activePageId = useEditorStore((s) => selectCurrentPage(s).id)
@@ -1820,6 +1823,10 @@ export default function EditorPage() {
   // preview would show it static, disagreeing with the published page.
   const componentViewNeedsIframe =
     hasFixedComponent(currentPage?.components) || pageHasMotion(currentPage)
+  // A site with a light/dark switch: View draws both palettes, as published.
+  const componentColorMode = currentPage
+    ? viewColorMode({ theme, colorMode: colorModeSetting, pages: storePages }, currentPage, colorModePreview)
+    : null
   const componentViewHtml =
     componentViewNeedsIframe && currentPage
       ? schemaToSingleHtml(
@@ -1832,7 +1839,7 @@ export default function EditorPage() {
           title || currentPage.name || 'My Site',
           // Inside the phone mockup a desktop scrollbar would steal layout width
           // from the design and look nothing like a phone.
-          { overlayScrollbars: viewport === 'mobile' },
+          { overlayScrollbars: viewport === 'mobile', colorMode: componentColorMode },
         )
       : ''
   const sizePresets = viewport === 'mobile' ? MOBILE_CANVAS_PRESETS : PC_CANVAS_PRESETS
@@ -2612,6 +2619,7 @@ export default function EditorPage() {
                   ref={workspaceRef}
                   persistKey={id}
                   html={siteHtml}
+                  colorMode={currentPage ? colorModeFor({ theme, colorMode: colorModeSetting, pages: storePages }, currentPage, pageHtmlMap) : null}
                   liveCode={liveCodeEnabled}
                   liveCodeHold={liveCodeHold}
                   liveCodeControls={liveCodeControls}
@@ -2739,6 +2747,7 @@ export default function EditorPage() {
                         onApplyThemeToHtml={applyThemeToAllHtmlPages}
                         htmlPageSettings={htmlPageSettings}
                         onHtmlPageSettings={changeHtmlPageSettings}
+                        pageHtmlMap={pageHtmlMap}
                       />
                     )}
                   </div>
@@ -3151,6 +3160,7 @@ export default function EditorPage() {
                         : currentPage.background || '#ffffff'
                     }
                     iframeHtml={componentViewHtml}
+                    colorMode={componentColorMode}
                     title={`${currentPage.name || 'Page'} preview`}
                     browserFrame={browserFrameEnabled}
                     browserSiteTitle={title}

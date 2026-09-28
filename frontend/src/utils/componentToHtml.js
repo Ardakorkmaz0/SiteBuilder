@@ -5,6 +5,7 @@
 // only inline styles + classes that already exist in the AI HTML-mode output
 // (.btn, .card, …) — keeps them composable with an AI-generated document.
 import { insertBeforeClosingTag } from './htmlInsert.js'
+import { THEME_TOGGLE_CSS, themeToggleHtml } from './themeToggle.js'
 
 const PALETTE_HTML = {
   navbar: `<nav style="display:flex;justify-content:space-between;align-items:center;padding:14px 28px;background:#111;color:#fff;flex-wrap:wrap;gap:12px;">
@@ -61,6 +62,7 @@ const PALETTE_HTML = {
 </div>`,
   html: '<div><!-- Paste your custom HTML here --></div>',
   icon: '<span style="display:inline-block;width:24px;height:24px;background:#2563eb;border-radius:50%;"></span>',
+  themeToggle: `<style data-pwb-theme-toggle-css>${THEME_TOGGLE_CSS}</style>${themeToggleHtml({}, { style: 'height:44px;min-width:44px;padding:0 12px;border:1px solid color-mix(in srgb, currentColor 35%, transparent);border-radius:999px;color:inherit' })}`,
 }
 
 // Return a snippet for the requested component type, or a minimal <div/> if

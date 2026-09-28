@@ -1,8 +1,10 @@
 // Presentational components rendered from the JSON schema.
 // Each receives { props, style }. The passed `style` already includes
-// width/height 100% so the component fills its free-canvas box. They never use
-// dangerouslySetInnerHTML, so React escapes all text. URLs go through sanitizeUrl.
-import { useContext, useId, useLayoutEffect, useRef, useState } from 'react'
+// width/height 100% so the component fills its free-canvas box. Nothing the
+// owner typed goes through dangerouslySetInnerHTML (only the fixed icon markup
+// shared with the published page does), so React escapes all text. URLs go
+// through sanitizeUrl.
+import { useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { sanitizeUrl, sanitizeImageSrc } from '../../utils/sanitize.js'
 import { ICONS } from '../../utils/icons.js'
 import { ALERT_VARIANTS } from './constants.js'
@@ -11,6 +13,8 @@ import { htmlEmbedDocument } from '../../utils/htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from '../../utils/htmlSnippetSizing.js'
 import { scaleCssValue, scaledPx } from './scale.js'
 import { EYE_ICONS, FORM_FIELD_CSS, choiceList, fieldClassName, fieldStyles, radioChoices, rangeAttrs } from '../../utils/formField.js'
+import { THEME_TOGGLE_CSS, THEME_TOGGLE_ICONS, showsLabel, themeToggleLabel } from '../../utils/themeToggle.js'
+import { useColorMode } from './colorModeContext.js'
 import {
   navLinkLabel,
   navbarBrandAlign,
@@ -409,6 +413,47 @@ export function Badge({ props, style }) {
   )
 }
 
+// The site's light/dark switch. On the canvas it shows the palette the page
+// is drawn in and does nothing when clicked (a click there selects it); in a
+// preview or the in-app viewer it switches the palette.
+export function ThemeToggle({ props, style }) {
+  useSharedCss('pwb-theme-toggle-css', THEME_TOGGLE_CSS)
+  const colorMode = useColorMode()
+  const dark = colorMode?.current === 'dark'
+  const label = themeToggleLabel(props)
+  return (
+    <button
+      type="button"
+      className="pwb-theme-toggle"
+      data-pwb-theme-toggle=""
+      aria-pressed={dark}
+      aria-label={label}
+      onClick={colorMode?.toggle || undefined}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '0.5em',
+        cursor: 'pointer',
+        font: 'inherit',
+        lineHeight: 1,
+        background: 'transparent',
+        border: 0,
+        padding: 0,
+        color: 'inherit',
+        ...style,
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{ display: 'inline-flex', width: '1.2em', height: '1.2em' }}
+        dangerouslySetInnerHTML={{ __html: dark ? THEME_TOGGLE_ICONS.sun : THEME_TOGGLE_ICONS.moon }}
+      />
+      {showsLabel(props) && <span>{label}</span>}
+    </button>
+  )
+}
+
 export function Icon({ props, style, boxScale = 1 }) {
   const d = ICONS[props.name] || ICONS.star
   const label = props.label || ''
@@ -444,14 +489,20 @@ export function Icon({ props, style, boxScale = 1 }) {
 
 // Once per document: what the field classes need (a placeholder's colour, a
 // focus ring, the switch). The canvas and the large view draw into the app.
-function useFormFieldCss() {
+// The CSS a part of the page shares with the published page, added to the
+// app's head once.
+function useSharedCss(id, css) {
   useLayoutEffect(() => {
-    if (typeof document === 'undefined' || document.getElementById('pwb-form-field-css')) return
+    if (typeof document === 'undefined' || document.getElementById(id)) return
     const tag = document.createElement('style')
-    tag.id = 'pwb-form-field-css'
-    tag.textContent = FORM_FIELD_CSS
+    tag.id = id
+    tag.textContent = css
     document.head.appendChild(tag)
-  }, [])
+  }, [id, css])
+}
+
+function useFormFieldCss() {
+  useSharedCss('pwb-form-field-css', FORM_FIELD_CSS)
 }
 
 // A form field and its parts, drawn from the same description the published
@@ -667,6 +718,18 @@ export function HtmlEmbed({ props, style, boxScale = 1, editorPreview = false })
   // `allow-same-origin`, can blank the iframe out and leave the user staring
   // at a white box.
   const srcDoc = font === null ? undefined : withBuilderInteractiveHtml(baseHtml)
+  // A site with a light/dark switch: the block's document carries both
+  // palettes (colorMode.js), and is told which one is on, now and on every
+  // switch, without being reloaded.
+  const palette = useColorMode()?.current || null
+  useEffect(() => {
+    const frame = frameRef.current
+    if (!frame || !palette) return undefined
+    const send = () => frame.contentWindow?.postMessage({ type: 'pwb-color-mode-set', mode: palette }, '*')
+    send()
+    frame.addEventListener('load', send)
+    return () => frame.removeEventListener('load', send)
+  }, [palette, srcDoc])
   return (
     <iframe
       ref={frameRef}

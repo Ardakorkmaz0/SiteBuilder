@@ -55,6 +55,7 @@ import {
   selectableParent,
 } from '../../utils/htmlElementEdit.js'
 import { componentToHtml } from '../../utils/componentToHtml.js'
+import { withColorModeHtml } from '../../utils/colorMode.js'
 import { matchingCssRules } from '../../utils/htmlFiles.js'
 import { brushElementPatch } from '../../utils/htmlRecolor.js'
 import { hasUnsavedSourceDraft } from '../../utils/htmlSourceDraft.js'
@@ -518,6 +519,9 @@ function authoredStyleText(source) {
 
 function HtmlWorkspace({
   html,
+  // Both palettes, when the site lets visitors switch (utils/colorMode.js):
+  // View shows the page as published, switch and all.
+  colorMode = null,
   fileName = 'index.html',
   deviceId = 'fit',
   landscape = false,
@@ -1824,7 +1828,7 @@ function HtmlWorkspace({
   // no separate "compatibility mode" toggle needed.
   // In code-project mode the View renders the assembled (linked-CSS/JS-resolved)
   // document; otherwise the html prop is already self-contained.
-  const viewHtml = assemble ? assembledView : html
+  const viewHtml = assemble ? assembledView : withColorModeHtml(html, colorMode)
   // Only for the document it was measured on: a page that styles itself with a
   // script looks unstyled in Edit otherwise (scripts never run there).
   const forThisDocument = generated?.key === documentKey(editSeed) ? generated : null

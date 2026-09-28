@@ -607,3 +607,34 @@ class TestPageDocumentSettings:
         assert page['direction'] == ''
         assert page['themeColor'] == ''
         assert page['smoothScroll'] is True
+
+
+class TestLightAndDark:
+    """A site visitors can switch between its two palettes."""
+
+    def _schema(self, **extra):
+        comp = {'id': 't1', 'type': 'themeToggle', 'props': {'label': 'Dark mode', 'showLabel': 'on'}}
+        return validate_and_clean_schema({'pages': [{'id': 'p', 'components': [comp]}], **extra})
+
+    def test_the_switch_survives_a_save(self):
+        props = self._schema()['pages'][0]['components'][0]['props']
+        assert props['label'] == 'Dark mode'
+        assert props['showLabel'] == 'on'
+
+    def test_a_site_without_the_other_palette_stores_nothing_for_it(self):
+        assert 'colorMode' not in self._schema()
+
+    def test_the_other_palette_keeps_only_hex_colours(self):
+        clean = self._schema(colorMode={
+            'theme': {
+                'backgroundColor': '#111317',
+                'textColor': 'red;} body{background:url(x)',
+                'primaryColor': '#60a5fa" onload="x',
+                'fontFamily': 'Comic Sans MS',
+            },
+            'followDevice': True,
+        })['colorMode']
+        assert clean == {'theme': {'backgroundColor': '#111317'}, 'followDevice': True}
+
+    def test_following_the_device_is_a_real_yes_only(self):
+        assert self._schema(colorMode={'followDevice': 'yes'})['colorMode']['followDevice'] is False

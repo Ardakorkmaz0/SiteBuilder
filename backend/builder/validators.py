@@ -14,7 +14,7 @@ ALLOWED_COMPONENT_TYPES = {
     'section', 'region', 'card', 'divider', 'spacer',
     'list', 'quote', 'badge', 'icon', 'input',
     'container', 'tabs', 'select', 'alert', 'accordion',
-    'html',
+    'html', 'themeToggle',
 }
 
 # Custom HTML embed cap. The embed renders inside its own sandboxed iframe so
@@ -321,6 +321,12 @@ def sanitize_props(ctype, props):
             'placeholder': _str(props.get('placeholder')),
             **_control_props(props),
             **_field_part_props(props),
+        }
+    if ctype == 'themeToggle':
+        # The site's light/dark switch: its text is also its spoken name.
+        return {
+            'label': _str(props.get('label'))[:80],
+            'showLabel': 'on' if props.get('showLabel') == 'on' else '',
         }
     if ctype == 'alert':
         variant = props.get('variant')
@@ -660,6 +666,30 @@ def _page_html(value):
     return value
 
 
+# The colours a site switches to when a visitor picks its other palette (see
+# frontend/src/utils/colorMode.js). Only colours: the fonts and shapes stay.
+COLOR_MODE_ROLES = (
+    'backgroundColor', 'surfaceColor', 'softColor', 'headerColor', 'headerTextColor',
+    'textColor', 'mutedColor', 'borderColor', 'primaryColor', 'buttonTextColor', 'accentColor',
+)
+
+
+def sanitize_color_mode(value):
+    """The other palette as hex colours, and whether to follow the device.
+
+    A colour that is not a plain hex value is left out rather than defaulted:
+    the editor fills a missing one from its own suggestion.
+    """
+    if not isinstance(value, dict):
+        return None
+    theme = value.get('theme') if isinstance(value.get('theme'), dict) else {}
+    colors = {role: sanitize_hex_color(theme.get(role)) for role in COLOR_MODE_ROLES}
+    return {
+        'theme': {role: color for role, color in colors.items() if color},
+        'followDevice': value.get('followDevice') is True,
+    }
+
+
 def validate_and_clean_schema(schema):
     """Validate the overall structure and return a fully sanitized copy."""
     if not isinstance(schema, dict):
@@ -721,8 +751,12 @@ def validate_and_clean_schema(schema):
             'html': _page_html(page.get('html')),
             'components': [sanitize_component(c) for c in comps],
         })
+    color_mode = sanitize_color_mode(schema.get('colorMode'))
     return {
         'theme': sanitize_theme(schema.get('theme')),
+        # Absent until the owner sets the other palette, so older schemas stay
+        # byte-identical.
+        **({'colorMode': color_mode} if color_mode else {}),
         'customCss': sanitize_custom_css(schema.get('customCss')),
         'customJs': sanitize_custom_js(schema.get('customJs')),
         'pages': clean_pages,

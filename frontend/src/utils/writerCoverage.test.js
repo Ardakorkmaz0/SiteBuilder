@@ -36,6 +36,7 @@ const PROBE_PROPS = {
   input: { label: MARKER, placeholder: 'x' },
   select: { label: MARKER, options: 'A\nB' },
   icon: { name: 'star', label: MARKER },
+  themeToggle: { label: MARKER, showLabel: 'on' },
   image: { src: 'https://example.com/a.png', alt: MARKER },
   html: { code: `<div>${MARKER}</div>` },
   tabs: { tabs: [{ id: 't1', label: MARKER }], activeId: 't1' },
