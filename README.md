@@ -94,6 +94,21 @@ npm install
 npm run dev                       # http://localhost:5173
 ```
 
+### Tests
+
+```bash
+cd backend && pytest -q           # backend
+cd frontend && npm run test:run   # frontend unit tests
+cd frontend && npm run e2e        # end-to-end, in a real browser
+```
+
+The end-to-end suite (`frontend/e2e/`) starts the backend and Vite itself, or
+uses them if they are already running, and signs up a fresh account for each
+run. If `python` is not the backend's virtualenv, say which one:
+`E2E_PYTHON=../backend/.venv/Scripts/python.exe npm run e2e`. The first time,
+install its browser with `npx playwright install chromium`. CI runs all three
+on every push.
+
 ## Going to production
 
 The app runs the same code in dev and prod — production hardening (Postgres,
