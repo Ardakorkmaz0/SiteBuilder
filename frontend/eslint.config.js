@@ -19,6 +19,11 @@ export default defineConfig([
     },
   },
   {
+    // End-to-end specs run in Node and hand functions to the page.
+    files: ['e2e/**/*.js', 'playwright.config.js'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     // `t` is the i18n translate function from useLanguage(). A callback that
     // names its parameter `t` shadows it, so every t('...') inside that callback
     // calls the loop item instead — a hard crash that white-screens the app

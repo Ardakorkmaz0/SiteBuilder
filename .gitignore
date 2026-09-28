@@ -109,3 +109,8 @@ chat_history/
 .hf/
 .huggingface/
 ai_outputs/
+
+# Playwright end-to-end runs
+frontend/e2e/.auth/
+frontend/test-results/
+frontend/playwright-report/
