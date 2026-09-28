@@ -331,7 +331,9 @@ export function linkSectionsInDocument(doc, exclude = null) {
   const seen = new Set()
   const sections = []
   for (const node of doc.body.querySelectorAll('[id]')) {
-    if (!node.id || seen.has(node.id) || NOT_A_PLACE.has(node.tagName)) continue
+    // "#top" is a choice of its own (Top of this page): listed here too, it was
+    // picked as the first section and flipped the control back to "Top".
+    if (!node.id || node.id === 'top' || seen.has(node.id) || NOT_A_PLACE.has(node.tagName)) continue
     // A link to itself, or into itself, goes nowhere.
     if (exclude && (node === exclude || exclude.contains(node))) continue
     if (node.closest(EDITOR_CHROME_SELECTOR)) continue
