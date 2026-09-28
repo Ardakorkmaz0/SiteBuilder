@@ -1,7 +1,7 @@
 // "Whole site" / "This page only": a theme chosen for one page stays on that
 // page, and the site theme stops reaching it.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../../ui/UiThemeProvider.jsx'
 import PropertiesPanel from './PropertiesPanel.jsx'
@@ -139,5 +139,36 @@ describe('the writers', () => {
     expect(out.pages[0].components[0].styles.color).toBe('#1e3a8a')
     expect(out.pages[1].components[0].styles).toEqual({})
     expect(pageTheme(out, out.pages[1]).textColor).toBe('#c2410c')
+  })
+})
+
+// A colour or font edit waits for Apply, and the panel said nothing about it:
+// the page kept its old colours and a save published them that way.
+describe('an edit that is not applied yet', () => {
+  it('says so by the Apply button until it is pressed', () => {
+    renderThemeTab()
+    expect(screen.queryByRole('status')).toBeNull()
+
+    act(() => useEditorStore.getState().updateTheme({ textColor: '#ff0000' }))
+    const note = screen.getByRole('status')
+    expect(note).toHaveTextContent('Not on the page yet: press "Apply to design" to use these edits.')
+    expect(colorOf('about')).not.toBe('#ff0000')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to design' }))
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(colorOf('about')).toBe('#ff0000')
+  })
+
+  it('does not ask for Apply after a preset, which applies itself', () => {
+    renderThemeTab()
+    fireEvent.click(screen.getByRole('button', { name: /Noir Gold/ }))
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('starts clear on a freshly loaded site', () => {
+    useEditorStore.getState().updateTheme({ textColor: '#ff0000' })
+    useEditorStore.getState().loadSchema({ pages: [{ id: 'home', name: 'Home', components: [] }] })
+    renderThemeTab()
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })
