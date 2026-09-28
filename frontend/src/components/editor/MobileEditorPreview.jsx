@@ -118,14 +118,17 @@ export default function MobileEditorPreview({
       </section>
 
       <nav className="shrink-0 border-t border-[#e5e7eb] bg-white pb-[env(safe-area-inset-bottom)]" aria-label={t('Mobile preview navigation')}>
+        {/* Type sits on the labels, not the items: the editor's buttons take
+            their font from context (index.css), so a size on the <button>
+            never applied and two tabs read at 16px beside two at 11px. */}
         <div className="grid h-16 grid-cols-4">
-          <button type="button" onClick={() => setFocused(true)} aria-label={t('Focus preview')} className="flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-semibold text-[#4f46e5]">
+          <button type="button" onClick={() => setFocused(true)} aria-label={t('Focus preview')} className="flex min-w-0 flex-col items-center justify-center gap-1 text-[#4f46e5]">
             <EyeIcon size={19} aria-hidden />
-            <span>{t('Preview')}</span>
+            <span className="text-[11px] font-semibold">{t('Preview')}</span>
           </button>
-          <button type="button" onClick={() => setSheet('pages')} className="flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-medium text-[#4b5563]">
+          <button type="button" onClick={() => setSheet('pages')} className="flex min-w-0 flex-col items-center justify-center gap-1 text-[#4b5563]">
             <LayersIcon size={19} aria-hidden />
-            <span>{t('Pages')}</span>
+            <span className="text-[11px] font-medium">{t('Pages')}</span>
           </button>
           {published && slug ? (
             <Link to={`/site/${slug}`} target="_blank" rel="noreferrer" aria-label={t('Open live site')} className="flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-medium text-[#4b5563]">
@@ -138,9 +141,9 @@ export default function MobileEditorPreview({
               <span>{t('Draft')}</span>
             </div>
           )}
-          <button type="button" onClick={() => setSheet('desktop')} className="flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium text-[#4b5563]">
+          <button type="button" onClick={() => setSheet('desktop')} className="flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[#4b5563]">
             <EditIcon size={19} aria-hidden />
-            <span className="truncate">{t('Desktop')}</span>
+            <span className="max-w-full truncate text-[11px] font-medium">{t('Desktop')}</span>
           </button>
         </div>
       </nav>
@@ -180,8 +183,8 @@ export default function MobileEditorPreview({
               <div className="space-y-4 p-5">
                 <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#eef2ff] text-[#4f46e5]"><EditIcon size={23} aria-hidden /></div>
                 <p className="text-sm leading-6 text-[#4b5563]">{t('Mobile keeps the site preview-first. Open this link on a desktop computer to make changes.')}</p>
-                <button type="button" onClick={copyEditorLink} className="w-full rounded-xl bg-[var(--studio-accent)] px-4 py-3 text-sm font-semibold text-white hover:bg-[var(--studio-accent-fill-hover)]">
-                  {t(copied ? 'Editor link copied' : 'Copy editor link')}
+                <button type="button" onClick={copyEditorLink} className="w-full rounded-xl bg-[var(--studio-accent)] px-4 py-3 text-white hover:bg-[var(--studio-accent-fill-hover)]">
+                  <span className="text-sm font-semibold">{t(copied ? 'Editor link copied' : 'Copy editor link')}</span>
                 </button>
               </div>
             )}
