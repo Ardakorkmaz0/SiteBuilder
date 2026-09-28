@@ -34,8 +34,6 @@ URL.
 <br>
 <img width="1280" alt="Dashboard" src="docs/screenshots/dashboard.png" />
 <br>
-<img width="1280" alt="Editor: blocks" src="docs/screenshots/editor-blocks.png" />
-<br>
 <img width="1280" alt="Editor: theme" src="docs/screenshots/editor-theme.png" />
 <br>
 <img width="1280" alt="Editor: mobile layout" src="docs/screenshots/editor-mobile-animation.png" />
