@@ -823,6 +823,11 @@ describe('linkSectionsInDocument', () => {
     expect(sections.find((s) => s.id === 'about').label).toBe('#about · About the team')
   })
 
+  it('leaves out #top, which is "Top of this page" already', () => {
+    document.body.insertAdjacentHTML('afterbegin', '<header id="top"><h1>Brand</h1></header>')
+    expect(linkSectionsInDocument(document).map((s) => s.id)).not.toContain('top')
+  })
+
   it('leaves out the link itself and what it contains', () => {
     const menu = document.getElementById('menu')
     expect(linkSectionsInDocument(document, menu).map((s) => s.id)).toEqual(['about', 'contact'])
