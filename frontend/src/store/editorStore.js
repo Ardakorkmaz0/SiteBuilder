@@ -1085,6 +1085,14 @@ let burstStart = 0
 // of the way.
 let gesture = null
 
+// One running order for every undo step in the editor. An HTML page keeps its
+// own stack of documents beside this store's schema stack, and its Undo only
+// read that one: deleting or renaming a page, or a theme edit, made on an HTML
+// page could not be undone at all. Each step now carries a stamp from here, so
+// Undo there can take whichever step is newest, whichever stack holds it.
+let historySeq = 0
+export const nextHistoryStamp = () => ++historySeq
+
 export const useEditorStore = create((set, get) => ({
   schema: emptySchema(),
   currentPageId: 'page_home',
@@ -1102,6 +1110,9 @@ export const useEditorStore = create((set, get) => ({
   dirty: false,
   past: [],
   future: [],
+  // The stamp (nextHistoryStamp) of each entry in `past` / `future`.
+  pastAt: [],
+  futureAt: [],
   // A colour or font was changed in the theme panel and not applied yet. Those
   // edits wait for "Apply" (applying restyles every component), and nothing
   // said so: the panel read "Changes here reach every page" while the page
@@ -1175,6 +1186,8 @@ export const useEditorStore = create((set, get) => ({
       && now - burstStart < COALESCE_MAX_MS
     ) {
       lastTime = now
+      // Still the same step, but it is the newest thing done now.
+      set((state) => (state.pastAt.length ? { pastAt: [...state.pastAt.slice(0, -1), nextHistoryStamp()] } : {}))
       return
     }
     lastKey = key
@@ -1182,7 +1195,9 @@ export const useEditorStore = create((set, get) => ({
     burstStart = now
     set((state) => ({
       past: [...state.past.slice(-(HISTORY_LIMIT - 1)), state.schema],
+      pastAt: [...state.pastAt.slice(-(HISTORY_LIMIT - 1)), nextHistoryStamp()],
       future: [],
+      futureAt: [],
     }))
   },
 
@@ -1217,6 +1232,8 @@ export const useEditorStore = create((set, get) => ({
       dirty: false,
       past: [],
       future: [],
+      pastAt: [],
+      futureAt: [],
       themeUnapplied: false,
       linkMode: false,
       linkSourceId: null,
@@ -2682,6 +2699,8 @@ export const useEditorStore = create((set, get) => ({
         currentPageId,
         past: state.past.slice(0, -1),
         future: [state.schema, ...state.future],
+        pastAt: state.pastAt.slice(0, -1),
+        futureAt: [state.pastAt[state.pastAt.length - 1] ?? nextHistoryStamp(), ...state.futureAt],
         selectedId: null,
         selectedIds: [],
         dirty: true,
@@ -2702,6 +2721,8 @@ export const useEditorStore = create((set, get) => ({
         currentPageId,
         future: state.future.slice(1),
         past: [...state.past.slice(-(HISTORY_LIMIT - 1)), state.schema],
+        futureAt: state.futureAt.slice(1),
+        pastAt: [...state.pastAt.slice(-(HISTORY_LIMIT - 1)), state.futureAt[0] ?? nextHistoryStamp()],
         selectedId: null,
         selectedIds: [],
         dirty: true,

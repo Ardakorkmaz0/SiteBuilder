@@ -11,7 +11,7 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { getSite, updateSite } from '../api/sites.js'
-import { useEditorStore, selectCurrentPage } from '../store/editorStore.js'
+import { useEditorStore, selectCurrentPage, nextHistoryStamp } from '../store/editorStore.js'
 import { useAuthStore } from '../store/authStore.js'
 import { useGuestGate } from '../utils/useGuestGate.jsx'
 import { lastPageOutside } from '../utils/lastVisited.js'
@@ -776,7 +776,7 @@ export default function EditorPage() {
   // Keep the global Ctrl+Z listener pointed at the right history (html
   // snapshot stacks vs canvas store) without re-binding it every render.
   useEffect(() => {
-    htmlHistoryRef.current = { currentPageIsHtml, undoHtml, redoHtml }
+    htmlHistoryRef.current = { currentPageIsHtml, undoHtml: undoOnHtmlPage, redoHtml: redoOnHtmlPage }
   })
 
   // Warn before closing/refreshing the tab while there are unsaved changes —
@@ -1202,7 +1202,7 @@ export default function EditorPage() {
     if (next === siteHtml) return
     setHtmlPast((p) => [
       ...p.slice(-(HTML_HISTORY_CAP - 1)),
-      { pageId: currentPageId, html: siteHtml },
+      { pageId: currentPageId, html: siteHtml, at: nextHistoryStamp() },
     ])
     setHtmlFuture([])
     setSiteHtml(next)
@@ -1216,10 +1216,32 @@ export default function EditorPage() {
     if (!htmlPast.length) return
     const entry = htmlPast[htmlPast.length - 1]
     setHtmlPast(htmlPast.slice(0, -1))
-    setHtmlFuture((f) => [...f, { pageId: entry.pageId, html: pageHtmlMap[entry.pageId] || '' }])
+    setHtmlFuture((f) => [...f, { pageId: entry.pageId, html: pageHtmlMap[entry.pageId] || '', at: entry.at }])
     setPageHtmlMap((m) => ({ ...m, [entry.pageId]: entry.html }))
     markHtmlDirty()
     if (entry.pageId === currentPageId) workspaceRef.current?.setDocument?.(entry.html)
+  }
+
+  // On an HTML page, Undo takes the newest step of either stack: the page's
+  // documents, or the site itself (a page deleted, added or renamed, a theme
+  // edit), which used to be out of reach of Undo there. Redo brings back the
+  // step undone last, which is the one with the lowest stamp.
+  const stampOf = (entry) => (entry && Number.isFinite(entry.at) ? entry.at : 0)
+  function undoOnHtmlPage() {
+    const store = useEditorStore.getState()
+    const htmlAt = htmlPast.length ? stampOf(htmlPast[htmlPast.length - 1]) : -1
+    const siteAt = store.past.length ? (store.pastAt[store.pastAt.length - 1] ?? 0) : -1
+    if (htmlAt < 0 && siteAt < 0) return
+    if (siteAt > htmlAt) store.undo()
+    else undoHtml()
+  }
+  function redoOnHtmlPage() {
+    const store = useEditorStore.getState()
+    const htmlAt = htmlFuture.length ? stampOf(htmlFuture[htmlFuture.length - 1]) : Infinity
+    const siteAt = store.future.length ? (store.futureAt[0] ?? 0) : Infinity
+    if (htmlAt === Infinity && siteAt === Infinity) return
+    if (siteAt < htmlAt) store.redo()
+    else redoHtml()
   }
 
   function redoHtml() {
@@ -1228,7 +1250,7 @@ export default function EditorPage() {
     setHtmlFuture(htmlFuture.slice(0, -1))
     setHtmlPast((p) => [
       ...p.slice(-(HTML_HISTORY_CAP - 1)),
-      { pageId: entry.pageId, html: pageHtmlMap[entry.pageId] || '' },
+      { pageId: entry.pageId, html: pageHtmlMap[entry.pageId] || '', at: entry.at },
     ])
     setPageHtmlMap((m) => ({ ...m, [entry.pageId]: entry.html }))
     markHtmlDirty()
@@ -1278,7 +1300,7 @@ export default function EditorPage() {
     }
     setHtmlPast((p) => [
       ...p.slice(-(HTML_HISTORY_CAP - 1)),
-      { pageId, html: pageHtmlMap[pageId] || '' },
+      { pageId, html: pageHtmlMap[pageId] || '', at: nextHistoryStamp() },
     ])
     setHtmlFuture([])
     setPageHtmlMap((m) => ({ ...m, [pageId]: htmlText }))
@@ -1956,10 +1978,10 @@ export default function EditorPage() {
         <div className="ml-auto flex min-w-0 items-center gap-1">
           <AiBar open={aiOpen} onOpenChange={setAiOpen} />
           <span className="mx-1 hidden h-5 w-px bg-[var(--studio-border)] lg:block" aria-hidden />
-          <button type="button" onClick={() => (currentPageIsHtml ? undoHtml() : undo())} disabled={currentPageIsHtml ? !htmlPast.length : !canUndo} title={t('Undo (Ctrl+Z)')} className="studio-icon-btn hidden md:inline-flex">
+          <button type="button" onClick={() => (currentPageIsHtml ? undoOnHtmlPage() : undo())} disabled={currentPageIsHtml ? !htmlPast.length && !canUndo : !canUndo} title={t('Undo (Ctrl+Z)')} className="studio-icon-btn hidden md:inline-flex">
             <UndoIcon size={16} />
           </button>
-          <button type="button" onClick={() => (currentPageIsHtml ? redoHtml() : redo())} disabled={currentPageIsHtml ? !htmlFuture.length : !canRedo} title={t('Redo (Ctrl+Shift+Z)')} className="studio-icon-btn hidden md:inline-flex">
+          <button type="button" onClick={() => (currentPageIsHtml ? redoOnHtmlPage() : redo())} disabled={currentPageIsHtml ? !htmlFuture.length && !canRedo : !canRedo} title={t('Redo (Ctrl+Shift+Z)')} className="studio-icon-btn hidden md:inline-flex">
             <RedoIcon size={16} />
           </button>
           <button type="button" onClick={previewCurrentSite} disabled={saving} className="studio-btn hidden lg:inline-flex">
@@ -2373,8 +2395,8 @@ export default function EditorPage() {
               HTML snapshot stacks or the canvas store as appropriate. */}
           <button
             type="button"
-            onClick={() => (currentPageIsHtml ? undoHtml() : undo())}
-            disabled={currentPageIsHtml ? !htmlPast.length : !canUndo}
+            onClick={() => (currentPageIsHtml ? undoOnHtmlPage() : undo())}
+            disabled={currentPageIsHtml ? !htmlPast.length && !canUndo : !canUndo}
             title={t('Undo (Ctrl+Z)')}
             className="rounded-lg px-2.5 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-40"
           >
@@ -2382,8 +2404,8 @@ export default function EditorPage() {
           </button>
           <button
             type="button"
-            onClick={() => (currentPageIsHtml ? redoHtml() : redo())}
-            disabled={currentPageIsHtml ? !htmlFuture.length : !canRedo}
+            onClick={() => (currentPageIsHtml ? redoOnHtmlPage() : redo())}
+            disabled={currentPageIsHtml ? !htmlFuture.length && !canRedo : !canRedo}
             title={t('Redo (Ctrl+Shift+Z)')}
             className="rounded-lg px-2.5 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-40"
           >
