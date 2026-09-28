@@ -30,7 +30,7 @@ URL.
 
 ## Screenshots
 
-<img width="1280" alt="Login" src="docs/screenshots/login.png" />
+<img width="1280" alt="Login" src="docs/screenshots/login.png?v=296681b0" />
 <br>
 <img width="1280" alt="Dashboard" src="docs/screenshots/dashboard.png" />
 <br>
