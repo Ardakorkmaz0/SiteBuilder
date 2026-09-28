@@ -52,11 +52,21 @@ export function shouldRunEditorAutoSave(state, discardRequested = false) {
 // text (designMode on, or a form field in the page) only Save is forwarded:
 // undo there stays the browser's own text undo — the rule the editor already
 // applies to any focused text field.
-export function shouldForwardIframeShortcut(event = {}, { designMode = 'off' } = {}) {
+//
+// With the text tool the caret is always in the page, so designMode alone
+// cannot say whether the person is typing. `typingPending` does: text typed
+// since the editor last recorded a change. Straight after a delete, duplicate
+// or panel edit there is none, and Ctrl+Z has to reach the editor, the only one
+// that knows about that change; the browser's text undo did nothing there.
+export function shouldForwardIframeShortcut(event = {}, { designMode = 'off', typingPending = true } = {}) {
   if (!(event.ctrlKey || event.metaKey)) return false
   const key = String(event.key || '').toLowerCase()
   if (key === 's') return true
-  const typing = designMode === 'on' || isTypingTarget(event.target)
+  const tag = String(event.target?.tagName || '').toLowerCase()
+  const formField = tag === 'input' || tag === 'textarea' || tag === 'select'
+  // In designMode every element reports isContentEditable, so only a real
+  // form field in the page counts as a field there.
+  const typing = designMode === 'on' ? typingPending || formField : isTypingTarget(event.target)
   return !typing && (key === 'z' || key === 'y')
 }
 

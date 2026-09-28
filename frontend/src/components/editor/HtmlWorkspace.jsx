@@ -704,6 +704,12 @@ function HtmlWorkspace({
   // The committed document, readable from the listener without re-binding it.
   const htmlRef = useRef(html)
   useEffect(() => { htmlRef.current = html }, [html])
+  // Text typed into the page since the editor last recorded a change. Typing
+  // is not an undo step per keystroke, but it has to become one before the
+  // next action: an action's undo step holds the last RECORDED document, so
+  // undoing a delete made after typing brought the block back and quietly
+  // threw the typing away.
+  const typedSinceCommitRef = useRef(false)
   // Edit seed / surface, readable from the live-state listener. A panel or
   // in-page edit commits a new `html` prop; that must not rebind the snapshot
   // to the serialized file or the edit iframe reloads from the old seed.
@@ -976,6 +982,23 @@ function HtmlWorkspace({
     }
     return html
   }, [html, mode, sourceDraft])
+  const readHtmlRef = useRef(readHtml)
+  useEffect(() => { readHtmlRef.current = readHtml }, [readHtml])
+
+  // Record pending typing as a step of its own. Runs as the pointer goes down
+  // on anything (a toolbar button, the panel, the header) and when focus
+  // leaves the page, so whatever comes next is undone separately from it.
+  const flushTyping = useCallback(() => {
+    if (!typedSinceCommitRef.current) return
+    typedSinceCommitRef.current = false
+    const live = readHtmlRef.current()
+    if (live !== htmlRef.current) onCommitRef.current?.(live)
+  }, [])
+  useEffect(() => {
+    if (mode !== 'edit') return undefined
+    window.addEventListener('pointerdown', flushTyping, true)
+    return () => window.removeEventListener('pointerdown', flushTyping, true)
+  }, [mode, flushTyping])
 
   // Phone/desktop and browser-shell changes replace the iframe's parent, while
   // BrowserFrame's reload control deliberately remounts its child. Snapshot the
@@ -1633,6 +1656,7 @@ function HtmlWorkspace({
       // type" discoverable. Stripped from every save by serializeDocument.
       ensureEditHintChrome(doc)
       attachSelectionListeners(doc)
+      attachTypingSteps(doc)
       attachShortcutForwarding(doc)
       if (pendingRef.current) attachPlacementListeners(doc)
       // Resting the unrun reveals is the loadTick effect's job — bumping the
@@ -1650,9 +1674,17 @@ function HtmlWorkspace({
   // Editor shortcuts typed while the page has focus (see
   // shouldForwardIframeShortcut): replay them on the editor window, and keep
   // the browser's own default (the Save-page dialog) when the editor took them.
+  // A fresh document has nothing typed into it yet.
+  function attachTypingSteps(doc) {
+    typedSinceCommitRef.current = false
+    doc.addEventListener('input', () => { typedSinceCommitRef.current = true })
+    doc.addEventListener('pointerdown', flushTyping, true)
+    doc.defaultView?.addEventListener('blur', flushTyping)
+  }
+
   function attachShortcutForwarding(doc) {
     doc.addEventListener('keydown', (e) => {
-      if (!shouldForwardIframeShortcut(e, { designMode: doc.designMode })) return
+      if (!shouldForwardIframeShortcut(e, { designMode: doc.designMode, typingPending: typedSinceCommitRef.current })) return
       const relay = new KeyboardEvent('keydown', {
         key: e.key,
         code: e.code,
