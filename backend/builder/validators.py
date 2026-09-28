@@ -107,6 +107,44 @@ def _control_props(props):
     }
 
 
+# Every kind of form field the editor offers (frontend/src/utils/formField.js,
+# FIELD_TYPES). A type missing here turned a password field back into a text
+# field on the next save.
+FIELD_INPUT_TYPES = (
+    'text', 'email', 'password', 'number', 'tel', 'url', 'search', 'date', 'time',
+    'textarea', 'checkbox', 'radio', 'switch', 'range',
+)
+# The settings of a field's parts (label, field, placeholder, show/hide
+# button, choices, control, help line) that are CSS values.
+_FIELD_CSS_PROPS = (
+    'labelColor', 'labelFontSize', 'labelFontWeight', 'labelGap',
+    'fieldFontSize', 'fieldFocusColor', 'placeholderColor', 'revealColor',
+    'choicesGap', 'choiceColor', 'choiceFontSize',
+    'accentColor', 'controlSize', 'helpColor', 'helpFontSize',
+)
+
+
+def _number_text(value):
+    """A slider bound as the editor keeps it: a number written as text, or ''."""
+    v = _str(value).strip()
+    return v[:24] if re.fullmatch(r'-?\d+(\.\d+)?', v) else ''
+
+
+def _field_part_props(props):
+    return {
+        **{key: _css_value(props.get(key)) for key in _FIELD_CSS_PROPS},
+        'required': 'on' if props.get('required') == 'on' else '',
+        'revealButton': 'off' if props.get('revealButton') == 'off' else '',
+        'choicesDirection': 'row' if props.get('choicesDirection') == 'row' else '',
+        'checked': 'on' if props.get('checked') == 'on' else '',
+        'rangeMin': _number_text(props.get('rangeMin')),
+        'rangeMax': _number_text(props.get('rangeMax')),
+        'rangeStep': _number_text(props.get('rangeStep')),
+        'rangeValue': _number_text(props.get('rangeValue')),
+        'helpText': _str(props.get('helpText'))[:500],
+    }
+
+
 def sanitize_url(value):
     """Return a safe URL, or '' if the value uses a disallowed scheme."""
     v = _str(value).strip()
@@ -270,8 +308,11 @@ def sanitize_props(ctype, props):
         return {
             'label': _str(props.get('label')),
             'placeholder': _str(props.get('placeholder')),
-            'inputType': itype if itype in ('text', 'email', 'number', 'tel', 'url') else 'text',
+            'inputType': itype if itype in FIELD_INPUT_TYPES else 'text',
+            # The choices of a choice list.
+            'options': _str(props.get('options')),
             **_control_props(props),
+            **_field_part_props(props),
         }
     if ctype == 'select':
         return {
@@ -279,6 +320,7 @@ def sanitize_props(ctype, props):
             'options': _str(props.get('options')),
             'placeholder': _str(props.get('placeholder')),
             **_control_props(props),
+            **_field_part_props(props),
         }
     if ctype == 'alert':
         variant = props.get('variant')
