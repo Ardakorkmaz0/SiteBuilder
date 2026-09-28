@@ -110,6 +110,22 @@ describe('HtmlElementPanel', () => {
     expect(props.onChange).toHaveBeenLastCalledWith({ href: '#about' })
   })
 
+  // An image here was an address box only; the canvas had upload, a library
+  // and presets.
+  it('offers the canvas image control for an image and a background', async () => {
+    const props = renderPanel({ info: { src: 'old.jpg', alt: '' } })
+    const user = userEvent.setup()
+
+    expect(screen.getByRole('button', { name: 'Image: Upload an image' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'My library' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Sunset' }))
+    expect(props.onChange).toHaveBeenLastCalledWith({ src: expect.any(String) })
+
+    await user.click(screen.getByRole('tab', { name: 'Design' }))
+    await user.click(screen.getByRole('button', { name: 'Background image & gradient' }))
+    expect(screen.getByRole('button', { name: 'Background image: Upload an image' })).toBeInTheDocument()
+  })
+
   it('clears a fraction field instead of writing 0', async () => {
     const props = renderPanel({ info: { letterSpacing: 0.05 } })
     const user = userEvent.setup()

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   LabeledCheckbox,
   LabeledColor,
+  LabeledImage,
   LabeledNumber,
   LabeledRange,
   LabeledSelect,
@@ -365,12 +366,13 @@ export default function HtmlElementPanel({
                     sections={info.sections}
                   />
                 )}
+                {/* The canvas image control: upload, your library, presets or
+                    an address. It used to be an address box only here. */}
                 {info.src !== null && (
-                  <LabeledText
-                    label={t('Image URL (src)')}
+                  <LabeledImage
+                    label={t('Image')}
                     value={info.src}
                     onChange={(value) => onChange({ src: value })}
-                    placeholder="https://..."
                   />
                 )}
                 {info.alt !== null && (
@@ -443,7 +445,7 @@ export default function HtmlElementPanel({
               <LabeledColor label={t('Gradient from')} value={info.gradientFrom || '#ffffff'} onChange={(value) => onChange({ gradientFrom: value })} />
               <LabeledColor label={t('Gradient to')} value={info.gradientTo || '#000000'} onChange={(value) => onChange({ gradientTo: value })} />
               <LabeledNumber label={t('Gradient angle (deg)')} value={info.gradientAngle} onChange={(value) => onChange({ gradientAngle: value })} />
-              <LabeledText label={t('Image URL')} value={info.backgroundImage} onChange={(value) => onChange({ backgroundImage: value })} placeholder="https://…" />
+              <LabeledImage label={t('Background image')} value={info.backgroundImage} onChange={(value) => onChange({ backgroundImage: value })} />
               <LabeledSelect label={t('Image fit')} value={info.backgroundSize} onChange={(value) => onChange({ backgroundSize: value })} options={translatedOptions(BACKGROUND_SIZE_OPTIONS)} />
               <p className="text-[11px] leading-relaxed text-[var(--studio-text-faint)]">
                 {t('A gradient and an image share the same slot — setting one replaces the other. Clear both to fall back to the plain colour.')}

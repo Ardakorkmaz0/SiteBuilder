@@ -2025,6 +2025,8 @@ export const TURKISH_TRANSLATIONS = {
   'Link Button': 'Bağlantı düğmesi',
   'Link text': 'Bağlantı metni',
   'Image': 'Görsel',
+  'Upload an image': 'Görsel yükle',
+  'Background image': 'Arka plan görseli',
   'Section': 'Bölüm',
   'Button link': 'Düğme bağlantısı',
   'Card': 'Kart',
