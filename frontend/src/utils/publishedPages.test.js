@@ -130,6 +130,29 @@ describe('publishedPagesFor', () => {
     expect(home.html).toContain('https://x.dev')
   })
 
+  // An HTML page is published as its own file, and "Go to page" (or the link
+  // tool) writes #<pageId> into it. Only the canvas schema was retargeted, so
+  // on the served site those links went nowhere.
+  it('points links inside an HTML page at the other pages too', () => {
+    const htmlSchema = { theme: {}, pages: [{ id: 'home', name: 'Home', mode: 'html' }, { id: 'about', name: 'About us', mode: 'html' }] }
+    const htmlMap = {
+      home: '<!DOCTYPE html><html><head><title>Home</title></head><body>'
+        + '<a id="go" href="#about">About</a> <a href=\'#about\'>Again</a> <a href="#contact">A section</a>'
+        + ' <a href="#aboutus">Not a page</a> <p>#about stays text</p></body></html>',
+      about: '<!DOCTYPE html><html><head><title>About</title></head><body><a href="#home">Home</a></body></html>',
+    }
+
+    const [home, about] = publishedPagesFor(htmlSchema, htmlMap, 'Ada', 'ada-site')
+
+    expect(home.html).toContain('<a id="go" href="/s/ada-site/about-us/">About</a>')
+    expect(home.html).toContain("href='/s/ada-site/about-us/'")
+    // A section on the same page and a lookalike id are left as they were.
+    expect(home.html).toContain('href="#contact"')
+    expect(home.html).toContain('href="#aboutus"')
+    expect(home.html).toContain('<p>#about stays text</p>')
+    expect(about.html).toContain('href="/s/ada-site/"')
+  })
+
   it('leaves the fragments alone when there is no address yet', () => {
     const [home] = publishedPagesFor({ theme: {}, pages: [{ id: 'home', name: 'Home', components: [{ id: 'b', type: 'button', props: { text: 'Go', href: '#other' }, layout: { x: 0, y: 0, w: 120, h: 40 } }] }, { id: 'other', name: 'Other', components: [] }] }, {}, 'Ada')
     expect(home.html).toContain('#other')

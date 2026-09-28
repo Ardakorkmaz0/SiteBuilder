@@ -32,9 +32,10 @@ export function pagePath(page, index) {
 }
 
 // A link to another page is stored as `#<pageId>` — the fragment the in-app
-// viewer understands. Served as a real page that link goes nowhere, so the
-// schema is retargeted to the addresses the pages are about to have. Done to
-// the schema rather than to the rendered HTML so every writer inherits it.
+// viewer understands. Served as a real page that link goes nowhere, so it is
+// retargeted to the addresses the pages are about to have: in the schema for
+// canvas pages, so every writer inherits it, and in the file itself for an
+// HTML page (withPublishedHtmlLinks).
 export function publishedHref(slug, path) {
   return path ? `/s/${slug}/${path}/` : `/s/${slug}/`
 }
@@ -53,6 +54,23 @@ function retarget(value, links) {
   return value
 }
 
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// The same links inside an HTML page, which is published as the file it is.
+// Only href attributes that name a page exactly are touched, so the rest of
+// the author's markup stays byte for byte.
+export function withPublishedHtmlLinks(html, links) {
+  if (!links.size || typeof html !== 'string') return html
+  let out = html
+  for (const [fragment, address] of links) {
+    const target = escapeRegExp(fragment)
+    out = out
+      .replace(new RegExp(`(\\bhref\\s*=\\s*)(["'])${target}\\2`, 'gi'), (_, lead, quote) => `${lead}${quote}${address}${quote}`)
+      .replace(new RegExp(`(\\bhref\\s*=\\s*)${target}(?=[\\s>])`, 'gi'), (_, lead) => `${lead}"${address}"`)
+  }
+  return out
+}
+
 export function withPublishedLinks(schema, links) {
   if (!links.size) return schema
   const pages = (Array.isArray(schema?.pages) ? schema.pages : []).map((page) => ({
@@ -67,9 +85,11 @@ export function withPublishedLinks(schema, links) {
 // adds (its forms go to the owner's inbox; without it a form published as-is
 // submitted to nowhere), otherwise the export the viewer already shows, which
 // writes both itself.
-export function pageDocument(page, schema, siteTitle, htmlMap = {}) {
+export function pageDocument(page, schema, siteTitle, htmlMap = {}, links = new Map()) {
   const authored = htmlMap[page?.id]
-  if (typeof authored === 'string' && authored.trim()) return withBuilderInteractiveHtml(withPageSeoTags(authored, page))
+  if (typeof authored === 'string' && authored.trim()) {
+    return withBuilderInteractiveHtml(withPageSeoTags(withPublishedHtmlLinks(authored, links), page))
+  }
   const title = pageSeoTitle(page, page?.name || siteTitle || 'My Site')
   try {
     return schemaToSingleHtml({ ...schema, pages: [page] }, title)
@@ -94,7 +114,7 @@ export function publishedPagesFor(schema, htmlMap = {}, siteTitle = '', slug = '
     .map((page, index) => ({
       path: paths[index],
       title: pageSeoTitle(page, page?.name || siteTitle || 'My Site').slice(0, 200),
-      html: pageDocument(linked.pages[index], linked, siteTitle, htmlMap),
+      html: pageDocument(linked.pages[index], linked, siteTitle, htmlMap, links),
       noIndex: !!page?.noIndex,
     }))
     .filter((page) => page.html)
