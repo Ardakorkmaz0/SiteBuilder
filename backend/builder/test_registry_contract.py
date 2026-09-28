@@ -26,6 +26,9 @@ import pytest
 from .validators import sanitize_props
 
 REGISTRY = Path(__file__).resolve().parents[2] / 'frontend' / 'src' / 'components' / 'registry.jsx'
+# Form fields list their settings once, in formField.js, and the registry
+# builds their editableProps from it rather than writing them out.
+FORM_FIELD = REGISTRY.parents[1] / 'utils' / 'formField.js'
 
 # Cross-type props handled by sanitize_shared_props, not by a per-type branch.
 SHARED = {
@@ -74,12 +77,25 @@ def _editable_props_by_type():
         end = starts[i + 1][1] if i + 1 < len(starts) else len(source)
         body = source[start:end]
         block = re.search(r'editableProps:\s*\[(.*?)\n    \],', body, re.S)
-        if not block:
-            continue
-        keys = list(dict.fromkeys(re.findall(r"key:\s*'([^']+)'", block.group(1))))
+        keys = list(dict.fromkeys(re.findall(r"key:\s*'([^']+)'", block.group(1)))) if block else []
+        if re.search(r'^    fieldParts: true,$', body, re.M):
+            keys = list(dict.fromkeys(keys + _form_field_keys(ctype)))
         if keys:
             out[ctype] = keys
     return out
+
+
+def _form_field_keys(ctype):
+    """The FIELD_CONTROLS keys formField.js gives a component of this type."""
+    source = FORM_FIELD.read_text(encoding='utf-8')
+    block = re.search(r'export const FIELD_CONTROLS = \[(.*?)\n\]', source, re.S)
+    keys = []
+    for entry in re.findall(r'^  \{ (key: .*) \},?$', block.group(1) if block else '', re.M):
+        only = re.search(r'componentTypes: \[([^\]]*)\]', entry)
+        if only and f"'{ctype}'" not in only.group(1):
+            continue
+        keys.append(re.match(r"key: '([^']+)'", entry).group(1))
+    return keys
 
 
 EDITABLE = _editable_props_by_type()
@@ -91,6 +107,10 @@ def test_parser_still_understands_the_registry():
     assert len(EDITABLE) >= 15, f'only parsed {len(EDITABLE)} types: {sorted(EDITABLE)}'
     assert 'navbar' in EDITABLE and 'section' in EDITABLE
     assert 'text' in EDITABLE['section'], EDITABLE['section']
+    # Form fields come from formField.js; a parse that finds none of them
+    # would let a new field setting slip past the checks below.
+    assert {'inputType', 'labelColor', 'revealButton', 'helpText'} <= set(EDITABLE.get('input', [])), EDITABLE.get('input')
+    assert 'inputType' not in EDITABLE.get('select', []), EDITABLE.get('select')
 
 
 @pytest.mark.parametrize('ctype', sorted(EDITABLE))

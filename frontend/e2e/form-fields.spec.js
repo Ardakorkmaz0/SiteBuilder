@@ -48,6 +48,15 @@ test('a password field on the canvas, edited part by part', async ({ page, reque
   const { viewer, visitor } = await revealOnPublishedPage(browser, slug)
   expect(await visitor.locator('label').first().evaluate((el) => getComputedStyle(el).color)).toBe('rgb(192, 0, 0)')
   await viewer.close()
+
+  // The server keeps what the editor sent: once, a saved password field came
+  // back as a text field and lost its part settings.
+  const { data: saved } = await api(request, 'GET', `/sites/${site.id}/`)
+  const props = saved.schema.pages[0].components[0].props
+  expect([props.inputType, props.labelColor]).toEqual(['password', '#c00000'])
+  await page.reload()
+  await page.waitForLoadState('networkidle')
+  await expect(page.locator('main [data-cid] input[type="password"]')).toHaveCount(1)
   await api(request, 'DELETE', `/sites/${site.id}/`)
 })
 
