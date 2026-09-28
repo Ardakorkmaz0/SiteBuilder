@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import HistoryPanel from './HistoryPanel.jsx'
-import { listVersions, setVersionPinned } from '../../api/versions.js'
+import { listVersions, restoreVersion, setVersionPinned } from '../../api/versions.js'
 
 vi.mock('../../api/versions.js', () => ({
   listVersions: vi.fn(),
@@ -63,5 +63,53 @@ describe('HistoryPanel save sources and pins', () => {
     fireEvent.click(screen.getByRole('button', { name: /Automatic 1/i }))
     expect(screen.queryByText('Manual save')).not.toBeInTheDocument()
     expect(screen.getByText('Auto-saved snapshot')).toBeInTheDocument()
+  })
+})
+
+// The server's snapshot before a load is of the SAVED site, so work still on
+// screen was lost although the confirmation promises the load can be undone.
+describe('loading a save with work not saved yet', () => {
+  beforeEach(() => {
+    localStorage.setItem('pwb_language', 'en')
+    vi.clearAllMocks()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    listVersions.mockResolvedValue([{ id: 1, source: 'manual', pinned: false, label: '', created_at: '2026-07-15T10:00:00Z' }])
+    restoreVersion.mockResolvedValue({ id: 7, schema: { pages: [] } })
+  })
+
+  it('saves that work first, then loads', async () => {
+    const order = []
+    const onSave = vi.fn(async () => { order.push('save'); return { id: 7 } })
+    restoreVersion.mockImplementation(async () => { order.push('load'); return { id: 7 } })
+    const onRestored = vi.fn()
+    renderPanel({ onSave, onRestored, hasUnsavedChanges: true })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Load' }))
+
+    await waitFor(() => expect(onRestored).toHaveBeenCalled())
+    expect(order).toEqual(['save', 'load'])
+  })
+
+  it('loads nothing when that save fails', async () => {
+    const onSave = vi.fn(async () => null)
+    const onRestored = vi.fn()
+    renderPanel({ onSave, onRestored, hasUnsavedChanges: true })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Load' }))
+
+    expect(await screen.findByText('Save failed. Nothing was loaded.')).toBeInTheDocument()
+    expect(restoreVersion).not.toHaveBeenCalled()
+    expect(onRestored).not.toHaveBeenCalled()
+  })
+
+  it('does not save when there is nothing new', async () => {
+    const onSave = vi.fn()
+    const onRestored = vi.fn()
+    renderPanel({ onSave, onRestored, hasUnsavedChanges: false })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Load' }))
+
+    await waitFor(() => expect(onRestored).toHaveBeenCalled())
+    expect(onSave).not.toHaveBeenCalled()
   })
 })

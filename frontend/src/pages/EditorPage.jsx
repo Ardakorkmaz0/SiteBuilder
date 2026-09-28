@@ -3329,6 +3329,7 @@ export default function EditorPage() {
             siteId={id}
             onClose={() => setHistoryOpen(false)}
             onSave={(options) => save(published, options)}
+            hasUnsavedChanges={dirty || htmlDirty || metaDirty || workspaceDirty}
             autoSaveEnabled={autoSaveEnabled}
             onAutoSaveEnabled={setAutoSaveEnabled}
             onRestored={(fresh) => {

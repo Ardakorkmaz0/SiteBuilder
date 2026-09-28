@@ -8,6 +8,7 @@ import {
   deleteVersion,
 } from '../../api/versions.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { apiError } from '../../utils/errors.js'
 import { groupSiteVersions } from '../../utils/versionGroups.js'
 import { ClockIcon, PlusIcon } from '../icons.jsx'
 
@@ -23,6 +24,8 @@ export default function HistoryPanel({
   onClose,
   onRestored,
   onSave,
+  // Work on screen that the server does not have yet.
+  hasUnsavedChanges = false,
   autoSaveEnabled = false,
   onAutoSaveEnabled,
 }) {
@@ -57,7 +60,7 @@ export default function HistoryPanel({
     try {
       await fn()
     } catch (e) {
-      setErr(e?.response?.data?.detail || e?.message || t('Something went wrong.'))
+      setErr(apiError(e, t('Something went wrong.')))
     } finally {
       setBusy(false)
     }
@@ -65,6 +68,13 @@ export default function HistoryPanel({
 
   const restore = (versionId) => run(async () => {
     if (!window.confirm(t('Load this save? Your current state is snapshotted first, so you can undo the load.'))) return
+    // The snapshot the server takes before a load is of the SAVED site. Work
+    // still on screen was dropped, though this dialog promises the load can
+    // be undone; it is saved first, so a save holds it.
+    if (hasUnsavedChanges) {
+      const saved = await onSave?.()
+      if (!saved) throw new Error(t('Save failed. Nothing was loaded.'))
+    }
     const fresh = await restoreVersion(siteId, versionId)
     onRestored?.(fresh)
     await refresh()
