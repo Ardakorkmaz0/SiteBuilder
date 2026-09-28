@@ -123,3 +123,34 @@ describe('a group gesture obeys the same edges as a single one', () => {
     expect(first().layout.y).toBeGreaterThanOrEqual(0)
   })
 })
+
+// An HTML page keeps its own stack of documents beside this one, and Undo
+// there has to know which stack holds the newest step. Every step here carries
+// a stamp from the same running order the page's stack uses.
+describe('history stamps', () => {
+  it('stamps each step, in order, with the order shared with HTML pages', async () => {
+    const { nextHistoryStamp } = await import('./editorStore.js')
+    s().addPage('About')
+    const stamps = s().pastAt
+    expect(stamps).toHaveLength(s().past.length)
+    expect(stamps[stamps.length - 1]).toBeGreaterThan(stamps[stamps.length - 2])
+    expect(nextHistoryStamp()).toBeGreaterThan(stamps[stamps.length - 1])
+  })
+
+  it('moves a step\'s stamp to the redo side and back with it', () => {
+    s().addPage('About')
+    const newest = s().pastAt[s().pastAt.length - 1]
+    s().undo()
+    expect(s().futureAt[0]).toBe(newest)
+    expect(s().pastAt).toHaveLength(s().past.length)
+    s().redo()
+    expect(s().pastAt[s().pastAt.length - 1]).toBe(newest)
+    expect(s().futureAt).toHaveLength(0)
+  })
+
+  it('starts empty for a freshly loaded site', () => {
+    s().loadSchema({ pages: [{ id: 'p1', name: 'Home', components: [] }] })
+    expect(s().pastAt).toEqual([])
+    expect(s().futureAt).toEqual([])
+  })
+})
