@@ -70,3 +70,85 @@ describe('typing in Edit', () => {
     expect(onDraftDirtyChange).toHaveBeenLastCalledWith(false)
   })
 })
+
+// Typing is not an undo step per keystroke, but it has to become one before
+// the next action. An action's undo step holds the last recorded document, so
+// undoing a delete made after typing brought the block back without the typing.
+describe('typing becomes an undo step before the next action', () => {
+  const typeInto = (doc, text) => {
+    doc.getElementById('t').textContent = text
+    act(() => { doc.dispatchEvent(new Event('input', { bubbles: true })) })
+  }
+
+  it('records what was typed when the pointer goes down on the page', () => {
+    const onCommit = vi.fn()
+    const doc = mountEditing({ onCommit }).contentDocument
+    typeInto(doc, 'Hi there')
+
+    act(() => { doc.body.dispatchEvent(new Event('pointerdown', { bubbles: true })) })
+
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(onCommit.mock.calls[0][0]).toContain('Hi there')
+  })
+
+  it('records it when the pointer goes down on the editor around the page', () => {
+    const onCommit = vi.fn()
+    const doc = mountEditing({ onCommit }).contentDocument
+    typeInto(doc, 'Hi there')
+
+    act(() => { window.dispatchEvent(new Event('pointerdown')) })
+
+    expect(onCommit).toHaveBeenCalledTimes(1)
+  })
+
+  it('records nothing when nothing was typed', () => {
+    const onCommit = vi.fn()
+    const doc = mountEditing({ onCommit }).contentDocument
+
+    act(() => {
+      doc.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      window.dispatchEvent(new Event('pointerdown'))
+    })
+
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('records it once, not on every later click', () => {
+    const onCommit = vi.fn()
+    const doc = mountEditing({ onCommit }).contentDocument
+    typeInto(doc, 'Hi there')
+
+    act(() => {
+      doc.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      doc.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    })
+
+    expect(onCommit).toHaveBeenCalledTimes(1)
+  })
+})
+
+// The × sits in the page, so focus is there after a delete: Ctrl+Z has to be
+// the editor's then, and the text's own only while there is typing to undo.
+describe('Ctrl+Z pressed in the page', () => {
+  const pressUndo = (doc) => {
+    const seen = vi.fn()
+    window.addEventListener('keydown', seen)
+    act(() => { doc.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true })) })
+    window.removeEventListener('keydown', seen)
+    return seen.mock.calls.length > 0
+  }
+
+  it('goes to the editor when nothing was typed since its last change', () => {
+    const doc = mountEditing({ onCommit: vi.fn() }).contentDocument
+    doc.designMode = 'on'
+    expect(pressUndo(doc)).toBe(true)
+  })
+
+  it('stays with the text while there is typing to undo', () => {
+    const doc = mountEditing({ onCommit: vi.fn() }).contentDocument
+    doc.designMode = 'on'
+    doc.getElementById('t').textContent = 'Hi there'
+    act(() => { doc.dispatchEvent(new Event('input', { bubbles: true })) })
+    expect(pressUndo(doc)).toBe(false)
+  })
+})

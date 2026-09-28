@@ -119,7 +119,18 @@ describe('shouldForwardIframeShortcut — keys typed inside the HTML edit iframe
 
   it('leaves undo to the text while the caret is in it', () => {
     expect(shouldForwardIframeShortcut(inPage('z'), { designMode: 'on' })).toBe(false)
+    expect(shouldForwardIframeShortcut(inPage('z'), { designMode: 'on', typingPending: true })).toBe(false)
     expect(shouldForwardIframeShortcut(inPage('z', { target: { tagName: 'INPUT' } }), { designMode: 'off' })).toBe(false)
+  })
+
+  // The × on an element sits in the page, so focus is there after a delete,
+  // and the browser's text undo knows nothing about a removed block.
+  it('hands undo to the editor when nothing was typed since its last change', () => {
+    const body = { tagName: 'BODY', isContentEditable: true }
+    expect(shouldForwardIframeShortcut(inPage('z', { target: body }), { designMode: 'on', typingPending: false })).toBe(true)
+    expect(shouldForwardIframeShortcut(inPage('y', { target: body }), { designMode: 'on', typingPending: false })).toBe(true)
+    // A form field in the page keeps its own undo either way.
+    expect(shouldForwardIframeShortcut(inPage('z', { target: { tagName: 'INPUT' } }), { designMode: 'on', typingPending: false })).toBe(false)
   })
 
   it('ignores plain keys and unrelated shortcuts', () => {
