@@ -866,6 +866,7 @@ export const TURKISH_TRANSLATIONS = {
   'Pages of your design. Click the open page again to toggle the code panel.': 'Tasarımınızdaki sayfalar. Kod panelini açıp kapatmak için açık sayfaya yeniden tıklayın.',
   'e.g. Marketing': 'ör. Pazarlama',
   'Apply this palette + font to every HTML page': 'Bu renk paletini ve yazı tipini tüm HTML sayfalarına uygula',
+  'Not on the page yet: press "{action}" to use these edits.': 'Henüz sayfada değil: bu düzenlemeleri kullanmak için "{action}" düğmesine basın.',
   'Apply the theme to every component': 'Temayı tüm bileşenlere uygula',
   'Use the "{name}" theme and apply it to the whole site': '“{name}” temasını kullan ve sitenin tamamına uygula',
   'Primary color': 'Ana renk',

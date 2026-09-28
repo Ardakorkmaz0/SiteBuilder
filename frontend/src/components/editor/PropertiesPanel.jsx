@@ -608,6 +608,8 @@ export default function PropertiesPanel({
   const setPageThemeScope = useEditorStore((s) => s.setPageThemeScope)
   const updatePageTheme = useEditorStore((s) => s.updatePageTheme)
   const applyPageTheme = useEditorStore((s) => s.applyPageTheme)
+  const themeUnapplied = useEditorStore((s) => s.themeUnapplied)
+  const markThemeApplied = useEditorStore((s) => s.markThemeApplied)
   const applyComponentPreset = useEditorStore((s) => s.applyComponentPreset)
   const setLayout = useEditorStore((s) => s.setLayout)
   const setLayoutMany = useEditorStore((s) => s.setLayoutMany)
@@ -741,10 +743,13 @@ export default function PropertiesPanel({
   const theme = normalizeTheme(ownTheme ? page.theme : (schema.theme || DEFAULT_THEME))
   const editTheme = (patch) => (ownTheme ? updatePageTheme(page.id, patch) : updateTheme(patch))
   const restyleWith = (next) => {
-    if (htmlMode) onApplyThemeToHtml?.(normalizeTheme(next), { pageOnly: ownTheme })
-    else if (ownTheme) applyPageTheme(page.id)
+    if (htmlMode) {
+      onApplyThemeToHtml?.(normalizeTheme(next), { pageOnly: ownTheme })
+      markThemeApplied()
+    } else if (ownTheme) applyPageTheme(page.id)
     else applyTheme()
   }
+  const applyLabel = ownTheme ? t('Apply to this page') : htmlMode ? t('Apply to pages') : t('Apply to design')
   // A whole theme at once (a preset or a saved one): set it, then restyle, as
   // presets always did, within the chosen scope.
   const applyWholeTheme = (next) => {
@@ -1072,6 +1077,11 @@ export default function PropertiesPanel({
             </p>
           </div>
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+            {themeUnapplied && (
+              <p role="status" className="min-w-0 flex-1 text-[11px] leading-snug text-[var(--studio-accent-text)]">
+                {t('Not on the page yet: press "{action}" to use these edits.', { action: applyLabel })}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => restyleWith(theme)}
@@ -1080,9 +1090,11 @@ export default function PropertiesPanel({
                 : htmlMode
                   ? t('Apply this palette + font to every HTML page')
                   : t('Apply the theme to every component')}
-              className="shrink-0 rounded-lg border border-[var(--studio-accent)] px-2 py-1 text-xs font-semibold text-[var(--studio-accent-hover)] hover:bg-[var(--studio-accent-soft)]"
+              className={`shrink-0 rounded-lg border border-[var(--studio-accent)] px-2 py-1 text-xs font-semibold ${themeUnapplied
+                ? 'bg-[var(--studio-accent)] text-white hover:bg-[var(--studio-accent-fill-hover)]'
+                : 'text-[var(--studio-accent-hover)] hover:bg-[var(--studio-accent-soft)]'}`}
             >
-              {ownTheme ? t('Apply to this page') : htmlMode ? t('Apply to pages') : t('Apply to design')}
+              {applyLabel}
             </button>
           </div>
             {/* One-click presets: set the palette AND restyle everything —

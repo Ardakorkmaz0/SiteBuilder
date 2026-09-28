@@ -1102,6 +1102,12 @@ export const useEditorStore = create((set, get) => ({
   dirty: false,
   past: [],
   future: [],
+  // A colour or font was changed in the theme panel and not applied yet. Those
+  // edits wait for "Apply" (applying restyles every component), and nothing
+  // said so: the panel read "Changes here reach every page" while the page
+  // kept its old colours, and a save published them that way.
+  themeUnapplied: false,
+  markThemeApplied: () => set({ themeUnapplied: false }),
   // Component-canvas link tool (the Empty-mode mirror of the HTML link tool):
   // linkMode arms the tool; linkSourceId is the component awaiting a target.
   linkMode: false,
@@ -1211,6 +1217,7 @@ export const useEditorStore = create((set, get) => ({
       dirty: false,
       past: [],
       future: [],
+      themeUnapplied: false,
       linkMode: false,
       linkSourceId: null,
     })
@@ -2329,6 +2336,7 @@ export const useEditorStore = create((set, get) => ({
       return {
         schema: { ...state.schema, theme: normalizeTheme(next) },
         dirty: true,
+        themeUnapplied: true,
       }
     })
   },
@@ -2338,6 +2346,7 @@ export const useEditorStore = create((set, get) => ({
     set((state) => ({
       schema: applyThemeToSchema(state.schema),
       dirty: true,
+      themeUnapplied: false,
     }))
   },
 
@@ -2379,6 +2388,7 @@ export const useEditorStore = create((set, get) => ({
         }),
       },
       dirty: true,
+      themeUnapplied: true,
     }))
   },
 
@@ -2388,6 +2398,7 @@ export const useEditorStore = create((set, get) => ({
     set((state) => ({
       schema: applyThemeToPage(state.schema, pageId),
       dirty: true,
+      themeUnapplied: false,
     }))
   },
 
