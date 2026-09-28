@@ -126,7 +126,7 @@ function buildEntries() {
   for (const item of ADDABLE_PALETTE_ITEMS) {
     for (const variant of variantsForType(item.type)) {
       const [w, h] = htmlSize(item.type, variant)
-      const native = NATIVE_CANVAS_TYPES.has(item.type)
+      const native = NATIVE_CANVAS_TYPES.has(item.type) || !!variant.native
       entries.push({
         kind: 'variant',
         key: `${item.type}-${variant.id}`,

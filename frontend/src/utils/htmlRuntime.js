@@ -1,4 +1,5 @@
 import { insertBeforeClosingTag } from './htmlInsert.js'
+import { FORM_FIELD_CSS } from './formField.js'
 import { MOTION_ARM_JS, MOTION_CSS, MOTION_OBSERVER_JS } from './motion.js'
 
 const RUNTIME_STYLE = `
@@ -82,6 +83,18 @@ const INTERACTIVE_SCRIPT = `
       }
     }
     function onClick(event) {
+      // A password field's eye: show what was typed, and hide it again.
+      var reveal = event.target && event.target.closest && event.target.closest('[data-pwb-reveal]');
+      if (reveal) {
+        var secret = reveal.parentNode && reveal.parentNode.querySelector('input');
+        if (secret) {
+          event.preventDefault();
+          var showing = secret.type === 'password';
+          secret.type = showing ? 'text' : 'password';
+          reveal.setAttribute('aria-pressed', showing ? 'true' : 'false');
+        }
+        return;
+      }
       var navToggle = event.target && event.target.closest && event.target.closest('[data-builder-mobile-nav-toggle]');
       if (navToggle) {
         var navRoot = navToggle.closest('[data-builder-mobile-nav]');
@@ -429,7 +442,7 @@ const INTERACTIVE_STYLE = `[data-builder-tabs] [role="tab"]{appearance:none;back
 // instead of all of them or none.
 const RUNTIME_STYLE_TAG = `<style data-builder-runtime-style>${RUNTIME_STYLE}</style>`
 const MOTION_STYLE_TAG = `<style data-builder-motion-style>${MOTION_CSS}</style>`
-const INTERACTIVE_STYLE_TAG = `<style data-builder-interactive-style>${INTERACTIVE_STYLE}</style>`
+const INTERACTIVE_STYLE_TAG = `<style data-builder-interactive-style>${INTERACTIVE_STYLE}${FORM_FIELD_CSS}</style>`
 const RUNTIME_SCRIPT_TAG = `<script data-builder-runtime-script>${RUNTIME_SCRIPT}${SCRIPT_END}`
 const INTERACTIVE_TAG = `<script data-builder-interactive>${INTERACTIVE_SCRIPT}${SCRIPT_END}`
 const MOTION_OBSERVER_TAG = `<script data-builder-motion>${MOTION_OBSERVER_JS}${SCRIPT_END}`
@@ -450,7 +463,7 @@ export function builderInteractiveTags() {
 // Split-project exports share these assets across every page instead of
 // embedding the same runtime into each HTML document.
 export function builderInteractiveCss() {
-  return `${INTERACTIVE_STYLE}\n${MOTION_CSS}`
+  return `${INTERACTIVE_STYLE}${FORM_FIELD_CSS}\n${MOTION_CSS}`
 }
 
 export function builderInteractiveJs() {

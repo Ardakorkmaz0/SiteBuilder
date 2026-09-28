@@ -2,14 +2,46 @@
 // (drag / tap-to-place) and the BlockLibrary overlay (discovery with search).
 // ONE visual library powers both editor modes. Pure data/helpers — components
 // stay in their own files so react-refresh keeps working.
-import { paletteItems } from '../registry.jsx'
+import { paletteItems, registry } from '../registry.jsx'
 import { HTML_BLOCKS, htmlVariantsFor } from '../../utils/htmlVariants.js'
 import { htmlSnippetSize } from '../../utils/htmlSnippetSizing.js'
 import { componentToHtml } from '../../utils/componentToHtml.js'
+import { componentPresetProps, presetsForType } from '../../utils/componentPresets.js'
+import { fieldSize, fieldSnippet } from '../../utils/formField.js'
+
+// Form fields drop as real field components, every part editable, not as a
+// block of HTML only the code view could change. Their swatches and the HTML
+// an HTML page receives are written by the same code the published page uses.
+const FIELD_TYPES = new Set(['input', 'select'])
+// Composite snippets (a field with its button) have no field component of
+// their own, so they stay HTML.
+const FIELD_HTML_VARIANTS = new Set(['inline'])
+
+function fieldVariants(type) {
+  const base = registry[type]?.defaultProps || {}
+  const presets = presetsForType(type)
+  const list = presets.length ? presets : [{ id: 'default', label: 'Default' }]
+  const native = list.map((preset) => {
+    const props = { ...base, ...(componentPresetProps(type, preset.id, 'en') || {}) }
+    const propsTr = { ...base, ...(componentPresetProps(type, preset.id, 'tr') || {}) }
+    const size = fieldSize(type, props)
+    return {
+      id: preset.id,
+      label: preset.label,
+      native: true,
+      recommended: preset.id === 'password',
+      html: fieldSnippet(type, props, `${type}-${preset.id}`),
+      htmlTr: fieldSnippet(type, propsTr, `${type}-${preset.id}`),
+      size: [size.w, size.h],
+    }
+  })
+  return [...native, ...htmlVariantsFor(type).filter((variant) => FIELD_HTML_VARIANTS.has(variant.id))]
+}
 
 // Variants for a type, with a synthesized "Default" snippet for the types that
 // have no curated variants yet (so every component is still placeable).
 export function variantsForType(type) {
+  if (FIELD_TYPES.has(type)) return fieldVariants(type)
   const vs = htmlVariantsFor(type)
   return vs.length ? vs : [{ id: 'default', label: 'Default', html: componentToHtml(type) }]
 }
@@ -31,6 +63,7 @@ export const ADDABLE_PALETTE_ITEMS = [
 export const WIDE_HTML = new Set(['navbar', 'section', 'region', 'card', 'image', 'list', 'input', 'select', 'alert', 'accordion', 'tabs', 'container', 'html', 'spacer'])
 
 export function htmlSize(type, variant) {
+  if (Array.isArray(variant?.size)) return variant.size
   const id = typeof variant === 'string' ? variant : variant?.id
   const size = htmlSnippetSize(type, id)
   return [size.w, size.h]

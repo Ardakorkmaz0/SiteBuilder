@@ -2,7 +2,7 @@
 // Each receives { props, style }. The passed `style` already includes
 // width/height 100% so the component fills its free-canvas box. They never use
 // dangerouslySetInnerHTML, so React escapes all text. URLs go through sanitizeUrl.
-import { useContext, useLayoutEffect, useRef, useState } from 'react'
+import { useContext, useId, useLayoutEffect, useRef, useState } from 'react'
 import { sanitizeUrl, sanitizeImageSrc } from '../../utils/sanitize.js'
 import { ICONS } from '../../utils/icons.js'
 import { ALERT_VARIANTS } from './constants.js'
@@ -10,6 +10,7 @@ import { withBuilderInteractiveHtml } from '../../utils/htmlRuntime.js'
 import { htmlEmbedDocument } from '../../utils/htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from '../../utils/htmlSnippetSizing.js'
 import { scaleCssValue, scaledPx } from './scale.js'
+import { EYE_ICONS, FORM_FIELD_CSS, choiceList, fieldClassName, fieldStyles, radioChoices, rangeAttrs } from '../../utils/formField.js'
 import {
   navLinkLabel,
   navbarBrandAlign,
@@ -441,65 +442,140 @@ export function Icon({ props, style, boxScale = 1 }) {
   )
 }
 
-function controlFieldStyle(props, boxScale = 1) {
-  return {
-    width: '100%',
-    height: scaleCssValue(props.fieldHeight || '44px', boxScale),
-    padding: scaleCssValue(props.fieldPadding || '10px 12px', boxScale),
-    borderWidth: scaleCssValue(props.fieldBorderWidth || '1px', boxScale),
-    borderStyle: 'solid',
-    borderColor: props.fieldBorderColor || '#cbd5e1',
-    borderRadius: scaleCssValue(props.fieldBorderRadius || '8px', boxScale),
-    font: 'inherit',
-    color: props.fieldColor || 'inherit',
-    background: props.fieldBackgroundColor || '#fff',
-    boxShadow: props.fieldBoxShadow || 'none',
-    boxSizing: 'border-box',
-    minWidth: 0,
+// Once per document: what the field classes need (a placeholder's colour, a
+// focus ring, the switch). The canvas and the large view draw into the app.
+function useFormFieldCss() {
+  useLayoutEffect(() => {
+    if (typeof document === 'undefined' || document.getElementById('pwb-form-field-css')) return
+    const tag = document.createElement('style')
+    tag.id = 'pwb-form-field-css'
+    tag.textContent = FORM_FIELD_CSS
+    document.head.appendChild(tag)
+  }, [])
+}
+
+// A form field and its parts, drawn from the same description the published
+// page writes (utils/formField.js). Each part is marked with data-field-part
+// so the large view can tell which one was clicked.
+function FormField({ componentType, props, style, boxScale = 1 }) {
+  useFormFieldCss()
+  const uid = useId()
+  const inputId = `f-${uid.replace(/[^a-zA-Z0-9_-]/g, '')}`
+  const [revealed, setRevealed] = useState(false)
+  const s = fieldStyles(componentType, props, (value) => scaleCssValue(value, boxScale))
+  const required = props.required === 'on'
+  const labelText = props.label
+    ? <>{props.label}{required ? <span aria-hidden="true"> *</span> : null}</>
+    : null
+  const help = props.helpText ? <p data-field-part="help" style={s.help}>{props.helpText}</p> : null
+  const className = fieldClassName(props)
+  const outer = { display: 'flex', flexDirection: 'column', minWidth: 0, ...style }
+
+  if (s.kind === 'check' || s.kind === 'switch') {
+    const control = s.kind === 'switch'
+      ? (
+        <span className="pwb-switch" data-field-part="control" style={s.switchBox}>
+          <input id={inputId} type="checkbox" role="switch" defaultChecked={props.checked === 'on'} required={required} />
+          <span className="pwb-switch-track" />
+        </span>
+      )
+      : <input id={inputId} data-field-part="control" type="checkbox" defaultChecked={props.checked === 'on'} required={required} style={s.control} />
+    return (
+      <div style={outer}>
+        <div style={s.root}>
+          {control}
+          {labelText ? <label data-field-part="label" htmlFor={inputId} style={s.label}>{labelText}</label> : null}
+          {help}
+        </div>
+      </div>
+    )
   }
+
+  if (s.kind === 'choice') {
+    return (
+      <div style={outer}>
+        <fieldset className="pwb-choices" style={s.root}>
+          {labelText ? <legend data-field-part="label" style={s.label}>{labelText}</legend> : null}
+          <div data-field-part="choices" style={s.choices}>
+            {radioChoices(props).map((option, index) => (
+              <label key={`${index}-${option}`} style={s.choice}>
+                <input type="radio" name={`${inputId}-choice`} value={option} required={required && index === 0} data-field-part="control" style={s.control} />
+                <span>{option}</span>
+              </label>
+            ))}
+          </div>
+          {help}
+        </fieldset>
+      </div>
+    )
+  }
+
+  const label = labelText
+    ? <label data-field-part="label" htmlFor={inputId} style={s.label}>{labelText}</label>
+    : null
+  let control
+  if (s.kind === 'range') {
+    const r = rangeAttrs(props)
+    control = <input id={inputId} data-field-part="control" type="range" min={r.min} max={r.max} step={r.step} defaultValue={r.value} style={s.range} />
+  } else if (s.kind === 'select') {
+    const options = choiceList(props)
+    control = (
+      <select id={inputId} data-field-part="field" className={className} required={required} defaultValue={props.placeholder ? '' : options[0] || ''} style={s.field}>
+        {props.placeholder ? <option value="" disabled>{props.placeholder}</option> : null}
+        {options.map((option, index) => <option key={`${index}-${option}`} value={option}>{option}</option>)}
+      </select>
+    )
+  } else if (s.kind === 'area') {
+    control = <textarea id={inputId} data-field-part="field" className={className} placeholder={props.placeholder || ''} required={required} style={s.field} />
+  } else {
+    const placeholder = ['date', 'time'].includes(s.type) ? undefined : props.placeholder || ''
+    const input = (
+      <input
+        id={inputId}
+        data-field-part="field"
+        type={s.type === 'password' && revealed ? 'text' : s.type}
+        className={className}
+        placeholder={placeholder}
+        required={required}
+        autoComplete={s.type === 'password' ? 'current-password' : undefined}
+        style={s.field}
+      />
+    )
+    control = s.reveal
+      ? (
+        <div className="pwb-password">
+          {input}
+          <button
+            type="button"
+            className="pwb-reveal"
+            data-field-part="reveal"
+            aria-label="Show password"
+            aria-pressed={revealed ? 'true' : 'false'}
+            onClick={() => setRevealed((value) => !value)}
+            style={s.revealButton}
+            dangerouslySetInnerHTML={{ __html: EYE_ICONS }}
+          />
+        </div>
+      )
+      : input
+  }
+  return (
+    <div style={outer}>
+      <div style={s.root}>
+        {label}
+        {control}
+        {help}
+      </div>
+    </div>
+  )
 }
 
 export function Input({ props, style, boxScale = 1 }) {
-  const type = ['text', 'email', 'number', 'tel', 'url'].includes(props.inputType)
-    ? props.inputType
-    : 'text'
-  return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: scaledPx(6, boxScale), minWidth: 0, ...style }}>
-      {props.label ? <span style={{ fontWeight: 600, ...multilineTextStyle }}>{props.label}</span> : null}
-      <input
-        type={type}
-        placeholder={props.placeholder || ''}
-        style={controlFieldStyle(props, boxScale)}
-      />
-    </label>
-  )
+  return <FormField componentType="input" props={props} style={style} boxScale={boxScale} />
 }
 
 export function Select({ props, style, boxScale = 1 }) {
-  const opts = String(props.options || '')
-    .split('\n')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: scaledPx(6, boxScale), minWidth: 0, ...style }}>
-      {props.label ? <span style={{ fontWeight: 600, ...multilineTextStyle }}>{props.label}</span> : null}
-      <select
-        defaultValue={props.placeholder ? '' : opts[0] || ''}
-        style={controlFieldStyle(props, boxScale)}
-      >
-        {props.placeholder ? (
-          <option value="" disabled>
-            {props.placeholder}
-          </option>
-        ) : null}
-        {opts.map((o, i) => (
-          <option key={i} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
+  return <FormField componentType="select" props={props} style={style} boxScale={boxScale} />
 }
 
 export function Alert({ props, style, boxScale = 1 }) {

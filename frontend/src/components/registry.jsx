@@ -5,6 +5,7 @@
 // Components live on a free canvas: each has a layout { x, y, w, h }. The box
 // controls size/position, so width/height/margin are NOT editable styles here —
 // they are controlled by dragging/resizing or the Position & Size inputs.
+import { FIELD_CONTROLS } from '../utils/formField.js'
 import {
   Navbar,
   Heading,
@@ -34,6 +35,17 @@ import { ICON_OPTIONS } from '../utils/icons.js'
 import { LinkIcon, ImageIcon } from './icons.jsx'
 
 const OPTIONAL_ICON_OPTIONS = [['', 'None'], ...ICON_OPTIONS]
+
+// Every field setting a component type can have, once per key: what the
+// panel's generic path and other readers of editableProps see. The panel
+// itself groups them by part (FieldPartsEditor).
+function controlsForAll(componentType) {
+  return FIELD_CONTROLS.filter((control) => !control.componentTypes || control.componentTypes.includes(componentType))
+}
+function uniqueControls(controls) {
+  const seen = new Set()
+  return controls.filter((control) => (seen.has(control.key) ? false : seen.add(control.key)))
+}
 
 export const registry = {
   navbar: {
@@ -401,16 +413,20 @@ export const registry = {
     editableStyles: ['color', 'fontSize', 'opacity'],
   },
 
+  // Every kind of form field (text, password, date, a switch, a slider…), with
+  // settings per part; see utils/formField.js and FieldPartsEditor.
   input: {
     type: 'input',
-    label: 'Input',
+    label: 'Form field',
     icon: '⌨',
     Render: Input,
     defaultSize: { w: 320, h: 70 },
+    fieldParts: true,
     defaultProps: {
       label: 'Email',
       placeholder: 'you@example.com',
       inputType: 'email',
+      options: 'Option 1\nOption 2\nOption 3',
       fieldBackgroundColor: '#ffffff',
       fieldColor: '#1d1d1f',
       fieldBorderColor: '#cbd5e1',
@@ -421,30 +437,7 @@ export const registry = {
       fieldBoxShadow: 'none',
     },
     defaultStyles: { fontSize: '15px', color: '#1d1d1f' },
-    editableProps: [
-      { key: 'label', label: 'Label', control: 'textarea' },
-      { key: 'placeholder', label: 'Placeholder', control: 'text' },
-      {
-        key: 'inputType',
-        label: 'Type',
-        control: 'select',
-        options: [
-          ['text', 'Text'],
-          ['email', 'Email'],
-          ['number', 'Number'],
-          ['tel', 'Phone'],
-          ['url', 'URL'],
-        ],
-      },
-      { key: 'fieldBackgroundColor', label: 'Field background', control: 'color' },
-      { key: 'fieldColor', label: 'Field text', control: 'color' },
-      { key: 'fieldBorderColor', label: 'Field border color', control: 'color' },
-      { key: 'fieldBorderWidth', label: 'Field border width', control: 'px' },
-      { key: 'fieldBorderRadius', label: 'Field radius', control: 'px' },
-      { key: 'fieldPadding', label: 'Field padding', control: 'text', placeholder: 'e.g. 12px 16px' },
-      { key: 'fieldHeight', label: 'Field height', control: 'px' },
-      { key: 'fieldBoxShadow', label: 'Field shadow', control: 'text', placeholder: 'none' },
-    ],
+    editableProps: uniqueControls(controlsForAll('input')),
     editableStyles: ['color', 'fontSize', 'fontFamily', 'textAlign', 'opacity'],
   },
 
@@ -454,6 +447,7 @@ export const registry = {
     icon: '▾',
     Render: Select,
     defaultSize: { w: 320, h: 70 },
+    fieldParts: true,
     defaultProps: {
       fieldBackgroundColor: '#ffffff',
       fieldColor: '#1d1d1f',
@@ -468,19 +462,7 @@ export const registry = {
       placeholder: 'Select…',
     },
     defaultStyles: { fontSize: '15px', color: '#1d1d1f' },
-    editableProps: [
-      { key: 'label', label: 'Label', control: 'textarea' },
-      { key: 'options', label: 'Options (one per line)', control: 'textarea' },
-      { key: 'placeholder', label: 'Placeholder', control: 'text' },
-      { key: 'fieldBackgroundColor', label: 'Field background', control: 'color' },
-      { key: 'fieldColor', label: 'Field text', control: 'color' },
-      { key: 'fieldBorderColor', label: 'Field border color', control: 'color' },
-      { key: 'fieldBorderWidth', label: 'Field border width', control: 'px' },
-      { key: 'fieldBorderRadius', label: 'Field radius', control: 'px' },
-      { key: 'fieldPadding', label: 'Field padding', control: 'text', placeholder: 'e.g. 12px 16px' },
-      { key: 'fieldHeight', label: 'Field height', control: 'px' },
-      { key: 'fieldBoxShadow', label: 'Field shadow', control: 'text', placeholder: 'none' },
-    ],
+    editableProps: uniqueControls(controlsForAll('select')),
     editableStyles: ['color', 'fontSize', 'fontFamily', 'textAlign', 'opacity'],
   },
 

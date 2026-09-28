@@ -286,8 +286,11 @@ function ImageLibrary({ value, onPick }) {
   )
 }
 
-export function LabeledColor({ label, value, onChange }) {
-  const hex = /^#[0-9a-fA-F]{6}$/.test(value || '') ? value : '#000000'
+// `fallback` is the colour in use while the setting is empty, so the swatch
+// shows what the page shows.
+export function LabeledColor({ label, value, onChange, fallback }) {
+  const shown = value || fallback || ''
+  const hex = /^#[0-9a-fA-F]{6}$/.test(shown) ? shown : '#000000'
   return (
     <label className="block min-w-0">
       <span className={labelCls}>{label}</span>
@@ -302,7 +305,7 @@ export function LabeledColor({ label, value, onChange }) {
           type="text"
           className={inputCls}
           value={value ?? ''}
-          placeholder="#000000"
+          placeholder={fallback || '#000000'}
           onChange={(e) => onChange(e.target.value)}
         />
       </div>

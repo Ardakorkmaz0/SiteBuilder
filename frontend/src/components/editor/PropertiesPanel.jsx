@@ -45,6 +45,7 @@ import { useLanguage } from '../../i18n/useLanguage.js'
 import { fitHtmlEmbedLayout } from '../../utils/htmlEmbedMeasure.js'
 import { listEmbedImages, replaceEmbedImage } from '../../utils/embedImages.js'
 import { blockTextHint, linkSectionsFor } from '../../utils/linkTargets.js'
+import FieldPartsEditor from './FieldPartsEditor.jsx'
 import { anchorOf, anchorProblem, slugifyAnchor } from '../../utils/anchors.js'
 
 // How far below the top edge a bar can be drawn and still be read as "meant
@@ -503,7 +504,7 @@ function PropControl({ field, value, onChange, extras, pages = [], sections = nu
     return <LabeledImage label={label} value={value} onChange={onChange} />
   }
   if (field.control === 'color') {
-    return <LabeledColor label={label} value={value} onChange={onChange} />
+    return <LabeledColor label={label} value={value} onChange={onChange} fallback={field.fallback} />
   }
   if (field.control === 'px') {
     return <LabeledPx label={label} value={value} onChange={onChange} />
@@ -1443,7 +1444,20 @@ export default function PropertiesPanel({
           options={[['', t('Original')], ['square', t('Square')], ['circle', t('Circle')]]}
         />
       )}
-      {def.editableProps.map((field) => (
+      {def.fieldParts && (
+        <FieldPartsEditor
+          component={component}
+          renderControl={(field) => (
+            <PropControl
+              key={`${field.key}-${field.control || 'text'}-${field.label}`}
+              field={field}
+              value={component.props[field.key]}
+              onChange={(val) => updateProps(component.id, { [field.key]: val })}
+            />
+          )}
+        />
+      )}
+      {!def.fieldParts && def.editableProps.map((field) => (
         <PropControl
           key={`${field.key}-${field.control || 'text'}-${field.label}`}
           field={field}

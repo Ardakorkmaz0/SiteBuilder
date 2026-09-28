@@ -1692,7 +1692,12 @@ export const useEditorStore = create((set, get) => ({
     })
   },
 
-  selectComponent: (id) => set({ selectedId: id, selectedIds: id ? [id] : [] }),
+  selectComponent: (id) => set({ selectedId: id, selectedIds: id ? [id] : [], selectedPart: null }),
+
+  // One part of a form field (its label, the field, the help text…) picked in
+  // the large view; the Properties panel then shows only that part's settings.
+  selectedPart: null,
+  setSelectedPart: (part) => set({ selectedPart: part || null }),
 
   selectParentComponent: (id) =>
     set((state) => {

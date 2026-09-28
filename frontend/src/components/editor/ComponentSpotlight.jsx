@@ -8,6 +8,7 @@
 // agreement without inventing a fourth.
 
 import SpotlightShell from './SpotlightShell.jsx'
+import { partLabel, partsFor } from '../../utils/formField.js'
 import PropertiesPanel from './PropertiesPanel.jsx'
 import { Renderer } from '../renderer/Renderer.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
@@ -44,14 +45,35 @@ export default function ComponentSpotlight({ open, componentId, onClose }) {
   const { t } = useLanguage()
   const viewport = useEditorStore((state) => state.viewport)
   const page = useEditorStore(selectCurrentPage)
+  const selectedPart = useEditorStore((state) => state.selectedPart)
+  const setSelectedPart = useEditorStore((state) => state.setSelectedPart)
   const component = findById(page?.components, componentId)
 
   if (!open || !component) return null
 
+  // A form field is edited part by part here: click its label, the field or
+  // the help line in the preview (or pick it from the row above) and the
+  // panel shows just that part.
+  const fieldParts = registry[component.type]?.fieldParts
+  const parts = fieldParts ? partsFor(component.type, component.props?.inputType) : []
+  const close = () => {
+    setSelectedPart(null)
+    onClose?.()
+  }
+  const pickPart = (event) => {
+    const element = event.target?.closest?.('[data-field-part]')
+    const part = element?.getAttribute('data-field-part')
+    if (!part || !parts.includes(part)) return
+    // A click on a <label> is passed on to its field as a second click, which
+    // picked the field instead. Here a label is a part to edit, not a way in.
+    if (element.tagName === 'LABEL') event.preventDefault()
+    setSelectedPart(part)
+  }
+
   return (
     <SpotlightShell
       open={open}
-      onClose={onClose}
+      onClose={close}
       initialWidth={viewport === 'mobile' ? 'phone' : 'desktop'}
       title={t(registry[component.type]?.label || component.type)}
       subtitle={component.type}
@@ -76,10 +98,15 @@ export default function ComponentSpotlight({ open, componentId, onClose }) {
           hiddenMobile: false,
         }
         const height = Math.max(120, Math.round(layout.h || 200) + 48 + openMenuRoom(component, previewViewport))
-        return (
+        const preview = (
           <div
             data-spotlight-viewport={previewViewport}
-            className="overflow-hidden rounded-xl"
+            data-part-picker={fieldParts ? '' : undefined}
+            data-selected-part={fieldParts ? selectedPart || '' : undefined}
+            onClickCapture={fieldParts ? pickPart : undefined}
+            // site-surface: the component keeps the published site's own
+            // colours here, not the app's dark theme.
+            className="site-surface overflow-hidden rounded-xl"
             style={{ width: '100%', height, background }}
           >
             <Renderer
@@ -90,6 +117,26 @@ export default function ComponentSpotlight({ open, componentId, onClose }) {
               viewport={previewViewport}
               flowMode={!!page.flowMode}
             />
+          </div>
+        )
+        if (!fieldParts) return preview
+        return (
+          <div className="space-y-2">
+            <div role="group" aria-label={t('Parts')} className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] text-[var(--studio-text-muted)]">{t('Click a part to edit only that part:')}</span>
+              {parts.map((part) => (
+                <button
+                  key={part}
+                  type="button"
+                  aria-pressed={selectedPart === part}
+                  onClick={() => setSelectedPart(selectedPart === part ? null : part)}
+                  className={`studio-btn px-2 py-0.5 text-[11px] ${selectedPart === part ? 'studio-btn-primary' : 'studio-btn-secondary'}`}
+                >
+                  {t(partLabel(part, component.type, component.props?.inputType))}
+                </button>
+              ))}
+            </div>
+            {preview}
           </div>
         )
       }}
