@@ -13,6 +13,8 @@ import {
   withoutExecutableScripts,
 } from '../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
+import { colorModeFor, withColorModeHtml, withColorModePage } from '../utils/colorMode.js'
+import { ColorModeRoot } from '../components/renderer/ColorMode.jsx'
 import { pageHasMotion } from '../utils/motion.js'
 import { previewDeviceWidth } from '../utils/previewDevices.js'
 import { customCssBlock, safeCustomJs, themeVariablesCss } from '../utils/theme.js'
@@ -147,6 +149,10 @@ export default function PreviewPage() {
   const [status, setStatus] = useState('loading') // loading | ok | notfound | error
   const [activeId, setActiveId] = useState(null)
   const [device, setDevice] = useState('pc')
+  // The palette a visitor switched to (a site with a light/dark switch). A
+  // page in a frame reports it; it is handed on when the next page opens, not
+  // pushed into the page on screen, which would reload it.
+  const [palette, setPalette] = useState({ chosen: null, forPage: null, pageId: null })
   const previewFrameRef = useRef(null)
   const siteCanvasRef = useRef(null)
 
@@ -348,6 +354,11 @@ export default function PreviewPage() {
   useEffect(() => {
     const onMsg = (e) => {
       if (!isPreviewMessageSource(e, previewFrameRef.current, siteCanvasRef.current)) return
+      if (e.data?.type === 'pwb-color-mode') {
+        const chosen = e.data.mode
+        if (chosen === 'light' || chosen === 'dark') setPalette((was) => ({ ...was, chosen }))
+        return
+      }
       if (e.data?.type !== 'pwb-navigate') return
       const id = previewPageId(e.data.hash)
       const list = site?.schema?.pages || []
@@ -369,6 +380,11 @@ export default function PreviewPage() {
     () => pages.find((p) => p.id === activeId) || pages[0] || {},
     [pages, activeId],
   )
+  if (palette.pageId !== current.id) setPalette((was) => ({ ...was, forPage: was.chosen, pageId: current.id }))
+  const colorMode = useMemo(() => {
+    const mode = colorModeFor(site?.schema, current)
+    return mode && palette.forPage ? { ...mode, initial: palette.forPage } : mode
+  }, [site?.schema, current, palette.forPage])
   const hasCustomJs = !!safeCustomJs(site?.schema?.customJs)
   const hasHtmlEmbed = useMemo(() => {
     const walk = (arr) => {
@@ -409,11 +425,12 @@ export default function PreviewPage() {
       customJs: staticMode ? '' : site?.schema?.customJs,
       pages: [current],
     }
-    return schemaToSingleHtml(pageSchema, site?.title || current.name || 'My Site')
+    return schemaToSingleHtml(pageSchema, site?.title || current.name || 'My Site', { colorMode })
   }, [
     useIframe,
     staticMode,
     current,
+    colorMode,
     site?.schema?.theme,
     site?.schema?.customCss,
     site?.schema?.customJs,
@@ -475,10 +492,11 @@ export default function PreviewPage() {
     // same behaviours the editor's View mode injects, minus the editor-only
     // readonly guard. Without it, in-page anchor links would navigate the
     // about:srcdoc iframe and blank the site out.
+    const pageHtml = withColorModeHtml(currentHtml, colorMode)
     const iframeHtml = withViewportMeta(
       staticMode
-        ? withoutExecutableScripts(currentHtml)
-        : withBuilderInteractiveHtml(currentHtml),
+        ? withoutExecutableScripts(pageHtml)
+        : withBuilderInteractiveHtml(pageHtml),
     )
     const setHtmlPreviewMode = (nextMode) => {
       const next = new URLSearchParams(searchParams)
@@ -595,7 +613,9 @@ ${customCssBlock(site?.schema?.customCss)}`
       <style>{siteCss}</style>
       <PreviewStage device={device}>
         <div ref={siteCanvasRef} data-public-site-canvas className="site-surface">
-          <ResponsiveSite key={current.id} page={current} />
+          <ColorModeRoot mode={colorMode}>
+            <ResponsiveSite key={current.id} page={withColorModePage(current, colorMode)} />
+          </ColorModeRoot>
         </div>
       </PreviewStage>
 

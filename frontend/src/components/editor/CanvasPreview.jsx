@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Renderer } from '../renderer/Renderer.jsx'
+import { ColorModeRoot } from '../renderer/ColorMode.jsx'
+import { withColorModeComponents, withColorModePage } from '../../utils/colorMode.js'
 import { canvasHeight, flowCanvasHeight } from '../renderer/layout.js'
 import { HTML_ALLOW, PUBLIC_HTML_SANDBOX } from '../../utils/htmlRuntime.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
@@ -111,6 +113,8 @@ export default function CanvasPreview({
   onBrowserPageEdit,
   onBrowserFaviconEdit,
   onBrowserAddressChange,
+  // Both palettes, when the site lets visitors switch (utils/colorMode.js).
+  colorMode = null,
 }) {
   const { t } = useLanguage()
   const workspaceRef = useRef(null)
@@ -338,14 +342,16 @@ export default function CanvasPreview({
         ...(mobile ? {} : { boxShadow: PAGE_SHEET_SHADOW }),
       }}
     >
-      <Renderer
-        components={components}
-        background={background}
-        viewport={viewport}
-        width={width}
-        designWidth={width}
-        flowMode={flowMode}
-      />
+      <ColorModeRoot mode={colorMode}>
+        <Renderer
+          components={withColorModeComponents(components, colorMode)}
+          background={colorMode ? withColorModePage({ background }, colorMode).background : background}
+          viewport={viewport}
+          width={width}
+          designWidth={width}
+          flowMode={flowMode}
+        />
+      </ColorModeRoot>
       {/* Same as the edit canvas: on the phone the screen's bottom edge already
           IS the fold, so a dashed rule across the design says nothing. */}
       {fold > 0 && !mobile && (

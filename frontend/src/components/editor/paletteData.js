@@ -6,8 +6,9 @@ import { paletteItems, registry } from '../registry.jsx'
 import { HTML_BLOCKS, htmlVariantsFor } from '../../utils/htmlVariants.js'
 import { htmlSnippetSize } from '../../utils/htmlSnippetSizing.js'
 import { componentToHtml } from '../../utils/componentToHtml.js'
-import { componentPresetProps, presetsForType } from '../../utils/componentPresets.js'
+import { componentPresetProps, componentPresetStyles, presetsForType } from '../../utils/componentPresets.js'
 import { fieldSize, fieldSnippet } from '../../utils/formField.js'
+import { THEME_TOGGLE_CSS, themeToggleHtml } from '../../utils/themeToggle.js'
 
 // Form fields drop as real field components, every part editable, not as a
 // block of HTML only the code view could change. Their swatches and the HTML
@@ -38,10 +39,45 @@ function fieldVariants(type) {
   return [...native, ...htmlVariantsFor(type).filter((variant) => FIELD_HTML_VARIANTS.has(variant.id))]
 }
 
+// The theme switch is a component of its own on the canvas (the site needs to
+// know it has one); an HTML page gets the same button as HTML.
+const TOGGLE_SIZES = { icon: [44, 44], labelled: [150, 44], soft: [44, 44] }
+
+function themeToggleVariants() {
+  return presetsForType('themeToggle').map((preset) => {
+    const size = TOGGLE_SIZES[preset.id] || [44, 44]
+    // In an HTML page the button can land anywhere, a dark sidebar as easily
+    // as the page: it takes the colour of the text around it.
+    const style = {
+      ...(registry.themeToggle?.defaultStyles || {}),
+      ...(componentPresetStyles('themeToggle', preset.id) || {}),
+      color: 'inherit',
+      fontFamily: 'inherit',
+      borderColor: 'color-mix(in srgb, currentColor 35%, transparent)',
+      backgroundColor: preset.id === 'soft' ? 'color-mix(in srgb, currentColor 10%, transparent)' : 'transparent',
+      display: 'inline-flex',
+      height: `${size[1]}px`,
+      minWidth: `${size[0]}px`,
+    }
+    const snippet = (language) => `<style data-pwb-theme-toggle-css>${THEME_TOGGLE_CSS}</style>${
+      themeToggleHtml(componentPresetProps('themeToggle', preset.id, language) || {}, { style })}`
+    return {
+      id: preset.id,
+      label: preset.label,
+      native: true,
+      recommended: preset.id === 'icon',
+      html: snippet('en'),
+      htmlTr: snippet('tr'),
+      size,
+    }
+  })
+}
+
 // Variants for a type, with a synthesized "Default" snippet for the types that
 // have no curated variants yet (so every component is still placeable).
 export function variantsForType(type) {
   if (FIELD_TYPES.has(type)) return fieldVariants(type)
+  if (type === 'themeToggle') return themeToggleVariants()
   const vs = htmlVariantsFor(type)
   return vs.length ? vs : [{ id: 'default', label: 'Default', html: componentToHtml(type) }]
 }

@@ -292,6 +292,13 @@ export function themedStyles(type, baseStyles = {}, theme = DEFAULT_THEME) {
         ...styles,
         backgroundColor: t.borderColor,
       }
+    case 'themeToggle':
+      return {
+        ...styles,
+        color: t.textColor,
+        borderColor: t.borderColor,
+        fontFamily: t.fontFamily,
+      }
     case 'input':
     case 'select':
       return {

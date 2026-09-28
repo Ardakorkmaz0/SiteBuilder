@@ -9,6 +9,7 @@
 import { schemaToSingleHtml } from './schemaToFiles.js'
 import { pageSeoTitle, withPageSeoTags } from './seoTags.js'
 import { withBuilderInteractiveHtml } from './htmlRuntime.js'
+import { colorModeFor, withColorModeHtml } from './colorMode.js'
 
 // The address of a page under /s/<slug>/. The home page has none: it IS the
 // site. The server slugifies and de-duplicates again, so this is the wish, not
@@ -86,13 +87,15 @@ export function withPublishedLinks(schema, links) {
 // submitted to nowhere), otherwise the export the viewer already shows, which
 // writes both itself.
 export function pageDocument(page, schema, siteTitle, htmlMap = {}, links = new Map()) {
+  // A switch on any page lets the visitor change the palette on every page.
+  const colorMode = colorModeFor(schema, page, htmlMap)
   const authored = htmlMap[page?.id]
   if (typeof authored === 'string' && authored.trim()) {
-    return withBuilderInteractiveHtml(withPageSeoTags(withPublishedHtmlLinks(authored, links), page))
+    return withBuilderInteractiveHtml(withColorModeHtml(withPageSeoTags(withPublishedHtmlLinks(authored, links), page), colorMode))
   }
   const title = pageSeoTitle(page, page?.name || siteTitle || 'My Site')
   try {
-    return schemaToSingleHtml({ ...schema, pages: [page] }, title)
+    return schemaToSingleHtml({ ...schema, pages: [page] }, title, { colorMode })
   } catch {
     // A page the writer cannot render must not take the whole publish down;
     // it simply is not served until it renders.

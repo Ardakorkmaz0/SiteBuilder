@@ -11,7 +11,7 @@ export const LINKABLE_TYPES = new Set([
 // (tabs/container/accordion/select/input/html). Everything else is linkable.
 export const NON_WRAP_LINK_TYPES = new Set([
   'button', 'linkbutton', 'navbar', 'tabs', 'container', 'accordion', 'select', 'input', 'html',
-  'section', 'region',
+  'section', 'region', 'themeToggle',
 ])
 
 // Shared tab-strip styles used by the editor and live renderer so the visual

@@ -20,6 +20,7 @@ import {
   Quote,
   Badge,
   Icon,
+  ThemeToggle,
   Input,
   Select,
   Alert,
@@ -439,6 +440,35 @@ export const registry = {
     defaultStyles: { fontSize: '15px', color: '#1d1d1f' },
     editableProps: uniqueControls(controlsForAll('input')),
     editableStyles: ['color', 'fontSize', 'fontFamily', 'textAlign', 'opacity'],
+  },
+
+  // A button visitors press to switch the site between its light and dark
+  // palettes (the other palette is set in the Theme panel).
+  themeToggle: {
+    type: 'themeToggle',
+    label: 'Theme switch',
+    icon: '◐',
+    Render: ThemeToggle,
+    defaultSize: { w: 44, h: 44 },
+    defaultProps: { label: 'Dark mode', showLabel: '' },
+    defaultStyles: {
+      color: '#1d1d1f',
+      backgroundColor: 'transparent',
+      borderWidth: '1px',
+      borderStyle: 'solid',
+      borderColor: '#d2d2d7',
+      borderRadius: '999px',
+      fontSize: '16px',
+      padding: '0px 12px',
+    },
+    editableProps: [
+      { key: 'showLabel', label: 'Shows', control: 'select', options: [['', 'Icon only'], ['on', 'Icon and text']] },
+      { key: 'label', label: 'Text', control: 'text' },
+    ],
+    editableStyles: [
+      'color', 'backgroundColor', 'fontSize', 'fontWeight', 'fontFamily', 'padding',
+      'borderRadius', 'borderWidth', 'borderStyle', 'borderColor', 'boxShadow', 'opacity',
+    ],
   },
 
   select: {

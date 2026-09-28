@@ -118,6 +118,11 @@ export const COMPONENT_PRESETS = {
     { id: 'underline', label: 'Underline' },
     { id: 'bootstrap', label: 'Bootstrap' },
   ],
+  themeToggle: [
+    { id: 'icon', label: 'Icon button' },
+    { id: 'labelled', label: 'Icon and text' },
+    { id: 'soft', label: 'Soft' },
+  ],
   divider: [
     { id: 'subtle', label: 'Subtle' },
     { id: 'accent', label: 'Accent' },
@@ -246,6 +251,11 @@ export const COMPONENT_PRESET_PROPS = {
       navLayout: 'twoRow',
     },
   },
+  themeToggle: {
+    icon: { label: 'Dark mode', showLabel: '' },
+    labelled: { label: 'Dark mode', showLabel: 'on' },
+    soft: { label: 'Dark mode', showLabel: '' },
+  },
   input: {
     name: { label: 'Your name', placeholder: 'Jane Doe', inputType: 'text' },
     email: { label: 'Email', placeholder: 'you@example.com', inputType: 'email' },
@@ -350,6 +360,11 @@ export const COMPONENT_PRESET_PROPS = {
 
 // A field placed from a Turkish screen says its words in Turkish.
 const COMPONENT_PRESET_PROPS_TR = {
+  themeToggle: {
+    icon: { label: 'Koyu mod' },
+    labelled: { label: 'Koyu mod' },
+    soft: { label: 'Koyu mod' },
+  },
   input: {
     name: { label: 'Adınız', placeholder: 'Ayşe Yılmaz' },
     email: { label: 'E-posta', placeholder: 'ornek@eposta.com' },
@@ -695,6 +710,11 @@ export function componentPresetStyles(type, presetId, theme) {
       large: { color: t.textColor, fontSize: '48px' },
       circle: { color: '#ffffff', backgroundColor: t.primaryColor, borderRadius: '999px', padding: '14px', fontSize: '24px' },
       soft: { color: t.primaryColor, backgroundColor: `${t.primaryColor}1a`, borderRadius: '999px', padding: '14px', fontSize: '24px' },
+    },
+    themeToggle: {
+      icon: { color: t.textColor, backgroundColor: transparent, borderWidth: border, borderStyle: 'solid', borderColor: t.borderColor, borderRadius: '999px', padding: '0px 12px', fontSize: '16px' },
+      labelled: { color: t.textColor, backgroundColor: transparent, borderWidth: border, borderStyle: 'solid', borderColor: t.borderColor, borderRadius: '999px', padding: '0px 16px', fontSize: '15px', fontWeight: '500', fontFamily: t.fontFamily },
+      soft: { color: t.textColor, backgroundColor: t.softColor, borderWidth: '0px', borderStyle: none, borderRadius: '12px', padding: '0px 12px', fontSize: '16px' },
     },
     input: Object.fromEntries(
       // Outer styles only; the field's look and type come from componentPresetProps.

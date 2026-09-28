@@ -46,6 +46,7 @@ import { fitHtmlEmbedLayout } from '../../utils/htmlEmbedMeasure.js'
 import { listEmbedImages, replaceEmbedImage } from '../../utils/embedImages.js'
 import { blockTextHint, linkSectionsFor } from '../../utils/linkTargets.js'
 import FieldPartsEditor from './FieldPartsEditor.jsx'
+import ColorModePanel from './ColorModePanel.jsx'
 import { anchorOf, anchorProblem, slugifyAnchor } from '../../utils/anchors.js'
 
 // How far below the top edge a bar can be drawn and still be read as "meant
@@ -595,6 +596,9 @@ export default function PropertiesPanel({
   simpleMode = false,
   htmlPageSettings = null,
   onHtmlPageSettings,
+  // Each HTML page's document, by page id: its palette and any theme switch
+  // in it are in there, not in the schema.
+  pageHtmlMap = null,
 }) {
   const { t } = useLanguage()
   const selectedId = useEditorStore((s) => s.selectedId)
@@ -1168,6 +1172,8 @@ export default function PropertiesPanel({
         <PanelGroup id="theme-mine" title={t('My themes')} defaultOpen>
           <SavedThemes theme={theme} onApply={(item) => applyWholeTheme(item.theme)} />
         </PanelGroup>
+
+        <ColorModePanel htmlMode={htmlMode} htmlMap={pageHtmlMap || undefined} />
 
         {!simpleMode && (
           <>
