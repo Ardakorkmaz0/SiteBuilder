@@ -120,7 +120,7 @@
   color-scheme: dark;
 }
 :root[data-ui-theme="dark"] .studio-theme-surface.bg-white,
-:root[data-ui-theme="dark"] .studio-theme-surface .bg-white:not(iframe) {
+:root[data-ui-theme="dark"] .studio-theme-surface .bg-white:not(iframe, .site-surface, .site-surface *) {
   background-color: var(--studio-panel-raised) !important;
 }
 :root[data-ui-theme="dark"] .studio-theme-surface [class*="bg-white/"] {
@@ -163,12 +163,14 @@
 :root[data-ui-theme="dark"] .studio-theme-surface [class*="text-[#4f46e5]"] {
   color: var(--studio-accent-hover) !important;
 }
-:root[data-ui-theme="dark"] .studio-theme-surface :where(input:not([type="color"]), textarea, select) {
+/* The site being designed is the owner's, not the app's: a field drawn in
+   the large view keeps the colours it has on the published page. */
+:root[data-ui-theme="dark"] .studio-theme-surface :where(input:not([type="color"]), textarea, select):not(.site-surface *) {
   border-color: var(--studio-border-strong) !important;
   background-color: var(--studio-control) !important;
   color: var(--studio-text) !important;
 }
-:root[data-ui-theme="dark"] .studio-theme-surface :where(input, textarea)::placeholder {
+:root[data-ui-theme="dark"] .studio-theme-surface :where(input, textarea):not(.site-surface *)::placeholder {
   color: var(--studio-text-faint) !important;
 }
 :root[data-ui-theme="dark"] .studio-theme-surface [class*="hover:bg-[#f3f4f6]"]:hover,
@@ -451,7 +453,7 @@
   outline-offset: 2px;
   box-shadow: 0 0 0 4px var(--studio-focus-ring);
 }
-:root[data-ui-theme="dark"] :is(.app-theme-surface, .studio-theme-surface, .studio-panel, .studio-properties-panel) :where(button, input, textarea, select):disabled {
+:root[data-ui-theme="dark"] :is(.app-theme-surface, .studio-theme-surface, .studio-panel, .studio-properties-panel) :where(button, input, textarea, select):disabled:not(.site-surface *) {
   color: var(--studio-text-faint);
 }
 
@@ -2390,4 +2392,20 @@ button:not(:disabled),
   0%, 64%, 100% { transform: none; }
   68% { transform: translate3d(0.012em, 0, 0); }
   76% { transform: translate3d(-0.01em, 0.006em, 0); }
+}
+
+/* The large view of a form field: each part can be clicked, and the part being
+   edited is outlined. A placeholder lives inside the field, so the field
+   stands in for it. */
+[data-part-picker] [data-field-part] { cursor: pointer; }
+[data-part-picker] [data-field-part]:hover { outline: 1px dashed var(--studio-accent); outline-offset: 2px; }
+[data-part-picker][data-selected-part="label"] [data-field-part="label"],
+[data-part-picker][data-selected-part="field"] [data-field-part="field"],
+[data-part-picker][data-selected-part="placeholder"] [data-field-part="field"],
+[data-part-picker][data-selected-part="reveal"] [data-field-part="reveal"],
+[data-part-picker][data-selected-part="choices"] [data-field-part="choices"],
+[data-part-picker][data-selected-part="control"] [data-field-part="control"],
+[data-part-picker][data-selected-part="help"] [data-field-part="help"] {
+  outline: 2px solid var(--studio-accent);
+  outline-offset: 2px;
 }

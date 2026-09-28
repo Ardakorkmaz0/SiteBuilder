@@ -1,4 +1,5 @@
 import { normalizeTheme } from './theme.js'
+import { detectInitialLanguage } from '../i18n/language.js'
 
 export const COMPONENT_PRESETS = {
   navbar: [
@@ -102,9 +103,20 @@ export const COMPONENT_PRESETS = {
   input: [
     { id: 'name', label: 'Name field' },
     { id: 'email', label: 'Email field' },
+    { id: 'password', label: 'Password' },
+    { id: 'search', label: 'Search' },
+    { id: 'phone', label: 'Phone' },
+    { id: 'date', label: 'Date' },
+    { id: 'time', label: 'Time' },
+    { id: 'message', label: 'Message' },
+    { id: 'checkbox', label: 'Checkbox' },
+    { id: 'choices', label: 'Choice list' },
+    { id: 'switch', label: 'On/off switch' },
+    { id: 'slider', label: 'Slider' },
     { id: 'rounded', label: 'Rounded' },
     { id: 'filled', label: 'Filled' },
     { id: 'underline', label: 'Underline' },
+    { id: 'bootstrap', label: 'Bootstrap' },
   ],
   divider: [
     { id: 'subtle', label: 'Subtle' },
@@ -237,6 +249,28 @@ export const COMPONENT_PRESET_PROPS = {
   input: {
     name: { label: 'Your name', placeholder: 'Jane Doe', inputType: 'text' },
     email: { label: 'Email', placeholder: 'you@example.com', inputType: 'email' },
+    password: { label: 'Password', placeholder: 'At least 8 characters', inputType: 'password' },
+    search: { label: '', placeholder: 'Search…', inputType: 'search', fieldBorderRadius: '999px', fieldPadding: '10px 18px' },
+    phone: { label: 'Phone', placeholder: '+1 555 123 4567', inputType: 'tel' },
+    date: { label: 'Date', placeholder: '', inputType: 'date' },
+    time: { label: 'Time', placeholder: '', inputType: 'time' },
+    message: { label: 'Message', placeholder: 'How can we help?', inputType: 'textarea', fieldHeight: '120px' },
+    checkbox: { label: 'Remember me', inputType: 'checkbox' },
+    choices: { label: 'How did you hear about us?', inputType: 'radio', options: 'Search engine\nA friend\nSocial media' },
+    switch: { label: 'Email me about new features', inputType: 'switch', checked: 'on' },
+    slider: { label: 'Budget', inputType: 'range', rangeMin: '0', rangeMax: '100', rangeStep: '1', rangeValue: '40' },
+    bootstrap: {
+      label: 'Email address',
+      placeholder: 'name@example.com',
+      inputType: 'email',
+      labelFontWeight: '400',
+      fieldBorderColor: '#ced4da',
+      fieldBorderRadius: '6px',
+      fieldPadding: '6px 12px',
+      fieldHeight: '38px',
+      fieldColor: '#212529',
+      fieldFocusColor: '#86b7fe',
+    },
     rounded: { fieldBorderRadius: '999px', fieldPadding: '12px 20px' },
     filled: { fieldBackgroundColor: '#f1f5f9', fieldBorderColor: 'transparent' },
     underline: { fieldBorderRadius: '0px', fieldBorderColor: 'transparent', fieldBackgroundColor: 'transparent', fieldBoxShadow: 'inset 0 -2px 0 #cbd5e1' },
@@ -314,8 +348,30 @@ export const COMPONENT_PRESET_PROPS = {
   },
 }
 
-export function componentPresetProps(type, presetId) {
-  return COMPONENT_PRESET_PROPS[type]?.[presetId] || null
+// A field placed from a Turkish screen says its words in Turkish.
+const COMPONENT_PRESET_PROPS_TR = {
+  input: {
+    name: { label: 'Adınız', placeholder: 'Ayşe Yılmaz' },
+    email: { label: 'E-posta', placeholder: 'ornek@eposta.com' },
+    password: { label: 'Şifre', placeholder: 'En az 8 karakter' },
+    search: { placeholder: 'Ara…' },
+    phone: { label: 'Telefon', placeholder: '+90 555 123 45 67' },
+    date: { label: 'Tarih' },
+    time: { label: 'Saat' },
+    message: { label: 'Mesajınız', placeholder: 'Size nasıl yardımcı olabiliriz?' },
+    checkbox: { label: 'Beni hatırla' },
+    choices: { label: 'Bizi nereden duydunuz?', options: 'Arama motoru\nBir arkadaş\nSosyal medya' },
+    switch: { label: 'Yeni özelliklerden e-postayla haberdar et' },
+    slider: { label: 'Bütçe' },
+    bootstrap: { label: 'E-posta adresi', placeholder: 'ad@ornek.com' },
+  },
+}
+
+export function componentPresetProps(type, presetId, language = detectInitialLanguage()) {
+  const props = COMPONENT_PRESET_PROPS[type]?.[presetId]
+  if (!props) return null
+  const local = language === 'tr' ? COMPONENT_PRESET_PROPS_TR[type]?.[presetId] : null
+  return local ? { ...props, ...local } : props
 }
 
 export function presetsForType(type) {
@@ -640,14 +696,10 @@ export function componentPresetStyles(type, presetId, theme) {
       circle: { color: '#ffffff', backgroundColor: t.primaryColor, borderRadius: '999px', padding: '14px', fontSize: '24px' },
       soft: { color: t.primaryColor, backgroundColor: `${t.primaryColor}1a`, borderRadius: '999px', padding: '14px', fontSize: '24px' },
     },
-    input: {
-      // Outer styles; the field look + email type come from componentPresetProps.
-      name: { fontFamily: t.fontFamily },
-      email: { fontFamily: t.fontFamily },
-      rounded: { fontFamily: t.fontFamily },
-      filled: { fontFamily: t.fontFamily },
-      underline: { fontFamily: t.fontFamily },
-    },
+    input: Object.fromEntries(
+      // Outer styles only; the field's look and type come from componentPresetProps.
+      COMPONENT_PRESETS.input.map(({ id }) => [id, { fontFamily: t.fontFamily }]),
+    ),
     tabs: {
       bootstrap: {
         backgroundColor: '#ffffff',

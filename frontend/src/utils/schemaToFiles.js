@@ -8,6 +8,7 @@
 // value can't break out of its rule.
 import { sanitizeStyles, sanitizeUrl, sanitizeImageSrc } from './sanitize.js'
 import { iconSvg } from './icons.js'
+import { fieldHtml } from './formField.js'
 import { ALERT_VARIANTS } from '../components/renderer/constants.js'
 import {
   customCssBlock,
@@ -181,24 +182,6 @@ function safeCssProp(value, fallback = '') {
     return cssValue(fallback)
   }
   return out
-}
-
-function controlFieldCss(props = {}) {
-  return [
-    'width:100%',
-    `height:${safeCssProp(props.fieldHeight, '44px')}`,
-    `padding:${safeCssProp(props.fieldPadding, '10px 12px')}`,
-    `border-width:${safeCssProp(props.fieldBorderWidth, '1px')}`,
-    'border-style:solid',
-    `border-color:${safeCssProp(props.fieldBorderColor, '#cbd5e1')}`,
-    `border-radius:${safeCssProp(props.fieldBorderRadius, '8px')}`,
-    'font:inherit',
-    `color:${safeCssProp(props.fieldColor, 'inherit')}`,
-    `background:${safeCssProp(props.fieldBackgroundColor, '#fff')}`,
-    `box-shadow:${safeCssProp(props.fieldBoxShadow, 'none')}`,
-    'box-sizing:border-box',
-    'min-width:0',
-  ].join(';')
 }
 
 function iconTextHtml(props = {}) {
@@ -461,12 +444,7 @@ function inlineNode(c, classedChildren = false) {
     return `<div data-builder-tabs="${esc(c.id)}" style="display:flex;flex-direction:column;${tabsCssVars(p)};${styleStr}"><div role="tablist">${strip}</div>${panels}</div>`
   }
   if (c.type === 'select') {
-    const opts = String(p.options || '').split('\n').map((s) => s.trim()).filter(Boolean)
-    return `<label style="display:flex;flex-direction:column;gap:6px;min-width:0;${styleStr}">${
-      p.label ? `<span style="font-weight:600">${multiline(p.label)}</span>` : ''
-    }<select style="${controlFieldCss(p)}">${
-      p.placeholder ? `<option value="" disabled selected>${esc(p.placeholder)}</option>` : ''
-    }${opts.map((o) => `<option>${esc(o)}</option>`).join('')}</select></label>`
+    return `<div style="display:flex;flex-direction:column;min-width:0;${styleStr}">${fieldHtml('select', p, c.id)}</div>`
   }
   if (c.type === 'alert') {
     const v = ALERT_VARIANTS[p.variant] || ALERT_VARIANTS.info
@@ -506,7 +484,6 @@ function tagFor(type) {
   if (type === 'region') return 'section'
   if (type === 'quote') return 'blockquote'
   if (type === 'badge' || type === 'icon') return 'span'
-  if (type === 'input') return 'label'
   return 'div'
 }
 
@@ -563,12 +540,8 @@ function innerHtml(c) {
       return multiline(p.text)
     case 'icon':
       return iconSvg(p.name)
-    case 'input': {
-      const t = ['text', 'email', 'number', 'tel', 'url'].includes(p.inputType) ? p.inputType : 'text'
-      return `${
-        p.label ? `<span style="font-weight:600">${multiline(p.label)}</span>` : ''
-      }<input type="${t}" placeholder="${esc(p.placeholder)}" style="${controlFieldCss(p)}" />`
-    }
+    case 'input':
+      return fieldHtml('input', p, c.id)
     default:
       return ''
   }

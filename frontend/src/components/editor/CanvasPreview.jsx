@@ -329,7 +329,7 @@ export default function CanvasPreview({
   const pageContent = (
     <div
       data-builder-preview-artboard
-      className={mobile ? '' : 'bg-white'}
+      className={mobile ? 'site-surface' : 'site-surface bg-white'}
       style={{
         position: 'relative',
         width,

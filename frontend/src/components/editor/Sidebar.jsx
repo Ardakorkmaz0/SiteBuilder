@@ -116,7 +116,7 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
   const { language, t } = useLanguage()
   const html = localizedHtml(variant, language)
   const [w, h] = htmlSize(type, variant)
-  const nativeCanvas = !onPick && NATIVE_CANVAS_TYPES.has(type)
+  const nativeCanvas = !onPick && (NATIVE_CANVAS_TYPES.has(type) || !!variant.native)
   const preset = variant.id === 'default' ? null : variant.id
   const variantLabel = t(variant.label)
   const inspect = () => onInspect?.({

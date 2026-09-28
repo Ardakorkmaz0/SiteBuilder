@@ -113,7 +113,7 @@ function PageThumbnail({ boxW = 208, boxH = 132 }) {
   }
   const scale = boxW / pageW
   return (
-    <div style={{ width: boxW, height: boxH, overflow: 'hidden', pointerEvents: 'none' }}>
+    <div className="site-surface" style={{ width: boxW, height: boxH, overflow: 'hidden', pointerEvents: 'none' }}>
       <div style={{ width: pageW, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
         <Renderer
           components={components}

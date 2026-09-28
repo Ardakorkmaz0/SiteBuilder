@@ -3,6 +3,7 @@
 // breakpoints (content reflows / stacks), instead of absolute positions + scale.
 // The result becomes an "HTML site" that adapts natively on every device.
 import { sanitizeStyles, sanitizeUrl, sanitizeImageSrc } from './sanitize.js'
+import { fieldHtml } from './formField.js'
 import { iconSvg } from './icons.js'
 import { ALERT_VARIANTS } from '../components/renderer/constants.js'
 import { customCssBlock, customJsBlock, pageTheme, themeVariablesCss } from './theme.js'
@@ -47,24 +48,6 @@ function safeCssProp(value, fallback = '') {
     return cssVal(fallback)
   }
   return out
-}
-
-function controlFieldCss(props = {}) {
-  return [
-    'width:100%',
-    `height:${safeCssProp(props.fieldHeight, '44px')}`,
-    `padding:${safeCssProp(props.fieldPadding, '10px 12px')}`,
-    `border-width:${safeCssProp(props.fieldBorderWidth, '1px')}`,
-    'border-style:solid',
-    `border-color:${safeCssProp(props.fieldBorderColor, '#cbd5e1')}`,
-    `border-radius:${safeCssProp(props.fieldBorderRadius, '8px')}`,
-    'font:inherit',
-    `color:${safeCssProp(props.fieldColor, 'inherit')}`,
-    `background:${safeCssProp(props.fieldBackgroundColor, '#fff')}`,
-    `box-shadow:${safeCssProp(props.fieldBoxShadow, 'none')}`,
-    'box-sizing:border-box',
-    'min-width:0',
-  ].join(';')
 }
 
 function tabsCssVars(props = {}) {
@@ -315,20 +298,9 @@ function itemElHtml(c, multi, colOverride) {
       return `<span class="rh-item"${styleAttr(c, colOverride || 'flex:0 0 auto;display:inline-flex;align-items:center')}>${multiline(p.text)}</span>`
     case 'icon':
       return `<span class="rh-item"${iconA11yAttrs(p)}${styleAttr(c, colOverride || 'flex:0 0 auto;display:inline-flex;align-items:center;line-height:0')}>${iconSvg(p.name)}</span>`
-    case 'input': {
-      const t = ['text', 'email', 'number', 'tel', 'url'].includes(p.inputType) ? p.inputType : 'text'
-      return `<label class="${cls}"${styleAttr(c, `${col};display:flex;flex-direction:column;gap:6px;min-width:0`)}>${
-        p.label ? `<span style="font-weight:600">${multiline(p.label)}</span>` : ''
-      }<input type="${t}" placeholder="${esc(p.placeholder)}" style="${controlFieldCss(p)}" /></label>`
-    }
-    case 'select': {
-      const opts = String(p.options || '').split('\n').map((s) => s.trim()).filter(Boolean)
-      return `<label class="${cls}"${styleAttr(c, `${col};display:flex;flex-direction:column;gap:6px;min-width:0`)}>${
-        p.label ? `<span style="font-weight:600">${multiline(p.label)}</span>` : ''
-      }<select style="${controlFieldCss(p)}">${
-        p.placeholder ? `<option value="" disabled selected>${esc(p.placeholder)}</option>` : ''
-      }${opts.map((o) => `<option>${esc(o)}</option>`).join('')}</select></label>`
-    }
+    case 'input':
+    case 'select':
+      return `<div class="${cls}"${styleAttr(c, `${col};display:flex;flex-direction:column;min-width:0`)}>${fieldHtml(c.type, p, c.id)}</div>`
     case 'alert': {
       const v = ALERT_VARIANTS[p.variant] || ALERT_VARIANTS.info
       return `<div class="${cls}"${styleAttr(c, `${col};display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;border:1px solid ${v.border};background:${v.bg};color:${v.color}`)}>${iconSvg(p.icon || 'check')}<span>${multiline(p.text)}</span></div>`
