@@ -1807,6 +1807,7 @@ export default function EditorPage() {
           currentPageId={currentPageId}
           pageHtmlMap={pageHtmlMap}
           theme={theme}
+          colorModeSetting={colorModeSetting}
           customCss={customCss}
           customJs={customJs}
           error={error}
