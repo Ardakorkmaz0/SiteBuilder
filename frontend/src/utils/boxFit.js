@@ -104,7 +104,9 @@ export function fitBoxContent(box, root, mode, fill) {
   var z
   if (mode === 'contain') {
     s.width = 'max-content'
-    var w0 = root.offsetWidth || 1
+    // offsetWidth is rounded down: a label that needs 118.4px would get 118
+    // and break onto a second line. A pixel of room keeps it on one.
+    var w0 = (root.offsetWidth || 0) + 1
     var h0 = root.offsetHeight || 1
     z = Math.min(W / w0, H / h0)
   } else {
