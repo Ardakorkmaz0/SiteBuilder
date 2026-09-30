@@ -2296,7 +2296,13 @@ export const useEditorStore = create((set, get) => ({
       // right/bottom edge. Top-level free-canvas items clamp to the active
       // artboard; nested children clamp to their parent's box.
       const isTop = isTopLevel(page.components, id)
-      const { maxX, maxY } = layoutBoundsFor(page, id, key)
+      // A section on the phone is one column too: a child there may grow past
+      // the section's bottom, and the section grows with it (below).
+      const phoneSectionChild = !isTop && key === 'mobileLayout' && !page.flowMode
+        && findParentInTree(page.components, id)?.type === 'region'
+      const bounds = layoutBoundsFor(page, id, key)
+      const maxX = bounds.maxX
+      const maxY = phoneSectionChild ? undefined : bounds.maxY
       const before = findInTree(page.components, id)
       // A SIZE change here is always user-driven (resize handle, Size panel,
       // align/distribute). Mark the embed so the auto-fit stops overriding the
@@ -2333,6 +2339,27 @@ export const useEditorStore = create((set, get) => ({
         const nextLayout = findInTree(components, id)?.mobileLayout || oldLayout
         const oldBottom = (oldLayout.y || 0) + (oldLayout.h || 0)
         components = followBottomOnPhone(components, id, (nextLayout.y || 0) + (nextLayout.h || 0) - oldBottom, oldBottom)
+      } else if (phoneSectionChild && before && patch.h !== undefined) {
+        const section = findParentInTree(components, id)
+        const oldLayout = before.mobileLayout || before.layout || {}
+        const nextLayout = findInTree(components, id)?.mobileLayout || oldLayout
+        const oldBottom = (oldLayout.y || 0) + (oldLayout.h || 0)
+        const delta = (nextLayout.y || 0) + (nextLayout.h || 0) - oldBottom
+        if (section && delta) {
+          // Its siblings follow; the section grows to hold its last child (or
+          // shrinks back, never cutting one off); the page after it follows.
+          const children = followBottomOnPhone(section.children || [], id, delta, oldBottom)
+          const sectionLayout = section.mobileLayout || section.layout || {}
+          const oldH = sectionLayout.h || 0
+          const needed = children
+            .filter((child) => !child.hiddenMobile && child.props?.scrollBehavior !== 'fixed')
+            .reduce((max, child) => Math.max(max, (child.mobileLayout?.y || 0) + (child.mobileLayout?.h || 0)), 0) + MOBILE_PAD
+          const newH = Math.round(needed > oldH ? needed : delta < 0 ? Math.max(needed, oldH + delta) : oldH)
+          components = mapTree(components, section.id, (node) => ({ ...node, children, mobileLayout: { ...sectionLayout, h: newH } }))
+          if (newH !== oldH && isTopLevel(components, section.id)) {
+            components = shiftAfterRegion(components, section.id, 'mobileLayout', newH - oldH, (sectionLayout.y || 0) + oldH)
+          }
+        }
       }
       // Editing the mobile layout directly switches that page to manual mode (it
       // stops auto-following PC); PC edits keep mobile in auto sync.

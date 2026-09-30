@@ -107,6 +107,40 @@ describe('an HTML block narrowed on the phone', () => {
   })
 })
 
+describe('inside a section on the phone', () => {
+  const load = () => useEditorStore.getState().loadSchema({ theme: {}, pages: [{ id: 'home', name: 'Home', components: [
+    { id: 'r', type: 'region', props: {}, styles: {}, layout: { x: 0, y: 0, w: 1000, h: 400 }, children: [
+      { id: 'a', type: 'heading', props: { text: 'Title' }, styles: {}, layout: { x: 40, y: 40, w: 400, h: 60 } },
+      { id: 'b', type: 'text', props: { text: 'Words' }, styles: {}, layout: { x: 40, y: 120, w: 400, h: 60 } },
+    ] },
+    { id: 'after', type: 'heading', props: { text: 'After' }, styles: {}, layout: { x: 40, y: 420, w: 400, h: 60 } },
+  ] }] })
+  const section = () => comps().find((c) => c.id === 'r')
+  const kid = (id) => section().children.find((c) => c.id === id).mobileLayout
+
+  beforeEach(() => {
+    load()
+    useEditorStore.getState().setViewport('mobile')
+  })
+
+  it('a child grows past the section, which grows with it, and the page follows', () => {
+    const start = { a: kid('a'), b: kid('b'), r: section().mobileLayout, after: phone('after') }
+    useEditorStore.getState().setLayout('a', { h: kid('a').h + 150 })
+    // Not squeezed back into the old section height.
+    expect(kid('a')).toMatchObject({ y: start.a.y, h: start.a.h + 150 })
+    expect(kid('b').y).toBe(start.b.y + 150)
+    expect(section().mobileLayout.h).toBe(start.r.h + 150)
+    expect(phone('after').y).toBe(start.after.y + 150)
+  })
+
+  it('and all of it comes back when the child shrinks again', () => {
+    const start = { b: kid('b').y, r: section().mobileLayout.h, after: phone('after').y }
+    useEditorStore.getState().setLayout('a', { h: kid('a').h + 150 })
+    useEditorStore.getState().setLayout('a', { h: kid('a').h - 150 })
+    expect([kid('b').y, section().mobileLayout.h, phone('after').y]).toEqual([start.b, start.r, start.after])
+  })
+})
+
 describe('on the desktop', () => {
   it('does not move anything: overlapping there can be the design', () => {
     useEditorStore.getState().setViewport('pc')
