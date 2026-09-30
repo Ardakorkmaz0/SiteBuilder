@@ -234,9 +234,14 @@ describe('schemaToSingleHtml auto-layout container', () => {
     expect(html).not.toContain('position:absolute;left:0px;top:0px;width:200px')
   })
 
+  // The page's own markup: the runtime's stylesheet and scripts ride along in
+  // every document and say nothing about this container.
+  const markup = (html) => html.slice(html.indexOf('<body'))
+    .replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/g, '')
+
   it('emits a responsive grid template', () => {
     const html = build('grid', { cols: 4 })
-    expect(html).toContain('display:grid')
+    expect(markup(html)).toContain('display:grid')
     expect(html).toContain('repeat(4, minmax(0, 1fr))')
   })
 
@@ -244,7 +249,7 @@ describe('schemaToSingleHtml auto-layout container', () => {
     const html = build('free')
     expect(html).toContain('position:relative')
     expect(html).toContain('position:absolute')
-    expect(html).not.toContain('display:grid')
+    expect(markup(html)).not.toContain('display:grid')
   })
 })
 

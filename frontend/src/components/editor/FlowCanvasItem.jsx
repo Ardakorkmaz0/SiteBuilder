@@ -780,7 +780,7 @@ function TabsCanvasItem({
         </div>
       ) : (
         <div className="pointer-events-none h-full w-full select-none overflow-hidden">
-          <RenderComponent component={component} viewport={viewport} editorPreview />
+          <RenderComponent component={component} viewport={viewport} editorPreview fit />
         </div>
       )}
 

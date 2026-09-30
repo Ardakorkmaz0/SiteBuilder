@@ -1240,6 +1240,8 @@ export const TURKISH_TRANSLATIONS = {
   'Only you, on your own sites': 'Yalnızca siz, kendi sitelerinizde',
   'Kept on your own shelf. Nobody else sees it, and you can make it public later.': 'Kendi rafınızda kalır. Başkası görmez; sonradan herkese açık yapabilirsiniz.',
   'My blocks': 'Bloklarım',
+  'Content fits the box': 'İçerik kutuya sığar',
+  'Resizing turns it on': 'Boyutlandırınca açılır',
   'Theme switch': 'Tema düğmesi',
   'Shows': 'Görünüm',
   'Icon only': 'Yalnızca simge',

@@ -25,6 +25,8 @@ import { scaleCssValue, scaledPx } from './scale.js'
 import { regionContentWidth, responsiveRegionChildLayout } from '../../utils/regionLayout.js'
 import { autoLayoutChildStyle, autoLayoutContainerStyle } from '../../utils/autoLayout.js'
 import { elementIdFor } from '../../utils/anchors.js'
+import { fitsBox, nativeFit } from '../../utils/boxFit.js'
+import FitBox from './FitBox.jsx'
 
 function isViewportStretch(component) {
   return component?.type === 'region' || (
@@ -64,6 +66,7 @@ function RegionRender({ component, style, viewport, editorPreview, canvasDesignW
                 viewport={viewport}
                 editorPreview={editorPreview}
                 canvasDesignWidth={canvasDesignWidth}
+                fit
               />
             </div>
           )
@@ -184,7 +187,7 @@ function TabsRender({ component, style, viewport, boxScale = 1, editorPreview = 
                     height: l.h || 80,
                   }}
                 >
-                  <RenderComponent component={c} viewport={viewport} editorPreview={editorPreview} />
+                  <RenderComponent component={c} viewport={viewport} editorPreview={editorPreview} fit />
                 </div>
                 )
               })(),
@@ -196,12 +199,16 @@ function TabsRender({ component, style, viewport, boxScale = 1, editorPreview = 
   )
 }
 
+// `fit`: the component sits in a box of its own size (a free page, a section,
+// a tab panel), so a block sized by hand can fit it (utils/boxFit.js). Never
+// in flow, where the content decides the height.
 export function RenderComponent({
   component,
   flowMode = false,
   viewport = 'pc',
   editorPreview = false,
   canvasDesignWidth,
+  fit = false,
 }) {
   const def = registry[component.type]
   if (!def) return null
@@ -295,7 +302,7 @@ export function RenderComponent({
                 height: l.h || 80,
               }}
             >
-              <RenderComponent component={c} viewport={viewport} editorPreview={editorPreview} />
+              <RenderComponent component={c} viewport={viewport} editorPreview={editorPreview} fit />
             </div>
           )
         })}
@@ -310,15 +317,19 @@ export function RenderComponent({
     FULL_BLEED_TYPES.includes(component.type)
       ? Math.round(Number(component.props?.contentWidth) || component.layout?.w || 0) || undefined
       : undefined
-  const el = (
+  const boxFit = fit && !flowMode
+  const native = boxFit ? nativeFit(component) : null
+  const drawn = (
     <Comp
       props={component.props || {}}
       style={style}
       viewport={viewport}
       contentWidth={contentWidth}
       editorPreview={editorPreview}
+      fit={boxFit && component.type === 'html' && fitsBox(component)}
     />
   )
+  const el = native ? <FitBox mode={native.mode} fill={native.fill}>{drawn}</FitBox> : drawn
   // Optional link wrapper: `display:contents` keeps the layout identical while
   // making the whole component clickable, just like wrapping any element in <a>.
   // ANY component can carry a link except the ones that are already anchors or
@@ -421,7 +432,7 @@ export function Renderer({
             id={elementIdFor(c)}
             style={pinnedLayoutStyle(c, baseStyle)}
           >
-            <RenderComponent component={c} viewport={viewport} canvasDesignWidth={baseDesignW} />
+            <RenderComponent component={c} viewport={viewport} canvasDesignWidth={baseDesignW} fit />
           </div>
         )
       })}

@@ -18,7 +18,7 @@ import { elementIdFor } from '../../utils/anchors.js'
 import { CANVAS_SELECTION_Z } from './spotlight.js'
 import { zoomScale } from './canvasZoom.js'
 import { browserFrameH, browserFrameW, mobileBrowserChromeH } from './browserFrameMetrics.js'
-import { canvasFontFamily } from '../../utils/theme.js'
+import { canvasFontFamily, pageTheme } from '../../utils/theme.js'
 import { EmbedFontContext } from '../renderer/embedFont.js'
 import { BRUSH_CURSOR } from './brushCursor.js'
 import PreviewScrollIndicator from './PreviewScrollIndicator.jsx'
@@ -126,6 +126,9 @@ export default function Canvas({
   // existing per-component baked-in fonts still win, which is the contract
   // the "Apply to design" button operates on.
   const themeFontFamily = useEditorStore((s) => canvasFontFamily(s.schema))
+  // Text with no colour of its own takes the page's text colour, as on the
+  // published page (body { color: var(--site-text) }), not the app's.
+  const themeTextColor = useEditorStore((s) => pageTheme(s.schema, selectCurrentPage(s)).textColor)
 
   const isMobile = viewport === 'mobile'
   const flowMode = !!page.flowMode
@@ -433,6 +436,7 @@ export default function Canvas({
           backgroundColor: background,
           cursor: pendingPlace ? 'crosshair' : brushMode ? BRUSH_CURSOR : undefined,
           fontFamily: themeFontFamily,
+          color: `var(--site-text, ${themeTextColor})`,
           // Clip selection chrome (resize handles, outline) and any off-artboard
           // content at the canvas edge so you can't scroll into empty space beside
           // the page. Vertical content is unaffected (clip is X-only).

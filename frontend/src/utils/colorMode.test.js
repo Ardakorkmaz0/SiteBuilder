@@ -16,6 +16,8 @@ import { DEFAULT_THEME, THEME_PRESETS, presetTheme, themedStyles } from './theme
 import { builderInteractiveJs } from './htmlRuntime.js'
 import { schemaToSingleHtml } from './schemaToFiles.js'
 import { publishedPagesFor } from './publishedPages.js'
+import { htmlEmbedDocument } from './htmlEmbedDocument.js'
+import { htmlEmbedDocumentOptions } from './htmlSnippetSizing.js'
 
 const toggle = { id: 'tt', type: 'themeToggle', props: { label: 'Dark mode' }, styles: themedStyles('themeToggle', {}, DEFAULT_THEME), layout: { x: 0, y: 0, w: 44, h: 44 } }
 const block = (type, styles, extra = {}) => ({ id: `${type}-${Math.random().toString(36).slice(2, 6)}`, type, props: {}, styles, layout: { x: 0, y: 0, w: 200, h: 80 }, ...extra })
@@ -102,11 +104,14 @@ describe('which colours follow', () => {
     expect(withColorModeComponents([embed], mode)[0].props.code).toBe(embed.props.code)
   })
 
-  it('inside an HTML block too, which carries the palette but no head script', () => {
+  it('inside an HTML block too, whose document carries the palette in its head', () => {
     const embed = one(block('html', {}, { props: { code: '<p style="color:#1d1d1f">x</p>' } }))
-    const doc = new JSDOM(embed.props.code).window.document
-    expect(doc.querySelector('p').getAttribute('style')).toBe('color:var(--pwb-alt-text, #1d1d1f)')
-    expect(doc.querySelector('style[data-pwb-color-mode]').textContent).toContain('--pwb-alt-text:')
+    // The code is only re-coloured: nothing is added beside the block's own
+    // element, which would stop a lone card or button being one.
+    expect(embed.props.code).toBe('<p style="color:var(--pwb-alt-text, #1d1d1f)">x</p>')
+    expect(embed.props._colorModeCss).toContain('--pwb-alt-text:')
+    const doc = new JSDOM(htmlEmbedDocument(embed.props.code, htmlEmbedDocumentOptions(embed))).window.document
+    expect(doc.head.querySelector('style[data-pwb-color-mode]').textContent).toContain('--pwb-alt-text:')
     expect(doc.querySelector('script')).toBeNull()
   })
 })

@@ -481,6 +481,12 @@ def sanitize_shared_props(props):
     anchor = props.get('anchor')
     if isinstance(anchor, str) and ANCHOR_RE.match(anchor) and anchor != 'top':
         clean['anchor'] = anchor
+    # A block sized by hand fits its box ('box'), or was told not to ('off');
+    # see frontend/src/utils/boxFit.js. Missing here, a reload would put every
+    # resized block back to clipping or floating in its box.
+    fit = props.get('fit')
+    if fit in ('box', 'off'):
+        clean['fit'] = fit
     # Motion (scroll-reveal + hover). Cross-type, so it lives here rather than in
     # every per-type branch; slugs + a clamped delay only, so a save can't smuggle
     # markup or an unbounded value through. Only stored when set, to keep legacy

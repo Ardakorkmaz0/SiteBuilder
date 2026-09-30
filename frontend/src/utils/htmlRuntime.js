@@ -1,6 +1,7 @@
 import { insertBeforeClosingTag } from './htmlInsert.js'
 import { FORM_FIELD_CSS } from './formField.js'
 import { THEME_TOGGLE_CSS } from './themeToggle.js'
+import { BOX_FIT_CSS, fitBoxContent } from './boxFit.js'
 import { MOTION_ARM_JS, MOTION_CSS, MOTION_OBSERVER_JS } from './motion.js'
 
 const RUNTIME_STYLE = `
@@ -397,7 +398,47 @@ const INTERACTIVE_SCRIPT = `
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
   })();
+` + boxFitScript()
+
+// Blocks sized by hand fit their box (utils/boxFit.js): on the published page
+// the native ones ([data-pwb-fit] around the block), and inside an HTML block
+// its own document (the body carries it). Refitted whenever a box changes size
+// (the phone layout, a font arriving, an image loading).
+function boxFitScript() {
+  return `
+  (function () {
+    var fitBoxContent = ${fitBoxContent.toString()};
+    function fitOne(box) {
+      var root = box.querySelector(':scope > [data-pwb-fit-root]');
+      if (root) fitBoxContent(box, root, box.getAttribute('data-pwb-fit'), box.hasAttribute('data-pwb-fit-fill'));
+    }
+    function fitAll() {
+      var boxes = document.querySelectorAll('[data-pwb-fit]');
+      for (var i = 0; i < boxes.length; i++) fitOne(boxes[i]);
+    }
+    function start() {
+      var boxes = document.querySelectorAll('[data-pwb-fit]');
+      if (!boxes.length) return;
+      fitAll();
+      if (window.ResizeObserver) {
+        var watcher = new ResizeObserver(function (entries) {
+          for (var i = 0; i < entries.length; i++) fitOne(entries[i].target);
+        });
+        for (var i = 0; i < boxes.length; i++) watcher.observe(boxes[i]);
+      } else {
+        window.addEventListener('resize', fitAll);
+      }
+      var images = document.querySelectorAll('[data-pwb-fit-root] img');
+      for (var j = 0; j < images.length; j++) {
+        if (!images[j].complete) images[j].addEventListener('load', fitAll);
+      }
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitAll);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+    else start();
+  })();
 `
+}
 
 const RUNTIME_SCRIPT = `
   (function () {
@@ -531,7 +572,7 @@ const INTERACTIVE_STYLE = `[data-builder-tabs] [role="tab"]{appearance:none;back
 // instead of all of them or none.
 const RUNTIME_STYLE_TAG = `<style data-builder-runtime-style>${RUNTIME_STYLE}</style>`
 const MOTION_STYLE_TAG = `<style data-builder-motion-style>${MOTION_CSS}</style>`
-const INTERACTIVE_STYLE_TAG = `<style data-builder-interactive-style>${INTERACTIVE_STYLE}${FORM_FIELD_CSS}${THEME_TOGGLE_CSS}</style>`
+const INTERACTIVE_STYLE_TAG = `<style data-builder-interactive-style>${INTERACTIVE_STYLE}${FORM_FIELD_CSS}${THEME_TOGGLE_CSS}${BOX_FIT_CSS}</style>`
 const RUNTIME_SCRIPT_TAG = `<script data-builder-runtime-script>${RUNTIME_SCRIPT}${SCRIPT_END}`
 const INTERACTIVE_TAG = `<script data-builder-interactive>${INTERACTIVE_SCRIPT}${SCRIPT_END}`
 const MOTION_OBSERVER_TAG = `<script data-builder-motion>${MOTION_OBSERVER_JS}${SCRIPT_END}`
@@ -552,7 +593,7 @@ export function builderInteractiveTags() {
 // Split-project exports share these assets across every page instead of
 // embedding the same runtime into each HTML document.
 export function builderInteractiveCss() {
-  return `${INTERACTIVE_STYLE}${FORM_FIELD_CSS}${THEME_TOGGLE_CSS}\n${MOTION_CSS}`
+  return `${INTERACTIVE_STYLE}${FORM_FIELD_CSS}${THEME_TOGGLE_CSS}${BOX_FIT_CSS}\n${MOTION_CSS}`
 }
 
 export function builderInteractiveJs() {

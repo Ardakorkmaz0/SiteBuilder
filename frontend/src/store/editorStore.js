@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { FIT_TYPES } from '../utils/boxFit.js'
 import { registry, CANVAS_WIDTH, MOBILE_CANVAS_WIDTH } from '../components/registry.jsx'
 import {
   DEFAULT_THEME,
@@ -2276,6 +2277,13 @@ export const useEditorStore = create((set, get) => ({
         const base = c[key] || c.layout || { x: 0, y: 0, w: 200, h: 80 }
         const next = { ...c, [key]: clampLayout({ ...base, ...patch }, { maxX, maxY }) }
         if (sized && c.type === 'html') next.props = { ...c.props, _boxManual: true }
+        // A block sized by hand fits its box from then on (utils/boxFit.js):
+        // its content grows and shrinks with it instead of being clipped or
+        // left in a corner. Blocks never resized keep drawing as they did.
+        const resized = (patch.w !== undefined && patch.w !== base.w) || (patch.h !== undefined && patch.h !== base.h)
+        if (resized && FIT_TYPES.has(c.type) && c.props?.fit !== 'box' && c.props?.fit !== 'off') {
+          next.props = { ...(next.props || c.props), fit: 'box' }
+        }
         return next
       })
       if (isTop && before?.type === 'region' && patch.h !== undefined) {

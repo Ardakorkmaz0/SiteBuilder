@@ -5,7 +5,7 @@
 import { sanitizeStyles, sanitizeUrl, sanitizeImageSrc } from './sanitize.js'
 import { fieldHtml } from './formField.js'
 import { themeToggleAttrs, themeToggleInner } from './themeToggle.js'
-import { iconSvg } from './icons.js'
+import { ICONS, iconSvg } from './icons.js'
 import { ALERT_VARIANTS } from '../components/renderer/constants.js'
 import { customCssBlock, customJsBlock, pageTheme, themeVariablesCss } from './theme.js'
 import { builderInteractiveTags, withBuilderInteractiveHtml } from './htmlRuntime.js'
@@ -143,7 +143,8 @@ function linkAttrs(href) {
 }
 
 function iconTextHtml(props = {}) {
-  const icon = props.icon ? `<span aria-hidden="true" style="display:inline-flex;line-height:0">${iconSvg(props.icon)}</span>` : ''
+  // Only a known icon, as the editor draws it.
+  const icon = ICONS[props.icon] ? `<span aria-hidden="true" style="display:inline-flex;line-height:0">${iconSvg(props.icon)}</span>` : ''
   return `${icon}<span>${multiline(props.text)}</span>`
 }
 

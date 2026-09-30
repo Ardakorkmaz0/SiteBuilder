@@ -371,13 +371,13 @@ export function fieldHtml(componentType, props = {}, id = 'field') {
 
   if (s.kind === 'range') {
     const r = rangeAttrs(props)
-    return `<div${attr(s.root)}>${label}<input id="${inputId}" type="range" min="${r.min}" max="${r.max}" step="${r.step}" value="${r.value}"${attr(s.range)} />${help}</div>`
+    return `<div class="pwb-field-line"${attr(s.root)}>${label}<input id="${inputId}" type="range" min="${r.min}" max="${r.max}" step="${r.step}" value="${r.value}"${attr(s.range)} />${help}</div>`
   }
 
   if (s.kind === 'select') {
     const options = choiceList(props)
     const placeholder = has(props.placeholder) ? `<option value="" disabled selected>${esc(props.placeholder)}</option>` : ''
-    return `<div${attr(s.root)}>${label}<select id="${inputId}" class="${cls}"${req}${attr(s.field)}>${placeholder}${options.map((o) => `<option>${esc(o)}</option>`).join('')}</select>${help}</div>`
+    return `<div class="pwb-field-line"${attr(s.root)}>${label}<select id="${inputId}" class="${cls}"${req}${attr(s.field)}>${placeholder}${options.map((o) => `<option>${esc(o)}</option>`).join('')}</select>${help}</div>`
   }
 
   const placeholder = has(props.placeholder) && !['date', 'time'].includes(s.type) ? ` placeholder="${esc(props.placeholder)}"` : ''
@@ -388,7 +388,7 @@ export function fieldHtml(componentType, props = {}, id = 'field') {
   const box = s.reveal
     ? `<div class="pwb-password">${input}<button type="button" class="pwb-reveal" data-pwb-reveal aria-label="Show password" aria-pressed="false"${attr(s.revealButton)}>${EYE_ICONS}</button></div>`
     : input
-  return `<div${attr(s.root)}>${label}${box}${help}</div>`
+  return `<div class="pwb-field-line"${attr(s.root)}>${label}${box}${help}</div>`
 }
 
 // A field on its own, for an HTML page: carries the stylesheet it needs,
