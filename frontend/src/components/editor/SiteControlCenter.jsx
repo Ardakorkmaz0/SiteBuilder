@@ -33,7 +33,7 @@ const TABS = [
 ]
 
 function EmptyState({ children }) {
-  return <div className="rounded-2xl border border-dashed border-[#d1d5db] px-5 py-10 text-center text-sm text-[#6b7280]">{children}</div>
+  return <div className="rounded-2xl border border-dashed border-[#d1d5db] px-5 py-10 text-center text-sm text-[var(--studio-text-muted)]">{children}</div>
 }
 
 export default function SiteControlCenter({
@@ -161,7 +161,7 @@ export default function SiteControlCenter({
         <header className="flex items-center gap-3 border-b border-[var(--studio-border)] bg-[var(--studio-panel-raised)] px-4 py-3 md:px-6">
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-lg font-bold text-[#111827]">{t('Site control center')}</h2>
-            <p className="truncate text-xs text-[#6b7280]">{site.title}</p>
+            <p className="truncate text-xs text-[var(--studio-text-muted)]">{site.title}</p>
           </div>
           <button type="button" onClick={onClose} aria-label={t('Close')} className="grid h-10 w-10 place-items-center rounded-full bg-[#f3f4f6] text-xl">×</button>
         </header>
@@ -173,7 +173,7 @@ export default function SiteControlCenter({
         {guestDialog}
         {error && <div role="alert" className="border-b border-red-200 bg-red-50 px-5 py-2 text-sm text-red-700">{error}</div>}
         <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-          {busy && <div role="status" className="mb-4 text-sm text-[#6b7280]">{t('Loading…')}</div>}
+          {busy && <div role="status" className="mb-4 text-sm text-[var(--studio-text-muted)]">{t('Loading…')}</div>}
 
           {tab === 'readiness' && (
             <div className="space-y-5">
@@ -202,7 +202,7 @@ export default function SiteControlCenter({
                 {readiness.checks.map((item) => (
                   <div key={item.id} className="flex items-start gap-3 rounded-2xl border border-[#e5e7eb] bg-white p-4">
                     <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm font-bold ${item.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{item.ok ? '✓' : '!'}</span>
-                    <div><div className="text-sm font-semibold text-[#111827]">{t(item.label)}</div>{!item.ok && <div className="mt-0.5 text-xs text-[#6b7280]">{t(item.action, item.params)}</div>}</div>
+                    <div><div className="text-sm font-semibold text-[#111827]">{t(item.label)}</div>{!item.ok && <div className="mt-0.5 text-xs text-[var(--studio-text-muted)]">{t(item.action, item.params)}</div>}</div>
                   </div>
                 ))}
               </div>
@@ -215,7 +215,7 @@ export default function SiteControlCenter({
                       and on the site's cards in the app. */}
                   <div className="text-sm font-medium text-[#374151]">
                     <LabeledImage label={t('Sharing image')} value={seo.socialImage} onChange={(value) => setSeo({ ...seo, socialImage: value })} />
-                    <p className="mt-1 text-xs font-normal text-[#6b7280]">{t('Shown on shared links and on this site\'s cards. 1200x630 works best.')}</p>
+                    <p className="mt-1 text-xs font-normal text-[var(--studio-text-muted)]">{t('Shown on shared links and on this site\'s cards. 1200x630 works best.')}</p>
                   </div>
                   <label className="text-sm font-medium text-[#374151] md:col-span-2">{t('SEO description')}<textarea className="ms-input mt-1 min-h-24" value={seo.description} maxLength={160} onChange={(e) => setSeo({ ...seo, description: e.target.value })} /></label>
                   <label className="text-sm font-medium text-[#374151]">{t('Favicon URL')}<input ref={faviconInputRef} className="ms-input mt-1" value={seo.favicon} onChange={(e) => setSeo({ ...seo, favicon: e.target.value })} /></label>
@@ -230,8 +230,8 @@ export default function SiteControlCenter({
             <div className="space-y-3">
               {!submissions.length ? <EmptyState>{t('No form submissions yet.')}</EmptyState> : submissions.map((row) => (
                 <article key={row.id} className={`rounded-2xl border p-4 ${row.is_read ? 'border-[#e5e7eb] bg-white' : 'border-[#a5b4fc] bg-[#eef2ff]'}`}>
-                  <div className="flex items-center justify-between gap-3"><div className="text-xs font-semibold text-[#6b7280]">{row.page || t('Site form')} · {new Date(row.created_at).toLocaleString()}</div><div className="flex gap-2"><button type="button" onClick={() => markSubmission(row, !row.is_read)} className="text-xs font-semibold text-[#4f46e5]">{t(row.is_read ? 'Mark unread' : 'Mark read')}</button><button type="button" onClick={() => removeSubmission(row)} className="text-xs font-semibold text-red-600">{t('Delete')}</button></div></div>
-                  <dl className="mt-3 grid gap-2 sm:grid-cols-2">{Object.entries(row.data || {}).map(([key, value]) => <div key={key} className="rounded-xl bg-white/80 p-3"><dt className="text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">{key}</dt><dd className="mt-1 whitespace-pre-wrap text-sm text-[#374151]">{String(value)}</dd></div>)}</dl>
+                  <div className="flex items-center justify-between gap-3"><div className="text-xs font-semibold text-[var(--studio-text-muted)]">{row.page || t('Site form')} · {new Date(row.created_at).toLocaleString()}</div><div className="flex gap-2"><button type="button" onClick={() => markSubmission(row, !row.is_read)} className="text-xs font-semibold text-[#4f46e5]">{t(row.is_read ? 'Mark unread' : 'Mark read')}</button><button type="button" onClick={() => removeSubmission(row)} className="text-xs font-semibold text-[var(--studio-danger)]">{t('Delete')}</button></div></div>
+                  <dl className="mt-3 grid gap-2 sm:grid-cols-2">{Object.entries(row.data || {}).map(([key, value]) => <div key={key} className="rounded-xl bg-white/80 p-3"><dt className="text-[11px] font-bold uppercase tracking-wide text-[var(--studio-text-faint)]">{key}</dt><dd className="mt-1 whitespace-pre-wrap text-sm text-[#374151]">{String(value)}</dd></div>)}</dl>
                 </article>
               ))}
             </div>
@@ -249,7 +249,7 @@ export default function SiteControlCenter({
             <div className="space-y-3">
               <div className="rounded-2xl border border-[color-mix(in_srgb,var(--studio-info)_30%,var(--studio-border))] bg-[var(--studio-info-soft)] p-4 text-sm text-[var(--studio-info)]">{t('Edit text and image descriptions without opening the design canvas. Changes remain undoable and are saved with the site.')}</div>
               {!contentEntries.length ? <EmptyState>{t('No editable content found.')}</EmptyState> : contentEntries.map((entry) => (
-                <label key={entry.id} className="block rounded-2xl border border-[#e5e7eb] bg-white p-4"><span className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-[#6b7280]"><span>{entry.pageName}</span><span>{entry.label}</span></span>{entry.value.length > 90 ? <textarea className="ms-input min-h-24" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} /> : <input className="ms-input" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} />}</label>
+                <label key={entry.id} className="block rounded-2xl border border-[#e5e7eb] bg-white p-4"><span className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-[var(--studio-text-muted)]"><span>{entry.pageName}</span><span>{entry.label}</span></span>{entry.value.length > 90 ? <textarea className="ms-input min-h-24" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} /> : <input className="ms-input" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} />}</label>
               ))}
             </div>
           )}
@@ -261,7 +261,7 @@ export default function SiteControlCenter({
                   resort for a link that leaked. */}
               <SharePanel siteId={site.id} reviewUrl={reviewUrl} onCopy={copy} copied={copied} />
               <button type="button" onClick={resetReviewLink} className="text-xs font-semibold text-[var(--studio-danger)]">{t('Replace the link (the old one stops working)')}</button>
-              {!comments.length ? <EmptyState>{t('No client comments yet.')}</EmptyState> : comments.map((row) => <article key={row.id} className={`rounded-2xl border bg-white p-4 ${row.resolved ? 'opacity-60' : ''}`}><div className="flex justify-between gap-3"><div><strong className="text-sm">{row.author_name}</strong><div className="text-xs text-[#9ca3af]">{row.author_email} · {row.page_id || t('General')}</div></div><button type="button" onClick={() => toggleComment(row)} className="text-xs font-semibold text-[#4f46e5]">{t(row.resolved ? 'Reopen' : 'Resolve')}</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#374151]">{row.body}</p></article>)}
+              {!comments.length ? <EmptyState>{t('No client comments yet.')}</EmptyState> : comments.map((row) => <article key={row.id} className={`rounded-2xl border bg-white p-4 ${row.resolved ? 'opacity-60' : ''}`}><div className="flex justify-between gap-3"><div><strong className="text-sm">{row.author_name}</strong><div className="text-xs text-[var(--studio-text-faint)]">{row.author_email} · {row.page_id || t('General')}</div></div><button type="button" onClick={() => toggleComment(row)} className="text-xs font-semibold text-[#4f46e5]">{t(row.resolved ? 'Reopen' : 'Resolve')}</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#374151]">{row.body}</p></article>)}
             </div>
           )}
 
