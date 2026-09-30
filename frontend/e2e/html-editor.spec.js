@@ -73,7 +73,8 @@ test.describe('editing an HTML page', () => {
     expect(await inFrame(page, (doc) => !!doc.querySelector('#contact'))).toBe(false)
 
     await page.keyboard.press('Control+z')
-    await expect.poll(() => inFrame(page, (doc) => [!!doc.querySelector('#contact'), doc.querySelector('#para').textContent]))
+    // Undo draws the page again: until it is back, the frame has no #para.
+    await expect.poll(() => inFrame(page, (doc) => [!!doc.querySelector('#contact'), doc.querySelector('#para')?.textContent ?? null]))
       .toEqual([true, 'Some paragraph text. typed first'])
   })
 
@@ -88,7 +89,7 @@ test.describe('editing an HTML page', () => {
     const chooser = page.waitForEvent('filechooser')
     await properties(page).getByRole('button', { name: 'Image: Upload an image' }).click()
     await (await chooser).setFiles({ name: 'red.png', mimeType: 'image/png', buffer: RED_PNG })
-    await expect.poll(() => inFrame(page, (doc) => doc.querySelector('#pic').getAttribute('src')), { timeout: 15_000 })
+    await expect.poll(() => inFrame(page, (doc) => doc.querySelector('#pic')?.getAttribute('src') ?? null), { timeout: 15_000 })
       .toContain('/media/')
     const image = await inFrame(page, (doc) => {
       const img = doc.querySelector('#pic')
