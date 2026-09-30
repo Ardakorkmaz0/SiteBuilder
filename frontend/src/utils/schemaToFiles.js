@@ -10,7 +10,7 @@ import { sanitizeStyles, sanitizeUrl, sanitizeImageSrc } from './sanitize.js'
 import { ICONS, iconSvg } from './icons.js'
 import { fieldHtml } from './formField.js'
 import { themeToggleAttrs, themeToggleInner } from './themeToggle.js'
-import { colorModeHeadTags, withColorModePage } from './colorMode.js'
+import { colorModeFor, colorModeHeadTags, withColorModePage } from './colorMode.js'
 import { fitsBox, nativeFit } from './boxFit.js'
 import { ALERT_VARIANTS } from '../components/renderer/constants.js'
 import {
@@ -616,7 +616,7 @@ function pageHtml(
   cssHref = 'styles.css',
   customJs = '',
   theme = null,
-  { externalRuntime = false } = {},
+  { externalRuntime = false, colorMode = null } = {},
 ) {
   const runtimeHead = externalRuntime
     ? '<script src="runtime.js"></script>'
@@ -634,7 +634,7 @@ function pageHtml(
     ${seoHeadTags(page, fileTitle)}${pageBehaviourStyleTag(page)}
     <link rel="stylesheet" href="${cssHref}" />${customStyleLink}
     ${googleFontLinkTag(theme)}
-    ${runtimeHead}
+    ${runtimeHead}${colorMode ? `\n    ${colorModeHeadTags(colorMode)}` : ''}
   </head>
   <body>
     <div class="page p-${page.id}">
@@ -1007,8 +1007,12 @@ ${fixedBody ? `      <div class="export-fixed">\n${fixedBody}\n      </div>` : '
 </html>`
 }
 
-export function schemaToFiles(schema) {
-  const pages = schema?.pages || []
+export function schemaToFiles(input) {
+  // A site with a light/dark switch: every page, and the stylesheet they
+  // share, carry both palettes, exactly as the published site does.
+  const modes = (input?.pages || []).map((page) => colorModeFor(input, page))
+  const schema = { ...input, pages: (input?.pages || []).map((page, index) => withColorModePage(page, modes[index])) }
+  const pages = schema.pages
   const files = []
   const used = new Set()
   pages.forEach((page, i) => {
@@ -1026,7 +1030,7 @@ export function schemaToFiles(schema) {
         'styles.css',
         schema?.customJs,
         pageTheme(schema, page),
-        { externalRuntime: true },
+        { externalRuntime: true, colorMode: modes[i] },
       ),
     })
   })
@@ -1053,7 +1057,8 @@ export function schemaToFiles(schema) {
   files.push({
     name: 'schema.json',
     lang: 'json',
-    content: JSON.stringify(schema, null, 2),
+    // The design as it is stored, not as it is drawn.
+    content: JSON.stringify(input, null, 2),
   })
   return files
 }

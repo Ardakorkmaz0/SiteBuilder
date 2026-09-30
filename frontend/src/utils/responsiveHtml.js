@@ -18,6 +18,7 @@ import { motionClassSuffix, motionCssVars, motionHeadTags, motionRevealAttr } fr
 import { pageBehaviourStyleTag, pageDirAttr, pageLanguage, pageSeoTitle, seoHeadTags } from './seoTags.js'
 import { pinnedLayoutStyle } from '../components/renderer/layout.js'
 import { elementIdFor } from './anchors.js'
+import { colorModeHeadTags, withColorModePage } from './colorMode.js'
 
 const FULL_WIDTH = new Set(['navbar', 'section', 'region', 'divider'])
 
@@ -409,8 +410,9 @@ function tabsHtml(c, cls, col) {
   )}><div role="tablist">${strip}</div>${panels}</div>`
 }
 
-export function schemaToResponsiveHtml(schema, title = 'My Site') {
-  const page = schema?.pages?.[0] || {}
+// `colorMode`: the site's two palettes (colorMode.js), when it has a switch.
+export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = null } = {}) {
+  const page = withColorModePage(schema?.pages?.[0] || {}, colorMode)
   const components = (page.components || []).filter((c) => !c.hidden)
   const bg = cssVal(page.background || '#ffffff')
   const maxW = Math.max(320, Math.min(1280, Math.round(page.canvasWidth || 1120)))
@@ -460,7 +462,7 @@ export function schemaToResponsiveHtml(schema, title = 'My Site') {
     <title>${esc(pageSeoTitle(page, title))}</title>
     ${seoHeadTags(page, title)}${pageBehaviourStyleTag(page)}
     ${googleFontLinkTag(pageTheme(schema, page))}
-    ${motionHeadTags()}
+    ${motionHeadTags()}${colorMode ? `\n    ${colorModeHeadTags(colorMode)}` : ''}
     <style>
       ${themeVariablesCss(pageTheme(schema, page))}
       *{ box-sizing: border-box; }
