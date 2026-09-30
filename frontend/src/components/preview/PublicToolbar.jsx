@@ -103,6 +103,7 @@ export default function PublicToolbar({
   const [copied, setCopied] = useState(false)
   const [showReport, setShowReport] = useState(false)
   useEscapeToClose(showReport, () => setShowReport(false))
+  useEscapeToClose(showCode, () => setShowCode(false))
   const [reason, setReason] = useState('spam')
   const [detail, setDetail] = useState('')
   const [reporting, setReporting] = useState(false)
@@ -302,16 +303,21 @@ export default function PublicToolbar({
           onClick={() => setShowCode(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="site-source-title"
             className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-[#1e1e1e] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
-              <span className="truncate text-sm font-semibold text-gray-200">
+              <h2 id="site-source-title" className="truncate text-sm font-semibold text-gray-200">
                 {t('Source')} — {site.title}
-              </span>
+              </h2>
               <div className="flex shrink-0 items-center gap-2">
+                {/* Focus comes here from the toolbar, so the dialog is where the keyboard is. */}
                 <button
                   type="button"
+                  autoFocus
                   onClick={() => {
                     navigator.clipboard?.writeText(code)
                     setCopied(true)
@@ -324,6 +330,7 @@ export default function PublicToolbar({
                 <button
                   type="button"
                   onClick={() => setShowCode(false)}
+                  aria-label={t('Close')}
                   className="rounded-md px-2 py-1 text-sm text-gray-300 hover:bg-white/10"
                 >
                   ×
