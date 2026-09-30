@@ -2376,8 +2376,9 @@ export const useEditorStore = create((set, get) => ({
   },
 
   // HTML blocks' measured phone heights ({ id: { w, h, key } }, see
-  // placeMobile). A measurement, not an edit: no undo step of its own, and the
-  // auto phone layout is laid out again around the new heights.
+  // placeMobile). A measurement, not an edit: no undo step of its own, and it
+  // leaves "unsaved" as it was, so opening a page never asks to be saved. The
+  // heights ride along with the next save, and a publish uses them anyway.
   setEmbedPhoneHeights: (heights) => {
     const entries = Object.entries(heights || {})
     if (!entries.length) return
@@ -2387,7 +2388,7 @@ export const useEditorStore = create((set, get) => ({
       for (const [id, phone] of entries) {
         components = mapTree(components, id, (c) => ({ ...c, props: { ...c.props, _phoneH: phone } }))
       }
-      return { schema: withComponents(state.schema, page.id, components), dirty: true }
+      return { schema: withComponents(state.schema, page.id, components) }
     })
   },
 
