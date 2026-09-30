@@ -28,6 +28,7 @@ import { chromeBadgeStyle, chromeMetrics } from './selectionChrome.js'
 import { pageDirection, pageLanguage } from '../../utils/seoTags.js'
 import { colorModeFor, withColorModePage } from '../../utils/colorMode.js'
 import { ColorModeRoot } from '../renderer/ColorMode.jsx'
+import { usePhoneEmbedHeights } from './usePhoneEmbedHeights.js'
 
 // One editable free canvas, rendered at the active breakpoint's chosen artboard
 // width. PC edits each component's `layout`; Mobile edits its `mobileLayout` on a
@@ -81,6 +82,7 @@ export default function Canvas({
   onFitScale,
 }) {
   const { t } = useLanguage()
+  usePhoneEmbedHeights()
   const storedPage = useEditorStore(selectCurrentPage)
   // "Show on the canvas" in the Theme panel's other-palette group: the page is
   // drawn in that palette, the way a visitor who switched sees it. The store

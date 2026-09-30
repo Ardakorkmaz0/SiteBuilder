@@ -650,3 +650,14 @@ def test_a_block_that_fits_its_box_keeps_it_after_a_save():
     assert props[0]['fit'] == 'box'
     assert props[1]['fit'] == 'off'
     assert 'fit' not in props[2]
+
+
+def test_an_html_block_keeps_its_measured_phone_height():
+    def phone(value):
+        clean = validate_and_clean_schema({'pages': [{'id': 'p', 'components': [
+            {'id': 'e', 'type': 'html', 'props': {'code': '<p>x</p>', '_phoneH': value}},
+        ]}]})
+        return clean['pages'][0]['components'][0]['props'].get('_phoneH')
+    assert phone({'w': 358, 'h': 64, 'key': 'abc123'}) == {'w': 358, 'h': 64, 'key': 'abc123'}
+    assert phone({'w': 358, 'h': 64, 'key': '"><script>'}) is None
+    assert phone({'w': 358, 'h': 2}) is None

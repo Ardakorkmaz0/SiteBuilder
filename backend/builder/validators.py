@@ -383,6 +383,15 @@ def sanitize_props(ctype, props):
         # survive a save or a reloaded embed would switch fonts and re-wrap.
         if props.get('_siteFont') is True:
             out['_siteFont'] = True
+        # The block's measured height on the phone (it re-wraps taller when
+        # narrowed there) and a key of what it was measured from. Without it a
+        # reloaded page cuts the second line off until it is measured again.
+        phone = props.get('_phoneH')
+        if isinstance(phone, dict) and isinstance(phone.get('key'), str) and re.fullmatch(r'[a-z0-9]{1,16}', phone['key']):
+            w = _num(phone.get('w'), 0, 0, 1200)
+            h = _num(phone.get('h'), 0, 0, 5000)
+            if w >= 8 and h >= 8:
+                out['_phoneH'] = {'w': w, 'h': h, 'key': phone['key']}
         base = props.get('_baseSize')
         if isinstance(base, dict):
             w = _num(base.get('w'), 0, 0, 4000)

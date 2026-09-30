@@ -200,3 +200,21 @@ export async function fitHtmlEmbedLayout(component, width, apply, { font = '' } 
   apply({ w, h })
   return true
 }
+
+// The phone layout narrows an HTML block made on a wider desktop box, and its
+// text re-wraps taller there. How tall, no estimate can say: it is measured
+// at the phone width and kept on the block (`_phoneH`) with a key of what it
+// was measured from, so a later edit makes it stale instead of wrong.
+export function embedPhoneKey(component) {
+  const p = component?.props || {}
+  const source = [p.code, p.tweakFont, p.tweakPadding, p.tweakZoom, p.shape, p._siteFont, component?.layout?.w].join('|')
+  let hash = 5381
+  for (let i = 0; i < source.length; i += 1) hash = ((hash * 33) ^ source.charCodeAt(i)) >>> 0
+  return hash.toString(36)
+}
+
+// The block's height at `width`, as its box should be; null when unmeasurable.
+export async function measureEmbedHeight(component, width, { font = '' } = {}) {
+  const measured = await measureHtmlSnippet(component, width, { font })
+  return measured ? decideFitSize({ boxW: width, measuredH: measured.h, naturalW: 0, allowTighten: false }).h : null
+}

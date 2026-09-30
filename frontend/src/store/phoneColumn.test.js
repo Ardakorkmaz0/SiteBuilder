@@ -3,6 +3,7 @@
 // spreads one block over the next.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useEditorStore } from './editorStore.js'
+import { embedPhoneKey } from '../utils/htmlEmbedMeasure.js'
 
 const COMPONENTS = [
   { id: 'fld', type: 'input', props: { label: 'Email', inputType: 'email' }, styles: { fontSize: '15px' }, layout: { x: 40, y: 40, w: 320, h: 70 } },
@@ -70,6 +71,37 @@ describe('on the phone', () => {
 describe('the phone layout made from the desktop', () => {
   it("keeps a theme switch its own size, not the phone's width", () => {
     expect([phone('tt').w, phone('tt').h]).toEqual([44, 44])
+  })
+})
+
+describe('an HTML block narrowed on the phone', () => {
+  const lead = (props = {}) => ({
+    id: 'lead', type: 'html', props: { code: '<p>A lead paragraph, one line on the desktop.</p>', ...props },
+    styles: {}, layout: { x: 40, y: 40, w: 510, h: 36 },
+  })
+  const below = { id: 'below', type: 'heading', props: { text: 'Next' }, styles: {}, layout: { x: 40, y: 120, w: 300, h: 50 } }
+  const load = (props) => {
+    useEditorStore.getState().loadSchema({ theme: {}, pages: [{ id: 'home', name: 'Home', components: [lead(props), below] }] })
+  }
+
+  it('gets room for its text to re-wrap until it is measured', () => {
+    load()
+    // Narrower on the phone, so taller: never the one-line desktop height.
+    expect(phone('lead').w).toBeLessThan(510)
+    expect(phone('lead').h).toBeGreaterThan(36)
+  })
+
+  it('takes the measured height, and the column follows it', () => {
+    load()
+    const key = embedPhoneKey(comps().find((c) => c.id === 'lead'))
+    useEditorStore.getState().setEmbedPhoneHeights({ lead: { w: phone('lead').w, h: 120, key } })
+    expect(phone('lead').h).toBe(120)
+    expect(phone('below').y).toBeGreaterThanOrEqual(phone('lead').y + 120)
+  })
+
+  it('ignores a measurement of what the block no longer is', () => {
+    load({ _phoneH: { w: 358, h: 300, key: 'stale' } })
+    expect(phone('lead').h).not.toBe(300)
   })
 })
 

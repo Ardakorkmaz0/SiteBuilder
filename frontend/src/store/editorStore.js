@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { FIT_TYPES } from '../utils/boxFit.js'
+import { embedPhoneKey } from '../utils/htmlEmbedMeasure.js'
 import { registry, CANVAS_WIDTH, MOBILE_CANVAS_WIDTH } from '../components/registry.jsx'
 import {
   DEFAULT_THEME,
@@ -7,6 +8,7 @@ import {
   applyThemeToSchema,
   normalizeTheme,
   pageTheme,
+  themedProps,
   themedStyles,
 } from '../utils/theme.js'
 import { componentPresetStyles, componentPresetProps } from '../utils/componentPresets.js'
@@ -700,12 +702,18 @@ function placeMobile(c, leftX, availW) {
       h = designedH
     } else if (c.props?._paletteType === 'image') {
       // A narrowed picture scales; its height follows the width exactly, so this
-      // is not a guess. Text blocks re-wrap TALLER when narrowed, which no
-      // synchronous estimate can predict — they keep the desktop height and the
-      // measured re-fit corrects them.
+      // is not a guess.
       h = Math.max(20, Math.round(designedH * (w / designed)))
     } else {
-      h = estMobileHeight(c, w)
+      // Text re-wraps TALLER when narrowed, which no synchronous estimate can
+      // predict: the phone height is measured at this width (see
+      // usePhoneEmbedHeights) and used once it matches the block as it is now.
+      // Until then, the same amount of text in a narrower box: taller by the
+      // ratio, with a little room, never shorter than on the desktop.
+      const phone = c.props?._phoneH
+      h = phone && phone.w === w && phone.key === embedPhoneKey(c)
+        ? phone.h
+        : Math.max(designedH, Math.round(designedH * (designed / w) * 1.15))
     }
     return { x: Math.round(leftX + (availW - w) / 2), w, h }
   }
@@ -1446,7 +1454,8 @@ export const useEditorStore = create((set, get) => ({
       const verticalNavbar = type === 'navbar' && presetProps?.navLayout === 'vertical'
       const fullWidth = FULL_WIDTH_TYPES.has(type) && !verticalNavbar
       const makeProps = () => {
-        const base = structuredClone(def.defaultProps)
+        // A preset's own look (a filled or underlined field) wins over the theme's.
+        const base = themedProps(type, structuredClone(def.defaultProps), theme)
         return presetProps ? { ...base, ...presetProps } : base
       }
       const kids = PARENT_TYPES.has(type) ? { children: [] } : {}
@@ -1675,7 +1684,7 @@ export const useEditorStore = create((set, get) => ({
             if (ps) styles = { ...styles, ...ps }
           }
           if (it.styles) styles = { ...styles, ...it.styles }
-          const props = { ...structuredClone(def.defaultProps), ...(it.props || {}) }
+          const props = { ...themedProps(it.type, structuredClone(def.defaultProps), theme), ...(it.props || {}) }
           const w = it.w ?? def.defaultSize?.w ?? 200
           const h = it.h ?? def.defaultSize?.h ?? 80
           return {
@@ -2366,6 +2375,22 @@ export const useEditorStore = create((set, get) => ({
     })
   },
 
+  // HTML blocks' measured phone heights ({ id: { w, h, key } }, see
+  // placeMobile). A measurement, not an edit: no undo step of its own, and the
+  // auto phone layout is laid out again around the new heights.
+  setEmbedPhoneHeights: (heights) => {
+    const entries = Object.entries(heights || {})
+    if (!entries.length) return
+    set((state) => {
+      const page = selectCurrentPage(state)
+      let components = page.components || []
+      for (const [id, phone] of entries) {
+        components = mapTree(components, id, (c) => ({ ...c, props: { ...c.props, _phoneH: phone } }))
+      }
+      return { schema: withComponents(state.schema, page.id, components), dirty: true }
+    })
+  },
+
   // Page background, per breakpoint.
   setPageBackground: (color) => {
     const key = get().viewport === 'mobile' ? 'backgroundMobile' : 'background'
@@ -2654,7 +2679,8 @@ export const useEditorStore = create((set, get) => ({
       const retheme = (nodes) =>
         nodes.map((n) => {
           if (n.id === id) {
-            return { ...n, styles: themedStyles(n.type, n.styles, pageTheme(state.schema, page)) }
+            const theme = pageTheme(state.schema, page)
+            return { ...n, styles: themedStyles(n.type, n.styles, theme), props: themedProps(n.type, n.props || {}, theme) }
           }
           if (Array.isArray(n.children)) return { ...n, children: retheme(n.children) }
           return n
