@@ -97,6 +97,8 @@ describe('an HTML block narrowed on the phone', () => {
     useEditorStore.getState().setEmbedPhoneHeights({ lead: { w: phone('lead').w, h: 120, key } })
     expect(phone('lead').h).toBe(120)
     expect(phone('below').y).toBeGreaterThanOrEqual(phone('lead').y + 120)
+    // Measuring is not an edit: a page just opened is not "unsaved".
+    expect(useEditorStore.getState().dirty).toBe(false)
   })
 
   it('ignores a measurement of what the block no longer is', () => {
