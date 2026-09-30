@@ -301,14 +301,15 @@ export function themedStyles(type, baseStyles = {}, theme = DEFAULT_THEME) {
       }
     case 'input':
     case 'select':
+      // A field's box (its background, border and corners) is its field part,
+      // in its props (themedProps). A frame here went around the label too and
+      // drew a second border around the field's own.
       return {
         ...styles,
-        backgroundColor: t.surfaceColor,
+        backgroundColor: 'transparent',
         color: t.textColor,
-        borderColor: t.borderColor,
-        borderWidth: styles.borderWidth || '1px',
-        borderStyle: styles.borderStyle || 'solid',
-        borderRadius: t.radius,
+        borderWidth: '0px',
+        borderStyle: 'none',
         fontFamily: t.fontFamily,
       }
     default:
@@ -316,10 +317,24 @@ export function themedStyles(type, baseStyles = {}, theme = DEFAULT_THEME) {
   }
 }
 
+// The theme's colours for the parts a component keeps in its props: a form
+// field's field. Everything else keeps its props as they are.
+export function themedProps(type, props = {}, theme = DEFAULT_THEME) {
+  if (type !== 'input' && type !== 'select') return props
+  const t = normalizeTheme(theme)
+  return {
+    ...props,
+    fieldBackgroundColor: t.surfaceColor,
+    fieldColor: t.textColor,
+    fieldBorderColor: t.borderColor,
+  }
+}
+
 function applyThemeToComponent(component, theme) {
   return {
     ...component,
     styles: themedStyles(component.type, component.styles || {}, theme),
+    props: themedProps(component.type, component.props || {}, theme),
     ...(Array.isArray(component.children)
       ? { children: component.children.map((child) => applyThemeToComponent(child, theme)) }
       : {}),
