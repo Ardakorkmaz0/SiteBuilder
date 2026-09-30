@@ -53,3 +53,28 @@ describe('reporting a site', () => {
     expect(screen.queryByRole('dialog', { name: 'Report this site' })).toBeNull()
   })
 })
+
+// The source viewer had the same gaps: a box of divs, a nameless ×, and Esc
+// left it open over the site.
+describe('reading the source', () => {
+  async function openSource(user) {
+    await user.click(screen.getByTitle("View this site's source code"))
+    return screen.getByRole('dialog', { name: 'Source — Bakery' })
+  }
+
+  it('is a named dialog that takes the keyboard', async () => {
+    const user = userEvent.setup()
+    renderToolbar()
+    const dialog = await openSource(user)
+    expect(dialog).toContainElement(document.activeElement)
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+  })
+
+  it('closes on Esc', async () => {
+    const user = userEvent.setup()
+    renderToolbar()
+    await openSource(user)
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Source — Bakery' })).toBeNull()
+  })
+})
