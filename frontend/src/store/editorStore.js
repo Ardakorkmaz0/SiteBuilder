@@ -273,6 +273,21 @@ function shiftAfterRegion(components, regionId, key, delta, oldBottom) {
   })
 }
 
+// The phone layout is one column: when a block's bottom edge moves, what
+// sits under it follows, the gap between them kept. Growing a block used to
+// spread it over the next one (the phone stack is laid out once and was then
+// left alone); shrinking it left a hole. Pinned overlays and blocks hidden on
+// the phone are not in the column and stay put.
+function followBottomOnPhone(components, id, delta, oldBottom) {
+  if (!delta) return components
+  return components.map((component) => {
+    if (component.id === id || component.hiddenMobile || component.props?.scrollBehavior === 'fixed') return component
+    const layout = component.mobileLayout || component.layout || {}
+    if ((layout.y || 0) < oldBottom - 1) return component
+    return { ...component, mobileLayout: { ...layout, y: Math.max(0, Math.round((layout.y || 0) + delta)) } }
+  })
+}
+
 // Proportionally scale a layout tree to a new artboard width (factor =
 // newWidth / oldWidth). Containers/tabs scale their children with them (child
 // coords live in the parent's box); region children are SKIPPED — they sit in
@@ -661,6 +676,12 @@ function placeMobile(c, leftX, availW) {
     const designed = Math.max(32, Math.round(c.layout?.w || 48))
     const w = Math.min(availW, designed)
     return { x: Math.round(leftX + (availW - w) / 2), w, h: estMobileHeight(c, w) }
+  }
+  // A theme switch keeps its own size too: stretched over the phone's width it
+  // became a long empty pill with a small moon in the middle.
+  if (c.type === 'themeToggle') {
+    const w = Math.min(availW, Math.max(32, Math.round(c.layout?.w || 44)))
+    return { x: Math.round(leftX + (availW - w) / 2), w, h: Math.max(32, Math.round(c.layout?.h || 44)) }
   }
   // An embed's desktop box has already been fitted to its content, so that width
   // is what the block actually needs — stretching it across the phone would put
@@ -2298,6 +2319,11 @@ export const useEditorStore = create((set, get) => ({
           delta,
           (oldLayout.y || 0) + (oldLayout.h || 0),
         )
+      } else if (isTop && key === 'mobileLayout' && !page.flowMode && before && patch.h !== undefined) {
+        const oldLayout = before.mobileLayout || before.layout || {}
+        const nextLayout = findInTree(components, id)?.mobileLayout || oldLayout
+        const oldBottom = (oldLayout.y || 0) + (oldLayout.h || 0)
+        components = followBottomOnPhone(components, id, (nextLayout.y || 0) + (nextLayout.h || 0) - oldBottom, oldBottom)
       }
       // Editing the mobile layout directly switches that page to manual mode (it
       // stops auto-following PC); PC edits keep mobile in auto sync.
