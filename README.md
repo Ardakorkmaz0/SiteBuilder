@@ -49,12 +49,98 @@ URL.
 - **Frontend:** React (Vite, JavaScript), Tailwind CSS, Zustand, @dnd-kit, React Router, axios
 - **Backend:** Django + Django REST Framework, token auth, SQLite (JSON schema storage)
 
-## Run the project
+## Installation & Setup
 
-**One command (Windows).** From the project root, double-click `start.bat` (or run
-it in a terminal). On the first run it creates the Python virtualenv, installs the
-backend + frontend dependencies, applies migrations, starts both servers, and opens
-the browser.
+Follow these steps to get the project running on your local machine. You need
+**Git**, **Python 3.12+** and **Node.js 20+**. The backend and the frontend run
+as two servers, each in its own terminal.
+
+### Windows (PowerShell)
+```powershell
+# 1. Clone the repository from GitHub
+git clone https://github.com/Ardakorkmaz0/SiteBuilder.git
+
+# 2. Navigate into the backend directory
+cd SiteBuilder\backend
+
+# 3. Create a virtual environment named '.venv'
+python -m venv .venv
+
+# 4. Activate the virtual environment
+.\.venv\Scripts\Activate.ps1
+
+# 5. Install all required Python packages
+pip install -r requirements.txt
+
+# 6. Apply migrations to create the database tables
+python manage.py migrate
+
+# 7. Create an administrative user (for the Admin panel and the Settings page)
+python manage.py createsuperuser
+
+# 8. Start the Django API server on port 8001
+python manage.py runserver 127.0.0.1:8001
+
+# 9. In a second terminal, navigate into the frontend directory
+cd SiteBuilder\frontend
+
+# 10. Install all required Node packages
+npm install
+
+# 11. Start the Vite development server
+npm run dev
+```
+
+### macOS / Linux (Bash)
+```bash
+# 1. Clone the repository from GitHub
+git clone https://github.com/Ardakorkmaz0/SiteBuilder.git
+
+# 2. Navigate into the backend directory
+cd SiteBuilder/backend
+
+# 3. Create a virtual environment named '.venv'
+python3 -m venv .venv
+
+# 4. Activate the virtual environment
+source .venv/bin/activate
+
+# 5. Install all required Python packages
+pip install -r requirements.txt
+
+# 6. Apply migrations to create the database tables
+python manage.py migrate
+
+# 7. Create an administrative user (for the Admin panel and the Settings page)
+python manage.py createsuperuser
+
+# 8. Start the Django API server on port 8001
+python manage.py runserver 127.0.0.1:8001
+
+# 9. In a second terminal, navigate into the frontend directory
+cd SiteBuilder/frontend
+
+# 10. Install all required Node packages
+npm install
+
+# 11. Start the Vite development server
+npm run dev
+```
+
+Once started, visit **`http://localhost:5173/`** in your web browser. The API
+runs on `http://127.0.0.1:8001/`.
+
+> **Note:** The project defaults to **development mode** (DEBUG=True, SQLite, no
+> `.env` needed). The backend uses port **8001**, not Django's usual 8000: 8000 is
+> what every Django project defaults to, so on a machine running more than one the
+> first to start takes the port and the others end up talking to the wrong API.
+> For production, see [Going to production](#going-to-production).
+
+### One command (Windows)
+
+From the project root, double-click `start.bat` (or run it in a terminal). On the
+first run it creates the virtual environment, installs the backend and frontend
+packages, applies migrations, starts both servers and opens the browser.
 
 ```powershell
 .\start.bat
@@ -64,33 +150,6 @@ If PowerShell blocks the script, run it explicitly:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\start.ps1
-```
-
-Then open http://localhost:5173 (backend runs on http://127.0.0.1:8001).
-
-> The backend uses **8001**, not Django's usual 8000. 8000 is what every Django
-> project defaults to, so on a machine running more than one the first to start
-> takes the port and the others end up talking to the wrong API.
-
-### Run manually
-
-Backend:
-
-```bash
-cd backend
-python -m venv .venv
-.venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver 127.0.0.1:8001   # http://127.0.0.1:8001
-```
-
-Frontend:
-
-```bash
-cd frontend
-npm install
-npm run dev                       # http://localhost:5173
 ```
 
 ### Tests
