@@ -924,3 +924,33 @@ describe('page language', () => {
     expect(selectCurrentPage(useEditorStore.getState()).language).toBe('en')
   })
 })
+
+describe('importSchema', () => {
+  const design = {
+    theme: {},
+    pages: [
+      { id: 'home', name: 'Home', components: [] },
+      { id: 'inner', name: 'Inner', mode: 'html', html: '<h1>In</h1>', components: [] },
+    ],
+  }
+
+  it('takes the file the dashboard exports, which wraps the site', () => {
+    freshTwoPageSchema()
+    const file = { format: 'sitebuilder-project', version: 1, site: { id: 9, title: 'Mine', schema: design } }
+    const html = s().importSchema(file)
+    expect(s().schema.pages.map((page) => page.name)).toEqual(['Home', 'Inner'])
+    expect(html.inner).toBe('<h1>In</h1>')
+  })
+
+  it('takes the design the editor exports as it is', () => {
+    freshTwoPageSchema()
+    expect(s().importSchema(design)).toBeTruthy()
+    expect(s().schema.pages.map((page) => page.name)).toEqual(['Home', 'Inner'])
+  })
+
+  it('refuses a file with no pages in it', () => {
+    freshTwoPageSchema()
+    expect(s().importSchema({ format: 'sitebuilder-project', version: 1, site: { title: 'Empty' } })).toBe(false)
+    expect(s().schema.pages.map((page) => page.name)).toEqual(['Home', 'Second'])
+  })
+})
