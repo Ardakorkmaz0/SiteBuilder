@@ -638,3 +638,15 @@ class TestLightAndDark:
 
     def test_following_the_device_is_a_real_yes_only(self):
         assert self._schema(colorMode={'followDevice': 'yes'})['colorMode']['followDevice'] is False
+
+
+def test_a_block_that_fits_its_box_keeps_it_after_a_save():
+    clean = validate_and_clean_schema({'pages': [{'id': 'p', 'components': [
+        {'id': 'h', 'type': 'heading', 'props': {'text': 'Hi', 'fit': 'box'}},
+        {'id': 'e', 'type': 'html', 'props': {'code': '<p>x</p>', 'fit': 'off'}},
+        {'id': 'b', 'type': 'button', 'props': {'text': 'Go', 'fit': 'stretch;'}},
+    ]}]})
+    props = [c['props'] for c in clean['pages'][0]['components']]
+    assert props[0]['fit'] == 'box'
+    assert props[1]['fit'] == 'off'
+    assert 'fit' not in props[2]

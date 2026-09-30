@@ -479,7 +479,7 @@ export default function FreeCanvasItem({
         </div>
       ) : (
         <div className="pointer-events-none h-full w-full select-none overflow-visible">
-          <RenderComponent component={component} viewport={viewport} editorPreview />
+          <RenderComponent component={component} viewport={viewport} editorPreview fit />
         </div>
       )}
 

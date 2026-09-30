@@ -47,6 +47,7 @@ import { listEmbedImages, replaceEmbedImage } from '../../utils/embedImages.js'
 import { blockTextHint, linkSectionsFor } from '../../utils/linkTargets.js'
 import FieldPartsEditor from './FieldPartsEditor.jsx'
 import ColorModePanel from './ColorModePanel.jsx'
+import { FIT_TYPES } from '../../utils/boxFit.js'
 import { anchorOf, anchorProblem, slugifyAnchor } from '../../utils/anchors.js'
 
 // How far below the top edge a bar can be drawn and still be read as "meant
@@ -1796,6 +1797,16 @@ export default function PropertiesPanel({
             <SizeQuickControls
               onScale={scaleSingleSize}
               onPreset={presetSingleSize}
+            />
+          )}
+          {/* Resizing a block turns this on (utils/boxFit.js); here it can be
+              turned off, for a block that should keep its own size. */}
+          {!isFlow && FIT_TYPES.has(component.type) && (
+            <LabeledCheckbox
+              label={t('Content fits the box')}
+              hint={component.props?.fit === 'box' ? '' : t('Resizing turns it on')}
+              checked={component.props?.fit === 'box'}
+              onChange={(on) => updateProps(component.id, { fit: on ? 'box' : 'off' })}
             />
           )}
           {component.type === 'html' && viewport !== 'mobile' && (

@@ -136,7 +136,36 @@ export function htmlEmbedTweaks(props) {
   return Object.keys(tweaks).length ? tweaks : null
 }
 
-export function htmlEmbedDocumentOptions(component, scale = 1) {
+// How a hand-sized HTML block fits its box (see utils/boxFit.js): a photo
+// fills it as a frame does, a button or badge or icon is scaled whole and
+// stretched over it, anything else re-wraps to the box's width and grows.
+export function embedFitMode(component) {
+  const props = component?.props || {}
+  // A line or a gap stretches with its box; zoomed, a rule would thicken.
+  if (props._paletteType === 'divider' || props._paletteType === 'spacer') return ''
+  if (embedShape(props) || props._paletteType === 'image') return 'cover'
+  const fill = htmlEmbedFillMode(component)
+  if (fill === 'control' || fill === 'icon') return 'contain'
+  return 'reflow'
+}
+
+// `fit`: the block sits in a box it should fit (a hand-sized block on a free
+// page); the fit then replaces the older fill modes and box scale.
+export function htmlEmbedDocumentOptions(component, scale = 1, { fit = false } = {}) {
+  const fitMode = fit ? embedFitMode(component) : ''
+  // A site with a light/dark switch hands the block its palette CSS
+  // (colorMode.js), for the document's head.
+  const headCss = typeof component?.props?._colorModeCss === 'string' ? component.props._colorModeCss : ''
+  if (fitMode) {
+    return {
+      fill: '',
+      scale: 1,
+      tweaks: htmlEmbedTweaks(component?.props),
+      siteFont: component?.props?._siteFont === true,
+      fit: fitMode,
+      headCss,
+    }
+  }
   const fill = htmlEmbedFillMode(component)
   const tweaks = htmlEmbedTweaks(component?.props)
   // A shaped embed fills its box directly (object-fit:cover), so the
@@ -150,6 +179,7 @@ export function htmlEmbedDocumentOptions(component, scale = 1) {
     tweaks,
     // Starts in the site's font (see baseFontTag in htmlEmbedDocument.js).
     siteFont: component?.props?._siteFont === true,
+    headCss,
   }
 }
 

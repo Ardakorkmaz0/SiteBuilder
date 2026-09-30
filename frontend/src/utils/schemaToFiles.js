@@ -7,10 +7,11 @@
 // whitelisted by sanitizeStyles, and CSS values are stripped of `;{}<` so a
 // value can't break out of its rule.
 import { sanitizeStyles, sanitizeUrl, sanitizeImageSrc } from './sanitize.js'
-import { iconSvg } from './icons.js'
+import { ICONS, iconSvg } from './icons.js'
 import { fieldHtml } from './formField.js'
 import { themeToggleAttrs, themeToggleInner } from './themeToggle.js'
 import { colorModeHeadTags, withColorModePage } from './colorMode.js'
+import { fitsBox, nativeFit } from './boxFit.js'
 import { ALERT_VARIANTS } from '../components/renderer/constants.js'
 import {
   customCssBlock,
@@ -187,7 +188,9 @@ function safeCssProp(value, fallback = '') {
 }
 
 function iconTextHtml(props = {}) {
-  const icon = props.icon ? `<span aria-hidden="true" style="display:inline-flex;line-height:0">${iconSvg(props.icon)}</span>` : ''
+  // Only a known icon, as in the editor (InlineIcon draws nothing for a name
+  // it does not know; iconSvg would fall back to a star).
+  const icon = ICONS[props.icon] ? `<span aria-hidden="true" style="display:inline-flex;line-height:0">${iconSvg(props.icon)}</span>` : ''
   return `${icon}<span>${multiline(props.text)}</span>`
 }
 
@@ -370,7 +373,7 @@ function nestedWithVisibility(components) {
 // geometry (see regionChildCss), so the inline copy is dropped and the mobile
 // media query can reposition the children. Only top-level regions get those
 // rules; a region nested inside a container keeps the inline fallback.
-function inlineNode(c, classedChildren = false) {
+function inlineNode(c, classedChildren = false, { fit = false } = {}) {
   const p = c.props || {}
   const styleStr = styleBlock(c.styles)
   if (c.type === 'region') {
@@ -379,7 +382,7 @@ function inlineNode(c, classedChildren = false) {
     const inner = kids.map((ch) => {
       const filled = { ...ch, styles: { ...(ch.styles || {}), width: '100%', height: '100%' } }
       const geometry = classedChildren ? '' : ` style="${regionChildInlineStyle(ch, designW)}"`
-      return `<div id="${esc(elementIdFor(ch))}" class="region-child region-${esc(c.id)}-${esc(ch.id)}${nestedClass(ch)}"${geometry}>${linkWrap(filled, inlineNode(filled))}</div>`
+      return `<div id="${esc(elementIdFor(ch))}" class="region-child region-${esc(c.id)}-${esc(ch.id)}${nestedClass(ch)}"${geometry}>${linkWrap(filled, boxedNode(filled))}</div>`
     }).join('')
     return `<section style="position:relative;width:100%;height:100%;overflow:hidden;${styleStr}"><div class="region-inner" style="position:relative;width:100%;max-width:${designW}px;height:100%;margin:0 auto;overflow:hidden">${inner}</div></section>`
   }
@@ -404,13 +407,14 @@ function inlineNode(c, classedChildren = false) {
         // Interactive types (accordion/select/tabs) and nested containers need
         // to grow when used — forcing height:100% would clip the open state or
         // pinch nested content. Static types still fill the wrapper exactly.
-        const grows = ['accordion', 'select', 'tabs', 'html', 'container'].includes(ch.type)
+        // A block that fits its box keeps that box, like on the canvas.
+        const grows = ['accordion', 'select', 'tabs', 'html', 'container'].includes(ch.type) && !nativeFit(ch)
         const filled = grows
           ? { ...ch, styles: { ...(ch.styles || {}), width: '100%' } }
           : { ...ch, styles: { ...(ch.styles || {}), width: '100%', height: '100%' } }
         const wrapH = grows ? '' : `;height:${Math.round(l.h || 80)}px`
         const wrapMinH = grows ? `;min-height:${Math.round(l.h || 80)}px` : ''
-        return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}">${linkWrap(filled, inlineNode(filled))}</div>`
+        return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}">${linkWrap(filled, boxedNode(filled))}</div>`
       })
       .join('')
     return `<div style="display:block;position:relative;min-height:${h}px;${styleStr}">${inner}</div>`
@@ -439,7 +443,7 @@ function inlineNode(c, classedChildren = false) {
               ...ch,
               styles: { ...(ch.styles || {}), width: '100%', height: '100%' },
             }
-            return `<div id="${esc(elementIdFor(ch))}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px;height:${Math.round(l.h || 80)}px">${linkWrap(filled, inlineNode(filled))}</div>`
+            return `<div id="${esc(elementIdFor(ch))}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px;height:${Math.round(l.h || 80)}px">${linkWrap(filled, boxedNode(filled))}</div>`
           })
           .join('')
         const hidden = t.id === activeId ? '' : ' hidden'
@@ -460,7 +464,7 @@ function inlineNode(c, classedChildren = false) {
   }
   if (c.type === 'html') {
     const code = typeof p.code === 'string' ? p.code : ''
-    const doc = htmlEmbedDocument(code, htmlEmbedDocumentOptions(c))
+    const doc = htmlEmbedDocument(code, htmlEmbedDocumentOptions(c, 1, { fit: fit && fitsBox(c) }))
     const h = Math.max(40, Math.round(c.layout?.h || 240))
     // withBuilderInteractiveHtml layers on the anchor-interceptor so `<a href="#">`
     // inside the user's snippet scrolls instead of navigating the sandboxed
@@ -478,7 +482,9 @@ function inlineNode(c, classedChildren = false) {
     const src = sanitizeImageSrc(p.src)
     return `<img src="${esc(src)}" alt="${esc(p.alt)}" style="${base} ${styleStr} max-width:100%;" />`
   }
-  return `<${tag}${c.type === 'icon' ? iconA11yAttrs(p) : ''} style="${base} ${styleStr}">${innerHtml(c)}</${tag}>`
+  // Through openTag, so a nested button keeps its link and the theme switch
+  // its button attributes, exactly as at the top level.
+  return `${openTag(c, ` style="${base} ${styleStr}"`, true)}${innerHtml(c)}</${tag}>`
 }
 
 function tagFor(type) {
@@ -555,15 +561,16 @@ function innerHtml(c) {
   }
 }
 
-function openTag(c, extraAttrs = '') {
+function openTag(c, extraAttrs = '', inner = false) {
   const tag = tagFor(c.type)
   // Motion: hover classes ride the class attribute, the reveal type rides a data
   // attribute the injected observer watches. Both come from the single motion
   // source, so the published bar animates exactly as the editor's Motion panel
-  // promised.
-  const cls = `c-${c.id}${motionClassSuffix(c.props)}`
+  // promised. A fitted block's inner node (see fitShell) leaves both, and the
+  // id, to the box around it.
+  const cls = inner ? `ci-${c.id}` : `c-${c.id}${motionClassSuffix(c.props)}`
   // id lets in-page links (#anchor, else #componentId) scroll to this component.
-  const idAttr = ` id="${esc(elementIdFor(c))}"${motionRevealAttr(c.props)}${extraAttrs}`
+  const idAttr = inner ? extraAttrs : ` id="${esc(elementIdFor(c))}"${motionRevealAttr(c.props)}${extraAttrs}`
   if (tag === 'a') {
     const href = sanitizeUrl((c.props || {}).href)
     const ext = /^https?:\/\//i.test(href)
@@ -582,6 +589,25 @@ function openTag(c, extraAttrs = '') {
     return `<button${idAttr} class="${cls} pwb-theme-toggle"${themeToggleAttrs(c.props || {})}>`
   }
   return `<${tag}${idAttr} class="${cls}">`
+}
+
+// A native block that fits its box (utils/boxFit.js): the runtime zooms the
+// root to the box. Before it runs (or without scripts) the block simply fills
+// the box, as it always did.
+function fitShell(fit, inner) {
+  return `<div data-pwb-fit="${fit.mode}"${fit.fill ? ' data-pwb-fit-fill' : ''} style="position:relative;width:100%;height:100%;overflow:hidden"><div data-pwb-fit-root style="position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:0 0">${inner}</div></div>`
+}
+
+// A child in a box of its own size (a section, a free container, a tab
+// panel): a block sized by hand fits it, as on the canvas.
+function boxedNode(c) {
+  const fit = nativeFit(c)
+  return fit ? fitShell(fit, inlineNode(c)) : inlineNode(c, false, { fit: true })
+}
+
+// A top-level block fits its box on a free page, never in flow.
+function pageFit(c, page) {
+  return page?.flowMode ? null : nativeFit(c)
 }
 
 function pageHtml(
@@ -643,9 +669,18 @@ function pageBodyHtml(page, fixed) {
         // iframe preview looked broken next to the non-Custom-JS path. The box
         // is positioned by its `.c-<id>` rule, exactly like every other type, so
         // the mobile breakpoint can move and resize it.
-        return `      <div id="${esc(elementIdFor(c))}" class="c-${esc(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}>${linkWrap(c, inlineNode(c, c.type === 'region'))}</div>`
+        const fit = pageFit(c, page)
+        const node = fit
+          ? fitShell(fit, inlineNode(c))
+          : inlineNode(c, c.type === 'region', { fit: !page.flowMode })
+        return `      <div id="${esc(elementIdFor(c))}" class="c-${esc(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}>${linkWrap(c, node)}</div>`
       }
       const tag = tagFor(c.type)
+      const fit = pageFit(c, page)
+      if (fit) {
+        const node = `${openTag(c, '', true)}${innerHtml(c)}</${tag}>`
+        return `      <div id="${esc(elementIdFor(c))}" class="c-${esc(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}>${linkWrap(c, fitShell(fit, node))}</div>`
+      }
       const el =
         tag === 'img'
           ? openTag(c, sticky)
@@ -706,7 +741,9 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
       const placed = navbarPlacementCss(c)
       // inlineNode types paint their own look on the inner node; repeating it on
       // the wrapper would apply padding and borders twice.
-      const own = INLINE_NODE_TYPES.has(c.type) ? '' : `${baseRules(c.type)} ${styleBlock(c.styles)}`
+      const fitted = !INLINE_NODE_TYPES.has(c.type) && !!pageFit(c, page)
+      const own = INLINE_NODE_TYPES.has(c.type) || fitted ? '' : `${baseRules(c.type)} ${styleBlock(c.styles)}`
+      if (fitted) css += `.ci-${c.id} { ${baseRules(c.type)} ${styleBlock(c.styles)} width:100%; height:100%; box-sizing:border-box; }\n`
       // Reveal speed/delay ride the component's own rule as CSS variables the
       // motion stylesheet reads.
       const motionVars = styleObjectBlock(motionCssVars(c.props))
@@ -770,17 +807,19 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
       css += `  .p-${page.id} { --design-offset:max(0px, calc((100% - ${mw}px) / 2)); width: ${mw}px; min-height: ${pageMinHeight(comps, 'mobileLayout', 400)}px; background: ${cssValue(page.backgroundMobile || page.background || '#ffffff')}; }\n`
     }
     for (const c of comps) {
+      const fitted = !INLINE_NODE_TYPES.has(c.type) && !!pageFit(c, page)
       const hide = c.hiddenMobile
         ? ' display:none;'
         : c.hidden
-          ? ` display:${baseDisplay(c.type)};`
+          ? ` display:${fitted ? 'block' : baseDisplay(c.type)};`
           : ''
       // Per-breakpoint style overrides (stylesMobile) ride the same media
       // block — the cascade merges them over the desktop rule above. Skipped for
       // inlineNode types for the same reason their desktop `styles` are: the
       // look lives on the inner node, not on this wrapper.
       const mobileStyles =
-        c.stylesMobile && !INLINE_NODE_TYPES.has(c.type) ? ` ${styleBlock(c.stylesMobile)}` : ''
+        c.stylesMobile && !INLINE_NODE_TYPES.has(c.type) && !fitted ? ` ${styleBlock(c.stylesMobile)}` : ''
+      if (fitted && c.stylesMobile) css += `  .ci-${c.id} { ${styleBlock(c.stylesMobile)} }\n`
       if (page.flowMode) {
         const fixed = FLOW_FIXED_HEIGHT_TYPES.has(c.type)
         css += `  .c-${c.id} { ${styleObjectBlock(wrapperStyle(c, 'mobile', mw, true))} overflow:${fixed ? 'hidden' : 'visible'};${mobileStyles}${hide} }\n`

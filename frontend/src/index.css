@@ -1947,6 +1947,10 @@ button:not(:disabled),
    while the live page shows it through. */
 .site-surface {
   color-scheme: light;
+  /* The published page sets no line height, so its text runs at the
+     browser's normal one; the app's own 1.5 made every line taller here than
+     on the live site (and a fitted block a size smaller). */
+  line-height: normal;
 }
 
 /* The editor walkthrough: a dim page, a ring around what the card is talking

@@ -46,6 +46,46 @@ function scaleTag(scale) {
   return `<style data-pwb-embed-scale>:root{--pwb-embed-scale:${value};}body[data-pwb-embed-scaled]{display:block!important;}body[data-pwb-embed-scaled]>[data-pwb-embed-scale-root]{display:block;width:calc(100% / var(--pwb-embed-scale));min-height:calc(100% / var(--pwb-embed-scale));transform:scale(var(--pwb-embed-scale));transform-origin:top left;}</style>`
 }
 
+// A block sized by hand fits its box (utils/boxFit.js): its content goes in
+// a root the runtime zooms to the box. `reflow` re-wraps text to the width,
+// `contain` scales a control whole and stretches it over the box, `cover`
+// makes a photo fill the box as a frame does. The root must not inherit the
+// reset's max-width or the lone-block min-height: both would fight the zoom.
+const FIT_MODES = new Set(['reflow', 'contain', 'cover'])
+
+function fitMode(fit) {
+  return FIT_MODES.has(fit) ? fit : ''
+}
+
+const FIT_CSS = [
+  'body[data-pwb-fit]{position:relative!important;display:block!important;overflow:hidden!important;}',
+  'body[data-pwb-fit]>[data-pwb-fit-root]{position:absolute;left:0;top:0;width:100%;max-width:none!important;min-height:0!important;margin:0!important;transform-origin:0 0;}',
+  'body[data-pwb-fit="contain"]>[data-pwb-fit-root]>:only-child{width:100%!important;height:100%!important;max-width:none!important;margin:0!important;box-sizing:border-box!important;display:flex!important;align-items:center!important;justify-content:center!important;}',
+  'body[data-pwb-fit="cover"]>[data-pwb-fit-root]{height:100%;display:flex;flex-direction:column;}',
+  'body[data-pwb-fit="cover"]>[data-pwb-fit-root]>*{flex:1 1 auto;min-height:0!important;display:flex;flex-direction:column;max-height:100%;}',
+  'body[data-pwb-fit="cover"]>[data-pwb-fit-root] :is(img,picture,video){flex:1 1 auto;min-height:0;width:100%!important;height:100%!important;max-height:100%!important;aspect-ratio:auto!important;object-fit:cover!important;}',
+  '@media (min-aspect-ratio: 17/10){'
+    + 'body[data-pwb-fit="reflow"]>[data-pwb-fit-root]>:only-child:has(>img:first-child){position:relative!important;box-sizing:border-box!important;width:100%!important;max-width:none!important;padding-left:42%!important;}'
+    + 'body[data-pwb-fit="reflow"]>[data-pwb-fit-root]>:only-child:has(>img:first-child)>img:first-child{position:absolute!important;left:0;top:0;width:42%!important;height:100%!important;max-width:none!important;aspect-ratio:auto!important;object-fit:cover!important;margin:0!important;}'
+    + '}',
+].join('')
+
+// CSS the builder writes for the block (the other palette's variables): a
+// style tag in the head, closed off so it can only ever be CSS.
+function headCssTag(css) {
+  const clean = String(css || '').replace(/<\/?style/gi, '').replace(/[<>]/g, '')
+  return clean ? `<style data-pwb-color-mode>${clean}</style>` : ''
+}
+
+function fitTag(fit) {
+  return fitMode(fit) ? `<style data-pwb-embed-fit>${FIT_CSS}</style>` : ''
+}
+
+function fitBodyAttrs(fit) {
+  const mode = fitMode(fit)
+  return mode ? ` data-pwb-fit="${mode}"${mode === 'contain' ? ' data-pwb-fit-fill' : ''}` : ''
+}
+
 function fillAttr(fill) {
   return fill === 'control' || fill === 'icon' || fill === 'form'
     ? ` data-pwb-embed-fill="${fill}"`
@@ -143,11 +183,12 @@ function hasReset(html) {
 function wrapBodyForOptions(html, options = {}) {
   const scale = cleanScale(options.scale)
   const fill = fillAttr(options.fill)
-  if (!scale && !fill) return html
+  const fit = fitMode(options.fit)
+  if (!scale && !fill && !fit) return html
   if (/<body(\s[^>]*)?>/i.test(html) && closingTagIndex(html, 'body') !== -1) {
-    const bodyAttrs = `${scale ? ' data-pwb-embed-scaled="true"' : ''}${fill}`
-    const open = scale ? '<div data-pwb-embed-scale-root>' : ''
-    const close = scale ? '</div>' : ''
+    const bodyAttrs = `${scale ? ' data-pwb-embed-scaled="true"' : ''}${fill}${fitBodyAttrs(fit)}`
+    const open = `${fit ? '<div data-pwb-fit-root>' : ''}${scale ? '<div data-pwb-embed-scale-root>' : ''}`
+    const close = `${scale ? '</div>' : ''}${fit ? '</div>' : ''}`
     const opened = html.replace(/<body([^>]*)>/i, `<body$1${bodyAttrs}>${open}`)
     return close ? insertBeforeClosingTag(opened, 'body', close) ?? opened : opened
   }
@@ -156,9 +197,9 @@ function wrapBodyForOptions(html, options = {}) {
 
 function injectReset(html, options = {}) {
   const font = options.siteFont ? options.font || scopedFont : ''
-  const extra = `${baseFontTag(font)}${scaleTag(options.scale)}${tweaksTag(options.tweaks)}`
+  const extra = `${baseFontTag(font)}${scaleTag(options.scale)}${tweaksTag(options.tweaks)}${fitTag(options.fit)}${headCssTag(options.headCss)}`
   const tags = `${hasReset(html) ? '' : resetTag}${extra}`
-  if (!tags && !fillAttr(options.fill)) return html
+  if (!tags && !fillAttr(options.fill) && !fitMode(options.fit)) return html
   if (hasReset(html)) {
     return wrapBodyForOptions(insertBeforeClosingTag(html, 'head', extra) ?? html, options)
   }
@@ -174,9 +215,10 @@ function injectReset(html, options = {}) {
     ), options)
   }
   const scale = cleanScale(options.scale)
-  const bodyAttr = `${scale ? ' data-pwb-embed-scaled="true"' : ''}${fillAttr(options.fill)}`
-  const open = scale ? '<div data-pwb-embed-scale-root>' : ''
-  const close = scale ? '</div>' : ''
+  const fit = fitMode(options.fit)
+  const bodyAttr = `${scale ? ' data-pwb-embed-scaled="true"' : ''}${fillAttr(options.fill)}${fitBodyAttrs(fit)}`
+  const open = `${fit ? '<div data-pwb-fit-root>' : ''}${scale ? '<div data-pwb-embed-scale-root>' : ''}`
+  const close = `${scale ? '</div>' : ''}${fit ? '</div>' : ''}`
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">${tags}</head><body${bodyAttr}>${open}${html}${close}</body></html>`
 }
 

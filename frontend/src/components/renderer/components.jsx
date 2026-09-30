@@ -313,6 +313,7 @@ export function Section({ props, style, contentWidth, boxScale = 1 }) {
   return (
     <section style={{ fontSize: scaledPx(16, boxScale), ...style, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
       <div
+        className="section-inner"
         style={{
           width: '100%',
           maxWidth: contentWidth || undefined,
@@ -612,7 +613,7 @@ function FormField({ componentType, props, style, boxScale = 1 }) {
   }
   return (
     <div style={outer}>
-      <div style={s.root}>
+      <div className={s.kind === 'area' ? undefined : 'pwb-field-line'} style={s.root}>
         {label}
         {control}
         {help}
@@ -694,7 +695,7 @@ export function Tabs({ style }) {
 // it can't reach the editor or other components on the page. The iframe runs
 // allow-scripts + allow-same-origin only when explicitly needed; the default
 // `allow-scripts` keeps an opaque origin so the embed can't read parent storage.
-export function HtmlEmbed({ props, style, boxScale = 1, editorPreview = false }) {
+export function HtmlEmbed({ props, style, boxScale = 1, editorPreview = false, fit = false }) {
   const language = useContext(LanguageContext)
   // The embed is its own document and inherits nothing, so an embed that opts
   // in (`_siteFont`, see baseFontTag) is handed the font of the page around it:
@@ -711,7 +712,7 @@ export function HtmlEmbed({ props, style, boxScale = 1, editorPreview = false })
   }, [siteFont, contextFont])
   const font = siteFont ? contextFont || pageFont : ''
   const code = typeof props.code === 'string' ? props.code : ''
-  const baseHtml = htmlEmbedDocument(code, { ...htmlEmbedDocumentOptions({ type: 'html', props }, boxScale), font })
+  const baseHtml = htmlEmbedDocument(code, { ...htmlEmbedDocumentOptions({ type: 'html', props }, boxScale, { fit }), font })
   // Inject the same anchor-interceptor / tabs handler the rest of the site
   // uses. Without it, an `<a href="#">` inside the user's snippet navigates the
   // sandboxed iframe to `about:srcdoc#` — which, in an iframe sandboxed without

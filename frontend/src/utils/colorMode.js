@@ -386,7 +386,14 @@ function mapComponent(component, mode, inside = false) {
   // way, and it carries the other palette, which the page around it switches
   // on by message (see the runtime).
   if (component.type === 'html' && typeof component.props?.code === 'string' && component.props.code) {
-    next.props = { ...component.props, code: withColorModeHtml(component.props.code, mode, { embed: true }) }
+    // The palette's CSS rides beside the code, into the block document's
+    // head: inside the code it would be one more child, and a block that is a
+    // single card or button would no longer be treated as one.
+    next.props = {
+      ...component.props,
+      code: withColorModeHtml(component.props.code, mode, { embed: true }),
+      _colorModeCss: embedCss(mode),
+    }
   }
   if (Array.isArray(component.children)) next.children = component.children.map((child) => mapComponent(child, mode, fixed))
   return next
@@ -500,7 +507,7 @@ function mapDeclarations(text, mode) {
     if (part.next !== undefined || !part.property) continue
     if (part.property.startsWith('--')) {
       const role = VAR_ROLE.get(part.property.slice(2))
-      part.next = role ? part.value.replace(HEX, (token) => wrap(role, token)) : part.value
+      part.next = role && !part.value.includes('var(--pwb-alt-') ? part.value.replace(HEX, (token) => wrap(role, token)) : part.value
       continue
     }
     const context = propertyContext(part.property)
@@ -517,8 +524,9 @@ function mapCss(css, mode) {
   return css.replace(/\{([^{}]*)\}/g, (match, body) => `{${mapDeclarations(body, mode)}}`)
 }
 
-// `embed`: an HTML block's code, which gets the palette's CSS but no head
-// script (the page around it says which palette is on).
+// `embed`: an HTML block's code, only re-coloured: its palette CSS goes in
+// its document's head (see mapComponent) and the page around it says which
+// palette is on.
 export function withColorModeHtml(html, mode, { embed = false } = {}) {
   if (!mode || typeof html !== 'string') return html
   if (html.includes('data-pwb-color-mode')) return html
@@ -532,7 +540,8 @@ export function withColorModeHtml(html, mode, { embed = false } = {}) {
     .replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi, (m, open, css, close) => `${open}${mapCss(css, mode)}${close}`)
     .replace(/(\sstyle=")([^"]*)(")/gi, (m, open, css, close) => `${open}${mapDeclarations(css, mode)}${close}`)
     .replace(/(\d+)/g, (m, i) => held[Number(i)])
-  const tags = embed ? `<style data-pwb-color-mode>${embedCss(mode)}</style>` : colorModeHeadTags(mode)
+  if (embed) return out
+  const tags = colorModeHeadTags(mode)
   if (/<\/head\s*>/i.test(out)) return out.replace(/<\/head\s*>/i, (close) => `${tags}${close}`)
   if (/<body\b[^>]*>/i.test(out)) return out.replace(/<body\b[^>]*>/i, (open) => `${open}${tags}`)
   return `${tags}${out}`
