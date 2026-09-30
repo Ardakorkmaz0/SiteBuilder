@@ -25,6 +25,7 @@ import { apiError } from '../../utils/errors.js'
 import { sharedBlockHtml } from '../../utils/componentExport.js'
 import { STATIC_HTML_SANDBOX } from '../../utils/htmlRuntime.js'
 import { SPOTLIGHT_Z } from '../editor/spotlight.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 const NEW_SITE = '__new__'
 
@@ -38,6 +39,7 @@ export default function UseComponentDialog({ component, onClose, onUsed }) {
   const [chosenPage, setChosenPage] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  useEscapeToClose(!!component, () => onClose?.())
 
   // No sites yet → the new-site option IS the default, not a dead end.
   const siteId = chosenSite || (sites?.[0] ? String(sites[0].id) : sites ? NEW_SITE : '')
@@ -138,7 +140,9 @@ export default function UseComponentDialog({ component, onClose, onUsed }) {
             <>
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-[var(--studio-text-muted)]">{t('Site')}</span>
+                {/* Drawn once the sites are in; the keyboard moves here then. */}
                 <select
+                  autoFocus
                   value={siteId}
                   onChange={(event) => setChosenSite(event.target.value)}
                   className="studio-input w-full px-3 py-2 text-sm"

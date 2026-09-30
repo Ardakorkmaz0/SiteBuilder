@@ -177,3 +177,16 @@ describe('a brand-new site as the destination', () => {
     expect(screen.queryByRole('combobox', { name: 'Page' })).toBeNull()
   })
 })
+
+// The report and source dialogs were fixed for this once; this one had the
+// same gap: Esc did nothing and the keyboard stayed on the grid behind it.
+describe('the keyboard', () => {
+  it('starts on the site picker and closes on Esc', async () => {
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+    renderDialog({ onClose })
+    expect(await screen.findByRole('combobox', { name: 'Site' })).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})

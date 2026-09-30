@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { reportComponent } from '../../api/community.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { apiError } from '../../utils/errors.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { SPOTLIGHT_Z } from '../editor/spotlight.js'
 
 const REPORT_REASONS = [
@@ -24,6 +25,7 @@ export default function ReportComponentDialog({ component, onClose }) {
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
+  useEscapeToClose(!!component, () => onClose?.())
 
   if (!component) return null
 
@@ -64,7 +66,7 @@ export default function ReportComponentDialog({ component, onClose }) {
         {done ? (
           <div className="p-4">
             <p className="text-sm text-[var(--studio-text)]">{t('Thanks — a moderator will look at it.')}</p>
-            <button type="button" onClick={onClose} className="studio-btn studio-btn-accent mt-3 w-full px-4 py-2 text-sm">
+            <button type="button" autoFocus onClick={onClose} className="studio-btn studio-btn-accent mt-3 w-full px-4 py-2 text-sm">
               {t('Close')}
             </button>
           </div>
@@ -73,7 +75,9 @@ export default function ReportComponentDialog({ component, onClose }) {
             {error && <p role="alert" className="studio-status-danger rounded-lg border px-3 py-2 text-xs">{error}</p>}
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-[var(--studio-text-muted)]">{t('Reason')}</span>
+              {/* Focus comes here from the card, so the dialog is where the keyboard is. */}
               <select
+                autoFocus
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
                 className="studio-input w-full px-3 py-2 text-sm"
