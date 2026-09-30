@@ -5,6 +5,7 @@ import LanguageSwitcher from '../LanguageSwitcher.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { HTML_ALLOW, PUBLIC_HTML_SANDBOX, withBuilderInteractiveHtml, withViewportMeta } from '../../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../../utils/schemaToFiles.js'
+import { colorModeFor, withColorModeHtml } from '../../utils/colorMode.js'
 
 function htmlForPage(page, pages, pageHtmlMap) {
   const live = pageHtmlMap?.[page?.id]
@@ -21,6 +22,7 @@ export default function MobileEditorPreview({
   currentPageId,
   pageHtmlMap,
   theme,
+  colorModeSetting,
   customCss,
   customJs,
   error,
@@ -39,14 +41,16 @@ export default function MobileEditorPreview({
   const currentIsHtml = currentPage.mode === 'html' || !!currentHtml.trim()
 
   const previewHtml = useMemo(() => {
-    if (currentIsHtml) return withViewportMeta(withBuilderInteractiveHtml(currentHtml))
+    // A light/dark switch works here as it does on the published page.
+    const colorMode = colorModeFor({ theme, colorMode: colorModeSetting, pages }, currentPage, pageHtmlMap)
+    if (currentIsHtml) return withViewportMeta(withBuilderInteractiveHtml(withColorModeHtml(currentHtml, colorMode)))
     return withViewportMeta(schemaToSingleHtml({
       theme,
       customCss,
       customJs,
       pages: [currentPage],
-    }, title || currentPage.name || 'My Site'))
-  }, [currentHtml, currentIsHtml, currentPage, customCss, customJs, theme, title])
+    }, title || currentPage.name || 'My Site', { colorMode }))
+  }, [colorModeSetting, currentHtml, currentIsHtml, currentPage, customCss, customJs, pageHtmlMap, pages, theme, title])
 
   async function copyEditorLink() {
     try {
