@@ -51,6 +51,15 @@ describe('the editor on a phone', () => {
     expect(preview(pages, 'inner')).toContain('data-pwb-color-mode')
   })
 
+  it('frames the page in the editor theme, not in fixed light colours', () => {
+    preview([{ id: 'home', name: 'Home', components: [text] }])
+    const root = screen.getByTestId('mobile-editor-preview')
+    for (const part of [root, root.querySelector('header'), root.querySelector('nav')]) {
+      expect(part.className).not.toMatch(/#[0-9a-f]{3,6}|bg-white/i)
+      expect(part.className).toContain('var(--studio-')
+    }
+  })
+
   it('is drawn as before when the site has one palette', () => {
     expect(preview([{ id: 'home', name: 'Home', components: [text] }])).not.toContain('data-pwb-color-mode')
   })

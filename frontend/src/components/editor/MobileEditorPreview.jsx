@@ -82,7 +82,7 @@ export default function MobileEditorPreview({
           type="button"
           onClick={() => setFocused(false)}
           aria-label={t('Exit focused preview')}
-          className="fixed right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white/90 text-lg font-bold text-[#111827] shadow-lg backdrop-blur"
+          className="fixed right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-11 w-11 place-items-center rounded-full border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] text-lg font-bold text-[var(--studio-text)] shadow-lg"
         >
           ×
         </button>
@@ -91,21 +91,21 @@ export default function MobileEditorPreview({
   }
 
   return (
-    <main className="flex h-[100dvh] flex-col overflow-hidden bg-[#f3f4f6]" aria-label={t('Mobile site preview')} data-testid="mobile-editor-preview">
-      <header className="shrink-0 border-b border-[#e5e7eb] bg-white pt-[env(safe-area-inset-top)] shadow-sm">
+    <main className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--studio-shell)] text-[var(--studio-text)]" aria-label={t('Mobile site preview')} data-testid="mobile-editor-preview">
+      <header className="shrink-0 border-b border-[var(--studio-border)] bg-[var(--studio-panel)] pt-[env(safe-area-inset-top)]">
         <div className="flex h-14 items-center gap-2 px-3">
           <button
             type="button"
             onClick={onBack}
             aria-label={t('Go back')}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-xl text-[#374151] hover:bg-[#f3f4f6]"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-xl text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)]"
           >
             ←
           </button>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-[#111827]">{title || t('Untitled site')}</div>
-            <div className="flex items-center gap-1.5 text-[11px] text-[#6b7280]">
-              <span className={`h-1.5 w-1.5 rounded-full ${published ? 'bg-emerald-500' : 'bg-amber-500'}`} aria-hidden />
+            <div className="truncate text-sm font-semibold text-[var(--studio-text)]">{title || t('Untitled site')}</div>
+            <div className="flex items-center gap-1.5 text-[11px] text-[var(--studio-text-muted)]">
+              <span className={`h-1.5 w-1.5 rounded-full ${published ? 'bg-[var(--studio-success)]' : 'bg-[var(--studio-warning)]'}`} aria-hidden />
               <span>{t(published ? 'Published' : 'Draft')}</span>
               <span aria-hidden>·</span>
               <span className="truncate">{currentPage.name || t('Preview')}</span>
@@ -115,37 +115,37 @@ export default function MobileEditorPreview({
         </div>
       </header>
 
-      {error && <div role="alert" className="shrink-0 bg-red-50 px-4 py-2 text-xs text-red-700">{error}</div>}
+      {error && <div role="alert" className="shrink-0 bg-[var(--studio-danger-soft)] px-4 py-2 text-xs text-[var(--studio-danger)]">{error}</div>}
 
       <section className="relative min-h-0 flex-1 bg-white" aria-label={t('Preview')}>
         {frame}
       </section>
 
-      <nav className="shrink-0 border-t border-[#e5e7eb] bg-white pb-[env(safe-area-inset-bottom)]" aria-label={t('Mobile preview navigation')}>
+      <nav className="shrink-0 border-t border-[var(--studio-border)] bg-[var(--studio-panel)] pb-[env(safe-area-inset-bottom)]" aria-label={t('Mobile preview navigation')}>
         {/* Type sits on the labels, not the items: the editor's buttons take
             their font from context (index.css), so a size on the <button>
             never applied and two tabs read at 16px beside two at 11px. */}
         <div className="grid h-16 grid-cols-4">
-          <button type="button" onClick={() => setFocused(true)} aria-label={t('Focus preview')} className="flex min-w-0 flex-col items-center justify-center gap-1 text-[#4f46e5]">
+          <button type="button" onClick={() => setFocused(true)} aria-label={t('Focus preview')} className="flex min-w-0 flex-col items-center justify-center gap-1 text-[var(--studio-accent-text)]">
             <EyeIcon size={19} aria-hidden />
             <span className="text-[11px] font-semibold">{t('Preview')}</span>
           </button>
-          <button type="button" onClick={() => setSheet('pages')} className="flex min-w-0 flex-col items-center justify-center gap-1 text-[#4b5563]">
+          <button type="button" onClick={() => setSheet('pages')} className="flex min-w-0 flex-col items-center justify-center gap-1 text-[var(--studio-text-muted)]">
             <LayersIcon size={19} aria-hidden />
             <span className="text-[11px] font-medium">{t('Pages')}</span>
           </button>
           {published && slug ? (
-            <Link to={`/site/${slug}`} target="_blank" rel="noreferrer" aria-label={t('Open live site')} className="flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-medium text-[#4b5563]">
+            <Link to={`/site/${slug}`} target="_blank" rel="noreferrer" aria-label={t('Open live site')} className="flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-medium text-[var(--studio-text-muted)]">
               <GlobeIcon size={19} aria-hidden />
               <span>{t('Live')}</span>
             </Link>
           ) : (
-            <div className="flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-medium text-[#9ca3af]" aria-label={t('Draft')}>
+            <div className="flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-medium text-[var(--studio-text-faint)]" aria-label={t('Draft')}>
               <GlobeIcon size={19} aria-hidden />
               <span>{t('Draft')}</span>
             </div>
           )}
-          <button type="button" onClick={() => setSheet('desktop')} className="flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[#4b5563]">
+          <button type="button" onClick={() => setSheet('desktop')} className="flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[var(--studio-text-muted)]">
             <EditIcon size={19} aria-hidden />
             <span className="max-w-full truncate text-[11px] font-medium">{t('Desktop')}</span>
           </button>
@@ -158,13 +158,13 @@ export default function MobileEditorPreview({
             role="dialog"
             aria-modal="true"
             aria-labelledby={`mobile-${sheet}-sheet-title`}
-            className="max-h-[75dvh] w-full overflow-hidden rounded-t-3xl bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl"
+            className="max-h-[75dvh] w-full overflow-hidden rounded-t-3xl border-t border-[var(--studio-border)] bg-[var(--studio-panel-raised)] pb-[env(safe-area-inset-bottom)] text-[var(--studio-text)] shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-[#d1d5db]" aria-hidden />
-            <div className="flex items-center justify-between border-b border-[#e5e7eb] px-5 py-4">
-              <h2 id={`mobile-${sheet}-sheet-title`} className="text-base font-semibold text-[#111827]">{t(sheet === 'pages' ? 'Site pages' : 'Desktop editing')}</h2>
-              <button type="button" onClick={() => setSheet(null)} className="grid h-9 w-9 place-items-center rounded-full bg-[#f3f4f6] text-lg" aria-label={t('Close')}>×</button>
+            <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-[var(--studio-border-strong)]" aria-hidden />
+            <div className="flex items-center justify-between border-b border-[var(--studio-border)] px-5 py-4">
+              <h2 id={`mobile-${sheet}-sheet-title`} className="text-base font-semibold text-[var(--studio-text)]">{t(sheet === 'pages' ? 'Site pages' : 'Desktop editing')}</h2>
+              <button type="button" onClick={() => setSheet(null)} className="grid h-9 w-9 place-items-center rounded-full bg-[var(--studio-control)] text-lg text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]" aria-label={t('Close')}>×</button>
             </div>
             {sheet === 'pages' ? (
               <div className="max-h-[55dvh] overflow-y-auto p-3">
@@ -175,19 +175,19 @@ export default function MobileEditorPreview({
                     aria-label={page.name || `${t('Pages')} ${index + 1}`}
                     onClick={() => { onSelectPage(page.id); setSheet(null) }}
                     aria-current={page.id === currentPage.id ? 'page' : undefined}
-                    className={`mb-1 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left ${page.id === currentPage.id ? 'bg-[#eef2ff] text-[#3730a3]' : 'text-[#374151] hover:bg-[#f9fafb]'}`}
+                    className={`mb-1 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left ${page.id === currentPage.id ? 'bg-[var(--studio-accent-soft)] text-[var(--studio-accent-text)]' : 'text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]'}`}
                   >
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-xs font-bold shadow-sm">{index + 1}</span>
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--studio-control)] text-xs font-bold">{index + 1}</span>
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold">{page.name || `${t('Pages')} ${index + 1}`}</span>
-                    {page.id === currentPage.id && <span className="text-[#4f46e5]" aria-hidden>✓</span>}
+                    {page.id === currentPage.id && <span className="text-[var(--studio-accent-text)]" aria-hidden>✓</span>}
                   </button>
                 ))}
               </div>
             ) : (
               <div className="space-y-4 p-5">
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#eef2ff] text-[#4f46e5]"><EditIcon size={23} aria-hidden /></div>
-                <p className="text-sm leading-6 text-[#4b5563]">{t('Mobile keeps the site preview-first. Open this link on a desktop computer to make changes.')}</p>
-                <button type="button" onClick={copyEditorLink} className="w-full rounded-xl bg-[var(--studio-accent)] px-4 py-3 text-white hover:bg-[var(--studio-accent-fill-hover)]">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--studio-accent-soft)] text-[var(--studio-accent-text)]"><EditIcon size={23} aria-hidden /></div>
+                <p className="text-sm leading-6 text-[var(--studio-text-muted)]">{t('Mobile keeps the site preview-first. Open this link on a desktop computer to make changes.')}</p>
+                <button type="button" onClick={copyEditorLink} className="w-full rounded-xl bg-[var(--studio-accent)] px-4 py-3 text-[var(--studio-on-accent)] hover:bg-[var(--studio-accent-fill-hover)]">
                   <span className="text-sm font-semibold">{t(copied ? 'Editor link copied' : 'Copy editor link')}</span>
                 </button>
               </div>
