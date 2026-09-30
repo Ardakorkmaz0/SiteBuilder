@@ -60,6 +60,20 @@ class TestClone:
         assert clone.id != src.id
         assert clone.site_options == src.site_options
 
+    def test_clone_says_how_ready_the_copy_is(self, client, alice):
+        # The dashboard shows the copy at once; it used to guess one page.
+        a, atok = alice
+        pages = [{'id': f'p{i}', 'name': f'P{i}', 'components': []} for i in range(3)]
+        src = Site.objects.create(owner=a, title='Three', schema={'theme': {}, 'pages': pages}, published=True)
+        _auth(client, atok)
+        resp = client.post(f'/api/sites/clone/{src.slug}/')
+        assert resp.status_code == 201
+        assert resp.data['project_health']['page_count'] == 3
+        listed = client.get('/api/sites/').data
+        rows = listed['results'] if isinstance(listed, dict) else listed
+        row = next(r for r in rows if r['id'] == resp.data['id'])
+        assert resp.data['project_health'] == row['project_health']
+
     def test_cannot_clone_someone_elses_draft(self, client, alice, bob):
         a, _ = alice
         _, btok = bob
