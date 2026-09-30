@@ -14,7 +14,8 @@ import {
 } from './colorMode.js'
 import { DEFAULT_THEME, THEME_PRESETS, presetTheme, themedStyles } from './theme.js'
 import { builderInteractiveJs } from './htmlRuntime.js'
-import { schemaToSingleHtml } from './schemaToFiles.js'
+import { schemaToFiles, schemaToSingleHtml } from './schemaToFiles.js'
+import { pageToResponsiveHtml } from './pageCode.js'
 import { publishedPagesFor } from './publishedPages.js'
 import { htmlEmbedDocument } from './htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from './htmlSnippetSizing.js'
@@ -165,6 +166,29 @@ describe('the published page', () => {
     expect(out).toContain('srcdoc="&lt;p style=&quot;color:#1d1d1f&quot;&gt;"')
     expect(out).toContain('var s = "color:#111"')
     expect(out.indexOf('data-pwb-color-mode')).toBeLessThan(out.indexOf('</head>'))
+  })
+})
+
+describe('the downloaded site', () => {
+  const text = { id: 't', type: 'text', props: { text: 'Hi' }, styles: { color: '#1d1d1f' }, layout: { x: 10, y: 80, w: 200, h: 40 } }
+
+  it('carries both palettes in the project and the single-file page', () => {
+    const schema = site([toggle, text])
+    const files = schemaToFiles(schema)
+    const index = files.find((file) => file.name === 'index.html').content
+    expect(index).toContain('<style data-pwb-color-mode>')
+    expect(files.find((file) => file.name === 'styles.css').content).toContain('var(--pwb-alt-text, #1d1d1f)')
+    // The design itself is kept as it is stored.
+    expect(files.find((file) => file.name === 'schema.json').content).not.toContain('--pwb-alt-')
+    const single = pageToResponsiveHtml(schema.pages[0], 'Home', schema)
+    expect(single).toContain('<style data-pwb-color-mode>')
+    expect(single).toContain('var(--pwb-alt-text, #1d1d1f)')
+  })
+
+  it('is written as before when the site has one palette', () => {
+    const schema = site([text])
+    expect(schemaToFiles(schema).find((file) => file.name === 'index.html').content).not.toContain('data-pwb-color-mode')
+    expect(pageToResponsiveHtml(schema.pages[0], 'Home', schema)).not.toContain('var(--pwb-alt-')
   })
 })
 
