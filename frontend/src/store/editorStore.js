@@ -1277,7 +1277,10 @@ export const useEditorStore = create((set, get) => ({
   // save. Replaces the current design but is undoable and left unsaved (dirty).
   // Returns the imported pages' HTML keyed by page id (as loadSchema does), or
   // false when there was nothing to import.
-  importSchema: (raw) => {
+  importSchema: (file) => {
+    // The dashboard's "Export project" wraps the site ({ format, version,
+    // site: { schema, … } }); the editor's own export is the design itself.
+    const raw = file?.format === 'sitebuilder-project' ? file.site?.schema : file
     const valid = raw && Array.isArray(raw.pages) && raw.pages.length > 0
     if (!valid) return false
     const { schema: normalized, htmlMap } = splitPageHtml(normalizeSchema(raw, { filterUnknown: true }))
