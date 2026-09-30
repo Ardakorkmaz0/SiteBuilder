@@ -183,11 +183,7 @@ export default function ProfilePage() {
     setError('')
     try {
       const copy = await cloneSite(site.slug)
-      setSites((previous) => [{
-        ...copy,
-        favorite_count: 0,
-        project_health: { score: 20, page_count: 1, seo_pages: 0, seo_total: 1 },
-      }, ...previous])
+      setSites((previous) => [{ ...copy, favorite_count: 0 }, ...previous])
     } catch (requestError) {
       setError(apiError(requestError))
     } finally {

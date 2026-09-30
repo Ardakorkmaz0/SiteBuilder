@@ -1523,7 +1523,11 @@ class CloneSiteView(APIView):
             site_options=src.site_options,
             published=False,
         )
-        return Response(SiteSerializer(copy).data, status=status.HTTP_201_CREATED)
+        data = SiteSerializer(copy).data
+        # The dashboard shows the copy straight away, with the readiness its
+        # list row will have.
+        data['project_health'] = SiteListSerializer().get_project_health(copy)
+        return Response(data, status=status.HTTP_201_CREATED)
 
 
 class ReportSiteView(APIView):
