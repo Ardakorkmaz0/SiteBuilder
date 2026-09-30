@@ -144,3 +144,52 @@ describe('standalone published inbox', () => {
     expect(form.textContent).toContain('Message sent.')
   })
 })
+
+// A form inside an HTML block posts to the page around it: the block has no
+// address of its own. The page used to drop that message, so a contact form in
+// a block reached no inbox on the published site or in the viewer.
+describe('a form in an HTML block', () => {
+  const blockPage = (options) => {
+    const opened = page('<iframe srcdoc="<p>block</p>"></iframe><iframe src="https://video.example/embed"></iframe>', options)
+    const [block, foreign] = [...opened.doc.querySelectorAll('iframe')].map((frame) => frame.contentWindow)
+    vi.spyOn(block, 'postMessage')
+    return { ...opened, block, foreign }
+  }
+  const post = (win, source, data) => win.dispatchEvent(new win.MessageEvent('message', { source, data }))
+
+  it('is sent to the inbox by the published page, which tells the block how it went', async () => {
+    const { win, block } = blockPage()
+    post(win, block, { type: 'pwb-form-submit', data: { name: 'Ada', message: 'Hi' }, page: '' })
+    expect(win.fetch).toHaveBeenCalledTimes(1)
+    const [url, request] = win.fetch.mock.calls[0]
+    expect(url).toBe('https://portfolio.example/__sitebuilder/form/')
+    expect(request).toMatchObject({ method: 'POST', credentials: 'omit', mode: 'cors' })
+    expect(JSON.parse(request.body)).toEqual({ data: { name: 'Ada', message: 'Hi' }, page: '/about/', website: '' })
+    await vi.waitFor(() => expect(block.postMessage).toHaveBeenCalledWith({ type: 'pwb-form-result', ok: true }, '*'))
+  })
+
+  it('reports a failure to the block when the inbox cannot be reached', async () => {
+    const { win, block } = blockPage({ endpoint: false })
+    post(win, block, { type: 'pwb-form-submit', data: { name: 'Ada' }, page: '' })
+    expect(win.fetch).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(block.postMessage).toHaveBeenCalledWith({ type: 'pwb-form-result', ok: false }, '*'))
+  })
+
+  it('is only taken from blocks on the page itself, and only as short text', () => {
+    const { win, foreign, block } = blockPage()
+    post(win, foreign, { type: 'pwb-form-submit', data: { name: 'Spam' }, page: '' })
+    post(win, {}, { type: 'pwb-form-submit', data: { name: 'Spam' }, page: '' })
+    expect(win.fetch).not.toHaveBeenCalled()
+    post(win, block, { type: 'pwb-form-submit', data: { name: { nested: true }, long: 'x'.repeat(3000) }, page: '' })
+    expect(JSON.parse(win.fetch.mock.calls[0][1].body).data).toEqual({ name: '[object Object]', long: 'x'.repeat(2000) })
+  })
+
+  it('is passed up by a page shown inside the viewer, and the answer passed back down', () => {
+    const { win, block, parent } = blockPage({ preview: true })
+    post(win, block, { type: 'pwb-form-submit', data: { name: 'Ada' }, page: '' })
+    expect(win.fetch).not.toHaveBeenCalled()
+    expect(parent.postMessage).toHaveBeenCalledWith({ type: 'pwb-form-submit', data: { name: 'Ada' }, page: '' }, '*')
+    post(win, parent, { type: 'pwb-form-result', ok: true })
+    expect(block.postMessage).toHaveBeenCalledWith({ type: 'pwb-form-result', ok: true }, '*')
+  })
+})

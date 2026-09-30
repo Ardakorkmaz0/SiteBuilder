@@ -92,3 +92,28 @@ test('an animated section is there for a visitor who asked for less motion', asy
   await calm.close()
   await api(request, 'DELETE', `/sites/${siteId}/`)
 })
+
+// A form in an HTML block posts to the page around it, and the published page
+// dropped that message: the visitor saw nothing and the owner got nothing.
+test('a form in an HTML block on a canvas page reaches the inbox', async ({ page, request, browser }) => {
+  const { data: site } = await api(request, 'POST', '/sites/', { title: 'E2E block form' })
+  const { data: full } = await api(request, 'GET', `/sites/${site.id}/`)
+  const code = '<form><input name="name"><textarea name="message"></textarea><button type="submit">Send</button></form>'
+  const block = { id: 'form', type: 'html', props: { code }, styles: {}, layout: { x: 40, y: 40, w: 500, h: 220 } }
+  await api(request, 'PATCH', `/sites/${site.id}/`, { schema: { ...full.schema, pages: [{ ...full.schema.pages[0], components: [block] }] } })
+  await openEditor(page, site.id)
+  const slug = await publish(page, request, site.id)
+
+  const viewer = await browser.newContext()
+  const visitor = await viewer.newPage()
+  await visitor.goto(`${BACKEND}/s/${slug}/`)
+  const form = visitor.frameLocator('iframe').first()
+  await form.locator('input[name="name"]').fill('Ada')
+  await form.locator('textarea[name="message"]').fill('Hello from a block')
+  await form.getByRole('button', { name: 'Send' }).click()
+  await expect(form.getByRole('status')).toHaveText('Message sent.')
+  const { data: rows } = await api(request, 'GET', `/sites/${site.id}/submissions/`)
+  expect(rows.map((row) => row.data.message)).toEqual(['Hello from a block'])
+  await viewer.close()
+  await api(request, 'DELETE', `/sites/${site.id}/`)
+})
