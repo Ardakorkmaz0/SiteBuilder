@@ -244,7 +244,9 @@ const INTERACTIVE_SCRIPT = `
     // actions resolve to about:srcdoc and blank the iframe out — same failure
     // mode the anchor handler defends against. External http(s) actions still
     // submit normally (sandbox blocks the response but the click is intentional).
-    var lastSubmittedForm = null;
+    // What the page around this one will answer about: a form of its own, or
+    // an HTML block whose form this page passed up ({ form } or { block }).
+    var lastPending = null;
     function formPayload(form) {
       var data = {};
       var fields = form.querySelectorAll('input,textarea,select');
@@ -258,36 +260,79 @@ const INTERACTIVE_SCRIPT = `
       }
       return data;
     }
+    // A block's form contents, held to what a form here would send.
+    function cleanPayload(data) {
+      var clean = {};
+      var keys = data && typeof data === 'object' ? Object.keys(data).slice(0, 20) : [];
+      for (var i = 0; i < keys.length; i++) {
+        var name = String(keys[i]).trim();
+        var value = data[keys[i]];
+        if (name) clean[name.slice(0, 80)] = String(value == null ? '' : value).slice(0, 2000);
+      }
+      return clean;
+    }
+    // Sends to the inbox this published page names; done(ok) once known.
+    function postToInbox(data, website, done) {
+      var config = document.querySelector('meta[name="pwb-form-endpoint"]');
+      var endpoint = config && config.getAttribute('content');
+      // The serving layer names the inbox: /__sitebuilder/form/ on the
+      // owner's domain, /s/<slug>/__sitebuilder/form/ on the shared address.
+      // Only those two shapes, on this host: an imported meta tag must never
+      // become a destination for arbitrary form contents.
+      if (!/^\\/(?:s\\/[a-z0-9-]+\\/)?__sitebuilder\\/form\\/$/.test(endpoint || '') || typeof window.fetch !== 'function') {
+        done(false);
+        return;
+      }
+      window.fetch(new URL(endpoint, location.href).href, {
+        method: 'POST', credentials: 'omit', mode: 'cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: data, page: location.pathname.slice(0, 140), website: website })
+      }).then(function (response) {
+        done(response.ok);
+      }, function () {
+        done(false);
+      });
+    }
     function sendToInbox(form) {
-      lastSubmittedForm = form;
       if (standalone()) {
-        var config = document.querySelector('meta[name="pwb-form-endpoint"]');
-        var endpoint = config && config.getAttribute('content');
-        // The serving layer names the inbox: /__sitebuilder/form/ on the
-        // owner's domain, /s/<slug>/__sitebuilder/form/ on the shared address.
-        // Only those two shapes, on this host: an imported meta tag must never
-        // become a destination for arbitrary form contents.
-        if (!/^\\/(?:s\\/[a-z0-9-]+\\/)?__sitebuilder\\/form\\/$/.test(endpoint || '') || typeof window.fetch !== 'function') {
-          showFormResult(form, false);
-          return;
-        }
         if (form.getAttribute('data-pwb-submitting') === 'true') return;
         form.setAttribute('data-pwb-submitting', 'true');
         var honeypot = form.querySelector('input[type="hidden"][name="website"]');
-        window.fetch(new URL(endpoint, location.href).href, {
-          method: 'POST', credentials: 'omit', mode: 'cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: formPayload(form), page: location.pathname.slice(0, 140), website: honeypot ? honeypot.value : '' })
-        }).then(function (response) {
-          showFormResult(form, response.ok);
-        }).catch(function () {
-          showFormResult(form, false);
-        }).finally(function () {
+        postToInbox(formPayload(form), honeypot ? honeypot.value : '', function (ok) {
           form.removeAttribute('data-pwb-submitting');
+          showFormResult(form, ok);
         });
         return;
       }
+      lastPending = { form: form };
       try { parent.postMessage({ type: 'pwb-form-submit', data: formPayload(form), page: location.hash || '' }, '*'); } catch (e) {}
+    }
+    // One of this page's HTML blocks (a srcdoc frame), not an embed from elsewhere.
+    function ownBlock(source) {
+      if (!source) return false;
+      var frames = document.querySelectorAll('iframe[srcdoc]');
+      for (var i = 0; i < frames.length; i++) {
+        if (frames[i].contentWindow === source) return true;
+      }
+      return false;
+    }
+    function answerBlock(block, ok) {
+      try { block.postMessage({ type: 'pwb-form-result', ok: ok }, '*'); } catch (e) {}
+    }
+    // A form in an HTML block has no address of its own and posts to this page.
+    // The published page sends it to the inbox; a page shown inside the viewer
+    // passes it up. Either way the block hears how it went.
+    function relayBlockForm(event) {
+      var data = event.data;
+      if (!data || data.type !== 'pwb-form-submit' || !ownBlock(event.source)) return;
+      var block = event.source;
+      var payload = cleanPayload(data.data);
+      if (standalone()) {
+        postToInbox(payload, '', function (ok) { answerBlock(block, ok); });
+        return;
+      }
+      lastPending = { block: block };
+      try { parent.postMessage({ type: 'pwb-form-submit', data: payload, page: location.hash || '' }, '*'); } catch (e) {}
     }
     function showFormResult(form, ok) {
       if (!form) return;
@@ -379,9 +424,11 @@ const INTERACTIVE_SCRIPT = `
       document.addEventListener('submit', onSubmit);
       window.addEventListener('message', function (event) {
         if (!standalone() && event.source === window.parent && event.data && event.data.type === 'pwb-form-result') {
-          showFormResult(lastSubmittedForm, !!event.data.ok);
+          if (lastPending && lastPending.block) answerBlock(lastPending.block, !!event.data.ok);
+          else showFormResult(lastPending && lastPending.form, !!event.data.ok);
         }
       });
+      window.addEventListener('message', relayBlockForm);
       initSticky();
       syncThemeToggles();
       initPalette();
