@@ -8,6 +8,7 @@ import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../../ui/UiThemeProvider.jsx'
 import { useAuthStore } from '../../store/authStore.js'
 import PublicToolbar from './PublicToolbar.jsx'
+import { cloneSite } from '../../api/sites.js'
 
 vi.mock('../../api/sites.js', () => ({ cloneSite: vi.fn(), reportSite: vi.fn() }))
 
@@ -76,5 +77,28 @@ describe('reading the source', () => {
     await openSource(user)
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog', { name: 'Source — Bakery' })).toBeNull()
+  })
+})
+
+// "Use this" swallowed every failure: the button stopped spinning and nothing
+// said why. A guest at the site limit now hears it, and anyone else sees the
+// reason.
+describe('using a site that cannot be copied', () => {
+  it('tells a guest at the limit what an account would change', async () => {
+    useAuthStore.setState({ token: 'x', user: { id: 9, username: 'guest-abcd', is_guest: true } })
+    cloneSite.mockRejectedValueOnce({ response: { status: 403, data: { code: 'guest_forbidden', action: 'site_limit', detail: 'Create an account to make more sites — the ones you have are kept.' } } })
+    const user = userEvent.setup()
+    renderToolbar()
+    await user.click(screen.getByRole('button', { name: /Use this/ }))
+    expect(await screen.findByText('A guest can keep three sites at a time. An account has no limit.')).toBeInTheDocument()
+  })
+
+  it('says why for everyone else', async () => {
+    useAuthStore.setState({ token: 'x', user: { id: 9, username: 'grace', is_guest: false } })
+    cloneSite.mockRejectedValueOnce({ response: { status: 403, data: { detail: 'This site was taken down by a moderator.' } } })
+    const user = userEvent.setup()
+    renderToolbar()
+    await user.click(screen.getByRole('button', { name: /Use this/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('This site was taken down by a moderator.')
   })
 })

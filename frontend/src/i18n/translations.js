@@ -272,6 +272,7 @@ export const TURKISH_TRANSLATIONS = {
   'Client review link': 'Müşteri inceleme bağlantısı',
   'Anyone with this private link can preview the draft and leave comments.': 'Bu özel bağlantıya sahip kişiler taslağı görüntüleyip yorum bırakabilir.',
   'Could not copy the link.': 'Bağlantı kopyalanamadı.',
+  'Could not copy this site.': 'Bu site kopyalanamadı.',
   'Message sent.': 'Mesaj gönderildi.',
   'Message could not be sent.': 'Mesaj gönderilemedi.',
   'Create a new review link? The previous link will stop working.': 'Yeni bir inceleme bağlantısı oluşturulsun mu? Önceki bağlantı çalışmayı durduracak.',
