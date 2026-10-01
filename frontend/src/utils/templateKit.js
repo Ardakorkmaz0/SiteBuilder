@@ -194,7 +194,8 @@ export function baseCss(p) {
   html, body { overflow-x: hidden; }
   body { margin:0; background:var(--bg); color:var(--ink); font-family:${p.body.fam};
     line-height:1.65; font-size:16.5px; }
-  h1,h2,h3,h4 { font-family:${p.head.fam}; line-height:1.12; margin:0 0 14px; letter-spacing:-0.015em; }
+  h1,h2,h3,h4 { font-family:${p.head.fam}; line-height:1.12; margin:0 0 14px; letter-spacing:-0.015em;
+    overflow-wrap:break-word; -webkit-hyphens:auto; hyphens:auto; }
   img { max-width:100%; height:auto; display:block; }
   a { color:inherit; text-decoration:none; }
   .container { width:100%; max-width:1120px; margin:0 auto; padding:0 24px; }
