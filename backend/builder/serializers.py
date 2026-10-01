@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password as dj_validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_image_file_extension
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import ErrorDetail
@@ -22,6 +23,7 @@ from .models import (
     UploadedImage,
 )
 from .site_meta import share_image
+from .svg_images import check_svg, is_svg_upload
 from .validators import clean_published_pages, validate_and_clean_schema
 
 
@@ -764,6 +766,21 @@ class SiteVersionSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class UploadedImageField(serializers.ImageField):
+    """Pillow checks every raster upload and the extension has to be an image
+    one; an SVG, which Pillow cannot open, is checked as an SVG (svg_images.py).
+    Its size rides along on the file for create() to store."""
+
+    def to_internal_value(self, data):
+        if is_svg_upload(data):
+            upload = serializers.FileField.to_internal_value(self, data)
+            upload.svg_size = check_svg(upload, MAX_IMAGE_BYTES)
+            return upload
+        upload = super().to_internal_value(data)
+        validate_image_file_extension(upload)
+        return upload
+
+
 class UploadedImageSerializer(serializers.ModelSerializer):
     """Upload + listing for user images consumed by the Image component.
 
@@ -775,6 +792,7 @@ class UploadedImageSerializer(serializers.ModelSerializer):
     """
 
     url = serializers.SerializerMethodField()
+    file = UploadedImageField(write_only=True)
 
     class Meta:
         model = UploadedImage
@@ -783,7 +801,6 @@ class UploadedImageSerializer(serializers.ModelSerializer):
         # schema). Listing both lets DRF pick the right one for each direction.
         fields = ('id', 'file', 'url', 'alt', 'width', 'height', 'size', 'uploaded_at')
         read_only_fields = ('id', 'url', 'width', 'height', 'size', 'uploaded_at')
-        extra_kwargs = {'file': {'write_only': True}}
 
     def get_url(self, obj):
         request = self.context.get('request')
@@ -813,6 +830,10 @@ class UploadedImageSerializer(serializers.ModelSerializer):
                 validated_data['size'] = upload.size
             except Exception:  # noqa: BLE001
                 pass
+            svg_size = getattr(upload, 'svg_size', None)
+            if svg_size:
+                validated_data['width'], validated_data['height'] = svg_size
+                return super().create(validated_data)
             try:
                 from PIL import Image  # noqa: WPS433 - local keeps top clean
                 upload.seek(0)
