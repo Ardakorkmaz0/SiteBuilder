@@ -100,6 +100,7 @@ export default function PublicToolbar({
   const { t } = useLanguage()
   const [showCode, setShowCode] = useState(false)
   const [cloning, setCloning] = useState(false)
+  const [cloneError, setCloneError] = useState('')
   const [copied, setCopied] = useState(false)
   const [showReport, setShowReport] = useState(false)
   useEscapeToClose(showReport, () => setShowReport(false))
@@ -122,11 +123,16 @@ export default function PublicToolbar({
       return
     }
     setCloning(true)
+    setCloneError('')
     try {
       const copy = await cloneSite(site.slug)
       navigate(`/editor/${copy.id}`)
-    } catch {
+    } catch (err) {
       setCloning(false)
+      // A guest at the site limit is told what an account changes; anything
+      // else says why, instead of the button just stopping.
+      if (err?.response?.data?.code === 'guest_forbidden' && guestGate('limit')) return
+      setCloneError(apiError(err, t('Could not copy this site.')))
     }
   }
 
@@ -189,6 +195,11 @@ export default function PublicToolbar({
   return (
     <>
       {guestDialog}
+      {cloneError && (
+        <div role="alert" className="studio-theme-surface studio-status-danger fixed bottom-4 left-1/2 z-[135] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-[var(--studio-radius)] border px-4 py-2 text-xs font-medium shadow-[var(--studio-shadow)]">
+          {cloneError}
+        </div>
+      )}
       <div className="studio-theme-surface">
         <header className="preview-topbar">
           <div className="preview-topbar-inner">
