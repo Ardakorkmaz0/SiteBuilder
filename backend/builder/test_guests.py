@@ -112,6 +112,21 @@ class TestWhatAGuestCannotDo:
         assert response.status_code == 403
         assert response.data['action'] == 'site_limit'
 
+    def test_use_this_is_capped_too(self, guest):
+        # Copying a public site made a fourth, and a fifth: the cap only stood
+        # in front of a blank site.
+        api, _ = guest
+        author = User.objects.create_user(username='author', password='secret123')
+        public = Site.objects.create(owner=author, title='Public', published=True)
+        for index in range(GUEST_SITE_LIMIT):
+            assert api.post(f'/api/sites/clone/{public.slug}/').status_code == 201
+
+        response = api.post(f'/api/sites/clone/{public.slug}/')
+
+        assert response.status_code == 403
+        assert response.data['action'] == 'site_limit'
+        assert Site.objects.filter(owner__username__startswith='guest-').count() == GUEST_SITE_LIMIT
+
 
 class TestKeepingTheWork:
     def test_signing_up_keeps_the_sites_and_the_id(self, guest):
