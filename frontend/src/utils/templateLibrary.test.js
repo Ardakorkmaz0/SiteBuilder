@@ -228,6 +228,13 @@ describe('the gallery offers real structural choice', () => {
       expect(wide, `${family} hard-codes ${wide.join(', ')}px`).toEqual([])
     }
   })
+
+  it('lets a word too long for a phone break inside a heading', () => {
+    // "Kullanabiliyorsanız" in a poster heading is wider than a 390px phone:
+    // with nothing allowing a break it ran off the side and was cut off.
+    const missing = ALL.filter((variant) => !/h1,\s*h2,\s*h3,\s*h4\s*\{[^}]*overflow-wrap:\s*(break-word|anywhere)/.test(variant.build('Probe')))
+    expect(missing.map((variant) => variant.id)).toEqual([])
+  })
 })
 
 describe('design packs stay readable', () => {
