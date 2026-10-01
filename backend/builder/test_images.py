@@ -111,6 +111,62 @@ class TestImageUpload:
         assert resp.status_code == 400
 
 
+# SVG was listed as allowed and said so in the error, but the model field ran
+# every upload through Pillow, which cannot open SVG: a plain logo was refused
+# as "not an image". It is checked as what it is instead, and anything in it
+# that could run is refused rather than quietly rewritten.
+LOGO_SVG = (b'<svg xmlns="http://www.w3.org/2000/svg" width="48" height="24" viewBox="0 0 48 24">'
+            b'<circle cx="12" cy="12" r="10" fill="#e8543f"/></svg>')
+
+
+@pytest.mark.django_db
+class TestSvgUploads:
+    def _post(self, client, alice, settings, tmp_path, name, body, ctype='image/svg+xml'):
+        settings.MEDIA_ROOT = tmp_path
+        _, token = alice
+        _auth(client, token)
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        return client.post('/api/images/', {'file': SimpleUploadedFile(name, body, ctype)}, format='multipart')
+
+    def test_a_plain_svg_logo_uploads_with_its_size(self, client, alice, settings, tmp_path):
+        resp = self._post(client, alice, settings, tmp_path, 'logo.svg', LOGO_SVG)
+        assert resp.status_code == 201, resp.data
+        assert resp.data['url'].endswith('.svg')
+        assert (resp.data['width'], resp.data['height']) == (48, 24)
+
+    def test_the_size_comes_from_the_view_box_when_none_is_given(self, client, alice, settings, tmp_path):
+        body = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><rect width="120" height="40"/></svg>'
+        resp = self._post(client, alice, settings, tmp_path, 'mark.svg', body)
+        assert resp.status_code == 201, resp.data
+        assert (resp.data['width'], resp.data['height']) == (120, 40)
+
+    @pytest.mark.parametrize('body', [
+        b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+        b'<svg xmlns="http://www.w3.org/2000/svg"><rect onload="alert(1)" width="1" height="1"/></svg>',
+        b'<svg xmlns="http://www.w3.org/2000/svg"><foreignObject><div>x</div></foreignObject></svg>',
+        b'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><a xlink:href="javascript:alert(1)"><rect width="1" height="1"/></a></svg>',
+        b'<!DOCTYPE svg [<!ENTITY x "y">]><svg xmlns="http://www.w3.org/2000/svg">&x;</svg>',
+    ])
+    def test_anything_that_could_run_is_refused(self, client, alice, settings, tmp_path, body):
+        resp = self._post(client, alice, settings, tmp_path, 'bad.svg', body)
+        assert resp.status_code == 400
+        assert not UploadedImage.objects.exists()
+
+    @pytest.mark.parametrize('name,body', [
+        ('fake.svg', b'<html><body>not a picture</body></html>'),
+        ('broken.svg', b'<svg xmlns="http://www.w3.org/2000/svg"><rect'),
+        ('page.html', LOGO_SVG),
+    ])
+    def test_what_is_not_an_svg_file_is_refused(self, client, alice, settings, tmp_path, name, body):
+        resp = self._post(client, alice, settings, tmp_path, name, body)
+        assert resp.status_code == 400
+        assert not UploadedImage.objects.exists()
+
+    def test_a_png_still_has_to_have_an_image_extension(self, client, alice, settings, tmp_path):
+        resp = self._post(client, alice, settings, tmp_path, 'page.html', _png_bytes(), 'image/png')
+        assert resp.status_code == 400
+
+
 @pytest.mark.django_db
 class TestImageScoping:
     def test_list_only_returns_own_images(self, client, alice, bob, settings, tmp_path):
