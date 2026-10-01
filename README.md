@@ -92,6 +92,15 @@ npm run dev
 ```
 
 ### macOS / Linux (Bash)
+
+If `node --version` fails, install Node.js first:
+
+```bash
+sudo pacman -S nodejs npm          # Arch / CachyOS / Manjaro
+sudo apt install nodejs npm        # Debian / Ubuntu (or nvm for a newer Node)
+brew install node                  # macOS
+```
+
 ```bash
 # 1. Clone the repository from GitHub
 git clone https://github.com/Ardakorkmaz0/SiteBuilder.git
@@ -102,7 +111,7 @@ cd SiteBuilder/backend
 # 3. Create a virtual environment named '.venv'
 python3 -m venv .venv
 
-# 4. Activate the virtual environment
+# 4. Activate the virtual environment (fish: source .venv/bin/activate.fish)
 source .venv/bin/activate
 
 # 5. Install all required Python packages
@@ -126,6 +135,20 @@ npm install
 # 11. Start the Vite development server
 npm run dev
 ```
+
+> **Copied the folder over from Windows?** A `backend/.venv` or
+> `frontend/node_modules` installed on Windows does not work on Linux: the
+> virtualenv has `Scripts\python.exe` instead of `bin/python`, and the packages in
+> `node_modules` are Windows builds without the executable bit, so `npm run dev`
+> fails with `vite: Permission denied`. Delete both and run the steps above again:
+>
+> ```bash
+> rm -rf backend/.venv frontend/node_modules
+> ```
+>
+> To keep the Windows virtualenv (a dual-boot drive, say), create the Linux one
+> under another name instead, e.g. `python3 -m venv .venv-linux`; it is
+> git-ignored.
 
 Once started, visit **`http://localhost:5173/`** in your web browser. The API
 runs on `http://127.0.0.1:8001/`.
@@ -163,7 +186,8 @@ cd frontend && npm run e2e        # end-to-end, in a real browser
 The end-to-end suite (`frontend/e2e/`) starts the backend and Vite itself, or
 uses them if they are already running, and signs up a fresh account for each
 run. If `python` is not the backend's virtualenv, say which one:
-`E2E_PYTHON=../backend/.venv/Scripts/python.exe npm run e2e`. The first time,
+`E2E_PYTHON=../backend/.venv/Scripts/python.exe npm run e2e` on Windows, or
+`E2E_PYTHON=../backend/.venv/bin/python npm run e2e` on macOS/Linux. The first time,
 install its browser with `npx playwright install chromium`. CI runs all three
 on every push.
 
