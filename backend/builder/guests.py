@@ -20,7 +20,10 @@ import secrets
 from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
+
+from .models import Site
 
 # Enough to try the product properly; not enough to turn throwaway identities
 # into a hosting farm. Signing up lifts it.
@@ -41,6 +44,18 @@ def is_guest(user):
         return False
     profile = getattr(user, 'profile', None)
     return bool(profile and profile.is_guest)
+
+
+def refuse_past_site_limit(user):
+    """A guest identity is free to make; it is not free to accumulate. Every
+    way of getting a new site goes through here (a blank one, a copy of a
+    public one), and the cap is lifted the moment they make it an account."""
+    if is_guest(user) and Site.objects.filter(owner=user).count() >= GUEST_SITE_LIMIT:
+        raise PermissionDenied({
+            'detail': 'Create an account to make more sites — the ones you have are kept.',
+            'code': 'guest_forbidden',
+            'action': 'site_limit',
+        })
 
 
 @transaction.atomic

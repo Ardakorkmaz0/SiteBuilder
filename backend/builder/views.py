@@ -23,7 +23,7 @@ from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
-from rest_framework.exceptions import ErrorDetail, PermissionDenied, ValidationError
+from rest_framework.exceptions import ErrorDetail, ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -65,11 +65,11 @@ from .validators import (
 )
 from .domains import DomainVerificationThrottle, check_domain, dns_records, domain_allowed, is_platform_host, normalize_domain, target_configured
 from .guests import (
-    GUEST_SITE_LIMIT,
     adopt_guest_work,
     create_guest_user,
     guest_blocked,
     is_guest,
+    refuse_past_site_limit,
     upgrade_guest,
 )
 from .serializers import (
@@ -580,16 +580,7 @@ class SiteViewSet(viewsets.ModelViewSet):
         return SiteSerializer
 
     def perform_create(self, serializer):
-        # A guest identity is free to make; it is not free to accumulate. The
-        # cap is lifted the moment they turn it into an account.
-        if is_guest(self.request.user):
-            made = Site.objects.filter(owner=self.request.user).count()
-            if made >= GUEST_SITE_LIMIT:
-                raise PermissionDenied({
-                    'detail': 'Create an account to make more sites — the ones you have are kept.',
-                    'code': 'guest_forbidden',
-                    'action': 'site_limit',
-                })
+        refuse_past_site_limit(self.request.user)
         serializer.save(owner=self.request.user)
 
     def perform_update(self, serializer):
@@ -1513,6 +1504,7 @@ class CloneSiteView(APIView):
         # site would be a way to publish it again.
         if src.moderation_blocked:
             return error_response('site_moderated', 'This site was taken down by a moderator.', status.HTTP_403_FORBIDDEN)
+        refuse_past_site_limit(request.user)
         copy = Site.objects.create(
             owner=request.user,
             title=f'{src.title} (copy)'[:100],
