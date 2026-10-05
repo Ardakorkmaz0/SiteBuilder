@@ -9,6 +9,9 @@
 #
 # Kullanım:  bash deploy.sh
 set -euo pipefail
+# Türkçe yerel ayarda (tr_TR) grep'in [A-Za-z] aralığı büyük "I"yı kaçırıyor;
+# paket adında I geçince derlenen paket bulunamıyor ve betik sessizce duruyor.
+export LC_ALL=C
 
 HOST="${SITEBUILDER_HOST:-SiteBuilt}"   # ~/.ssh/config içindeki isim
 REMOTE_APP="/home/ubuntu/sitebuilder"
