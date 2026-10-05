@@ -355,6 +355,47 @@ describe('applyMobileElementPatch', () => {
     expect(document.querySelector('style[data-pwb-responsive-overrides]')).toBeNull()
   })
 
+  it('keeps font, text case, italic and underline on the phone instead of dropping them', () => {
+    const p = document.getElementById('para')
+    applyMobileElementPatch(p, { fontFamily: 'Lora', textTransform: 'uppercase', italic: true, underline: true })
+
+    expect(p.style.fontFamily).toBe('')
+    expect(p.style.getPropertyValue('--pwb-mobile-font-family')).toContain('Lora')
+    expect(p.style.getPropertyValue('--pwb-mobile-text-transform')).toBe('uppercase')
+    expect(p.style.getPropertyValue('--pwb-mobile-font-style')).toBe('italic')
+    expect(p.style.getPropertyValue('--pwb-mobile-text-decoration')).toBe('underline')
+    expect(document.head.querySelector('link[data-pwb-font="Lora"]')).not.toBeNull()
+    const rule = document.head.querySelector('style[data-pwb-responsive-overrides]').textContent
+    expect(rule).toContain('[data-pwb-mobile-font-family]')
+    expect(rule).toContain('[data-pwb-mobile-text-transform]')
+    expect(describeElement(p).mobileFontFamily).toBe('Lora')
+
+    // Back to the page font: the phone falls back to the PC value again.
+    applyMobileElementPatch(p, { fontFamily: '' })
+    expect(p).not.toHaveAttribute('data-pwb-mobile-font-family')
+    expect(describeElement(p).mobileFontFamily).toBe('')
+  })
+
+  it('writes the plain value when italic or underline is unticked on the phone', () => {
+    const p = document.getElementById('para')
+    applyElementPatch(p, { italic: true, underline: true })
+    applyMobileElementPatch(p, { italic: false, underline: false })
+    expect(p.style.getPropertyValue('--pwb-mobile-font-style')).toBe('normal')
+    expect(p.style.getPropertyValue('--pwb-mobile-text-decoration')).toBe('none')
+  })
+
+  it('brings an older override stylesheet up to date', () => {
+    const old = document.createElement('style')
+    old.setAttribute('data-pwb-responsive-overrides', '')
+    old.textContent = '@media (max-width: 767px) { [data-pwb-mobile-width] { width: var(--pwb-mobile-width) !important; } }'
+    document.head.appendChild(old)
+
+    applyMobileElementPatch(document.getElementById('para'), { textTransform: 'uppercase' })
+    const styles = document.head.querySelectorAll('style[data-pwb-responsive-overrides]')
+    expect(styles).toHaveLength(1)
+    expect(styles[0].textContent).toContain('[data-pwb-mobile-text-transform]')
+  })
+
   it('clears only mobile overrides and removes the stylesheet when unused', () => {
     const p = document.getElementById('para')
     p.style.width = '640px'

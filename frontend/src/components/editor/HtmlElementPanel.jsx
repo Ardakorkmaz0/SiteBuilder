@@ -422,7 +422,7 @@ export default function HtmlElementPanel({
             <PanelGroup id="html-typography" title={t('Typography')} defaultOpen>
               <LabeledSelect
                 label={t('Font')}
-                value={info.fontFamily}
+                value={(isMobile ? info.mobileFontFamily : '') || info.fontFamily}
                 onChange={(value) => onChange({ fontFamily: value })}
                 options={translatedOptions(FONT_CHOICES)}
               />
