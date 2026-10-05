@@ -31,6 +31,10 @@ const MOBILE_STYLE_FIELDS = [
   // say something different about on a phone.
   ['line-height', 'line-height'],
   ['letter-spacing', 'letter-spacing'],
+  ['font-family', 'font-family'],
+  ['text-transform', 'text-transform'],
+  ['font-style', 'font-style'],
+  ['text-decoration', 'text-decoration'],
   ['padding-top', 'padding-top'],
   ['padding-right', 'padding-right'],
   ['padding-bottom', 'padding-bottom'],
@@ -56,7 +60,11 @@ ${MOBILE_STYLE_FIELDS.map(([name, property]) => (
 function ensureMobileOverrideStyle(doc) {
   if (!doc) return null
   let style = doc.querySelector(`style[${MOBILE_STYLE_TAG_ATTR}]`)
-  if (style) return style
+  if (style) {
+    // A page saved before a field was added carries the older rule list.
+    if (style.textContent !== MOBILE_OVERRIDE_CSS) style.textContent = MOBILE_OVERRIDE_CSS
+    return style
+  }
   style = doc.createElement('style')
   style.setAttribute(MOBILE_STYLE_TAG_ATTR, '')
   style.textContent = MOBILE_OVERRIDE_CSS
@@ -401,6 +409,7 @@ export function describeElement(el, win = el?.ownerDocument?.defaultView) {
     // picker round-trips our own choice; the computed value is a resolved stack
     // that would never match an option.
     fontFamily: fontFamilyKey(el.style.fontFamily),
+    mobileFontFamily: fontFamilyKey(el.style.getPropertyValue(`${MOBILE_VAR_PREFIX}font-family`)),
     // Unitless line-height is what typography wants (it scales with the font),
     // so it is stored and shown as a ratio rather than pixels.
     lineHeight: cs ? lineHeightRatio(cs.lineHeight, cs.fontSize) : 0,
@@ -813,6 +822,16 @@ export function applyMobileElementPatch(el, patch = {}) {
     const n = Number(patch.letterSpacing)
     setMobileStyle(el, 'letter-spacing', patch.letterSpacing === '' || !Number.isFinite(n) ? '' : `${n}em`)
   }
+  if (patch.fontFamily !== undefined) {
+    const stack = fontStackFor(patch.fontFamily)
+    setMobileStyle(el, 'font-family', stack)
+    if (stack) ensureFontLink(el.ownerDocument, patch.fontFamily)
+  }
+  direct('textTransform', 'text-transform')
+  // Unticking on a phone has to beat an italic/underline the PC value or the
+  // stylesheet gives, so it writes the plain value instead of clearing.
+  if (patch.italic !== undefined) setMobileStyle(el, 'font-style', patch.italic ? 'italic' : 'normal')
+  if (patch.underline !== undefined) setMobileStyle(el, 'text-decoration', patch.underline ? 'underline' : 'none')
   for (const [key, name] of [
     ['paddingTop', 'padding-top'],
     ['paddingRight', 'padding-right'],
