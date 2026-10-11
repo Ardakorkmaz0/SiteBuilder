@@ -368,6 +368,18 @@ function sharedLayoutValue(items, key) {
     : null
 }
 
+// Several store edits behind one click, as ONE undo step (the store's pointer
+// gesture does exactly this for a drag).
+function asOneStep(run) {
+  const store = useEditorStore.getState()
+  store.beginHistoryGesture()
+  try {
+    run()
+  } finally {
+    store.endHistoryGesture()
+  }
+}
+
 function SectionTitle({ children }) {
   return (
     <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6b7280]">
@@ -499,6 +511,7 @@ function PropControl({ field, value, onChange, extras, pages = [], sections = nu
         onActiveChange={extras?.onActiveChange}
         children={extras?.children}
         onChildrenChange={extras?.onChildrenChange}
+        batch={extras?.batch}
       />
     )
   }
@@ -758,10 +771,10 @@ export default function PropertiesPanel({
   const applyLabel = ownTheme ? t('Apply to this page') : htmlMode ? t('Apply to pages') : t('Apply to design')
   // A whole theme at once (a preset or a saved one): set it, then restyle, as
   // presets always did, within the chosen scope.
-  const applyWholeTheme = (next) => {
+  const applyWholeTheme = (next) => asOneStep(() => {
     editTheme(next)
     restyleWith(next)
-  }
+  })
   // Extra hints and the X/Y fields used to hide behind a Basic/Extended switch
   // in this panel. That switch is gone — collapsible groups do that job — so
   // they now follow the app-wide Simple mode alone.
@@ -1441,13 +1454,13 @@ export default function PropertiesPanel({
         <LabeledSelect
           label={t('Shape')}
           value={component.props.shape || ''}
-          onChange={(shape) => {
+          onChange={(shape) => asOneStep(() => {
             updateProps(component.id, { shape: shape || undefined })
             if (shape === 'square' || shape === 'circle') {
               const side = Math.round(Math.min(layout.w || 200, layout.h || 200))
               fitEmbedBox(component.id, { w: side, h: side })
             }
-          }}
+          })}
           options={[['', t('Original')], ['square', t('Square')], ['circle', t('Circle')]]}
         />
       )}
@@ -1479,6 +1492,7 @@ export default function PropertiesPanel({
                   onActiveChange: (id) => setActiveTab(component.id, id),
                   children: component.children || [],
                   onChildrenChange: (next) => setTabsChildren(component.id, next),
+                  batch: asOneStep,
                 }
               : undefined
           }
@@ -1634,10 +1648,10 @@ export default function PropertiesPanel({
           <div className="mt-3">
             <AiComponentEdit
               component={component}
-              onApply={(styles, props) => {
+              onApply={(styles, props) => asOneStep(() => {
                 if (styles && Object.keys(styles).length) updateStyles(component.id, styles)
                 if (props && Object.keys(props).length) updateProps(component.id, props)
-              }}
+              })}
             />
           </div>
         )}

@@ -488,7 +488,9 @@ export function LabeledCheckbox({ label, checked, onChange, hint }) {
 // auto-generated and kept stable when labels are renamed, so already-placed
 // children stay associated with their tab. Removing the active tab moves its
 // children onto the first remaining tab.
-export function TabsEditorControl({ label, value, onChange, activeId, onActiveChange, children, onChildrenChange }) {
+// `batch` runs a function whose edits are to count as ONE undo step: adding or
+// removing a tab writes the list, the blocks in it and the tab that is showing.
+export function TabsEditorControl({ label, value, onChange, activeId, onActiveChange, children, onChildrenChange, batch = (run) => run() }) {
   const { t } = useLanguage()
   const tabs = Array.isArray(value) ? value.filter((tab) => tab && tab.id) : []
 
@@ -502,23 +504,25 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
   const rename = (id, label) =>
     onChange(tabs.map((tab) => (tab.id === id ? { ...tab, label } : tab)))
 
-  const add = () => {
+  const add = () => batch(() => {
     const id = genId()
     onChange([...tabs, { id, label: t('Tab {count}', { count: tabs.length + 1 }) }])
     if (onActiveChange) onActiveChange(id)
-  }
+  })
 
   const remove = (id) => {
     if (tabs.length <= 1) return
     const next = tabs.filter((tab) => tab.id !== id)
-    onChange(next)
-    // Reassign any children that pointed at the removed tab.
-    if (children && onChildrenChange) {
-      onChildrenChange(
-        children.map((c) => (c.tabId === id ? { ...c, tabId: next[0].id } : c)),
-      )
-    }
-    if (activeId === id && onActiveChange) onActiveChange(next[0].id)
+    batch(() => {
+      onChange(next)
+      // Reassign any children that pointed at the removed tab.
+      if (children && onChildrenChange) {
+        onChildrenChange(
+          children.map((c) => (c.tabId === id ? { ...c, tabId: next[0].id } : c)),
+        )
+      }
+      if (activeId === id && onActiveChange) onActiveChange(next[0].id)
+    })
   }
 
   const move = (id, dir) => {
