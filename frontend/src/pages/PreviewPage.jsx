@@ -17,7 +17,7 @@ import { colorModeFor, withColorModeHtml, withColorModePage } from '../utils/col
 import { ColorModeRoot } from '../components/renderer/ColorMode.jsx'
 import { pageHasMotion } from '../utils/motion.js'
 import { previewDeviceWidth } from '../utils/previewDevices.js'
-import { customCssBlock, safeCustomJs, themeVariablesCss } from '../utils/theme.js'
+import { safeCustomCss, safeCustomJs, themeVariablesCss } from '../utils/theme.js'
 import { googleFontHrefForTheme } from '../utils/googleFonts.js'
 import PublicToolbar from '../components/preview/PublicToolbar.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
@@ -386,6 +386,12 @@ export default function PreviewPage() {
     return mode && palette.forPage ? { ...mode, initial: palette.forPage } : mode
   }, [site?.schema, current, palette.forPage])
   const hasCustomJs = !!safeCustomJs(site?.schema?.customJs)
+  // A site's own stylesheet is its owner's to write, and it is not ours to run:
+  // in this document `button { display: none }` or a full-screen ::before would
+  // style the viewer around the page too — somebody else's CSS on the app's
+  // origin, in front of a signed-in visitor. Like a site with scripts, a site
+  // with a stylesheet is shown in the sandboxed frame, as its published page is.
+  const hasCustomCss = !!safeCustomCss(site?.schema?.customCss).trim()
   const hasHtmlEmbed = useMemo(() => {
     const walk = (arr) => {
       for (const c of arr || []) {
@@ -415,7 +421,7 @@ export default function PreviewPage() {
     () => (site?.schema?.pages || []).some((p) => pageHasMotion(p)),
     [site?.schema?.pages],
   )
-  const useIframe = hasCustomJs || hasHtmlEmbed || hasPinnedFixed || hasMotion
+  const useIframe = hasCustomJs || hasCustomCss || hasHtmlEmbed || hasPinnedFixed || hasMotion
   const staticMode = searchParams.get('mode') === 'static'
   const iframeHtml = useMemo(() => {
     if (!useIframe || !current?.id) return ''
@@ -537,9 +543,10 @@ export default function PreviewPage() {
     )
   }
 
+  // Theme variables only (each value cleaned by themeVariablesCss). The site's
+  // custom CSS never reaches this document: see hasCustomCss.
   const siteCss = `${themeVariablesCss(current?.theme || site?.schema?.theme)}
-body { font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, sans-serif); color: var(--site-text, #1d1d1f); background: var(--site-bg, #ffffff); }
-${customCssBlock(site?.schema?.customCss)}`
+body { font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, sans-serif); color: var(--site-text, #1d1d1f); background: var(--site-bg, #ffffff); }`
 
   if (useIframe) {
     const setComponentPreviewMode = (nextMode) => {
