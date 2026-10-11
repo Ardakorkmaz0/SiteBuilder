@@ -37,7 +37,7 @@ describe('changing it', () => {
     const onZoom = vi.fn()
     renderControl({ onZoom })
 
-    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    await user.click(screen.getByRole('button', { name: 'Zoom the canvas in' }))
 
     expect(onZoom).toHaveBeenCalledWith(67)
   })
@@ -47,7 +47,7 @@ describe('changing it', () => {
     const onZoom = vi.fn()
     renderControl({ onZoom })
 
-    await user.click(screen.getByRole('button', { name: 'Zoom out' }))
+    await user.click(screen.getByRole('button', { name: 'Zoom the canvas out' }))
 
     expect(onZoom).toHaveBeenCalledWith(50)
   })
