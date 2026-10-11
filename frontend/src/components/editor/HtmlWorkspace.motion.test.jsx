@@ -75,8 +75,8 @@ describe('how big the page is drawn', () => {
 
   it('offers a zoom control on the edit canvas', () => {
     mountWorkspace()
-    expect(screen.getByRole('button', { name: 'Zoom in' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Zoom out' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zoom the canvas in' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zoom the canvas out' })).toBeInTheDocument()
   })
 
   it('takes a chosen zoom instead of only ever fitting', async () => {
@@ -89,7 +89,7 @@ describe('how big the page is drawn', () => {
     mountWorkspace()
     expect(localStorage.getItem('pwb_html_canvas_zoom')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    await user.click(screen.getByRole('button', { name: 'Zoom the canvas in' }))
 
     // The exact step depends on what fit measured, which jsdom cannot do. What
     // matters is that the canvas is no longer on fit and the readout agrees.
@@ -102,7 +102,7 @@ describe('how big the page is drawn', () => {
   it('remembers the zoom across a remount', async () => {
     const user = userEvent.setup()
     const { unmount } = mountWorkspace()
-    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    await user.click(screen.getByRole('button', { name: 'Zoom the canvas in' }))
     const chosen = localStorage.getItem('pwb_html_canvas_zoom')
     unmount()
 

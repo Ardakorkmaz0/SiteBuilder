@@ -27,7 +27,8 @@ export default function CanvasZoomControl({
         <button
           type="button"
           onClick={() => onZoom(nextZoom(zoom, -1, fitScale))}
-          aria-label={t('Zoom out')}
+          aria-label={t('Zoom the canvas out')}
+          title={t('Zoom the canvas out')}
           className="grid h-6 w-6 place-items-center rounded-md text-base leading-none text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]"
         >
           &#8722;
@@ -48,7 +49,8 @@ export default function CanvasZoomControl({
         <button
           type="button"
           onClick={() => onZoom(nextZoom(zoom, 1, fitScale))}
-          aria-label={t('Zoom in')}
+          aria-label={t('Zoom the canvas in')}
+          title={t('Zoom the canvas in')}
           className="grid h-6 w-6 place-items-center rounded-md text-base leading-none text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]"
         >
           +
