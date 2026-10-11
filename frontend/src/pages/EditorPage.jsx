@@ -326,7 +326,17 @@ function RailSlot({ side, label, open, narrow, onOpen, onClose, children }) {
   )
 }
 
+// One editor per site. /editor/1 and /editor/2 are the same route, so going
+// from one straight to the other (the browser's history menu does it) used to
+// keep this component mounted with only the id swapped: the first site's undo
+// steps, selection and pending state stayed, and Undo then wrote the first
+// site's page over the second's. Keyed by the id, every site starts clean.
 export default function EditorPage() {
+  const { id } = useParams()
+  return <SiteEditor key={id} />
+}
+
+function SiteEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { language, setLanguage, t } = useLanguage()
