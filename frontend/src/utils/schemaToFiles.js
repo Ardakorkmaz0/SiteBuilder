@@ -443,7 +443,8 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
               ...ch,
               styles: { ...(ch.styles || {}), width: '100%', height: '100%' },
             }
-            return `<div id="${esc(elementIdFor(ch))}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px;height:${Math.round(l.h || 80)}px">${linkWrap(filled, boxedNode(filled))}</div>`
+            // nestedClass: the hook its "hide on PC / on mobile" rule names.
+            return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px;height:${Math.round(l.h || 80)}px">${linkWrap(filled, boxedNode(filled))}</div>`
           })
           .join('')
         const hidden = t.id === activeId ? '' : ' hidden'
