@@ -217,6 +217,68 @@ describe('duplicateElement / moveElement', () => {
   })
 })
 
+// An id names one element: a link to "#contact" goes to the first of two.
+describe('a copy of a block has ids of its own', () => {
+  it('renames the ids in the copy, and what points at them from inside the copy follows', () => {
+    document.body.innerHTML = `
+      <section id="hero"><h1>Hi</h1></section>
+      <section id="contact">
+        <label for="email">E-mail</label><input id="email" aria-describedby="hint email">
+        <p id="hint">We never share it</p>
+        <a id="again" href="#contact">Back to the form</a>
+        <a id="up" href="#hero">Up</a>
+        <svg><defs><linearGradient id="g"></linearGradient></defs><rect fill="url(#g)"></rect></svg>
+      </section>`
+    const original = document.getElementById('contact')
+    const copy = duplicateElement(original)
+
+    expect(copy.id).toBe('contact-2')
+    expect(copy.querySelector('input').id).toBe('email-2')
+    expect(copy.querySelector('label').getAttribute('for')).toBe('email-2')
+    expect(copy.querySelector('input').getAttribute('aria-describedby')).toBe('hint-2 email-2')
+    expect(copy.querySelector('a').getAttribute('href')).toBe('#contact-2')
+    expect(copy.querySelector('rect').getAttribute('fill')).toBe('url(#g-2)')
+    // A link out of the copy still goes where it went.
+    expect(copy.querySelectorAll('a')[1].getAttribute('href')).toBe('#hero')
+    // The original is as it was, and no id is on the page twice.
+    expect(original.querySelector('label').getAttribute('for')).toBe('email')
+    const ids = [...document.querySelectorAll('[id]')].map((node) => node.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('counts on for a second copy', () => {
+    const p = document.getElementById('para')
+    expect(duplicateElement(p).id).toBe('para-2')
+    expect(duplicateElement(p).id).toBe('para-3')
+  })
+
+  it('keeps an id the page styles the block by, so the copy arrives with its design', () => {
+    document.head.insertAdjacentHTML('beforeend', '<style id="page-css">#hero { padding: 80px } .x #hero-wide { margin: 0 }</style>')
+    const copy = duplicateElement(document.getElementById('hero'))
+    expect(copy.id).toBe('hero')
+    expect(copy.querySelector('h1').id).toBe('title-2')
+    document.getElementById('page-css').remove()
+  })
+})
+
+describe('Move up / Move down step over what cannot be seen', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '<section id="a">A</section><style>.x{}</style><script type="text/plain"></script><section id="b">B</section><style>.y{}</style>'
+  })
+
+  it('swaps with the block on the other side of a <style>', () => {
+    expect(moveElement(document.getElementById('b'), 'up')).toBe(true)
+    expect([...document.querySelectorAll('section')].map((node) => node.id)).toEqual(['b', 'a'])
+    expect(moveElement(document.getElementById('b'), 'down')).toBe(true)
+    expect([...document.querySelectorAll('section')].map((node) => node.id)).toEqual(['a', 'b'])
+  })
+
+  it('is at the edge when only a <style> is left on that side', () => {
+    expect(moveElement(document.getElementById('b'), 'down')).toBe(false)
+    expect(document.body.lastElementChild.tagName).toBe('STYLE')
+  })
+})
+
 describe('selectableParent', () => {
   it('returns the containing element', () => {
     expect(selectableParent(document.getElementById('para'))).toBe(document.getElementById('hero'))
@@ -418,6 +480,11 @@ describe('ensureElementId / bindLinkToTarget / nearestAnchor', () => {
     expect(ensureElementId(fresh)).toBe('2nd') // reuses
     // an element that already has an id keeps it
     expect(ensureElementId(document.getElementById('para'))).toBe('para')
+  })
+
+  it('names a Turkish heading the way it reads', () => {
+    document.body.innerHTML = '<h2 id="">Özellikler ve Fiyatlandırma</h2>'
+    expect(ensureElementId(document.querySelector('h2'))).toBe('ozellikler-ve-fiyatlandirma')
   })
 
   it('points a link at a target, giving the target an id', () => {
