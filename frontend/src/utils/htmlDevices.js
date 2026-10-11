@@ -17,10 +17,43 @@ export const DEVICES = [
   { id: 'pixel7', label: 'Pixel 7 · 412×915', w: 412, h: 915 },
 ]
 
+// Under this width a page is in its phone layout: the breakpoint the editor's
+// own phone overrides use (max-width: 767px), and what makes a device a phone.
+export const PHONE_BREAKPOINT = 768
+// The narrowest a page is drawn on the PC side of the toggle.
+export const PC_MIN_WIDTH = 1024
+
 // Is this device a phone-sized frame? Drives the PC/Mobile quick toggle.
 export const isMobileDevice = (id) => {
   const d = DEVICES.find((x) => x.id === id)
-  return !!d && d.w > 0 && d.w < 768
+  return !!d && d.w > 0 && d.w < PHONE_BREAKPOINT
+}
+
+// The page size "Responsive · area width" draws at, for the area the stage has
+// (`frameW`/`frameH`: what a browser frame around the page takes of it).
+//
+// The area can be narrower than any desktop is: a small window with both rails
+// open leaves about 700px. At that width the page is in its phone layout, with
+// the phone overrides made in the editor applied, while the toggle says PC. A
+// hamburger stood where the menu should be, and a PC style edit that a phone
+// override covers looked as if it had never been made. So PC is never drawn
+// narrower than a desktop: under the breakpoint the page keeps a desktop width
+// and is drawn smaller to fit, exactly like the fixed desktop sizes. `height`
+// then grows by the same factor, so the smaller page still fills the area.
+//
+// An unmeasured stage (0 wide, before the first layout) is not a narrow one.
+export function responsivePcSize({ availableW, availableH, frameW = 0, frameH = 0, measured = true }) {
+  const areaW = Math.round(availableW - frameW)
+  const areaH = Math.round(availableH - frameH)
+  if (!measured || areaW >= PHONE_BREAKPOINT) {
+    return { narrow: false, width: Math.max(320, areaW), height: Math.max(420, areaH) }
+  }
+  const scale = Math.min(1, availableW / (PC_MIN_WIDTH + frameW))
+  return {
+    narrow: true,
+    width: PC_MIN_WIDTH,
+    height: Math.max(420, Math.round(availableH / scale) - frameH),
+  }
 }
 
 // The sizes one side of that toggle offers: phones under Mobile, everything
