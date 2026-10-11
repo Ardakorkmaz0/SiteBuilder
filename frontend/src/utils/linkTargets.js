@@ -72,3 +72,31 @@ export function isDeadSectionLink(href, sections) {
   if (!id || id === 'top') return false
   return !(sections || []).some((s) => s.id === id)
 }
+
+// What someone means by what they typed into "External URL". The field writes
+// each keystroke as it is, so "example.com" was saved as a link to a page
+// called example.com on the site itself, and went nowhere once published.
+// Meant for when the field loses focus, not per keystroke: "exam" is on its
+// way to "example.com", and completing it mid-word would fight the typing.
+// A name that ends like a file ("about.html") is left alone: in a project of
+// files that IS the link.
+const FILE_ENDINGS = new Set([
+  'html', 'htm', 'php', 'asp', 'aspx', 'jsp', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp',
+  'css', 'js', 'json', 'xml', 'txt', 'md', 'zip', 'mp3', 'mp4',
+])
+
+export function completeExternalUrl(value) {
+  const href = String(value ?? '').trim()
+  if (!href || /\s/.test(href)) return href
+  // In-page, root-relative and relative links are already complete.
+  if (/^[#/?.]/.test(href)) return href
+  // host:port reads like a scheme ("localhost:3000"), so it goes first.
+  if (/^[a-z0-9.-]+:\d+(\/|$)/i.test(href)) return `https://${href}`
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return href
+  if (/^[^/@]+@[^/@]+\.[^/@]+$/.test(href)) return `mailto:${href}`
+  const host = href.split(/[/?#]/)[0]
+  const labels = host.split('.')
+  if (labels.length < 2 || labels.some((label) => !/^[a-z0-9-]+$/i.test(label))) return href
+  if (FILE_ENDINGS.has(labels[labels.length - 1].toLowerCase())) return href
+  return `https://${href}`
+}

@@ -8,6 +8,7 @@ import {
 } from '../../utils/htmlQuickEdit.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { apiError } from '../../utils/errors.js'
+import { completeExternalUrl } from '../../utils/linkTargets.js'
 
 // Shared property controls inherit the active Studio theme.
 const inputCls = 'studio-input min-w-0 w-full px-2.5 py-2 text-sm'
@@ -703,6 +704,10 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
           value={href}
           placeholder="https://…"
           onChange={(e) => onChange(e.target.value)}
+          onBlur={(e) => {
+            const complete = completeExternalUrl(e.target.value)
+            if (complete !== e.target.value) onChange(complete)
+          }}
         />
       )}
       {kind === 'top' && (
