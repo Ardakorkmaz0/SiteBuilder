@@ -28,6 +28,10 @@ const PAD = 6
 // box is measured around the text the page will actually show.
 export function measureHtmlSnippet(component, width, { timeout = 2500, font = '' } = {}) {
   return new Promise((resolve) => {
+    // The window this measurement belongs to, held for the timers below: they
+    // can fire after the page that asked has gone (a test's document torn
+    // down, an editor that was left), and then there is no global `window`.
+    const win = window
     let frame
     let settled = false
     const done = (result) => {
@@ -62,9 +66,9 @@ export function measureHtmlSnippet(component, width, { timeout = 2500, font = ''
         `width:${Math.max(MIN_W, Math.round(width))}px`, 'height:10px',
         'visibility:hidden', 'pointer-events:none', 'border:0',
       ].join(';')
-      const timer = window.setTimeout(() => done(null), timeout)
+      const timer = win.setTimeout(() => done(null), timeout)
       const read = () => {
-        window.clearTimeout(timer)
+        win.clearTimeout(timer)
         try {
           const cd = frame.contentDocument
           const body = cd?.body
@@ -105,7 +109,7 @@ export function measureHtmlSnippet(component, width, { timeout = 2500, font = ''
         // reflow, and the settle timer runs in the PARENT window: an offscreen
         // iframe may never get an animation frame of its own.
         const fontsReady = frame.contentWindow?.document?.fonts?.ready
-        const settle = () => window.setTimeout(read, 30)
+        const settle = () => win.setTimeout(read, 30)
         if (fontsReady?.then) {
           let waited = false
           const go = () => {
@@ -114,7 +118,7 @@ export function measureHtmlSnippet(component, width, { timeout = 2500, font = ''
             settle()
           }
           fontsReady.then(go, go)
-          window.setTimeout(go, Math.max(200, timeout - 500))
+          win.setTimeout(go, Math.max(200, timeout - 500))
         } else {
           settle()
         }
