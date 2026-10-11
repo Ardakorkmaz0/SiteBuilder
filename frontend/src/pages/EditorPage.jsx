@@ -405,6 +405,10 @@ export default function EditorPage() {
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
   const [published, setPublished] = useState(false)
+  // Whether the site is published as far as the server has told us, readable
+  // from a save that is waiting in the queue. `published` above is this
+  // render's value, and a waiting save was scheduled in an older render.
+  const publishedRef = useRef(false)
   // A moderator took the site down: it stays off the platform whatever the
   // publish switch says (the server enforces it), so say so rather than let
   // Publish look like it worked.
@@ -819,7 +823,7 @@ export default function EditorPage() {
     const timer = window.setTimeout(() => {
       const s = saveLifecycleRef.current
       if (shouldRunEditorAutoSave(s, discardLeaveRef.current)) {
-        s.save(s.published, { auto: true })
+        s.save(undefined, { auto: true })
       }
     }, EDITOR_AUTO_SAVE_DELAY_MS)
     return () => window.clearTimeout(timer)
@@ -842,7 +846,7 @@ export default function EditorPage() {
     const flush = () => {
       const s = saveLifecycleRef.current
       if (shouldRunEditorAutoSave(s, discardLeaveRef.current)) {
-        s.save(s.published, { auto: true })
+        s.save(undefined, { auto: true })
       }
     }
     const onVisibility = () => { if (document.visibilityState === 'hidden') flush() }
@@ -861,6 +865,7 @@ export default function EditorPage() {
         setTitle(data.title)
         setSlug(data.slug)
         setPublished(data.published)
+        publishedRef.current = !!data.published
         setModerationBlocked(!!data.moderation_blocked)
         setSiteOptions(data.site_options || {})
         setReviewToken(data.review_token || '')
@@ -933,7 +938,7 @@ export default function EditorPage() {
       if (scope === 'save') {
         e.preventDefault()
         const lifecycle = saveLifecycleRef.current
-        if (!lifecycle?.loading) lifecycle?.save(lifecycle.published)
+        if (!lifecycle?.loading) lifecycle?.save()
         return
       }
       if (scope === 'field') return
@@ -1400,7 +1405,14 @@ export default function EditorPage() {
     return map
   }
 
-  async function performSave(nextPublished = published, { auto = false, versionSource } = {}) {
+  // `wantPublished` is a boolean only when the save IS the publish switch.
+  // Every other save keeps the site as it is, and reads that when it runs, not
+  // when it was scheduled: an automatic save fires 2.5s after an edit, and one
+  // that queued behind a publish request still held "not published" and took
+  // the site down again the moment the publish finished (and put a site that
+  // was just unpublished back up).
+  async function performSave(wantPublished, { auto = false, versionSource } = {}) {
+      const nextPublished = typeof wantPublished === 'boolean' ? wantPublished : publishedRef.current
       setAutoSaveState('saving')
       const schemaBase = useEditorStore.getState().schema
       const map = liveHtmlMap({ commit: true })
@@ -1449,6 +1461,7 @@ export default function EditorPage() {
         },
         { saveSource: versionSource || (auto ? 'auto' : 'manual') },
       )
+      publishedRef.current = !!data.published
       setPublished(data.published)
       setModerationBlocked(!!data.moderation_blocked)
       setSlug(data.slug)
@@ -1473,7 +1486,7 @@ export default function EditorPage() {
       return data
   }
 
-  async function save(nextPublished = published, { auto = false, versionSource } = {}) {
+  async function save(nextPublished, { auto = false, versionSource } = {}) {
     // Every server write goes through one queue. Automatic saves wait behind an
     // active write instead of being dropped; each queued task invokes the latest
     // render's performSave so slow requests cannot lose newer work.
@@ -3339,7 +3352,7 @@ export default function EditorPage() {
             open={historyOpen}
             siteId={id}
             onClose={() => setHistoryOpen(false)}
-            onSave={(options) => save(published, options)}
+            onSave={(options) => save(undefined, options)}
             hasUnsavedChanges={dirty || htmlDirty || metaDirty || workspaceDirty}
             autoSaveEnabled={autoSaveEnabled}
             onAutoSaveEnabled={setAutoSaveEnabled}
@@ -3369,7 +3382,10 @@ export default function EditorPage() {
               }
               metaRevisionRef.current = 0
               setMetaDirty(false)
-              if (fresh?.published !== undefined) setPublished(fresh.published)
+              if (fresh?.published !== undefined) {
+                publishedRef.current = !!fresh.published
+                setPublished(fresh.published)
+              }
               markSaved()
             }}
           />
