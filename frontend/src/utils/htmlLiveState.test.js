@@ -6,6 +6,8 @@
 import { describe, expect, it } from 'vitest'
 import { liveStateDiff, restoreAuthoredState, withLiveState } from './htmlLiveState.js'
 import { serializeDocument } from './htmlPlacement.js'
+import { applyElementMotion } from './htmlMotion.js'
+import { applyElementPatch } from './htmlElementEdit.js'
 
 const authored = `<!DOCTYPE html><html lang="en" class="scroll-smooth"><head><title>t</title></head>
 <body class="bg-white">
@@ -132,11 +134,73 @@ describe('restoreAuthoredState', () => {
   // The borrowed value is only borrowed until the author overrules it.
   it('keeps a value the author changed by hand', () => {
     const doc = parse(withLiveState(authored, liveStateDiff(authored, live)))
-    doc.getElementById('panel').className = 'flex gap-2'
+    doc.getElementById('menu').setAttribute('aria-expanded', 'mixed')
 
     restoreAuthoredState(doc.documentElement)
 
-    expect(doc.getElementById('panel').className).toBe('flex gap-2')
+    expect(doc.getElementById('menu').getAttribute('aria-expanded')).toBe('mixed')
     expect(doc.documentElement.className).toBe('scroll-smooth')
+  })
+})
+
+// class and style hold many things at once. An edit to one of them used to
+// keep everything the page's scripts had put in the attribute as well.
+describe('an edit to an element that is showing borrowed state', () => {
+  const page = (body) => `<!DOCTYPE html><html><head><title>t</title></head><body>${body}</body></html>`
+
+  it('saves a hover effect without the class the reveal script added', () => {
+    const file = page('<div id="card" class="card" data-anim-in="fade-up">Card</div>')
+    const running = page('<div id="card" class="card pwb-in" data-anim-in="fade-up">Card</div>')
+    const doc = parse(withLiveState(file, liveStateDiff(file, running)))
+    const card = doc.getElementById('card')
+    expect(card.className).toBe('card pwb-in')
+
+    applyElementMotion(card, { animHover: 'lift' })
+
+    const saved = parse(serializeDocument(doc)).getElementById('card')
+    expect(saved.className).toBe('card pwb-hover pwb-hover-lift')
+  })
+
+  it('keeps a class the script took away, and drops one the author took away', () => {
+    const file = page('<div id="panel" class="panel hidden pwb-hover pwb-hover-grow">Panel</div>')
+    const running = page('<div id="panel" class="panel open pwb-hover pwb-hover-grow">Panel</div>')
+    const doc = parse(withLiveState(file, liveStateDiff(file, running)))
+
+    applyElementMotion(doc.getElementById('panel'), { animHover: 'none' })
+
+    expect(parse(serializeDocument(doc)).getElementById('panel').className).toBe('panel hidden')
+  })
+
+  it('saves a colour without the inline styles the script wrote', () => {
+    const file = page('<div id="panel" style="height: 0px;">Panel</div><p id="plain">Text</p>')
+    const running = page('<div id="panel" style="height: 240px; opacity: 1;">Panel</div><p id="plain" style="opacity: 1;">Text</p>')
+    const doc = parse(withLiveState(file, liveStateDiff(file, running)))
+
+    applyElementPatch(doc.getElementById('panel'), { color: '#ff0000' })
+    applyElementPatch(doc.getElementById('plain'), { color: '#ff0000' })
+
+    const saved = parse(serializeDocument(doc))
+    expect(saved.getElementById('panel').style.height).toBe('0px')
+    expect(saved.getElementById('panel').style.opacity).toBe('')
+    expect(saved.getElementById('panel').style.color).toBe('rgb(255, 0, 0)')
+    expect(saved.getElementById('plain').getAttribute('style')).toMatch(/^color: ?(rgb\(255, 0, 0\)|#ff0000);?$/)
+  })
+
+  it('keeps the author\'s value for the very thing the script had changed', () => {
+    const file = page('<div id="panel" style="height: 0px;">Panel</div>')
+    const running = page('<div id="panel" style="height: 240px;">Panel</div>')
+    const doc = parse(withLiveState(file, liveStateDiff(file, running)))
+
+    applyElementPatch(doc.getElementById('panel'), { height: 300 })
+
+    expect(parse(serializeDocument(doc)).getElementById('panel').style.height).toBe('300px')
+  })
+
+  it('leaves the author\'s own text alone when nothing was edited', () => {
+    const file = page('<div id="panel" class="a   b" style="height:0">Panel</div>')
+    const running = page('<div id="panel" class="a b open" style="height: 240px;">Panel</div>')
+    const doc = parse(withLiveState(file, liveStateDiff(file, running)))
+
+    expect(serializeDocument(doc)).toContain('<div id="panel" class="a   b" style="height:0">')
   })
 })
