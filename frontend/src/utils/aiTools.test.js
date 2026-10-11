@@ -261,3 +261,53 @@ describe('setLayout argument validation', () => {
     expect(page().components[0].layout.x).toBe(80)
   })
 })
+
+// A tool that did nothing must say so. "ok" for a component that was never
+// created is how the assistant ends a turn with "I added a footer" over a page
+// that has none.
+describe('addComponent that adds nothing', () => {
+  it('refuses a component type that does not exist and lists the real ones', () => {
+    const res = executeTool('addComponent', { type: 'footer' })
+    expect(res.ok).toBe(false)
+    expect(res.error).toMatch(/footer/)
+    expect(res.error).toContain('heading')
+    expect(page().components).toHaveLength(0)
+  })
+
+  it('refuses a parent that cannot hold components', () => {
+    const heading = add('heading')
+    const res = executeTool('addComponent', { type: 'text', parentId: heading })
+    expect(res.ok).toBe(false)
+    expect(res.error).toMatch(/container|section|tabs/i)
+    expect(page().components).toHaveLength(1)
+  })
+
+  it('still reports the new id when the component was created', () => {
+    const res = executeTool('addComponent', { type: 'heading' })
+    expect(res.ok).toBe(true)
+    expect(res.id).toBe(page().components[0].id)
+  })
+})
+
+describe('setActiveTab', () => {
+  it('refuses a tab the block does not have', () => {
+    const tabs = add('tabs')
+    const res = executeTool('setActiveTab', { id: tabs, tabId: 'no-such-tab' })
+    expect(res.ok).toBe(false)
+    expect(res.error).toMatch(/no-such-tab/)
+  })
+
+  it('refuses a block that is not a tabs block', () => {
+    const heading = add('heading')
+    expect(executeTool('setActiveTab', { id: heading, tabId: 't1' }).ok).toBe(false)
+  })
+})
+
+describe('alignComponent', () => {
+  it('refuses a mode that is not one of the six', () => {
+    const heading = add('heading')
+    const res = executeTool('alignComponent', { id: heading, mode: 'centre' })
+    expect(res.ok).toBe(false)
+    expect(res.error).toContain('centerH')
+  })
+})

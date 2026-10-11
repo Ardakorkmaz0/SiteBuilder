@@ -743,13 +743,24 @@ export function executeTool(rawName, args) {
   const name = normaliseToolName(rawName)
   switch (name) {
     case 'addComponent': {
+      // "ok" for a component that was never created is how a turn ends with
+      // "I added a footer" over a page that has none: models invent types
+      // (footer, hero, form) and put children in blocks that cannot hold any.
+      if (!registry[a.type]) {
+        return { ok: false, error: `Unknown component type ${JSON.stringify(a.type)}. Use one of: ${Object.keys(registry).join(', ')}.` }
+      }
       if (a.parentId) {
         const bad = checkId(a.parentId, 'Parent')
         if (bad) return bad
+        const parent = findDeep(store.schema, a.parentId)
+        if (!['container', 'tabs', 'region'].includes(parent?.type)) {
+          return { ok: false, error: `Component "${a.parentId}" is a ${parent?.type} and cannot hold other components. Only a container, a tabs block or a section (addSection) can be a parentId.` }
+        }
       }
       const before = collectIds(store.schema)
       store.addComponent(a.type, Math.round(a.x || 24), Math.round(a.y || 24), a.parentId || null)
       const newId = firstNewId(collectIds(useEditorStore.getState().schema), before)
+      if (!newId) return { ok: false, error: `The ${a.type} could not be added.` }
       return { ok: true, id: newId }
     }
     case 'setPlan': {
@@ -824,8 +835,20 @@ export function executeTool(rawName, args) {
       return checkId(a.id) || (store.moveForward(a.id), { ok: true })
     case 'moveBackward':
       return checkId(a.id) || (store.moveBackward(a.id), { ok: true })
-    case 'setActiveTab':
-      return checkId(a.id) || (store.setActiveTab(a.id, a.tabId), { ok: true })
+    case 'setActiveTab': {
+      const bad = checkId(a.id)
+      if (bad) return bad
+      const node = findDeep(store.schema, a.id)
+      if (node.type !== 'tabs') {
+        return { ok: false, error: `Component "${a.id}" is a ${node.type}, not a tabs block.` }
+      }
+      const tabIds = (Array.isArray(node.props?.tabs) ? node.props.tabs : []).map((tab) => tab?.id).filter(Boolean)
+      if (!tabIds.includes(a.tabId)) {
+        return { ok: false, error: `No tab ${JSON.stringify(a.tabId)} on "${a.id}". Its tabs: ${tabIds.join(', ') || '(none)'}.` }
+      }
+      store.setActiveTab(a.id, a.tabId)
+      return { ok: true }
+    }
     case 'setCustomCss':
       store.setCustomCss(a.code || '')
       return { ok: true }
@@ -917,8 +940,16 @@ export function executeTool(rawName, args) {
       store.setVisibility(a.id, patch)
       return { ok: true }
     }
-    case 'alignComponent':
-      return checkId(a.id) || (store.alignComponent(a.id, a.mode), { ok: true })
+    case 'alignComponent': {
+      const bad = checkId(a.id)
+      if (bad) return bad
+      const modes = ['left', 'centerH', 'right', 'top', 'middleV', 'bottom']
+      if (!modes.includes(a.mode)) {
+        return { ok: false, error: `Unknown mode ${JSON.stringify(a.mode)}. Choose one of: ${modes.join(', ')}.` }
+      }
+      store.alignComponent(a.id, a.mode)
+      return { ok: true }
+    }
     case 'distributeSiblings': {
       if (a.parentId) {
         const bad = checkId(a.parentId, 'Parent')
