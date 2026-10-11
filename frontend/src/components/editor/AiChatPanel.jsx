@@ -89,6 +89,11 @@ function captureEditorPreviewState() {
     dirty: state.dirty,
     past: state.past,
     future: state.future,
+    // The stamps of those steps travel with them: left behind, the undo list
+    // had more stamps than steps after every AI run, and on an HTML page Undo
+    // (which takes the newest step of two lists by stamp) picked the wrong one.
+    pastAt: state.pastAt,
+    futureAt: state.futureAt,
     linkMode: state.linkMode,
     linkSourceId: state.linkSourceId,
   }
@@ -103,6 +108,8 @@ function restoreEditorPreviewState(snapshot) {
     dirty: snapshot.dirty,
     past: snapshot.past,
     future: snapshot.future,
+    pastAt: snapshot.pastAt,
+    futureAt: snapshot.futureAt,
     linkMode: snapshot.linkMode,
     linkSourceId: snapshot.linkSourceId,
   })
@@ -508,7 +515,14 @@ export default function AiChatPanel({
         // schema snapshot.
         .slice(0, -1)
       const previewBase = captureEditorPreviewState()
+      // From here until the canvas is put back, what it shows is a proposal:
+      // the store says so, and nothing saves it (see previewBase there).
+      useEditorStore.getState().beginPreview()
       let aiResult
+      let callsArr = []
+      let allFailed = false
+      let rescued = null
+      let previewResult
       try {
         aiResult = await runAiPrompt(trimmed, {
           history,
@@ -527,38 +541,38 @@ export default function AiChatPanel({
             }
           },
         })
-      } catch (requestError) {
-        restoreEditorPreviewState(previewBase)
-        throw requestError
-      }
-      const { text, toolCallCount, calls } = aiResult
-      const callsArr = calls || []
-      const allFailed = callsArr.length > 0 && callsArr.every((c) => c?.result?.ok === false)
-      // Last-ditch rescue: the model produced zero usable tool calls (gemma4
-      // and other non-tool-tuned models invent fake names like
-      // "google:search" or just print prose). Read the user's prompt and
-      // apply the most plausible intent directly via the store — bypassing
-      // the model entirely. Better than handing the user a wall of red
-      // failures with no path forward.
-      const needsRescue = callsArr.length === 0 || allFailed
-      let rescued = null
-      if (needsRescue) {
-        const intent = recoverIntentFromPrompt(trimmed)
-        if (intent) {
-          let result
-          try { result = executeTool(intent.name, intent.args) }
-          catch (e) { result = { ok: false, error: String(e?.message || e) } }
-          if (result?.ok) {
-            rescued = {
-              call: { name: intent.name, args: intent.args, result },
-              reason: intent.reason,
+        callsArr = aiResult.calls || []
+        allFailed = callsArr.length > 0 && callsArr.every((c) => c?.result?.ok === false)
+        // Last-ditch rescue: the model produced zero usable tool calls (gemma4
+        // and other non-tool-tuned models invent fake names like
+        // "google:search" or just print prose). Read the user's prompt and
+        // apply the most plausible intent directly via the store — bypassing
+        // the model entirely. Better than handing the user a wall of red
+        // failures with no path forward.
+        const needsRescue = callsArr.length === 0 || allFailed
+        if (needsRescue) {
+          const intent = recoverIntentFromPrompt(trimmed)
+          if (intent) {
+            let result
+            try { result = executeTool(intent.name, intent.args) }
+            catch (e) { result = { ok: false, error: String(e?.message || e) } }
+            if (result?.ok) {
+              rescued = {
+                call: { name: intent.name, args: intent.args, result },
+                reason: intent.reason,
+              }
             }
           }
         }
+        previewResult = captureEditorPreviewState()
+      } finally {
+        // Whatever happened — an answer, a failed request, an error on the
+        // way — the canvas goes back to the user's own design.
+        restoreEditorPreviewState(previewBase)
+        useEditorStore.getState().endPreview()
       }
-      const previewResult = captureEditorPreviewState()
+      const { text, toolCallCount } = aiResult
       const schemaChanged = JSON.stringify(previewBase.schema) !== JSON.stringify(previewResult.schema)
-      restoreEditorPreviewState(previewBase)
       if (schemaChanged) {
         const previewCalls = rescued ? [rescued.call] : callsArr
         const summary = rescued

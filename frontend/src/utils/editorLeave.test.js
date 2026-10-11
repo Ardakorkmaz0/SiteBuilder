@@ -39,6 +39,12 @@ describe('editor leave decisions', () => {
     expect(shouldRunEditorAutoSave(dirty, true)).toBe(false)
   })
 
+  // An AI run draws its proposal on the canvas while it works.
+  it('never auto-saves while the canvas shows a proposal nobody has accepted', () => {
+    expect(shouldRunEditorAutoSave({ ...dirty, previewing: true }, false)).toBe(false)
+    expect(shouldRunEditorAutoSave({ ...dirty, previewing: false }, false)).toBe(true)
+  })
+
   it('uses a short, user-perceivable auto-save debounce', () => {
     expect(EDITOR_AUTO_SAVE_DELAY_MS).toBeGreaterThanOrEqual(1000)
     expect(EDITOR_AUTO_SAVE_DELAY_MS).toBeLessThanOrEqual(3000)
