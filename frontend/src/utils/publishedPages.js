@@ -28,8 +28,28 @@ export function pagePath(page, index) {
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 140)
     .replace(/^-+|-+$/g, '')
   return slug || `page-${index + 1}`
+}
+
+// The address every page WILL have, in page order. Two pages cannot share one:
+// the server gives the later one a suffix (_published_path in validators.py).
+// The links written into the pages have to name that address — with two pages
+// called "Products", every link to the second one opened the first.
+export function pagePaths(pages) {
+  const taken = new Set()
+  return pages.map((page, index) => {
+    let path = pagePath(page, index)
+    if (taken.has(path)) {
+      const base = path || 'page'
+      let n = 2
+      while (taken.has(`${base}-${n}`)) n += 1
+      path = `${base}-${n}`
+    }
+    taken.add(path)
+    return path
+  })
 }
 
 // A link to another page is stored as `#<pageId>` — the fragment the in-app
@@ -105,7 +125,7 @@ export function pageDocument(page, schema, siteTitle, htmlMap = {}, links = new 
 
 export function publishedPagesFor(schema, htmlMap = {}, siteTitle = '', slug = '') {
   const pages = Array.isArray(schema?.pages) ? schema.pages : []
-  const paths = pages.map((page, index) => pagePath(page, index))
+  const paths = pagePaths(pages)
   // Only with a slug: without one there is no address to point a link at, and
   // a half-rewritten link is worse than the fragment it replaced.
   const links = new Map(

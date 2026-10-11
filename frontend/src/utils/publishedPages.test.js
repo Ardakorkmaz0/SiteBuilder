@@ -153,6 +153,32 @@ describe('publishedPagesFor', () => {
     expect(about.html).toContain('href="/s/ada-site/"')
   })
 
+  // The server gives the second of two same-named pages a suffix. The links
+  // have to name the address the page ends up at.
+  it('sends a link to the second of two pages with the same name to that page, not the first', () => {
+    const twins = {
+      theme: {},
+      pages: [
+        { id: 'home', name: 'Home', mode: 'html' },
+        { id: 'first', name: 'Ürünler', mode: 'html' },
+        { id: 'second', name: 'Ürünler!', mode: 'html' },
+        { id: 'third', name: 'urunler', mode: 'html' },
+      ],
+    }
+    const doc = (body) => `<!DOCTYPE html><html><head><title>t</title></head><body>${body}</body></html>`
+    const htmlMap = {
+      home: doc('<a href="#first">1</a><a href="#second">2</a><a href="#third">3</a>'),
+      first: doc('first'),
+      second: doc('second'),
+      third: doc('third'),
+    }
+
+    const pages = publishedPagesFor(twins, htmlMap, 'Shop', 'shop')
+
+    expect(pages.map((page) => page.path)).toEqual(['', 'urunler', 'urunler-2', 'urunler-3'])
+    expect(pages[0].html).toContain('<a href="/s/shop/urunler/">1</a><a href="/s/shop/urunler-2/">2</a><a href="/s/shop/urunler-3/">3</a>')
+  })
+
   it('leaves the fragments alone when there is no address yet', () => {
     const [home] = publishedPagesFor({ theme: {}, pages: [{ id: 'home', name: 'Home', components: [{ id: 'b', type: 'button', props: { text: 'Go', href: '#other' }, layout: { x: 0, y: 0, w: 120, h: 40 } }] }, { id: 'other', name: 'Other', components: [] }] }, {}, 'Ada')
     expect(home.html).toContain('#other')
