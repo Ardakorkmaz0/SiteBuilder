@@ -227,4 +227,14 @@ export function htmlEmbedDocument(code, options = {}) {
   return injectReset(html, options)
 }
 
+// A whole document as the value of a srcdoc="…" attribute. The browser decodes
+// character references in an attribute before it reads the value as a
+// document, so the document's own references have to survive that pass: with
+// only the quotes escaped, `&lt;b&gt;` written to be SEEN arrived as <b> and was
+// read as a tag. Shown right in the editor (React escapes for itself), wrong
+// on the published page.
+export function srcdocAttrValue(doc) {
+  return String(doc || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+}
+
 export { HTML_EMBED_RESET_CSS }

@@ -27,7 +27,7 @@ import {
   builderInteractiveTags,
   withBuilderInteractiveHtml,
 } from './htmlRuntime.js'
-import { htmlEmbedDocument, withEmbedFont } from './htmlEmbedDocument.js'
+import { htmlEmbedDocument, srcdocAttrValue, withEmbedFont } from './htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from './htmlSnippetSizing.js'
 import { googleFontLinkTag } from './googleFonts.js'
 import {
@@ -469,7 +469,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
     // withBuilderInteractiveHtml layers on the anchor-interceptor so `<a href="#">`
     // inside the user's snippet scrolls instead of navigating the sandboxed
     // iframe to `about:srcdoc#` (which whites it out without allow-same-origin).
-    const safe = withBuilderInteractiveHtml(doc).replace(/"/g, '&quot;')
+    const safe = srcdocAttrValue(withBuilderInteractiveHtml(doc))
     // Keep the desktop height as a fallback, but let the responsive stylesheet
     // supply the active breakpoint's height through a custom property. A
     // literal inline `height` outranks the mobile media rule; a `var()` does
