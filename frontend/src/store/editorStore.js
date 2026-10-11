@@ -654,6 +654,13 @@ function estMobileHeight(c, boxW) {
         hasFlowingChildren ? c.mobileLayout?.h || c.layout?.h || 360 : c.layout?.h || 360,
       ))
     }
+    case 'tabs': {
+      // Its height is its content's, measured on the phone canvas
+      // (growToContent) for the width it is drawn at there.
+      const designed = Math.max(40, Math.round(c.layout?.h || 80))
+      const phone = c.props?._phoneH
+      return phone && phone.w === boxW ? Math.max(designed, Math.round(phone.h) || 0) : designed
+    }
     default:
       return Math.max(40, Math.round(c.layout?.h || 80))
   }
@@ -2412,6 +2419,38 @@ export const useEditorStore = create((set, get) => ({
         },
       }))
       return { schema: withComponents(state.schema, page.id, components), dirty: true }
+    })
+  },
+
+  // A block whose height is its content's (tabs) grows its box onto what was
+  // measured. A measurement, not an edit. As an edit it was an undo step of its
+  // own, and undoing it made the block grow again a moment later as a NEW
+  // step, so Ctrl+Z went round in a circle; and on the phone it switched the
+  // page to a hand-made phone layout just for having been looked at. So: no
+  // undo step, "unsaved" left as it was (the height rides along with the next
+  // save), and a phone layout that follows the desktop keeps following it —
+  // there the height is kept as a measurement the auto layout reads.
+  growToContent: (id, height) => {
+    const h = Math.round(Number(height))
+    if (!(h > 0)) return
+    set((state) => {
+      const page = selectCurrentPage(state)
+      const before = findInTree(page.components, id)
+      if (!before) return {}
+      const phone = state.viewport === 'mobile' && !page.flowMode && isTopLevel(page.components, id)
+      if (phone && !page.mobileManual) {
+        const w = (before.mobileLayout || before.layout || {}).w
+        const components = mapTree(page.components, id, (c) => ({ ...c, props: { ...c.props, _phoneH: { w, h } } }))
+        return { schema: withComponents(state.schema, page.id, components) }
+      }
+      const key = phone ? 'mobileLayout' : 'layout'
+      const old = before[key] || before.layout || {}
+      if ((old.h || 0) >= h) return {}
+      let components = mapTree(page.components, id, (c) => ({ ...c, [key]: { ...old, h } }))
+      if (!phone) return { schema: withComponents(state.schema, page.id, components) }
+      // The phone is one column: what sits under the block follows its bottom.
+      components = followBottomOnPhone(components, id, h - (old.h || 0), (old.y || 0) + (old.h || 0))
+      return { schema: mapPage(state.schema, page.id, (p) => ({ ...p, components })) }
     })
   },
 

@@ -246,15 +246,15 @@ export default function FlowCanvasItem({
     >
       {pinMode && (
         <span
-          title={
+          title={t(
             pinMode === 'fixed'
               ? 'Pinned to the screen — stays put while the page scrolls.'
-              : 'Sticky — scrolls with the page until it reaches the edge, then stays.'
-          }
+              : 'Sticky — scrolls with the page until it reaches the edge, then stays.',
+          )}
           style={chromeBadgeStyle(chrome, 'bottom-left')}
           className="rounded-lg bg-[#4f46e5]/85 px-1.5 py-0.5 text-[10px] font-medium text-white"
         >
-          {pinMode === 'fixed' ? 'Pinned' : 'Sticky'}
+          {t(pinMode === 'fixed' ? 'Pinned' : 'Sticky')}
         </span>
       )}
       {component.type === 'region' ? (
