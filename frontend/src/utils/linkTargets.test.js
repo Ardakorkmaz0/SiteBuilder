@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { componentTextHint, isDeadSectionLink, linkSectionsFor } from './linkTargets.js'
+import { completeExternalUrl, componentTextHint, isDeadSectionLink, linkSectionsFor } from './linkTargets.js'
 
 const c = (id, y, props = {}, extra = {}) => ({ id, type: 'text', props, layout: { x: 0, y, w: 100, h: 40 }, ...extra })
 
@@ -48,5 +48,31 @@ describe('bands are named by what is in them', () => {
     const [features, , pricing] = linkSectionsFor([band('a', 0, 'Features'), band('b', 400, 'Pricing plans')])
     expect(features.text).toBe('Features')
     expect(pricing.text).toBe('Pricing plans')
+  })
+})
+
+describe('an address typed into External URL', () => {
+  it('gets https:// when it is a site address without one, instead of becoming a path on this site', () => {
+    expect(completeExternalUrl('example.com')).toBe('https://example.com')
+    expect(completeExternalUrl('example.com/sayfa?x=1')).toBe('https://example.com/sayfa?x=1')
+    expect(completeExternalUrl('  www.sitebuilt.app  ')).toBe('https://www.sitebuilt.app')
+    expect(completeExternalUrl('localhost:3000/demo')).toBe('https://localhost:3000/demo')
+  })
+
+  it('turns a bare e-mail address into a mailto link', () => {
+    expect(completeExternalUrl('hello@example.com')).toBe('mailto:hello@example.com')
+  })
+
+  it('leaves alone what is already a link', () => {
+    for (const href of ['https://example.com', 'http://example.com', 'mailto:a@b.co', 'tel:+905551112233', '#contact', '/pricing', './about.html', '?tab=2', '']) {
+      expect(completeExternalUrl(href)).toBe(href)
+    }
+  })
+
+  it('does not mistake a file in the project, or a half-typed word, for a site', () => {
+    expect(completeExternalUrl('about.html')).toBe('about.html')
+    expect(completeExternalUrl('files/menu.pdf')).toBe('files/menu.pdf')
+    expect(completeExternalUrl('exam')).toBe('exam')
+    expect(completeExternalUrl('two words.com')).toBe('two words.com')
   })
 })
