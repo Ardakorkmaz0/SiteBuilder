@@ -109,7 +109,6 @@ import {
 import { localizeTemplateHtml } from '../utils/templateLocalization.js'
 import { useLanguage } from '../i18n/useLanguage.js'
 import { useUiTheme } from '../ui/useUiTheme.js'
-import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import MobileEditorPreview from '../components/editor/MobileEditorPreview.jsx'
 import SiteControlCenter from '../components/editor/SiteControlCenter.jsx'
 
@@ -429,7 +428,6 @@ export default function EditorPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [activeType, setActiveType] = useState(null)
-  const [justSaved, setJustSaved] = useState(false)
   // Auto-save status: 'idle'|'saving'|'saved'|'error'. Auto-save runs only at
   // boundaries (tab hidden / leaving the editor), never on every keystroke. It
   // NEVER touches the undo/redo history (markSaved only clears `dirty`), so you
@@ -456,13 +454,11 @@ export default function EditorPage() {
   const [moreOpen, setMoreOpen] = useState(false)
   const [tourOpen, setTourOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [templateOpen, setTemplateOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
-  const [toolsOpen, setToolsOpen] = useState(false)
   const [controlCenterOpen, setControlCenterOpen] = useState(false)
   const [controlCenterFocus, setControlCenterFocus] = useState('')
   // Which tab the control centre opens on — the Share button goes straight to
@@ -472,14 +468,12 @@ export default function EditorPage() {
   useEffect(() => {
     try { localStorage.setItem(AI_PANEL_LAYOUT_KEY, aiPanelLayout) } catch { /* ignore */ }
   }, [aiPanelLayout])
-  // The Import/Tools menus are position:fixed, anchored to their trigger
+  // The header menus are position:fixed, anchored to their trigger
   // button's on-screen rect (computed on open) — robust regardless of header
   // layout (the single-row strip scrolls horizontally; fixed positioning
   // keeps the menus unclipped by that overflow).
   const moreBtnRef = useRef(null)
   const accountBtnRef = useRef(null)
-  const importBtnRef = useRef(null)
-  const toolsBtnRef = useRef(null)
   const resolutionWidthRef = useRef(null)
   const resolutionHeightRef = useRef(null)
   const [menuPos, setMenuPos] = useState({})
@@ -1476,12 +1470,8 @@ export default function EditorPage() {
       // changed during this request, its newer revision must remain dirty.
       if (useEditorStore.getState().schema === schemaBase) markSaved()
       setAutoSaveState('saved')
-      if (!auto) {
-        setJustSaved(true)
-        setTimeout(() => setJustSaved(false), 1500)
-        if (fileError) {
-          setError(t('Saved to the server, but writing {name} failed: {error}', { name: localFile.name, error: fileError }))
-        }
+      if (!auto && fileError) {
+        setError(t('Saved to the server, but writing {name} failed: {error}', { name: localFile.name, error: fileError }))
       }
       return data
   }
@@ -1555,7 +1545,6 @@ export default function EditorPage() {
   // Pick an .html file from disk, load it into the editor, and keep the
   // handle so every Save writes back to it (Chromium only).
   async function openAndLinkLocalFile() {
-    setImportOpen(false)
     try {
       const picked = await openLocalHtmlFile()
       if (
@@ -1645,7 +1634,6 @@ export default function EditorPage() {
   // is a template and lives in the template picker.
   // No confirm for an EMPTY page — there is nothing to lose there.
   function startBlankHtml() {
-    setImportOpen(false)
     if (
       siteHtml.trim() &&
       !window.confirm(
@@ -1841,8 +1829,12 @@ export default function EditorPage() {
   const componentColorMode = currentPage
     ? viewColorMode({ theme, colorMode: colorModeSetting, pages: storePages }, currentPage, colorModePreview)
     : null
+  // Built only while it is on screen (View, or full screen). It is the whole
+  // page as an export, and this used to run on every render of the editor —
+  // every keystroke in Edit — for any page with motion or a pinned block.
+  const componentViewShown = !currentPageIsHtml && (canvasMode === 'view' || fullscreen)
   const componentViewHtml =
-    componentViewNeedsIframe && currentPage
+    componentViewShown && componentViewNeedsIframe && currentPage
       ? schemaToSingleHtml(
           {
             theme,
@@ -1959,7 +1951,6 @@ export default function EditorPage() {
     const placed = workspaceRef.current?.applyAiHtml?.(html) ?? html
     commitHtml(placed)
   }
-  const showLegacyHeader = false
 
   return (
     <div className="studio-shell flex h-screen flex-col">
@@ -2179,384 +2170,6 @@ export default function EditorPage() {
         }}
         className="hidden"
       />
-      {/* One focused editing mode. Secondary metadata lives under Tools and
-          nonessential labels collapse before this row could overflow. */}
-      {showLegacyHeader && (
-      <header className="hidden">
-        <div className="flex shrink-0 items-center gap-1">
-          <Link
-            to="/"
-            onClick={(e) => { e.preventDefault(); requestLeave(() => navigate('/')) }}
-            title={t('Sitebuilder home')}
-            className="brand-mark"
-            style={{ width: '1.6rem', height: '1.6rem', fontSize: '0.8rem' }}
-          >S</Link>
-          <button type="button" onClick={guardedBack} title={t('Back to previous page')} aria-label={t('Back to previous page')} className="px-1 text-sm font-medium text-[#6b7280] hover:text-[#111827]">&larr;</button>
-        </div>
-        <input
-          className="min-w-[3rem] max-w-[110px] flex-shrink rounded-lg border border-transparent px-2 py-1 text-sm font-semibold text-[#111827] hover:border-[#d1d5db] focus:border-[#4f46e5] focus:outline-none md:max-w-[160px]"
-          value={title}
-          onChange={(e) => changeTitle(e.target.value)}
-          aria-label={t('Site title')}
-        />
-        <span
-          className={`hidden shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold 2xl:inline-block ${
-            published ? 'bg-[#dcfce7] text-[#15803d]' : 'bg-[#f3f4f6] text-[#6b7280]'
-          }`}
-        >
-          {published ? t('Published') : t('Draft')}
-        </span>
-        {/* Which editing surface this page uses — switches as you move between
-            pages so the active mode is always obvious. */}
-        <span
-          title={
-            currentPageIsHtml
-              ? t('This page is an uploaded/authored HTML document')
-              : t('This page uses the drag-and-drop component canvas')
-          }
-          className={`hidden shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide 2xl:inline-block ${
-            currentPageIsHtml
-              ? 'bg-[#eef2ff] text-[#4f46e5]'
-              : 'bg-[var(--studio-control)] text-[var(--studio-text-muted)]'
-          }`}
-        >
-          {currentPageIsHtml ? t('HTML Upload Mode') : t('Canvas Mode')}
-        </span>
-        {/* Save status in a FIXED-WIDTH slot so the changing text never reflows
-            the toolbar (the churn the user hit). Auto-save now fires only when
-            you leave / refresh, so this mostly just reads Unsaved → Saved. */}
-        <span role="status" aria-live="polite" className="hidden w-[6.5rem] shrink-0 whitespace-nowrap text-right text-xs font-medium xl:block">
-          {autoSaveState === 'error' ? (
-            <span className="text-red-500">{t('Save failed')}</span>
-          ) : saving || autoSaveState === 'saving' ? (
-            <span className="text-[#6b7280]">{t('Saving…')}</span>
-          ) : (dirty || htmlDirty || metaDirty || workspaceDirty) ? (
-            <span className="text-amber-500">{t('Unsaved')}</span>
-          ) : justSaved || autoSaveState === 'saved' ? (
-            <span className="text-[#15803d]">{t('Saved ✓')}</span>
-          ) : (
-            <span className="text-[#15803d]">{t('Saved ✓')}</span>
-          )}
-        </span>
-
-        {/* The spacer pins actions right; responsive labels collapse on narrow
-            desktop windows so the header never needs side scrolling. */}
-        <div className="grow shrink basis-0" aria-hidden />
-
-        {/* Primary actions stay on one row; secondary labels progressively
-            collapse while their functions remain available. */}
-        <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1">
-          {/* AI stays available in BOTH modes — in HTML mode the chat's HTML
-              path iterates on site.html, so hiding it there would orphan the
-              whole flow. */}
-          <AiBar open={aiOpen} onOpenChange={setAiOpen} />
-          {/* Guided full-site generation — the onboarding path for a blank
-              site, but always reachable for a fresh start. */}
-          <button
-            type="button"
-            onClick={() => setWizardOpen(true)}
-            title={t('AI Site Wizard — answer a few questions, get a complete site')}
-            className="flex h-9 shrink-0 items-center gap-1 rounded-[4px] border border-[#c7d2fe] bg-[#eef2ff] px-2.5 text-xs font-semibold text-[#4f46e5] shadow-sm transition hover:bg-[#e0e7ff]"
-          >
-            ✨ <span className="hidden 2xl:inline">{t('Wizard')}</span>
-          </button>
-          {/* Device controls (PC/Mobile + size) live in the canvas/workspace
-              toolbar below, next to View/Edit/Source — keeps this header a
-              single row that fits without scrolling on common desktops. */}
-          <input
-            ref={jsonInputRef}
-            type="file"
-            accept=".json,application/json"
-            onChange={(e) => {
-              importFiles(e.target.files)
-              e.target.value = ''
-            }}
-            className="hidden"
-          />
-          <input
-            ref={htmlInputRef}
-            type="file"
-            accept=".html,.htm"
-            multiple
-            onChange={(e) => {
-              importFiles(e.target.files)
-              e.target.value = ''
-            }}
-            className="hidden"
-          />
-          <input
-            ref={folderInputRef}
-            type="file"
-            multiple
-            onChange={(e) => {
-              importFiles(e.target.files)
-              e.target.value = ''
-            }}
-            className="hidden"
-          />
-          <div className="relative">
-            <button
-              ref={importBtnRef}
-              onClick={() => { anchorMenu('import', importBtnRef); setImportOpen((o) => !o) }}
-              title={t("Import, export, or remove this page's HTML")}
-              className="rounded-lg px-3 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6]"
-            >
-              {t('File')} &#9662;
-            </button>
-            {importOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setImportOpen(false)}
-                />
-                <div
-                  style={{ position: 'fixed', top: menuPos.import?.top, right: menuPos.import?.right }}
-                  className="z-50 w-52 overflow-hidden rounded-lg border border-[#e5e7eb] bg-white py-1 shadow-lg"
-                >
-                  <button
-                    onClick={() => {
-                      setImportOpen(false)
-                      setTemplateOpen(true)
-                    }}
-                    className="block w-full px-3 py-1.5 text-left text-sm font-medium text-[#4f46e5] hover:bg-[#eef2ff]"
-                  >
-                    {t('Choose a template...')}
-                  </button>
-                  <button
-                    onClick={startBlankHtml}
-                    className="block w-full px-3 py-1.5 text-left text-sm font-medium text-[#4f46e5] hover:bg-[#eef2ff]"
-                  >
-                    {t('Start blank HTML')}
-                  </button>
-                  {!currentPageIsHtml && (
-                    <button
-                      onClick={() => {
-                        setImportOpen(false)
-                        convertToResponsiveHtml()
-                      }}
-                      className="block w-full px-3 py-1.5 text-left text-sm font-medium text-[#4f46e5] hover:bg-[#eef2ff]"
-                    >
-                      {t('Convert to responsive HTML')}
-                    </button>
-                  )}
-                  <div className="my-1 border-t border-[#e5e7eb]" />
-                  {supportsLocalFiles() && (
-                    <button
-                      onClick={openAndLinkLocalFile}
-                      title={t('Open an HTML file and keep it linked — every Save also updates the file on disk')}
-                      className="block w-full px-3 py-1.5 text-left text-sm text-[#374151] hover:bg-[#f3f4f6]"
-                    >
-                      {t('Open & link HTML file...')}
-                    </button>
-                  )}
-                  {[
-                    ['HTML file...', htmlInputRef],
-                    ['Project folder...', folderInputRef],
-                    ['Project JSON...', jsonInputRef],
-                  ].map(([label, ref]) => (
-                    <button
-                      key={label}
-                      onClick={() => {
-                        setImportOpen(false)
-                        ref.current?.click()
-                      }}
-                      className="block w-full px-3 py-1.5 text-left text-sm text-[#374151] hover:bg-[#f3f4f6]"
-                    >
-                      {t(label)}
-                    </button>
-                  ))}
-                  {/* Export + Remove live here too so the header stays one row. */}
-                  <div className="my-1 border-t border-[#e5e7eb]" />
-                  <button
-                    onClick={() => {
-                      setImportOpen(false)
-                      if (currentPageIsHtml) exportHtmlToDisk()
-                      else exportProject()
-                    }}
-                    title={t(currentPageIsHtml ? 'Export (download) the HTML file' : 'Download this project (.json)')}
-                    className="block w-full px-3 py-1.5 text-left text-sm text-[#374151] hover:bg-[#f3f4f6]"
-                  >
-                    {t(currentPageIsHtml ? 'Export HTML…' : 'Export project (.json)')}
-                  </button>
-                  {currentPageIsHtml && (
-                    <button
-                      onClick={() => {
-                        setImportOpen(false)
-                        if (window.confirm(t('Remove this page HTML and switch it back to the component canvas? (Undo brings the HTML back.)'))) {
-                          commitHtml('')
-                          setPageMode(currentPageId, 'empty')
-                          if (localFile?.pageId === currentPageId) unlinkLocalFile()
-                          setHtmlSelection(null)
-                        }
-                      }}
-                      className="block w-full px-3 py-1.5 text-left text-sm text-[#b91c1c] hover:bg-[#fef2f2]"
-                    >
-                      {t('Remove HTML')}
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          {/* Linked-file status chip — green means every Save also writes this
-              file on disk; click to unlink. Export / Remove HTML now live inside
-              the File ▾ menu so the header stays a single row. */}
-          {currentPageIsHtml && localFile && (
-            <span
-              title={t('Linked to {name} — every Save also updates this file on disk. Click to unlink.', { name: localFile.name })}
-              onClick={() => {
-                if (window.confirm(t('Stop updating {name} on Save?', { name: localFile.name }))) unlinkLocalFile()
-              }}
-              className="studio-status-success hidden shrink-0 cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs hover:brightness-110 xl:flex"
-            >
-              <SaveIcon size={13} /> {localFile.name}
-            </span>
-          )}
-          {/* Shared Undo/Redo — identical in both modes; dispatches to the
-              HTML snapshot stacks or the canvas store as appropriate. */}
-          <button
-            type="button"
-            onClick={() => (currentPageIsHtml ? undoOnHtmlPage() : undo())}
-            disabled={currentPageIsHtml ? !htmlPast.length && !canUndo : !canUndo}
-            title={t('Undo (Ctrl+Z)')}
-            className="rounded-lg px-2.5 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-40"
-          >
-            ↶
-          </button>
-          <button
-            type="button"
-            onClick={() => (currentPageIsHtml ? redoOnHtmlPage() : redo())}
-            disabled={currentPageIsHtml ? !htmlFuture.length && !canRedo : !canRedo}
-            title={t('Redo (Ctrl+Shift+Z)')}
-            className="rounded-lg px-2.5 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-40"
-          >
-            ↷
-          </button>
-          {/* History / Shortcuts / Notes live under one Tools menu so the
-              toolbar stays uncluttered. */}
-          <div className="relative">
-            <button
-              type="button"
-              ref={toolsBtnRef}
-              onClick={() => { anchorMenu('tools', toolsBtnRef); setToolsOpen((o) => !o) }}
-              title={t('History, shortcuts & notes')}
-              className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm hover:bg-[#f3f4f6] ${
-                toolsOpen || historyOpen || notesOpen ? 'bg-[#eef2ff] text-[#4f46e5]' : 'text-[#374151]'
-              }`}
-            >
-              <CogIcon size={15} /> <span className="hidden xl:inline">{t('Tools')}</span> &#9662;
-            </button>
-            {toolsOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setToolsOpen(false)} />
-                <div
-                  style={{ position: 'fixed', top: menuPos.tools?.top, right: menuPos.tools?.right }}
-                  className="z-50 w-64 overflow-hidden rounded-lg border border-[#e5e7eb] bg-white py-1 shadow-lg"
-                >
-                  <button
-                    type="button"
-                    onClick={() => { setToolsOpen(false); setControlCenterOpen(true) }}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-semibold text-[#4f46e5] hover:bg-[#eef2ff]"
-                  >
-                    ◎ {t('Site control center')}
-                  </button>
-                  <div className="my-1 border-t border-[#e5e7eb]" />
-                  <div className="space-y-2 px-3 py-2">
-                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#6b7280]">
-                      {t('Explore category (used when published)')}
-                      <select
-                        value={category}
-                        onChange={(event) => changeCategory(event.target.value)}
-                        className="mt-1 block w-full rounded-lg border border-[#d1d5db] px-2 py-1.5 text-xs font-medium capitalize text-[#374151] focus:border-[#4f46e5] focus:outline-none"
-                      >
-                        {DISCOVERY_CATEGORIES.map((item) => (
-                          <option key={item} value={item}>{t(item.charAt(0).toUpperCase() + item.slice(1))}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#6b7280]">
-                      {t('Tags')}
-                      <input
-                        value={tagsText}
-                        onChange={(event) => changeTagsText(event.target.value)}
-                        placeholder={t('Comma-separated tags for discovery')}
-                        className="mt-1 block w-full rounded-lg border border-[#d1d5db] px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[#374151] focus:border-[#4f46e5] focus:outline-none"
-                      />
-                    </label>
-                  </div>
-                  <div className="my-1 border-t border-[#e5e7eb]" />
-                  <button
-                    type="button"
-                    onClick={() => { setToolsOpen(false); setHistoryOpen(true) }}
-                    disabled={saving}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-50"
-                  >
-                    <ClockIcon size={15} /> {t('History')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setToolsOpen(false); setShortcutsOpen(true) }}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#374151] hover:bg-[#f3f4f6]"
-                  >
-                    <KeyboardIcon size={15} /> {t('Shortcuts')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setToolsOpen(false); setNotesOpen((o) => !o) }}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#374151] hover:bg-[#f3f4f6]"
-                  >
-                    <NoteIcon size={15} /> {t('Notes')}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={previewCurrentSite}
-            disabled={saving}
-            className="hidden rounded-lg px-3 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-60 xl:block"
-          >
-            {t('Preview')}
-          </button>
-          <button
-            onClick={() => save()}
-            disabled={saving}
-            className="hidden rounded-lg bg-[#4f46e5] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#4338ca] disabled:opacity-60 md:block"
-          >
-            {saving ? t('Saving…') : t('Save')}
-          </button>
-          {published ? (
-            <button
-              onClick={() => save(false)}
-              disabled={saving}
-              className="hidden rounded-lg border border-[#d1d5db] px-3 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-60 md:block"
-            >
-              {t('Unpublish')}
-            </button>
-          ) : (
-            <button
-              onClick={() => save(true)}
-              disabled={saving}
-              className="hidden rounded-lg bg-[#16a34a] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#15803d] disabled:opacity-60 md:block"
-            >
-              {t('Publish')}
-            </button>
-          )}
-          <LanguageSwitcher className="hidden md:flex" />
-          {/* Your profile — a quick hop to /profile (and your published sites).
-              Hidden on phones: it alone pushed the toolbar onto a third row. */}
-          <Link
-            to="/profile"
-            onClick={(e) => { e.preventDefault(); requestLeave(() => navigate('/profile')) }}
-            title={t('Your profile')}
-            className="hidden h-8 w-8 shrink-0 place-items-center rounded-full bg-[#eef2ff] text-sm font-bold text-[#4f46e5] ring-offset-2 hover:ring-2 hover:ring-[#c7d2fe] 2xl:grid"
-          >
-            {(authUser?.username || '?').trim().charAt(0).toUpperCase()}
-          </Link>
-        </div>
-      </header>
-      )}
 
       {moderationBlocked && (
         <div role="status" className="studio-status-warning border-b px-4 py-2 text-sm">
@@ -2904,121 +2517,6 @@ export default function EditorPage() {
                       <MonitorIcon size={14} />
                       <span className="hidden @[1000px]:inline">{t('Browser')}</span>
                     </button>
-                  )}
-                  {/* Selected element's actions, docked right after the screen
-                      controls: one stable spot instead of floating over (and
-                      covering) the design. */}
-                  <div
-                    className="hidden"
-                    aria-label={t('Custom resolution')}
-                  >
-                    <span aria-hidden>W</span>
-                    <input
-                      ref={resolutionWidthRef}
-                      key={`canvas-width-${viewport}-${curW}`}
-                      type="number"
-                      inputMode="numeric"
-                      min={viewport === 'mobile' ? 240 : 320}
-                      max={viewport === 'mobile' ? 1200 : 4000}
-                      defaultValue={curW}
-                      aria-label={t('Custom width (px)')}
-                      title={t('Custom width (px)')}
-                      onFocus={(e) => e.currentTarget.select()}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') applyCustomCanvasResolution()
-                      }}
-                      className="w-16 rounded border-0 bg-[#f9fafb] px-1.5 py-1 text-center font-medium text-[#374151] outline-none ring-[#4f46e5] focus:ring-1"
-                    />
-                    <span aria-hidden>×</span>
-                    <span aria-hidden>H</span>
-                    <input
-                      ref={resolutionHeightRef}
-                      key={`canvas-height-${viewport}-${curFold}`}
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      max="20000"
-                      defaultValue={curFold || ''}
-                      placeholder="—"
-                      aria-label={t('Custom height (px)')}
-                      title={t('Custom height (px)')}
-                      onFocus={(e) => e.currentTarget.select()}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') applyCustomCanvasResolution()
-                      }}
-                      className="w-16 rounded border-0 bg-[#f9fafb] px-1.5 py-1 text-center font-medium text-[#374151] outline-none ring-[#4f46e5] focus:ring-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={applyCustomCanvasResolution}
-                      aria-label={t('Apply custom resolution')}
-                      title={t('Apply custom resolution')}
-                      className="rounded bg-[#eef2ff] px-1.5 py-1 font-semibold text-[#4f46e5] hover:bg-[#e0e7ff]"
-                    >
-                      ✓
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!curFold}
-                      onClick={() => setCanvasPreset({ width: curFold, fold: curW })}
-                      aria-label={t('Swap width and height')}
-                      title={t('Swap width and height')}
-                      className="rounded px-1.5 py-1 text-sm text-[#4f46e5] hover:bg-[#eef2ff] disabled:cursor-not-allowed disabled:text-[#d1d5db]"
-                    >
-                      ↔
-                    </button>
-                  </div>
-                  {canvasMode === 'legacy' && (
-                    <button
-                      type="button"
-                      onClick={() => setGridStep(gridStep ? 0 : 10)}
-                      title={t('Snap dragged items to a 10px grid')}
-                      className={
-                        gridStep
-                          ? 'hidden rounded-lg bg-[#4f46e5] px-2.5 py-1 text-xs font-medium text-white md:block'
-                          : 'hidden rounded-lg border border-[#d1d5db] px-2.5 py-1 text-xs font-medium text-[#374151] hover:bg-[#f3f4f6] md:block'
-                      }
-                    >
-                      # {t('Grid')}
-                    </button>
-                  )}
-                  {/* Link tool — mirrors the HTML workspace's Link sub-tool:
-                      click a button/link component, then click its target
-                      component (or a page in the Files panel). */}
-                  {canvasMode === 'legacy' && (
-                    <>
-                      <button
-                        type="button"
-                        title={t('Connect a button/link to a target component or page')}
-                        onClick={() => {
-                          setBrushMode(false)
-                          setLinkMode(!linkMode)
-                        }}
-                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${
-                          linkMode
-                            ? 'border-[#4f46e5] bg-[#4f46e5] text-white'
-                            : 'border-[#d1d5db] text-[#374151] hover:bg-[#f3f4f6]'
-                        }`}
-                      >
-                        <LinkIcon size={13} /> {t('Link')}
-                      </button>
-                      <button
-                        type="button"
-                        title={t('Paint colors onto elements')}
-                        onClick={() => {
-                          const next = !brushMode
-                          setBrushMode(next)
-                          if (next) setLinkMode(false)
-                        }}
-                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${
-                          brushMode
-                            ? 'border-[#4f46e5] bg-[#4f46e5] text-white'
-                            : 'border-[#d1d5db] text-[#374151] hover:bg-[#f3f4f6]'
-                        }`}
-                      >
-                        <PaletteIcon size={13} /> {t('Brush')}
-                      </button>
-                    </>
                   )}
                   {canvasMode === 'edit' && (
                     <CanvasZoomControl
