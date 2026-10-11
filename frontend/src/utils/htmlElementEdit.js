@@ -513,9 +513,10 @@ export function describeElement(el, win = el?.ownerDocument?.defaultView) {
     classes: [...el.classList].join(' '),
     canEditText,
     text: canEditText ? readElementMultilineText(el) : '',
-    // Every element can carry a link (wrapped in <a> when needed), so the panel
-    // always offers the link picker — not just for existing anchors.
-    href: elementLinkHref(el),
+    // Nearly every element can carry a link (wrapped in <a> when needed), so
+    // the panel offers the link picker for more than existing anchors. null
+    // where a link cannot go: the panel leaves the picker out.
+    href: canCarryLink(el) ? elementLinkHref(el) : null,
     sections: linkSectionsInDocument(el.ownerDocument, el),
     src: tag === 'img' ? el.getAttribute('src') || '' : null,
     alt: tag === 'img' ? el.getAttribute('alt') || '' : null,
@@ -1041,22 +1042,41 @@ export function ensureElementId(el) {
   return id
 }
 
-// Make `el` carry a link by ensuring it is (or is wrapped by) an <a>, so ANY
-// element — not just existing anchors — can become a link. Returns the anchor.
-// Reuses an existing wrapping <a>; otherwise wraps el in a fresh one in place.
+// An <a> may not sit inside another <a>. The live page tolerates it, but the
+// file is read back by the parser, which ends the outer link where the inner
+// one starts: a link set on the label inside a button-link left the button
+// empty with its label beside it, and a link around a card that holds a
+// "Read more" was cut in two. So a link on anything inside an anchor is that
+// anchor's link, and a block with links of its own cannot be wrapped in one.
+function linkHost(el) {
+  if (!el || el.nodeType !== 1) return null
+  const host = el.closest('a')
+  const body = el.ownerDocument?.body
+  return host && (!body || body.contains(host)) ? host : null
+}
+
+// Table parts cannot be wrapped either: the parser moves the wrapper out of
+// the table and the row stays behind without it.
+const NO_LINK_WRAP_TAGS = new Set([
+  'TR', 'TD', 'TH', 'TBODY', 'THEAD', 'TFOOT', 'CAPTION', 'COL', 'COLGROUP', 'OPTION', 'OPTGROUP',
+])
+
+// Can this element be given a link at all?
+export function canCarryLink(el) {
+  if (!el || el.nodeType !== 1) return false
+  if (linkHost(el)) return true
+  return !NO_LINK_WRAP_TAGS.has(el.tagName) && !el.querySelector('a')
+}
+
+// Make `el` carry a link by ensuring it is (or is wrapped by) an <a>, so any
+// element that can hold one — not just existing anchors — can become a link.
+// Returns the anchor: the one it already is or sits in, else a fresh wrapper,
+// or null when the element cannot carry a link (see canCarryLink).
 export function ensureAnchor(el) {
   if (!el || el.nodeType !== 1) return null
-  if (el.tagName === 'A') return el
-  const parent = el.parentElement
-  // Already wrapped by an <a> that holds only this element → reuse it.
-  if (
-    parent &&
-    parent.tagName === 'A' &&
-    parent.childElementCount === 1 &&
-    parent.getAttribute('data-pwb-linkwrap') === ''
-  ) {
-    return parent
-  }
+  const host = linkHost(el)
+  if (host) return host
+  if (!canCarryLink(el)) return null
   const doc = el.ownerDocument
   const a = doc.createElement('a')
   a.setAttribute('href', '#')
@@ -1073,41 +1093,26 @@ export function ensureAnchor(el) {
   return a
 }
 
-// The effective link of an element: its own href (if it's an <a>) or the href
-// of a builder-created <a> wrapper around it. '' when there is no link yet.
+// The effective link of an element: the href of the anchor it is or sits in.
+// '' when there is no link yet.
 export function elementLinkHref(el) {
-  if (!el || el.nodeType !== 1) return ''
-  if (el.tagName === 'A') return el.getAttribute('href') || ''
-  const parent = el.parentElement
-  if (parent && parent.tagName === 'A' && parent.getAttribute('data-pwb-linkwrap') === '') {
-    return parent.getAttribute('href') || ''
-  }
-  return ''
+  return linkHost(el)?.getAttribute('href') || ''
 }
 
-// Set (or clear) an element's link. A non-anchor gets wrapped in an <a>; an
-// empty href on a builder-created wrapper unwraps it again so "No link" leaves
-// the markup clean. Real <a> elements just have their href set/removed.
+// Set (or clear) an element's link. An element outside any anchor gets wrapped
+// in one; "No link" unwraps a builder-created wrapper so the markup is left
+// clean, and takes the href off an anchor the page wrote itself.
 export function setElementLink(el, href) {
   if (!el || el.nodeType !== 1) return
   const value = String(href || '')
-  if (el.tagName === 'A') {
-    if (value) el.setAttribute('href', value)
-    else el.removeAttribute('href')
+  const host = linkHost(el)
+  if (!host) {
+    if (value) ensureAnchor(el)?.setAttribute('href', value)
     return
   }
-  const parent = el.parentElement
-  const wrapped =
-    parent && parent.tagName === 'A' && parent.getAttribute('data-pwb-linkwrap') === ''
-  if (!value) {
-    // Unwrap a builder-created wrapper; leave foreign anchors alone.
-    if (wrapped) {
-      parent.replaceWith(...parent.childNodes)
-    }
-    return
-  }
-  const anchor = ensureAnchor(el)
-  if (anchor) anchor.setAttribute('href', value)
+  if (value) host.setAttribute('href', value)
+  else if (host !== el && host.getAttribute('data-pwb-linkwrap') === '') host.replaceWith(...host.childNodes)
+  else host.removeAttribute('href')
 }
 
 // Link binding for the visual "connect a link to a target" tool: point the
