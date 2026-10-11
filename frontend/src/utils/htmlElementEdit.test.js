@@ -670,8 +670,10 @@ describe('the row that becomes a column on a phone', () => {
     applyElementPatch(el, { display: 'flex', flexDirection: 'row' })
     applyMobileElementPatch(el, { flexDirection: 'column' })
 
-    // Desktop keeps its row…
-    expect(el.style.getPropertyValue('flex-direction')).toBe('row')
+    // Desktop keeps its row. Not inline any more: an inline !important row
+    // outranks every stylesheet rule, the phone's column included.
+    expect(el.style.getPropertyValue('flex-direction')).toBe('')
+    expect(el.style.getPropertyValue('--pwb-pc-flex-direction')).toBe('row')
     // …and the phone value rides on the guarded custom property.
     expect(el.getAttribute('data-pwb-mobile-flex-direction')).toBe('')
     expect(el.style.getPropertyValue('--pwb-mobile-flex-direction')).toBe('column')
@@ -698,6 +700,142 @@ describe('the row that becomes a column on a phone', () => {
     expect(describeElement(el).mobileOverrideCount).toBe(3)
     clearMobileElementStyles(el)
     expect(describeElement(el).mobileOverrideCount).toBe(0)
+  })
+})
+
+// A panel edit on the PC is written inline with !important, so that it beats a
+// template that pins the property. Nothing in a stylesheet outranks that, and
+// the phone value IS a stylesheet rule: line height 2 on the PC, then 1.2 on
+// the phone, was saved and the phone went on showing 2. jsdom does not resolve
+// the cascade, so these check what makes the cascade come out right: while a
+// phone value exists there is no inline !important left to outrank it.
+describe('a phone value is never outranked by the PC value', () => {
+  const para = () => document.getElementById('para')
+  const inlineImportant = (el, name) => el.style.getPropertyPriority(name) === 'important' && el.style.getPropertyValue(name)
+  const rules = () => document.head.querySelector('style[data-pwb-responsive-overrides]').textContent
+
+  it('moves an inline !important PC value into the stylesheet when the phone gets its own', () => {
+    const p = para()
+    applyElementPatch(p, { lineHeight: 2 })
+    expect(inlineImportant(p, 'line-height')).toBe('2')
+
+    applyMobileElementPatch(p, { lineHeight: 1.2 })
+
+    expect(inlineImportant(p, 'line-height')).toBeFalsy()
+    expect(p.style.getPropertyValue('--pwb-pc-line-height')).toBe('2')
+    expect(p).toHaveAttribute('data-pwb-pc-line-height')
+    expect(p.style.getPropertyValue('--pwb-mobile-line-height')).toBe('1.2')
+    // The PC rule comes first and the phone rule after it, equally specific.
+    expect(rules().indexOf('[data-pwb-pc-line-height]')).toBeLessThan(rules().indexOf('@media (max-width: 767px)'))
+    expect(rules()).toContain('[data-pwb-pc-line-height][data-pwb-pc-line-height] { line-height: var(--pwb-pc-line-height) !important; }')
+    expect(rules()).toContain('[data-pwb-mobile-line-height][data-pwb-mobile-line-height] { line-height: var(--pwb-mobile-line-height) !important; }')
+  })
+
+  it('does the same when the PC value is set after the phone value', () => {
+    const p = para()
+    applyMobileElementPatch(p, { width: 280 })
+    applyElementPatch(p, { width: 640 })
+
+    expect(inlineImportant(p, 'width')).toBeFalsy()
+    expect(p.style.getPropertyValue('--pwb-pc-width')).toBe('640px')
+    expect(p.style.getPropertyValue('--pwb-mobile-width')).toBe('280px')
+  })
+
+  it('puts the PC value back inline once the phone value is cleared', () => {
+    const p = para()
+    applyElementPatch(p, { lineHeight: 2 })
+    applyMobileElementPatch(p, { lineHeight: 1.2 })
+    applyMobileElementPatch(p, { lineHeight: '' })
+
+    expect(inlineImportant(p, 'line-height')).toBe('2')
+    expect(p).not.toHaveAttribute('data-pwb-pc-line-height')
+    expect(p.style.getPropertyValue('--pwb-pc-line-height')).toBe('')
+    expect(document.head.querySelector('style[data-pwb-responsive-overrides]')).toBeNull()
+  })
+
+  it('"reset mobile styles" returns every PC value too', () => {
+    const p = para()
+    applyElementPatch(p, { lineHeight: 2, maxWidth: 600 })
+    applyMobileElementPatch(p, { lineHeight: 1.2, maxWidth: 300 })
+    clearMobileElementStyles(p)
+
+    expect(inlineImportant(p, 'line-height')).toBe('2')
+    expect(inlineImportant(p, 'max-width')).toBe('600px')
+    expect(p.getAttributeNames().filter((name) => name.startsWith('data-pwb-'))).toEqual([])
+  })
+
+  it('treats a shorthand and its sides as one: PC padding against the phone’s top padding', () => {
+    const p = para()
+    applyElementPatch(p, { padding: 40 })
+    applyMobileElementPatch(p, { paddingTop: 8 })
+
+    expect(inlineImportant(p, 'padding-top')).toBeFalsy()
+    expect(p.style.getPropertyValue('--pwb-pc-padding-top')).toBe('40px')
+    // The other three sides have no phone value and stay where they were.
+    expect(inlineImportant(p, 'padding-left')).toBe('40px')
+
+    // And a PC padding written while the phone holds one side goes to the
+    // sheet, as the one PC value for all four sides.
+    applyElementPatch(p, { padding: 24 })
+    expect(inlineImportant(p, 'padding-left')).toBeFalsy()
+    expect(p.style.getPropertyValue('--pwb-pc-padding')).toBe('24px')
+    expect(p).not.toHaveAttribute('data-pwb-pc-padding-top')
+    expect(p.style.getPropertyValue('--pwb-mobile-padding-top')).toBe('8px')
+  })
+
+  it('clears a PC value that lives in the stylesheet', () => {
+    const p = para()
+    applyElementPatch(p, { width: 640 })
+    applyMobileElementPatch(p, { width: 280 })
+    applyElementPatch(p, { width: 0 })
+
+    expect(p).not.toHaveAttribute('data-pwb-pc-width')
+    expect(p.style.getPropertyValue('--pwb-pc-width')).toBe('')
+    expect(p.style.getPropertyValue('width')).toBe('')
+    expect(p.style.getPropertyValue('--pwb-mobile-width')).toBe('280px')
+  })
+
+  it('still reports the PC font and placement after they moved', () => {
+    const p = para()
+    applyElementPatch(p, { fontFamily: 'Lora', alignBlock: 'center' })
+    applyMobileElementPatch(p, { fontFamily: 'Inter', alignBlock: 'left' })
+
+    const info = describeElement(p)
+    expect(info.fontFamily).toBe('Lora')
+    expect(info.mobileFontFamily).toBe('Inter')
+    expect(info.alignBlock).toBe('center')
+    expect(info.mobileAlignBlock).toBe('left')
+  })
+
+  it('leaves a PC value that is not !important inline: the phone rule already wins over it', () => {
+    const p = para()
+    applyElementPatch(p, { fontSize: 26 })
+    applyMobileElementPatch(p, { fontSize: 18 })
+
+    expect(p.style.getPropertyValue('font-size')).toBe('26px')
+    expect(p).not.toHaveAttribute('data-pwb-pc-font-size')
+  })
+})
+
+describe('phone edits the panel offers and used to drop', () => {
+  it('keeps a gradient, a background image, position and stacking to the phone', () => {
+    const p = document.getElementById('para')
+    applyMobileElementPatch(p, { gradientFrom: '#ff0000', gradientTo: '#0000ff', gradientAngle: 90 })
+    expect(p.style.getPropertyValue('--pwb-mobile-background-image')).toBe('linear-gradient(90deg, #ff0000, #0000ff)')
+    expect(p.style.getPropertyValue('background-image')).toBe('')
+
+    applyMobileElementPatch(p, { backgroundImage: 'https://example.com/a.png' })
+    expect(p.style.getPropertyValue('--pwb-mobile-background-image')).toBe('url("https://example.com/a.png")')
+    expect(p.style.getPropertyValue('--pwb-mobile-background-size')).toBe('cover')
+
+    applyMobileElementPatch(p, { position: 'sticky', zIndex: 5 })
+    expect(p.style.getPropertyValue('--pwb-mobile-position')).toBe('sticky')
+    expect(p.style.getPropertyValue('--pwb-mobile-top')).toBe('0px')
+    expect(p.style.getPropertyValue('--pwb-mobile-z-index')).toBe('5')
+    expect(p.style.getPropertyValue('position')).toBe('')
+
+    applyMobileElementPatch(p, { backgroundImage: '', position: '', zIndex: 0 })
+    expect(describeElement(p).mobileOverrideCount).toBe(0)
   })
 })
 

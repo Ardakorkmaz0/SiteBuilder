@@ -3,6 +3,7 @@ import { readElementMotion } from './htmlMotion.js'
 
 const MOBILE_STYLE_TAG_ATTR = 'data-pwb-responsive-overrides'
 const MOBILE_VAR_PREFIX = '--pwb-mobile-'
+const PC_VAR_PREFIX = '--pwb-pc-'
 const MOBILE_STYLE_FIELDS = [
   ['font-size', 'font-size'],
   ['font-weight', 'font-weight'],
@@ -44,16 +45,47 @@ const MOBILE_STYLE_FIELDS = [
   // desktop becomes a column on a phone.
   ['flex-direction', 'flex-direction'],
   ['flex-wrap', 'flex-wrap'],
+  // The rest of what the panel offers on a phone. These used to be shown there
+  // and dropped on the way in.
+  ['background-image', 'background-image'],
+  ['background-size', 'background-size'],
+  ['background-position', 'background-position'],
+  ['position', 'position'],
+  ['top', 'top'],
+  ['z-index', 'z-index'],
 ]
 
+const RESPONSIVE_NAMES = new Set(MOBILE_STYLE_FIELDS.map(([name]) => name))
+const mobileAttr = (name) => `data-pwb-mobile-${name}`
+const pcAttr = (name) => `data-pwb-pc-${name}`
+
 const MOBILE_OVERRIDE_SELECTOR = MOBILE_STYLE_FIELDS
-  .map(([name]) => `[data-pwb-mobile-${name}]`)
+  .flatMap(([name]) => [`[${mobileAttr(name)}]`, `[${pcAttr(name)}]`])
   .join(',')
 
+// The phone value has to win over the PC value, and the PC value is very often
+// an inline `!important` (see setPcStyle: that is what lets a panel edit beat a
+// template that pins the property). Nothing in a stylesheet outranks an inline
+// `!important`, so a phone override written next to one was saved and never
+// applied: line height 2 on the PC, 1.2 on the phone, and the phone showed 2.
+//
+// So while a property has a phone value, its PC value does not live inline. It
+// moves into this same stylesheet as a rule of its own, ahead of the phone
+// rule and exactly as specific, where the later phone rule wins on a phone and
+// the PC rule holds everywhere else. Clearing the phone value puts the PC
+// value back inline.
+//
+// The attribute is written twice for the specificity of two, so a template
+// rule like `.hero .title { … !important }` still does not outrank a value the
+// user set.
+const twice = (attr) => `[${attr}][${attr}]`
 const MOBILE_OVERRIDE_CSS = `
+${MOBILE_STYLE_FIELDS.map(([name, property]) => (
+    `${twice(pcAttr(name))} { ${property}: var(${PC_VAR_PREFIX}${name}) !important; }`
+  )).join('\n')}
 @media (max-width: 767px) {
 ${MOBILE_STYLE_FIELDS.map(([name, property]) => (
-    `  [data-pwb-mobile-${name}] { ${property}: var(${MOBILE_VAR_PREFIX}${name}) !important; }`
+    `  ${twice(mobileAttr(name))} { ${property}: var(${MOBILE_VAR_PREFIX}${name}) !important; }`
   )).join('\n')}
 }`
 
@@ -72,16 +104,103 @@ function ensureMobileOverrideStyle(doc) {
   return style
 }
 
+// A shorthand and its sides answer for each other: an inline
+// `padding: 40px !important` holds padding-top too.
+const PADDING_SIDES = ['padding-top', 'padding-right', 'padding-bottom', 'padding-left']
+const RELATED_SIDES = { padding: PADDING_SIDES }
+const RELATED = {
+  ...RELATED_SIDES,
+  ...Object.fromEntries(PADDING_SIDES.map((side) => [side, ['padding']])),
+}
+const withRelated = (name) => [name, ...(RELATED[name] || [])]
+
+// Does a phone value stand in the way of an inline PC value for this property?
+function phoneOverrides(el, name) {
+  return withRelated(name).some((n) => el.hasAttribute(mobileAttr(n)))
+}
+
+function setPcVar(el, name, value) {
+  el.setAttribute(pcAttr(name), '')
+  el.style.setProperty(`${PC_VAR_PREFIX}${name}`, String(value))
+}
+
+function clearPcVar(el, name) {
+  if (!el.hasAttribute(pcAttr(name))) return
+  el.removeAttribute(pcAttr(name))
+  el.style.removeProperty(`${PC_VAR_PREFIX}${name}`)
+}
+
+/** The PC value the editor wrote for a property, wherever it currently lives:
+ *  inline, or in the stylesheet rule it moved to because a phone value exists. */
+function pcStyleValue(el, name) {
+  return el.style.getPropertyValue(name) || el.style.getPropertyValue(`${PC_VAR_PREFIX}${name}`).trim()
+}
+
+// Write a PC style. `important` is for the spacing/sizing/type controls: they
+// often "do nothing" otherwise, because the page's own CSS pins the property
+// with !important (very common in templates). An empty value clears the
+// override so the stylesheet value shows through again.
+function setPcStyle(el, name, value, { important = true } = {}) {
+  // Writing the shorthand replaces its sides, wherever each of them lives.
+  const sides = RELATED_SIDES[name] || []
+  const dropSides = () => sides.forEach((side) => {
+    el.style.removeProperty(side)
+    clearPcVar(el, side)
+  })
+  if (value === '' || value == null) {
+    el.style.removeProperty(name)
+    clearPcVar(el, name)
+    dropSides()
+    return
+  }
+  if (important && RESPONSIVE_NAMES.has(name) && phoneOverrides(el, name)) {
+    el.style.removeProperty(name)
+    dropSides()
+    setPcVar(el, name, value)
+    ensureMobileOverrideStyle(el.ownerDocument)
+    return
+  }
+  clearPcVar(el, name)
+  dropSides()
+  el.style.setProperty(name, String(value), important ? 'important' : '')
+}
+
+// A phone value was just set: move any inline `!important` PC value that would
+// outrank it into the stylesheet.
+function yieldPcToPhone(el, name) {
+  for (const n of withRelated(name)) {
+    if (!RESPONSIVE_NAMES.has(n)) continue
+    const value = el.style.getPropertyValue(n)
+    if (!value || el.style.getPropertyPriority(n) !== 'important') continue
+    el.style.removeProperty(n)
+    setPcVar(el, n, value)
+  }
+}
+
+// A phone value was just cleared: a PC value that only left the inline style
+// to make way for it goes back there.
+function returnPcInline(el, name) {
+  for (const n of withRelated(name)) {
+    if (!el.hasAttribute(pcAttr(n)) || phoneOverrides(el, n)) continue
+    const value = el.style.getPropertyValue(`${PC_VAR_PREFIX}${n}`).trim()
+    clearPcVar(el, n)
+    if (value) el.style.setProperty(n, value, 'important')
+  }
+}
+
 function setMobileStyle(el, name, value) {
-  const attr = `data-pwb-mobile-${name}`
+  const attr = mobileAttr(name)
   const variable = `${MOBILE_VAR_PREFIX}${name}`
   if (value === '' || value == null) {
+    const had = el.hasAttribute(attr)
     el.removeAttribute(attr)
     el.style.removeProperty(variable)
+    if (had) returnPcInline(el, name)
     return
   }
   el.setAttribute(attr, '')
   el.style.setProperty(variable, String(value))
+  yieldPcToPhone(el, name)
 }
 
 function removeUnusedMobileOverrideStyle(doc) {
@@ -246,6 +365,15 @@ export function gradientParts(value) {
 // Content is shared across breakpoints: a phone shows the same words and the
 // same menu as a desktop, so these keys always write to the element itself
 // rather than into the mobile override layer.
+// The first of several candidate values that is one of our own gradients.
+function gradientPartsOf(...values) {
+  for (const value of values) {
+    const parts = gradientParts(value)
+    if (parts.gradientFrom) return parts
+  }
+  return gradientParts('')
+}
+
 const CONTENT_PATCH_KEYS = ['text', 'href', 'src', 'alt', 'links']
 
 const LINK_LIST_TAGS = new Set(['NAV', 'UL', 'OL', 'HEADER', 'MENU'])
@@ -408,7 +536,7 @@ export function describeElement(el, win = el?.ownerDocument?.defaultView) {
     // Typography beyond size/weight. Family is read from the INLINE value so the
     // picker round-trips our own choice; the computed value is a resolved stack
     // that would never match an option.
-    fontFamily: fontFamilyKey(el.style.fontFamily),
+    fontFamily: fontFamilyKey(pcStyleValue(el, 'font-family')),
     mobileFontFamily: fontFamilyKey(el.style.getPropertyValue(`${MOBILE_VAR_PREFIX}font-family`)),
     // Unitless line-height is what typography wants (it scales with the font),
     // so it is stored and shown as a ratio rather than pixels.
@@ -428,13 +556,15 @@ export function describeElement(el, win = el?.ownerDocument?.defaultView) {
     // Background beyond a flat colour.
     backgroundImage: backgroundImageUrl(cs?.backgroundImage),
     backgroundSize: cs ? String(cs.backgroundSize || '') : '',
-    ...gradientParts(el.style.backgroundImage),
+    // What is on screen first (on a phone that is the phone's own gradient),
+    // then the PC value wherever it lives.
+    ...gradientPartsOf(cs?.backgroundImage, pcStyleValue(el, 'background-image')),
     // Flow direction of a flex container, and whether it may wrap.
     flexDirection: cs ? String(cs.flexDirection || '') : '',
     flexWrap: cs ? String(cs.flexWrap || '') : '',
     // Stacking: a sticky header is the case that keeps coming up.
     position: cs ? String(cs.position || '') : '',
-    zIndex: el.style.zIndex !== '' ? Number(el.style.zIndex) : 0,
+    zIndex: Number(pcStyleValue(el, 'z-index')) || 0,
     padding: cs ? px(cs.paddingTop) : 0,
     radius: cs ? px(cs.borderTopLeftRadius) : 0,
     width: cs ? px(cs.width) : 0,
@@ -445,13 +575,13 @@ export function describeElement(el, win = el?.ownerDocument?.defaultView) {
     // Border (single width/colour/style for the whole box — covers the common case).
     borderWidth: cs ? px(cs.borderTopWidth) : 0,
     borderColor: cs ? cssColorToHex(cs.borderTopColor) : '',
-    borderStyle: el.style.borderStyle || (cs ? cs.borderTopStyle : '') || '',
+    borderStyle: pcStyleValue(el, 'border-style') || (cs ? cs.borderTopStyle : '') || '',
     // Effects — mirror the component-mode html panel. Read the INLINE value
     // first so a preset applied here round-trips in the select; fall back to the
     // computed value (which won't match a preset, but shows the right default).
-    boxShadow: el.style.boxShadow || (cs ? cs.boxShadow : '') || '',
-    opacity: el.style.opacity !== '' ? Number(el.style.opacity) : (cs ? Number(cs.opacity) : 1),
-    overflow: el.style.overflow || (cs ? cs.overflow : '') || '',
+    boxShadow: pcStyleValue(el, 'box-shadow') || (cs ? cs.boxShadow : '') || '',
+    opacity: pcStyleValue(el, 'opacity') !== '' ? Number(pcStyleValue(el, 'opacity')) : (cs ? Number(cs.opacity) : 1),
+    overflow: pcStyleValue(el, 'overflow') || (cs ? cs.overflow : '') || '',
     // Flex layout — lets a nav/row container space and align its children
     // (the navbar case: it's a flex box, not a plain block).
     justifyContent: cs ? String(cs.justifyContent || '') : '',
@@ -461,11 +591,11 @@ export function describeElement(el, win = el?.ownerDocument?.defaultView) {
     // Read from the INLINE style: computed styles resolve `auto` to pixels,
     // so only our own writes round-trip — which is exactly what we want.
     alignBlock:
-      el.style.marginLeft === 'auto' && el.style.marginRight === 'auto'
+      pcStyleValue(el, 'margin-left') === 'auto' && pcStyleValue(el, 'margin-right') === 'auto'
         ? 'center'
-        : el.style.marginLeft === 'auto'
+        : pcStyleValue(el, 'margin-left') === 'auto'
           ? 'right'
-          : el.style.marginRight === 'auto'
+          : pcStyleValue(el, 'margin-right') === 'auto'
             ? 'left'
             : '',
     mobileAlignBlock:
@@ -517,27 +647,19 @@ export function applyElementPatch(el, patch = {}) {
   if (patch.links !== undefined) setElementLinks(el, patch.links)
   if (patch.src !== undefined && el.tagName === 'IMG') setImageSource(el, patch.src)
   if (patch.alt !== undefined && el.tagName === 'IMG') el.setAttribute('alt', patch.alt)
-  const setStyle = (prop, value) => {
-    if (value) el.style[prop] = value
-    else el.style[prop] = ''
-  }
-  // Spacing / sizing controls often "do nothing" because the page's own CSS
-  // pins them with !important (very common in templates). Write THESE as
-  // !important so the panel's explicit edit actually wins; clearing removes
-  // the override so the stylesheet value shows through again. Uses kebab-case
-  // property names (setProperty requires them).
-  const setImp = (prop, value) => {
-    if (value === '' || value == null) el.style.removeProperty(prop)
-    else el.style.setProperty(prop, value, 'important')
-  }
+  // Both go through setPcStyle, which knows where a PC value lives while a
+  // phone value exists for the same property. setImp is for the controls that
+  // have to beat a template's own !important; an empty value clears either.
+  const setStyle = (name, value) => setPcStyle(el, name, value, { important: false })
+  const setImp = (name, value) => setPcStyle(el, name, value)
   if (patch.fontSize !== undefined) {
     const n = Number(patch.fontSize)
-    setStyle('fontSize', n > 0 ? `${n}px` : '')
+    setStyle('font-size', n > 0 ? `${n}px` : '')
   }
-  if (patch.fontWeight !== undefined) setStyle('fontWeight', patch.fontWeight)
-  if (patch.textAlign !== undefined) setStyle('textAlign', patch.textAlign)
+  if (patch.fontWeight !== undefined) setStyle('font-weight', patch.fontWeight)
+  if (patch.textAlign !== undefined) setStyle('text-align', patch.textAlign)
   if (patch.color !== undefined) setStyle('color', patch.color)
-  if (patch.background !== undefined) setStyle('backgroundColor', patch.background)
+  if (patch.background !== undefined) setStyle('background-color', patch.background)
   if (patch.padding !== undefined) {
     const n = Number(patch.padding)
     setImp('padding', n > 0 ? `${n}px` : '')
@@ -572,8 +694,8 @@ export function applyElementPatch(el, patch = {}) {
       setImp('border-style', 'solid')
       setImp('border-width', `${n}px`)
     } else {
-      el.style.removeProperty('border-width')
-      el.style.removeProperty('border-style')
+      setImp('border-width', '')
+      setImp('border-style', '')
     }
   }
   if (patch.borderColor !== undefined) setImp('border-color', patch.borderColor)
@@ -582,26 +704,26 @@ export function applyElementPatch(el, patch = {}) {
   if (patch.borderStyle !== undefined) {
     if (patch.borderStyle && patch.borderStyle !== 'none') {
       setImp('border-style', patch.borderStyle)
-      if (!el.style.getPropertyValue('border-width')) setImp('border-width', '1px')
+      if (!pcStyleValue(el, 'border-width')) setImp('border-width', '1px')
     } else {
-      el.style.removeProperty('border-style')
-      el.style.removeProperty('border-width')
+      setImp('border-style', '')
+      setImp('border-width', '')
     }
   }
   // Effects — parity with the component-mode html panel. Empty string clears the
   // override so the stylesheet value (if any) shows through again.
   if (patch.boxShadow !== undefined) {
     if (patch.boxShadow && patch.boxShadow !== 'none') setImp('box-shadow', patch.boxShadow)
-    else el.style.removeProperty('box-shadow')
+    else setImp('box-shadow', '')
   }
   if (patch.opacity !== undefined) {
     const n = Number(patch.opacity)
-    if (patch.opacity === '' || !Number.isFinite(n) || n >= 1) el.style.removeProperty('opacity')
+    if (patch.opacity === '' || !Number.isFinite(n) || n >= 1) setImp('opacity', '')
     else setImp('opacity', String(Math.max(0, n)))
   }
   if (patch.overflow !== undefined) {
     if (patch.overflow && patch.overflow !== 'visible') setImp('overflow', patch.overflow)
-    else el.style.removeProperty('overflow')
+    else setImp('overflow', '')
   }
   // One-click horizontal placement inside the parent. Auto side margins work
   // for BOTH block elements and flex children (auto margins absorb the free
@@ -629,14 +751,14 @@ export function applyElementPatch(el, patch = {}) {
       setImp('margin-left', 'auto')
       setImp('margin-right', '0')
     } else {
-      el.style.removeProperty('margin-left')
-      el.style.removeProperty('margin-right')
+      setImp('margin-left', '')
+      setImp('margin-right', '')
     }
   }
   // Flex layout controls (only take effect on flex/inline-flex containers, but
   // harmless otherwise) — the practical way to space/align a navbar's items.
-  if (patch.justifyContent !== undefined) setStyle('justifyContent', patch.justifyContent)
-  if (patch.alignItems !== undefined) setStyle('alignItems', patch.alignItems)
+  if (patch.justifyContent !== undefined) setStyle('justify-content', patch.justifyContent)
+  if (patch.alignItems !== undefined) setStyle('align-items', patch.alignItems)
   if (patch.gap !== undefined) {
     const n = Number(patch.gap)
     setImp('gap', n > 0 ? `${n}px` : '')
@@ -690,23 +812,23 @@ export function applyElementPatch(el, patch = {}) {
   // Gradient and image share `background-image`, so the last one set wins and
   // clearing either falls back to the flat colour underneath.
   if (patch.gradientFrom !== undefined || patch.gradientTo !== undefined || patch.gradientAngle !== undefined) {
-    const current = gradientParts(el.style.backgroundImage)
+    const current = gradientParts(pcStyleValue(el, 'background-image'))
     const from = patch.gradientFrom !== undefined ? patch.gradientFrom : current.gradientFrom
     const to = patch.gradientTo !== undefined ? patch.gradientTo : current.gradientTo
     const angle = Number(patch.gradientAngle !== undefined ? patch.gradientAngle : current.gradientAngle)
     if (from && to) setImp('background-image', `linear-gradient(${Number.isFinite(angle) ? angle : 160}deg, ${from}, ${to})`)
-    else el.style.removeProperty('background-image')
+    else setImp('background-image', '')
   }
   if (patch.backgroundImage !== undefined) {
     const url = String(patch.backgroundImage || '').trim()
     if (url) {
       setImp('background-image', `url("${url.replace(/"/g, '%22')}")`)
-      if (!el.style.getPropertyValue('background-size')) setImp('background-size', 'cover')
-      if (!el.style.getPropertyValue('background-position')) setImp('background-position', 'center')
+      if (!pcStyleValue(el, 'background-size')) setImp('background-size', 'cover')
+      if (!pcStyleValue(el, 'background-position')) setImp('background-position', 'center')
     } else {
-      el.style.removeProperty('background-image')
-      el.style.removeProperty('background-size')
-      el.style.removeProperty('background-position')
+      setImp('background-image', '')
+      setImp('background-size', '')
+      setImp('background-position', '')
     }
   }
   if (patch.backgroundSize !== undefined) setImp('background-size', patch.backgroundSize)
@@ -715,8 +837,8 @@ export function applyElementPatch(el, patch = {}) {
   if (patch.position !== undefined) {
     setImp('position', patch.position)
     // A sticky element with no offset never sticks to anything.
-    if (patch.position === 'sticky' && !el.style.getPropertyValue('top')) setImp('top', '0px')
-    if (!patch.position) el.style.removeProperty('top')
+    if (patch.position === 'sticky' && !pcStyleValue(el, 'top')) setImp('top', '0px')
+    if (!patch.position) setImp('top', '')
   }
   if (patch.zIndex !== undefined) {
     const n = Number(patch.zIndex)
@@ -845,6 +967,42 @@ export function applyMobileElementPatch(el, patch = {}) {
   // per-breakpoint layer exists for.
   direct('flexDirection', 'flex-direction')
   direct('flexWrap', 'flex-wrap')
+
+  // Background, stacking: the same rules as on the PC side, kept to the phone.
+  const phoneValue = (name) => el.style.getPropertyValue(`${MOBILE_VAR_PREFIX}${name}`).trim()
+  if (patch.gradientFrom !== undefined || patch.gradientTo !== undefined || patch.gradientAngle !== undefined) {
+    const current = gradientPartsOf(phoneValue('background-image'), pcStyleValue(el, 'background-image'))
+    const from = patch.gradientFrom !== undefined ? patch.gradientFrom : current.gradientFrom
+    const to = patch.gradientTo !== undefined ? patch.gradientTo : current.gradientTo
+    const angle = Number(patch.gradientAngle !== undefined ? patch.gradientAngle : current.gradientAngle)
+    setMobileStyle(
+      el,
+      'background-image',
+      from && to ? `linear-gradient(${Number.isFinite(angle) ? angle : 160}deg, ${from}, ${to})` : '',
+    )
+  }
+  if (patch.backgroundImage !== undefined) {
+    const url = String(patch.backgroundImage || '').trim()
+    if (url) {
+      setMobileStyle(el, 'background-image', `url("${url.replace(/"/g, '%22')}")`)
+      if (!phoneValue('background-size')) setMobileStyle(el, 'background-size', 'cover')
+      if (!phoneValue('background-position')) setMobileStyle(el, 'background-position', 'center')
+    } else {
+      setMobileStyle(el, 'background-image', '')
+      setMobileStyle(el, 'background-size', '')
+      setMobileStyle(el, 'background-position', '')
+    }
+  }
+  direct('backgroundSize', 'background-size')
+  if (patch.position !== undefined) {
+    setMobileStyle(el, 'position', patch.position)
+    if (patch.position === 'sticky' && !phoneValue('top')) setMobileStyle(el, 'top', '0px')
+    if (!patch.position) setMobileStyle(el, 'top', '')
+  }
+  if (patch.zIndex !== undefined) {
+    const n = Number(patch.zIndex)
+    setMobileStyle(el, 'z-index', patch.zIndex === '' || !Number.isFinite(n) || n === 0 ? '' : String(Math.round(n)))
+  }
 
   removeUnusedMobileOverrideStyle(el.ownerDocument)
 }
