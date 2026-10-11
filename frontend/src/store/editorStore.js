@@ -321,7 +321,12 @@ function removeWithRegionReflow(components, ids) {
   const regions = components
     .filter((component) => wanted.has(component.id) && component.type === 'region')
     .sort((a, b) => (a.layout?.y || 0) - (b.layout?.y || 0))
-  for (const region of regions) {
+  for (const { id } of regions) {
+    // Where the band stands NOW: removing an earlier one has moved it up, and
+    // measured where it used to be, what sat right under it counted as above
+    // it and was left behind.
+    const region = next.find((component) => component.id === id)
+    if (!region) continue
     next = removeFromTree(next, region.id)
     for (const key of ['layout', 'mobileLayout']) {
       const layout = region[key] || region.layout || {}
@@ -1826,19 +1831,22 @@ export const useEditorStore = create((set, get) => ({
     get().record('dup-sel')
     set((state) => {
       const page = selectCurrentPage(state)
-      const clones = ids
-        .map((id) => findInTree(page.components, id))
-        .filter(Boolean)
-        .map((src) => {
-          const copy = cloneTree(src)
-          if (isTopLevel(page.components, src.id)) {
-            copy.layout = { ...src.layout, x: (src.layout?.x || 0) + 24, y: (src.layout?.y || 0) + 24 }
-          }
-          return copy
-        })
-      const newIds = clones.map((c) => c.id)
+      let components = page.components
+      const newIds = []
+      for (const src of ids.map((id) => findInTree(page.components, id)).filter(Boolean)) {
+        const copy = cloneTree(src)
+        newIds.push(copy.id)
+        if (isTopLevel(page.components, src.id)) {
+          copy.layout = { ...src.layout, x: (src.layout?.x || 0) + 24, y: (src.layout?.y || 0) + 24 }
+          components = [...components, copy]
+        } else {
+          // A block inside a container is placed by that container's own
+          // coordinates: its copy belongs in there, beside it.
+          components = insertAfterInTree(components, src.id, copy)
+        }
+      }
       return {
-        schema: withComponents(state.schema, page.id, [...page.components, ...clones]),
+        schema: withComponents(state.schema, page.id, components),
         selectedIds: newIds,
         selectedId: newIds[newIds.length - 1] || null,
         dirty: true,
@@ -2069,19 +2077,21 @@ export const useEditorStore = create((set, get) => ({
       const page = selectCurrentPage(state)
       const bounds = computeAlignParentBox(page, state.viewport, id, page.components)
       if (!bounds) return {}
+      const baseKey = isTopLevel(page.components, id) && !page.flowMode && state.viewport === 'mobile'
+        ? 'mobileLayout'
+        : 'layout'
       const components = mapTree(page.components, id, (c) => {
-        const baseKey = isTopLevel(page.components, id)
-          ? page.flowMode
-            ? 'layout'
-            : state.viewport === 'mobile'
-              ? 'mobileLayout'
-              : 'layout'
-          : 'layout'
         const base = c[baseKey] || c.layout || { x: 0, y: 0, w: 200, h: 80 }
         const next = applyAlignMode(base, bounds, mode)
         return { ...c, [baseKey]: { ...base, ...next } }
       })
-      return { schema: withComponents(state.schema, page.id, components), dirty: true }
+      // A place chosen on the phone is a manual phone edit, like a drag there:
+      // left following the desktop, the phone was laid out again on the spot
+      // and the block was back where it started.
+      const schema = baseKey === 'mobileLayout'
+        ? mapPage(state.schema, page.id, (p) => ({ ...p, components, mobileManual: true }))
+        : withComponents(state.schema, page.id, components)
+      return { schema, dirty: true }
     })
   },
 
@@ -2608,12 +2618,11 @@ export const useEditorStore = create((set, get) => ({
             np.components = scaleLayoutTree(np.components, factor, isMobile ? 'mobileLayout' : 'layout')
           }
           // Re-fit the auto mobile layout to the new phone width.
+          // Sections included: their blocks are laid out for the phone's width
+          // too, and left as they were they stuck out of a narrower phone
+          // until the next edit.
           if (isMobile && !p.mobileManual) {
-            const auto = autoMobileLayout(np.components, np.mobileWidth)
-            np.components = np.components.map((c) => ({
-              ...c,
-              mobileLayout: auto[c.id] || c.mobileLayout,
-            }))
+            np.components = applyAutoMobileLayouts(np.components, np.mobileWidth)
           }
           return np
         }),
