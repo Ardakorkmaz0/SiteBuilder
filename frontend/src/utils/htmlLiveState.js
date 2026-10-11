@@ -188,12 +188,70 @@ export function withLiveState(html, diff) {
   return `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`
 }
 
+// ---- what a save keeps when the author edited an element showing borrowed state
+//
+// `class` and `style` each hold many things at once, and the editor changes one
+// of them at a time: a hover effect adds two class names, a colour sets one
+// declaration. Treating the whole attribute as "changed by the author" kept
+// everything else in it too — the class a reveal script adds once an element
+// has animated in was written to the file with the hover effect, and that
+// element never animated in again. So these two are merged part by part: the
+// author's own value, plus what the author did to it in the editor.
+
+const classNames = (value) => String(value || '').split(/\s+/).filter(Boolean)
+
+function mergedClass(was, shown, current) {
+  const shownNames = new Set(classNames(shown))
+  const currentNames = new Set(classNames(current))
+  const added = [...currentNames].filter((name) => !shownNames.has(name))
+  const removed = new Set([...shownNames].filter((name) => !currentNames.has(name)))
+  if (!added.length && !removed.size) return was
+  const kept = classNames(was).filter((name) => !removed.has(name))
+  const names = [...kept, ...added.filter((name) => !kept.includes(name))]
+  if (names.length) return names.join(' ')
+  return was === '' ? '' : null
+}
+
+function declarations(doc, text) {
+  const probe = doc.createElement('span')
+  probe.setAttribute('style', text || '')
+  const out = new Map()
+  for (let i = 0; i < probe.style.length; i += 1) {
+    const name = probe.style.item(i)
+    out.set(name, [probe.style.getPropertyValue(name), probe.style.getPropertyPriority(name)])
+  }
+  return out
+}
+
+// undefined = cannot be merged safely; the caller keeps the value as it is.
+function mergedStyle(doc, was, shown, current) {
+  const shownDecl = declarations(doc, shown)
+  const currentDecl = declarations(doc, current)
+  const changed = [...currentDecl].filter(([name, [value, priority]]) => {
+    const before = shownDecl.get(name)
+    return !before || before[0] !== value || before[1] !== priority
+  })
+  const removed = [...shownDecl.keys()].filter((name) => !currentDecl.has(name))
+  if (!changed.length && !removed.length) return was
+  // A side of a shorthand written with var() has no value of its own to copy.
+  if (changed.some(([, [value]]) => value === '')) return undefined
+  const probe = doc.createElement('span')
+  probe.setAttribute('style', was || '')
+  removed.forEach((name) => probe.style.removeProperty(name))
+  changed.forEach(([name, [value, priority]]) => probe.style.setProperty(name, value, priority))
+  const text = probe.getAttribute('style') || ''
+  if (text) return text
+  return was === '' ? '' : null
+}
+
 // Called by serializeDocument on the clone it is about to save: put the
-// author's own values back, unless the value on the element is no longer the
-// one we wrote — that means the author changed it themselves, and their
-// version is the one to keep.
+// author's own values back. A value on the element that is no longer the one we
+// wrote was changed in the editor: for class and style the change is carried
+// over onto the author's value (see above); for anything else the element's
+// current value is the one to keep.
 export function restoreAuthoredState(root) {
   if (!root?.querySelectorAll) return
+  const doc = root.ownerDocument
   // <html> itself carries the dark-mode class, and querySelectorAll on an
   // element never returns that element — so it has to be asked for by name.
   const marked = [...root.querySelectorAll('[data-pwb-state]')]
@@ -207,10 +265,16 @@ export function restoreAuthoredState(root) {
     }
     el.removeAttribute('data-pwb-state')
     if (!state?.was) return
-    for (const [name, value] of Object.entries(state.was)) {
+    for (const [name, was] of Object.entries(state.was)) {
       const mine = state.now?.[name] ?? null
       const current = el.hasAttribute(name) ? el.getAttribute(name) : null
-      if (current !== mine) continue
+      let value = was
+      if (current !== mine) {
+        if (name === 'class') value = mergedClass(was, mine, current)
+        else if (name === 'style' && doc) value = mergedStyle(doc, was, mine, current)
+        else continue
+        if (value === undefined) continue
+      }
       if (value === null) el.removeAttribute(name)
       else el.setAttribute(name, value)
     }
