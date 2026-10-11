@@ -1,5 +1,6 @@
 import { readElementMultilineText, writeElementMultilineText } from './domMultilineText.js'
 import { readElementMotion } from './htmlMotion.js'
+import { slugifyAnchor } from './anchors.js'
 
 const MOBILE_STYLE_TAG_ATTR = 'data-pwb-responsive-overrides'
 const MOBILE_VAR_PREFIX = '--pwb-mobile-'
@@ -1008,23 +1009,64 @@ export function applyMobileElementPatch(el, patch = {}) {
   removeUnusedMobileOverrideStyle(el.ownerDocument)
 }
 
+// Attributes that name another element by its id, alone or in a list.
+const ID_LIST_ATTRS = ['for', 'aria-labelledby', 'aria-describedby', 'aria-controls', 'aria-owns', 'list', 'headers']
+// Attributes that name it as "#id".
+const HASH_ATTRS = ['href', 'xlink:href', 'data-target', 'data-bs-target']
+
+// Is the id what a stylesheet on the page styles the element by? Then it has
+// to stay on a copy, or the copy arrives without its design.
+function idIsStyled(doc, id) {
+  const selector = new RegExp(`#${id.replace(/[^\w-]/g, '\\$&')}(?![\\w-])`)
+  return [...doc.querySelectorAll('style')].some((style) => selector.test(style.textContent || ''))
+}
+
+// An id names ONE element. A copy that kept the original's ids could not be
+// linked to (the link went to the original, the first of the two), its labels
+// focused the original's fields and its own "#id" links jumped back into the
+// original. So the copy gets ids of its own, and whatever points at them from
+// inside the copy follows.
+function giveCloneOwnIds(doc, clone) {
+  const renamed = new Map()
+  const taken = (id) => !!doc.getElementById(id) || [...renamed.values()].includes(id)
+  for (const node of [clone, ...clone.querySelectorAll('[id]')]) {
+    const id = node.getAttribute('id')
+    if (!id || renamed.has(id) || idIsStyled(doc, id)) continue
+    let n = 2
+    while (taken(`${id}-${n}`)) n += 1
+    renamed.set(id, `${id}-${n}`)
+  }
+  if (!renamed.size) return
+  for (const node of [clone, ...clone.querySelectorAll('*')]) {
+    const id = node.getAttribute('id')
+    if (renamed.has(id)) node.setAttribute('id', renamed.get(id))
+    for (const name of ID_LIST_ATTRS) {
+      const value = node.getAttribute(name)
+      if (!value) continue
+      node.setAttribute(name, value.split(/(\s+)/).map((part) => renamed.get(part) || part).join(''))
+    }
+    for (const name of HASH_ATTRS) {
+      const value = node.getAttribute(name) || ''
+      if (value.startsWith('#') && renamed.has(value.slice(1))) node.setAttribute(name, `#${renamed.get(value.slice(1))}`)
+    }
+    // An inline SVG paints with url(#gradient).
+    for (const attr of [...node.attributes]) {
+      if (!attr.value.includes('url(#')) continue
+      node.setAttribute(attr.name, attr.value.replace(/url\(#([^)]+)\)/g, (whole, ref) => (
+        renamed.has(ref) ? `url(#${renamed.get(ref)})` : whole
+      )))
+    }
+  }
+}
+
 // Insert a deep clone right after the element. Returns the clone (the panel
 // flashes it so the user sees where it landed).
 export function duplicateElement(el) {
   if (!el?.parentElement) return null
   const clone = el.cloneNode(true)
+  giveCloneOwnIds(el.ownerDocument, clone)
   el.insertAdjacentElement('afterend', clone)
   return clone
-}
-
-// Slugify a string into an id-safe token.
-function slugify(s) {
-  return String(s || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 40)
 }
 
 // Ensure an element has a stable, unique id (so a link can target it). Reuses
@@ -1034,7 +1076,8 @@ export function ensureElementId(el) {
   if (!el || el.nodeType !== 1) return ''
   if (el.id) return el.id
   const doc = el.ownerDocument
-  const base = slugify(el.textContent) || el.tagName.toLowerCase()
+  // The shared slug: "Özellikler" has to read #ozellikler, not #zellikler.
+  const base = slugifyAnchor(el.textContent).slice(0, 40).replace(/[-_]+$/, '') || el.tagName.toLowerCase()
   let id = base
   let n = 2
   while (doc.getElementById(id)) id = `${base}-${n++}`
@@ -1151,17 +1194,29 @@ export function reorderToPoint(doc, node, clientX, clientY, helpers) {
   return target
 }
 
-// Swap the element with its previous/next sibling. Returns true when a move
-// actually happened (false at the edges).
+// What sits next to a block without being seen: the page's own <style> and
+// <script> tags, and the editor's overlays.
+const UNSEEN_SIBLING_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TEMPLATE', 'NOSCRIPT'])
+
+function seenSibling(el, step) {
+  let node = el[step]
+  while (node && (UNSEEN_SIBLING_TAGS.has(node.tagName) || node.matches(EDITOR_CHROME_SELECTOR))) node = node[step]
+  return node
+}
+
+// Swap the element with the block before/after it. Returns true when a move
+// actually happened (false at the edges). A <style> between two sections is
+// stepped over: swapping with it changed nothing on the page, yet counted as
+// a move — the button seemed dead and Undo had a step that undid nothing.
 export function moveElement(el, dir) {
   if (!el?.parentElement) return false
   if (dir === 'up') {
-    const prev = el.previousElementSibling
+    const prev = seenSibling(el, 'previousElementSibling')
     if (!prev) return false
     prev.insertAdjacentElement('beforebegin', el)
     return true
   }
-  const next = el.nextElementSibling
+  const next = seenSibling(el, 'nextElementSibling')
   if (!next) return false
   next.insertAdjacentElement('afterend', el)
   return true
