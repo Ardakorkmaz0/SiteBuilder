@@ -859,6 +859,17 @@ function SiteEditor() {
       document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [autoSaveEnabled])
+  // Leaving by the browser's Back button unmounts the editor with no prompt
+  // (the "save before leaving?" dialog only guards the editor's own buttons)
+  // and takes the pending automatic save with it. Send it on the way out. The
+  // rules are the same as for any automatic save: not when it is switched off,
+  // and not after "leave without saving".
+  useEffect(() => () => {
+    const s = saveLifecycleRef.current
+    if (shouldRunEditorAutoSave(s, discardLeaveRef.current)) {
+      s.save(undefined, { auto: true })
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
