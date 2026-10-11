@@ -40,6 +40,7 @@ export default function FreeCanvasItem({
   const toggleSelect = useEditorStore((s) => s.toggleSelect)
   const setLayout = useEditorStore((s) => s.setLayout)
   const setLayoutMany = useEditorStore((s) => s.setLayoutMany)
+  const growToContent = useEditorStore((s) => s.growToContent)
   const updateProps = useEditorStore((s) => s.updateProps)
   const setDragGuides = useEditorStore((s) => s.setDragGuides)
   const clearDragGuides = useEditorStore((s) => s.clearDragGuides)
@@ -162,7 +163,7 @@ export default function FreeCanvasItem({
       const node = wrapRef.current?.firstElementChild?.firstElementChild
       if (!node) return
       const needed = Math.ceil(node.getBoundingClientRect().height / canvasScale)
-      if (needed > (layout.h || 0) + 1) setLayout(component.id, { h: needed })
+      if (needed > (layout.h || 0) + 1) growToContent(component.id, needed)
     }, 60)
     return () => window.clearTimeout(timer)
   }, [
@@ -172,7 +173,7 @@ export default function FreeCanvasItem({
     component.children,
     layout.h,
     canvasScale,
-    setLayout,
+    growToContent,
   ])
   const pinY = props.pinY === 'bottom' ? 'bottom' : 'top'
   const pinX = ['right', 'center'].includes(props.pinX) ? props.pinX : 'left'
@@ -327,6 +328,11 @@ export default function FreeCanvasItem({
         const dy = snap.y - base.y
         const updates = {}
         for (const id of groupIds) {
+          // A selection can reach into a container (click a block in one, then
+          // shift-click others). That block is placed by its container and
+          // stays in it; looked up here it was not found and the drag stopped
+          // with an error on every move.
+          if (!origins[id]) continue
           updates[id] = {
             x: Math.max(0, Math.round(origins[id].x + dx)),
             y: Math.max(0, Math.round(origins[id].y + dy)),
@@ -494,15 +500,15 @@ export default function FreeCanvasItem({
 
       {pinMode && (
         <span
-          title={
+          title={t(
             pinMode === 'fixed'
               ? 'Pinned to the screen — stays put while the page scrolls. Drag to adjust the pin offsets.'
-              : 'Sticky — scrolls with the page until it reaches the edge, then stays.'
-          }
+              : 'Sticky — scrolls with the page until it reaches the edge, then stays.',
+          )}
           style={chromeBadgeStyle(chrome, 'bottom-left')}
           className="rounded-lg bg-[#4f46e5]/85 px-1.5 py-0.5 text-[10px] font-medium text-white"
         >
-          {pinMode === 'fixed' ? 'Pinned' : 'Sticky'}
+          {t(pinMode === 'fixed' ? 'Pinned' : 'Sticky')}
         </span>
       )}
 
