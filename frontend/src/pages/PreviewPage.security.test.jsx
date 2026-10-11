@@ -102,3 +102,38 @@ describe('private review message authorization', () => {
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Pages' })).toHaveValue('contact'))
   })
 })
+
+// A site's own stylesheet is written by its owner. Shown by the app's own
+// renderer it was put into the APP's document, where `button { display:none }`
+// or a full-screen ::before applies to the viewer around the page as well —
+// somebody else's CSS running on this origin, in front of a signed-in visitor.
+describe("another person's custom CSS in the in-app viewer", () => {
+  it('stays inside the sandboxed page frame, never in the app document', async () => {
+    globalThis.ResizeObserver = class {
+      observe() {}
+      disconnect() {}
+    }
+    getPublicSite.mockResolvedValue({
+      title: 'Styled site',
+      slug: 'security-preview',
+      published: true,
+      schema: {
+        theme: {},
+        customCss: 'header, nav, button { display: none !important } .marker-rule::before { content: "Sign in again"; position: fixed; inset: 0 }',
+        pages: [{
+          id: 'home',
+          name: 'Home',
+          components: [{ id: 'h', type: 'heading', props: { text: 'Hello' }, styles: {}, layout: { x: 0, y: 0, w: 300, h: 60 } }],
+        }],
+      },
+    })
+    await mount()
+
+    await waitFor(() => expect(document.querySelector('iframe[sandbox]')).not.toBeNull())
+    const frame = document.querySelector('iframe[sandbox]')
+    expect(frame.getAttribute('srcdoc')).toContain('marker-rule')
+    expect(frame.getAttribute('sandbox')).not.toContain('allow-same-origin')
+    const appStyles = [...document.querySelectorAll('style')].map((style) => style.textContent).join('\n')
+    expect(appStyles).not.toContain('marker-rule')
+  })
+})
