@@ -2134,7 +2134,22 @@ export async function runAiPrompt(prompt, { maxRounds = 5, history = [], onProgr
   const tried = []
   let lastErr = null
   let switchedFrom = null
+  // The page as it was when the turn began. A provider that gives out
+  // part-way (its quota ends in round three) has already made changes, and
+  // the next one does the whole request over: on top of them, everything the
+  // first had managed came back twice.
+  const begun = useEditorStore.getState()
+  const startState = {
+    schema: begun.schema,
+    currentPageId: begun.currentPageId,
+    dirty: begun.dirty,
+    past: begun.past,
+    pastAt: begun.pastAt,
+    future: begun.future,
+    futureAt: begun.futureAt,
+  }
   for (const p of candidates) {
+    if (tried.length) useEditorStore.setState(startState)
     if (getProvider() !== p.id) {
       switchedFrom = switchedFrom || getProvider()
       setProvider(p.id)
