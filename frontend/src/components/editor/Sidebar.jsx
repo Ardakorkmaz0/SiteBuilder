@@ -163,7 +163,7 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
           inspect()
           onPick(type, html)
         }}
-        title={`Click to place, or drag onto the page — ${variantLabel}`}
+        title={t('Click to place, or drag onto the page — {name}', { name: variantLabel })}
         className={`cursor-pointer rounded-lg border p-1.5 transition select-none hover:border-[var(--studio-accent)] hover:bg-[var(--studio-control-hover)] active:cursor-grabbing ${variant.recommended ? 'border-[var(--studio-accent)] bg-[var(--studio-control)]' : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)]'}`}
       >
         {preview}
@@ -186,7 +186,7 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
             : { type, preset, html, w, h, label: variantLabel },
         )
       }}
-      title={`Click to place, or drag onto the canvas — ${variantLabel}`}
+      title={t('Click to place, or drag onto the canvas — {name}', { name: variantLabel })}
       style={{ touchAction: 'manipulation' }}
       className={`cursor-grab rounded-lg border p-1.5 transition hover:border-[var(--studio-accent)] hover:bg-[var(--studio-control-hover)] active:cursor-grabbing ${variant.recommended ? 'border-[var(--studio-accent)] bg-[var(--studio-control)]' : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)]'} ${isDragging ? 'opacity-40' : ''}`}
     >
@@ -242,6 +242,7 @@ function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle }) {
 // A ready-made section block, dual-mode (same library as the variants). HTML mode
 // inserts the raw section HTML; the free canvas drops it as one `html` component.
 function BlockCard({ block, onPick, onArm, onInspect, theme }) {
+  const { t } = useLanguage()
   const [w, h] = blockSize(block.id)
   const inspect = () => onInspect?.({
     type: 'Section',
@@ -278,7 +279,7 @@ function BlockCard({ block, onPick, onArm, onInspect, theme }) {
           inspect()
           onPick('section', block.html)
         }}
-        title={`Click to place, or drag onto the page — ${block.label} section`}
+        title={t('Click to place, or drag onto the page — {name} section', { name: block.label })}
         className="cursor-pointer rounded-lg border border-[#e5e7eb] bg-white p-2.5 transition select-none hover:border-[#4f46e5] hover:bg-[#fafaff] active:cursor-grabbing"
       >
         {inner}
@@ -295,7 +296,7 @@ function BlockCard({ block, onPick, onArm, onInspect, theme }) {
         inspect()
         onArm?.({ type: 'section', preset: block.id, html: block.html, w, h, label: block.label })
       }}
-      title={`Click to place, or drag onto the canvas — ${block.label} section`}
+      title={t('Click to place, or drag onto the canvas — {name} section', { name: block.label })}
       style={{ touchAction: 'manipulation' }}
       className={`cursor-grab rounded-lg border border-[#e5e7eb] bg-white p-2.5 transition hover:border-[#4f46e5] hover:bg-[#fafaff] active:cursor-grabbing ${isDragging ? 'opacity-40' : ''}`}
     >
