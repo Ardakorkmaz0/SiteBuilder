@@ -54,8 +54,6 @@ const ALLOWED = new Map([
   // control is the one that keeps its literals: its warm paper look is
   // deliberate in light mode, so dark mode redefines the RELATIONSHIP (recessed
   // track, raised active pill) in index.css instead of flattening the colours.
-  ['#eae7e0', 'segmented-toggle track — warm in light, remapped in index.css'],
-  ['#76736b', 'segmented-toggle inactive label — remapped in index.css'],
 ])
 
 function walk(dir, out = []) {

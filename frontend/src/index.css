@@ -215,25 +215,6 @@
   background-color: var(--studio-panel-raised) !important;
 }
 
-/* Segmented control. Its light look is deliberately warm ("paper track, white
-   pill lifted on top"), so rather than flatten that into the cool neutral
-   tokens, dark mode gets the same RELATIONSHIP: a recessed track with the
-   active option raised above it. Without this the track stayed beige while the
-   active pill turned dark — the selected state read as the unselected one. */
-:root[data-ui-theme="dark"] .app-theme-surface [class*="bg-[#eae7e0]"] {
-  background-color: var(--studio-panel-raised) !important;
-}
-:root[data-ui-theme="dark"] .app-theme-surface [class*="bg-[#eae7e0]"] [role="tab"][aria-selected="true"] {
-  /* Lighter than the track, never darker: on a dark surface "raised" reads as
-     lighter, so reusing the light theme's white pill directly would sink the
-     selected option instead of lifting it. */
-  background-color: var(--studio-control-hover) !important;
-  color: var(--studio-text) !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
-}
-:root[data-ui-theme="dark"] .app-theme-surface [class*="text-[#76736b]"] {
-  color: var(--studio-text-muted) !important;
-}
 :root[data-ui-theme="dark"] .app-theme-surface [class*="border-[#e5e7eb]"],
 :root[data-ui-theme="dark"] .app-theme-surface [class*="border-[#d1d5db]"],
 :root[data-ui-theme="dark"] .app-theme-surface [class*="border-[#c7d2fe]"] {
