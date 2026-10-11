@@ -257,6 +257,80 @@ describe('editing a page whose styles come from a script', () => {
   })
 })
 
+// The reading View takes of a page (the DOM its scripts left behind) is laid
+// over the document Edit opens, so a dark-mode class or an opened accordion
+// shows there too. It used to be matched to the page, not to the document: a
+// reading taken when the page opened was laid over every later seed of it. So
+// after a style edit, switching PC/phone or pressing Undo showed the old style
+// again, and a deleted block came back as a block nobody could select.
+describe('a reading of the page is only laid over the document it was taken from', () => {
+  beforeEach(() => {
+    globalThis.ResizeObserver = class { observe() {} disconnect() {} }
+  })
+
+  // A real page opens with a stylesheet far longer than the stretch of text the
+  // editor tells one page from another by, so every edit of it looks like the
+  // same page. A short test document would not: the bug needs this head.
+  const HEAD = `<head><title>T</title><style>${'.card{margin:0;padding:0}'.repeat(80)}</style></head>`
+  const OPENED = `<html>${HEAD}<body><h1 style="font-size: 38px;">Title</h1><p class="lead">Delete me</p></body></html>`
+  // The same page after the user set a size on the heading and deleted the paragraph.
+  const EDITED = `<html>${HEAD}<body><h1 style="font-size: 24px;">Title</h1></body></html>`
+
+  function reportLiveState(frame, html) {
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: { type: 'pwb-live-state', styles: [], html },
+      }))
+    })
+  }
+
+  function mount(html, workspaceRef) {
+    return (
+      <LanguageProvider>
+        <HtmlWorkspace ref={workspaceRef} persistKey="stale-reading" html={html} onCommit={vi.fn()} />
+      </LanguageProvider>
+    )
+  }
+
+  function openEditedThenReseed() {
+    const workspaceRef = createRef()
+    const { rerender } = render(mount(OPENED, workspaceRef))
+    reportLiveState(screen.getByTitle('site'), OPENED) // View read the page as it opened
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    // The edits were committed, then Undo/Redo (or a device switch) reseeds Edit.
+    rerender(mount(EDITED, workspaceRef))
+    act(() => workspaceRef.current.setDocument(EDITED))
+    return { workspaceRef, rerender }
+  }
+
+  it('keeps the user’s style after Edit is reseeded, instead of the style the page opened with', () => {
+    openEditedThenReseed()
+    const source = screen.getByTitle('site').getAttribute('srcdoc') || ''
+    expect(source).toContain('font-size: 24px;')
+    expect(source).not.toContain('font-size: 38px;')
+    expect(source).not.toContain('data-pwb-state')
+  })
+
+  it('does not bring a deleted block back as a block that cannot be selected', () => {
+    openEditedThenReseed()
+    const source = screen.getByTitle('site').getAttribute('srcdoc') || ''
+    expect(source).not.toContain('Delete me')
+    expect(source).not.toContain('data-pwb-injected="live-state"')
+  })
+
+  it('takes a new reading of the reseeded document, and lays that one over it', () => {
+    openEditedThenReseed()
+    const measure = screen.getByTitle('Reading the page')
+    // A script on the page opens the menu: that IS state to carry into Edit.
+    reportLiveState(measure, EDITED.replace('<h1 style="font-size: 24px;">', '<h1 style="font-size: 24px;" class="is-open">'))
+
+    const source = screen.getByTitle('site').getAttribute('srcdoc') || ''
+    expect(source).toContain('class="is-open"')
+    expect(screen.queryByTitle('Reading the page')).toBeNull()
+  })
+})
+
 describe('HTML selection quick actions', () => {
   beforeEach(() => {
     document.body.innerHTML = '<main><p id="selected">Hello</p></main>'
