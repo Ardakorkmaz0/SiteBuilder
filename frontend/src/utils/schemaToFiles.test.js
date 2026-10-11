@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { schemaToFiles, schemaToSingleHtml } from './schemaToFiles.js'
+import { schemaToResponsiveHtml } from './responsiveHtml.js'
 
 describe('schemaToFiles custom code', () => {
   it('keeps page markup, shared styles, runtime and custom code in separate files', () => {
@@ -634,5 +635,41 @@ describe('schemaToSingleHtml embed font', () => {
   it('leaves an older embed in the font it was sized around', () => {
     const html = schemaToSingleHtml(site({}), 'Font test')
     expect(html).not.toContain('--pwb-embed-font:')
+  })
+})
+
+// An HTML block is written as a document inside srcdoc="…". The browser
+// decodes character references in the attribute BEFORE reading the document.
+describe('an HTML block on the published page shows what it shows in the editor', () => {
+  const schema = {
+    theme: {},
+    pages: [{
+      id: 'p1',
+      name: 'Home',
+      components: [{
+        id: 'embed',
+        type: 'html',
+        props: { code: '<p id="sample">Write &lt;b&gt;bold&lt;/b&gt; &amp;amp; "quoted"</p>' },
+        styles: {},
+        layout: { x: 0, y: 0, w: 400, h: 120 },
+      }],
+    }],
+  }
+  const blockDocument = (html) => {
+    const frame = new DOMParser().parseFromString(html, 'text/html').querySelector('iframe[srcdoc]')
+    return new DOMParser().parseFromString(frame.getAttribute('srcdoc'), 'text/html')
+  }
+  const SEEN = 'Write <b>bold</b> &amp; "quoted"'
+
+  it('in the published export', () => {
+    const sample = blockDocument(schemaToSingleHtml(schema, 'T')).getElementById('sample')
+    expect(sample.textContent).toBe(SEEN)
+    expect(sample.querySelector('b')).toBeNull()
+  })
+
+  it('in the responsive export', () => {
+    const sample = blockDocument(schemaToResponsiveHtml(schema, 'T')).getElementById('sample')
+    expect(sample.textContent).toBe(SEEN)
+    expect(sample.querySelector('b')).toBeNull()
   })
 })
