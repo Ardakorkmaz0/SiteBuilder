@@ -1640,6 +1640,7 @@ export const TURKISH_TRANSLATIONS = {
   'Click any element to start the link, then click its target.': 'Bağlantıyı başlatmak için bir öğeye, ardından hedefine tıklayın.',
   'Now click the target element, or a page in the Files panel on the left to link to that page.': 'Şimdi hedef öğeye tıklayın ya da o sayfaya bağlamak için soldaki Dosyalar panelinden bir sayfa seçin.',
   'Pick a different element as the target.': 'Hedef olarak başka bir öğe seçin.',
+  'This block already has links inside it. Click one of those links, or an element without a link.': 'Bu bloğun içinde zaten bağlantılar var. Onlardan birine ya da bağlantısı olmayan bir öğeye tıklayın.',
   'Linked to {href}. Click another element to connect more.': '{href} adresine bağlandı. Başka bir bağlantı için başka bir öğeye tıklayın.',
   'Click in the page to place the': 'Yerleştirmek için sayfaya tıklayın:',
   ', or drag it onto the spot.': ' veya istediğiniz konuma sürükleyin.',

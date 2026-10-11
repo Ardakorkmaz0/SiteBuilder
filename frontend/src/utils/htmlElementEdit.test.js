@@ -468,6 +468,60 @@ describe('ensureAnchor / elementLinkHref / setElementLink', () => {
   })
 })
 
+// The file is read back by the HTML parser, and the parser does not allow an
+// <a> inside an <a>: it ends the outer link where the inner one starts.
+describe('a link never ends up inside another link', () => {
+  const reread = () => new DOMParser().parseFromString(serializeDocument(document), 'text/html')
+
+  it('a link set on the label inside a button-link changes that button, and the button keeps its label', () => {
+    document.body.innerHTML = '<a id="btn" class="btn" href="/pricing"><span id="label">Get started</span></a>'
+    const label = document.getElementById('label')
+    expect(describeElement(label).href).toBe('/pricing')
+
+    applyElementPatch(label, { href: '/signup' })
+
+    const after = reread()
+    expect(after.querySelectorAll('a')).toHaveLength(1)
+    expect(after.getElementById('btn').getAttribute('href')).toBe('/signup')
+    expect(after.getElementById('btn').textContent).toBe('Get started')
+  })
+
+  it('"No link" on that label takes the address off the button without taking the button apart', () => {
+    document.body.innerHTML = '<a id="btn" class="btn" href="/pricing"><span id="label">Get started</span></a>'
+    applyElementPatch(document.getElementById('label'), { href: '' })
+    const btn = document.getElementById('btn')
+    expect(btn.hasAttribute('href')).toBe(false)
+    expect(btn.querySelector('#label')).not.toBeNull()
+  })
+
+  it('"No link" on something inside a wrapper the editor added removes that wrapper', () => {
+    document.body.innerHTML = '<section id="s"><div id="card"><h3 id="t">Title</h3></div></section>'
+    setElementLink(document.getElementById('card'), '/about')
+    expect(elementLinkHref(document.getElementById('t'))).toBe('/about')
+    setElementLink(document.getElementById('t'), '')
+    expect(document.querySelector('a')).toBeNull()
+    expect(document.getElementById('card').parentElement.id).toBe('s')
+  })
+
+  it('a block that holds a link of its own is not offered a link and cannot be wrapped in one', () => {
+    document.body.innerHTML = '<div id="card"><h3>Title</h3><a id="more" href="/more">Read more</a></div>'
+    const card = document.getElementById('card')
+    expect(describeElement(card).href).toBeNull()
+    setElementLink(card, '/about')
+    expect(ensureAnchor(card)).toBeNull()
+    expect(card.parentElement).toBe(document.body)
+    expect(reread().querySelectorAll('a')).toHaveLength(1)
+  })
+
+  it('a table cell is not offered a link: the parser would move the wrapper out of the table', () => {
+    document.body.innerHTML = '<table><tbody><tr><td id="cell">Price</td></tr></tbody></table>'
+    const cell = document.getElementById('cell')
+    expect(describeElement(cell).href).toBeNull()
+    setElementLink(cell, '/about')
+    expect(document.querySelector('a')).toBeNull()
+  })
+})
+
 describe('reorderToPoint', () => {
   it('moves a node before/after the block under the point', () => {
     // jsdom has no layout, so stub getBoundingClientRect for a deterministic

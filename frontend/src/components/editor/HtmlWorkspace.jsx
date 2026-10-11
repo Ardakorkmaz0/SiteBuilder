@@ -46,6 +46,7 @@ import {
   bindLinkToTarget,
   clearMobileElementStyles,
   describeElement,
+  canCarryLink,
   duplicateElement,
   ensureAnchor,
   moveElement,
@@ -1310,6 +1311,7 @@ function HtmlWorkspace({
       if (!doc || !src || !pageId) return false // not armed → caller navigates
       // The source may be any block — wrap it in <a> so the page link works.
       const anchor = ensureAnchor(src)
+      if (!anchor) return false
       anchor.setAttribute('href', `#${pageId}`)
       linkSourceRef.current = null
       onLinkArmedChange?.(false)
@@ -1579,6 +1581,8 @@ function HtmlWorkspace({
         // made source and target collapse to the same node (link never bound).
         const src = nearestAnchor(e.target, doc.body) || resolveSelectableElement(e.target, doc.body)
         if (!src) { setLinkHint(['Click any element to start the link, then click its target.']); return }
+        // A block that holds links cannot become one (an <a> inside an <a>).
+        if (!canCarryLink(src)) { setLinkHint(['This block already has links inside it. Click one of those links, or an element without a link.']); return }
         linkSourceRef.current = src
         onLinkArmedChange?.(true)
         setLinkSource(doc, src) // persistent blue highlight until the next click
