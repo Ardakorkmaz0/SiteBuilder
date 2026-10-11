@@ -673,3 +673,36 @@ describe('an HTML block on the published page shows what it shows in the editor'
     expect(sample.querySelector('b')).toBeNull()
   })
 })
+
+// "Hide on mobile" / "Hide on PC" on a block inside a Tabs panel. The rule that
+// hides it was written to the stylesheet, but the block never got the class the
+// rule names: hidden in the editor, still there on the published page.
+describe('a block inside a tab that is hidden on one screen size', () => {
+  const schema = {
+    theme: {},
+    pages: [{
+      id: 'p1',
+      name: 'Home',
+      components: [{
+        id: 'tabs',
+        type: 'tabs',
+        props: { tabs: [{ id: 't1', label: 'One' }], activeId: 't1' },
+        styles: {},
+        layout: { x: 0, y: 0, w: 600, h: 240 },
+        children: [
+          { id: 'phoneless', type: 'text', tabId: 't1', hiddenMobile: true, props: { text: 'Not on phones' }, styles: {}, layout: { x: 10, y: 10, w: 200, h: 40 } },
+          { id: 'deskless', type: 'text', tabId: 't1', hidden: true, props: { text: 'Not on desktops' }, styles: {}, layout: { x: 10, y: 60, w: 200, h: 40 } },
+        ],
+      }],
+    }],
+  }
+
+  it('carries the class its hide rule names on the published page', () => {
+    const html = schemaToSingleHtml(schema, 'T')
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    expect(html).toContain('.n-phoneless { display:none; }')
+    expect(html).toContain('.n-deskless { display:none; }')
+    expect(doc.getElementById('phoneless').classList.contains('n-phoneless')).toBe(true)
+    expect(doc.getElementById('deskless').classList.contains('n-deskless')).toBe(true)
+  })
+})
