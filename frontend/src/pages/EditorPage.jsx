@@ -50,6 +50,7 @@ import EditorTour from '../components/editor/EditorTour.jsx'
 import { tourWasSeen } from '../utils/editorTour.js'
 import { applyHtmlPageSettings, readHtmlPageSettings } from '../utils/htmlPageSettings.js'
 import { publishedPagesFor } from '../utils/publishedPages.js'
+import { isPreviewMessageSource, previewPageId } from '../utils/previewMessages.js'
 import CanvasZoomControl from '../components/editor/CanvasZoomControl.jsx'
 import FullscreenStage from '../components/editor/FullscreenStage.jsx'
 import useFullscreenEditing from '../components/editor/useFullscreenEditing.js'
@@ -1038,7 +1039,12 @@ function SiteEditor() {
   useEffect(() => {
     const onMsg = (e) => {
       if (e.data?.type !== 'pwb-navigate') return
-      const pid = decodeURIComponent(String(e.data.hash || '').replace(/^#/, ''))
+      // Only a page preview of this editor may ask, told by which window it is
+      // (a sandboxed frame has no origin to check): the request used to be
+      // taken from any window, so a frame a third party put in the page, or a
+      // window that opened the editor, could switch the page being edited.
+      if (!isPreviewMessageSource(e, null, document)) return
+      const pid = previewPageId(e.data.hash)
       const { storePages: pages, switchToPage: go } = navigateTargetRef.current || {}
       if (pid && pages?.some((p) => p.id === pid)) go(pid)
     }
