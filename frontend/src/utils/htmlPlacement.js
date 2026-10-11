@@ -94,6 +94,29 @@ export function insertPositionForY(rectTop, rectHeight, clientY) {
   return ratio < 0.4 ? 'beforebegin' : 'afterend'
 }
 
+// Blocks whose start tag ends an open paragraph when the file is read back.
+const ENDS_PARAGRAPH = new Set([
+  'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'DETAILS', 'DIALOG', 'DIV', 'DL', 'FIELDSET',
+  'FIGCAPTION', 'FIGURE', 'FOOTER', 'FORM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'HEADER',
+  'HGROUP', 'HR', 'LI', 'MAIN', 'MENU', 'NAV', 'OL', 'P', 'PRE', 'SECTION', 'TABLE', 'UL',
+])
+
+// The block `node` can stand beside and still be there after a save.
+//
+// The page on screen takes a block anywhere; the file is read back by the
+// parser, which does not. A section dropped beside a picture inside a paragraph
+// ends that paragraph (and leaves an empty one after it), and a button-link
+// dropped inside a card that is itself a link ends the card's link — what
+// followed it fell out of the card. So the landing place climbs out of the
+// paragraph, or the link, that cannot hold the block.
+export function landingTarget(target, node) {
+  let landing = target
+  if (!landing?.parentElement || !node?.tagName) return landing
+  if (ENDS_PARAGRAPH.has(node.tagName)) landing = landing.parentElement.closest('p') || landing
+  if (node.tagName === 'A' || node.querySelector?.('a')) landing = landing.parentElement?.closest('a') || landing
+  return landing
+}
+
 // Parse a snippet string into a single DOM node within `doc`. Multi-root
 // snippets are wrapped in a <div> so we always return one node to insert.
 export function snippetToNode(doc, snippet) {
@@ -122,7 +145,7 @@ export function insertSnippet(doc, snippet, target, position = 'afterend') {
     return node
   }
   try {
-    target.insertAdjacentElement(position, node)
+    landingTarget(target, node).insertAdjacentElement(position, node)
   } catch {
     body.appendChild(node)
   }

@@ -1,6 +1,7 @@
 import { readElementMultilineText, writeElementMultilineText } from './domMultilineText.js'
 import { readElementMotion } from './htmlMotion.js'
 import { slugifyAnchor } from './anchors.js'
+import { landingTarget } from './htmlPlacement.js'
 
 const MOBILE_STYLE_TAG_ATTR = 'data-pwb-responsive-overrides'
 const MOBILE_VAR_PREFIX = '--pwb-mobile-'
@@ -1190,7 +1191,8 @@ export function reorderToPoint(doc, node, clientX, clientY, helpers) {
   if (!target || target === doc.body || target === node || node.contains(target)) return null
   const rect = target.getBoundingClientRect()
   const position = insertPositionForY(rect.top, rect.height, clientY)
-  target.insertAdjacentElement(position, node)
+  // Out of a paragraph or a link that cannot hold the block (see landingTarget).
+  landingTarget(target, node).insertAdjacentElement(position, node)
   return target
 }
 
