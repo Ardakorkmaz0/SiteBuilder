@@ -23,7 +23,7 @@ import {
   snippetToNode,
   thinSelectableAtPoint,
 } from './htmlPlacement.js'
-import { applyMobileElementPatch } from './htmlElementEdit.js'
+import { applyMobileElementPatch, reorderToPoint } from './htmlElementEdit.js'
 
 describe('closestPlaceableBlock', () => {
   let body
@@ -159,6 +159,59 @@ describe('insertSnippet', () => {
     expect(document.body.lastElementChild.id).toBe('end')
     insertSnippet(document, '<div id="end2">E2</div>', null)
     expect(document.body.lastElementChild.id).toBe('end2')
+  })
+})
+
+// The page on screen takes a block anywhere. The saved file is read back by
+// the parser, which ends a paragraph, or a link, where such a block starts.
+describe('a block lands where it is still standing after a save', () => {
+  const reread = () => new DOMParser().parseFromString(serializeDocument(document), 'text/html')
+
+  it('a section placed beside a picture in a paragraph lands after the paragraph', () => {
+    document.body.innerHTML = '<p id="para">Before <img id="pic" src="a.png"> after</p>'
+    const node = insertSnippet(document, '<section id="new"><h2>New</h2></section>', document.getElementById('pic'), 'afterend')
+
+    expect(node.previousElementSibling.id).toBe('para')
+    const after = reread()
+    expect(after.querySelectorAll('p')).toHaveLength(1)
+    expect(after.getElementById('para').textContent).toBe('Before  after')
+  })
+
+  it('a picture placed beside that picture stays in the paragraph', () => {
+    document.body.innerHTML = '<p id="para"><img id="pic" src="a.png"></p>'
+    const node = insertSnippet(document, '<img id="second" src="b.png">', document.getElementById('pic'), 'afterend')
+    expect(node.parentElement.id).toBe('para')
+  })
+
+  it('a button-link placed inside a card that is a link lands beside the card, which stays whole', () => {
+    document.body.innerHTML = '<a id="card" href="/post"><h3 id="title">Title</h3><p id="text">Text</p></a>'
+    const node = insertSnippet(document, '<a id="btn" class="btn" href="#">Go</a>', document.getElementById('title'), 'afterend')
+
+    expect(node.previousElementSibling.id).toBe('card')
+    const card = reread().getElementById('card')
+    expect(card.querySelector('#title')).not.toBeNull()
+    expect(card.querySelector('#text')).not.toBeNull()
+  })
+
+  it('a block with a link somewhere inside it does the same', () => {
+    document.body.innerHTML = '<a id="card" href="/post"><h3 id="title">Title</h3></a>'
+    const node = insertSnippet(document, '<div id="box"><p>Read <a href="/more">more</a></p></div>', document.getElementById('title'), 'beforebegin')
+    expect(node.nextElementSibling.id).toBe('card')
+  })
+
+  it('a heading placed inside that card stays inside it', () => {
+    document.body.innerHTML = '<a id="card" href="/post"><h3 id="title">Title</h3></a>'
+    const node = insertSnippet(document, '<h4 id="sub">Sub</h4>', document.getElementById('title'), 'afterend')
+    expect(node.parentElement.id).toBe('card')
+  })
+
+  it('a block moved onto a picture in a paragraph lands after the paragraph too', () => {
+    document.body.innerHTML = '<section id="moved">Moved</section><p id="para"><img id="pic" src="a.png"></p>'
+    const pic = document.getElementById('pic')
+    pic.getBoundingClientRect = () => ({ top: 100, height: 100, left: 0, width: 100, bottom: 200, right: 100 })
+    document.elementFromPoint = () => pic
+    reorderToPoint(document, document.getElementById('moved'), 10, 190, { closestPlaceableBlock, insertPositionForY })
+    expect(document.getElementById('moved').previousElementSibling.id).toBe('para')
   })
 })
 
