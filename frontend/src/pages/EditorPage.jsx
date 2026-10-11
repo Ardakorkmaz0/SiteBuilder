@@ -380,6 +380,9 @@ function SiteEditor() {
   const canRedo = useEditorStore((s) => s.future.length > 0)
   const markSaved = useEditorStore((s) => s.markSaved)
   const dirty = useEditorStore((s) => s.dirty)
+  // The canvas is showing an AI proposal nobody has accepted yet (see the
+  // store's previewBase): nothing of it may be saved.
+  const previewing = useEditorStore((s) => !!s.previewBase)
   const authUser = useAuthStore((s) => s.user)
   // Back LEAVES the editor. One history step back is usually another editor
   // (open a site, return, open the next), and moving between pages of a design
@@ -818,11 +821,11 @@ function SiteEditor() {
   // immediately by Ctrl+S/click Save must observe this render's title, HTML map
   // and dirty flags instead of the previous render's closure.
   saveLifecycleRef.current = {
-    save, performSave, dirty, htmlDirty, metaDirty, workspaceDirty, published, loading, autoSaveEnabled,
+    save, performSave, dirty, htmlDirty, metaDirty, workspaceDirty, published, loading, autoSaveEnabled, previewing,
   }
   useEffect(() => {
     if (!shouldRunEditorAutoSave(
-      { autoSaveEnabled, loading, dirty, htmlDirty, metaDirty, workspaceDirty },
+      { autoSaveEnabled, loading, dirty, htmlDirty, metaDirty, workspaceDirty, previewing },
       discardLeaveRef.current,
     )) return undefined
     const timer = window.setTimeout(() => {
@@ -835,6 +838,7 @@ function SiteEditor() {
   }, [
     autoSaveEnabled,
     loading,
+    previewing,
     dirty,
     htmlDirty,
     metaDirty,
@@ -1435,7 +1439,11 @@ function SiteEditor() {
   async function performSave(wantPublished, { auto = false, versionSource } = {}) {
       const nextPublished = typeof wantPublished === 'boolean' ? wantPublished : publishedRef.current
       setAutoSaveState('saving')
-      const schemaBase = useEditorStore.getState().schema
+      // While an AI proposal is drawn on the canvas, the design is the one it
+      // was drawn over: a save pressed (or already queued) at that moment
+      // writes that, never the proposal.
+      const storeNow = useEditorStore.getState()
+      const schemaBase = storeNow.previewBase || storeNow.schema
       const map = liveHtmlMap({ commit: true })
       // A save may finish after the user has already made another edit. These
       // snapshots ensure we acknowledge only the exact revision sent below.

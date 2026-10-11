@@ -1161,6 +1161,14 @@ export const useEditorStore = create((set, get) => ({
   // kept its old colours, and a save published them that way.
   themeUnapplied: false,
   markThemeApplied: () => set({ themeUnapplied: false }),
+  // The design as it stood when a PREVIEW began, or null. An AI run draws its
+  // proposal on the canvas while it works and takes it off again before
+  // asking "accept or reject" (see AiChatPanel). Until then `schema` above is
+  // not the user's design: whatever saves during that time writes this one,
+  // and automatic saves wait (shouldRunEditorAutoSave).
+  previewBase: null,
+  beginPreview: () => set((state) => ({ previewBase: state.schema })),
+  endPreview: () => set({ previewBase: null }),
   // Component-canvas link tool (the Empty-mode mirror of the HTML link tool):
   // linkMode arms the tool; linkSourceId is the component awaiting a target.
   linkMode: false,
@@ -1277,6 +1285,7 @@ export const useEditorStore = create((set, get) => ({
       pastAt: [],
       futureAt: [],
       themeUnapplied: false,
+      previewBase: null,
       linkMode: false,
       linkSourceId: null,
     })

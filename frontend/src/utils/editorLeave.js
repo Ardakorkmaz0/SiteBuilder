@@ -35,11 +35,17 @@ export function shouldBlockEditorUnload(state, leaveConfirmed = false) {
 // An explicit "leave without saving" must win over lifecycle auto-save. Page
 // visibility commonly changes during navigation, which used to persist the
 // very edits the user had just asked to discard.
+//
+// `previewing`: the canvas is showing a proposal nobody has accepted yet (an AI
+// run draws its changes on the page while it works). That is not the design,
+// and an automatic save of it put an unreviewed proposal on the server — and
+// on the live site, when the site was published.
 export function shouldRunEditorAutoSave(state, discardRequested = false) {
   return Boolean(
     !discardRequested &&
     state?.autoSaveEnabled &&
     !state?.loading &&
+    !state?.previewing &&
     hasUnsavedEditorChanges(state),
   )
 }
