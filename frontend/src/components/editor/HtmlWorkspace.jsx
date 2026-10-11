@@ -919,6 +919,12 @@ function HtmlWorkspace({
   // actually showing. Kept with the document it came from so a stale stylesheet
   // or a stale open-accordion never lands on a different page — compared at
   // render time rather than cleared by an effect.
+  //
+  // `key` is loose (the page, whatever was edited on it) and is enough for the
+  // CSS. `seed` is the exact document the reading was taken from, and the live
+  // DOM is only ever laid over that one: over any other document, whatever the
+  // reading has and the document lacks is not something a script did — it is
+  // what the user changed since.
   const [generated, setGenerated] = useState(null)
 
   useEffect(() => {
@@ -935,7 +941,7 @@ function HtmlWorkspace({
         // rewritten on every serialize, which used to look like a new page
         // and reseat the iframe on the pre-edit seed ("every change reverts").
         const bind = modeRef.current === 'edit' ? editSeedRef.current : htmlRef.current
-        setGenerated({ key: documentKey(bind), css, live })
+        setGenerated({ key: documentKey(bind), seed: bind, css, live })
         return
       }
       if (fromMeasure) return
@@ -1815,9 +1821,16 @@ function HtmlWorkspace({
   // Do not key the snapshot off the committed `html` prop. Commits rewrite
   // the file; treating that as a new page rebuilds srcDoc from editSeed and
   // the iframe snaps back to whatever it was when Edit opened.
+  //
+  // The reading has to be of this exact document. It used to be matched by
+  // page (documentKey), so a reading taken when the page opened was laid over
+  // every later seed of it: after a style edit, switching PC/phone or pressing
+  // Undo put the old style back on the element, and a deleted block came back
+  // as a block that could not be selected.
+  const readingIsCurrent = generated?.seed === editSeed
   const editDocument = useMemo(() => {
     const seeded = withEditorViewportMeta(editSeed)
-    const live = generated?.key === documentKey(editSeed) ? generated.live : ''
+    const live = generated?.seed === editSeed ? generated.live : ''
     if (!live) return seeded
     return withLiveState(seeded, liveStateDiff(editSeed, live))
   }, [editSeed, generated])
@@ -1844,7 +1857,9 @@ function HtmlWorkspace({
   // that" first impression. So when Edit has no reading for this document, one
   // is taken off-screen, in the same sandbox View uses (scripts, opaque
   // origin, no access to this app). It unmounts the moment it has reported.
-  const measuring = mode === 'edit' && !forThisDocument && !!String(html || '').trim()
+  // The same goes for a document Edit was reseeded with (undo, redo, a PC/phone
+  // switch): the older reading is of another document, so a new one is taken.
+  const measuring = mode === 'edit' && !readingIsCurrent && !!String(html || '').trim()
   const measureIframe = measuring ? (
     <iframe
       key={`measure-${nonce}`}
