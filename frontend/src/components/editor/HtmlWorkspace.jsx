@@ -9,7 +9,7 @@ import {
 } from '../../utils/htmlRuntime.js'
 import { insertBeforeClosingTag } from '../../utils/htmlInsert.js'
 import { liveStateDiff, withLiveState } from '../../utils/htmlLiveState.js'
-import { DEVICES, isMobileDevice } from '../../utils/htmlDevices.js'
+import { DEVICES, isMobileDevice, responsivePcSize } from '../../utils/htmlDevices.js'
 import PhoneFrame from './PhoneFrame.jsx'
 import { phoneFrameH, phoneFrameW, phoneModel } from './phoneFrameMetrics.js'
 import BrowserFrame from './BrowserFrame.jsx'
@@ -1323,11 +1323,21 @@ function HtmlWorkspace({
   const mobileBrowser = browserFrame && framedPhone
   const availableW = Math.max(1, stage.w - 24)
   const availableH = Math.max(1, stage.h - 24)
+  // The area's own size, unless that would put a PC page in its phone layout
+  // (see responsivePcSize): then a desktop width, drawn smaller.
+  const fitSize = responsivePcSize({
+    availableW,
+    availableH,
+    frameW: desktopBrowser ? browserFrameW() : 0,
+    frameH: desktopBrowser ? browserFrameH() : 0,
+    measured: stage.w > 0,
+  })
+  const narrowPc = isFit && fitSize.narrow
   const contentW = isFit
-    ? Math.max(320, Math.round(availableW - (desktopBrowser ? browserFrameW() : 0)))
+    ? fitSize.width
     : landscape ? device.h : device.w
   const contentH = isFit
-    ? Math.max(420, Math.round(availableH - (desktopBrowser ? browserFrameH() : 0)))
+    ? fitSize.height
     : landscape
       ? device.w
       : device.h
@@ -2281,7 +2291,17 @@ function HtmlWorkspace({
                 className="h-full w-full overflow-hidden bg-white"
                 style={{ boxShadow: placing ? 'inset 0 0 0 2px #2563eb' : 'none' }}
               >
-                {stageIframe}
+                {/* Always here: when the area drops under a desktop's width
+                    (or grows back) this box is restyled, and the iframe stays
+                    where it is. Moving it to the scaled branch below would
+                    remount it and reload the page from an older seed. */}
+                <div
+                  style={narrowPc
+                    ? { width: contentW, height: contentH, ...previewScaleStyle(scale) }
+                    : { width: '100%', height: '100%' }}
+                >
+                  {stageIframe}
+                </div>
               </div>
             ) : (
               <div

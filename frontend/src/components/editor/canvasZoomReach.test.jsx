@@ -3,9 +3,9 @@
 // those: the component canvas clipped anything past the workspace edge with no
 // scrollbar, and the HTML canvas on its default "Responsive" device ignored the
 // zoom entirely while the readout kept changing.
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { DndContext } from '@dnd-kit/core'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import { useEditorStore } from '../../store/editorStore.js'
 import Canvas from './Canvas.jsx'
@@ -102,5 +102,64 @@ describe('HTML canvas on the Responsive device', () => {
     expect(scaledBox()?.style.transform).toBe('scale(2)')
     const stage = scaledBox().closest('main')
     expect(stage.className).toContain('overflow-auto')
+  })
+  // A small window with both rails open leaves the page about 700px. It used to
+  // be drawn at that width: its phone layout, with the phone overrides applied,
+  // under a toggle that said PC.
+  describe('in an area narrower than a desktop', () => {
+    const clientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
+    const clientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
+    let areaWidth = 0
+    let resized = []
+
+    const stubStage = () => {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => areaWidth })
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 624 })
+      resized = []
+      globalThis.ResizeObserver = class {
+        constructor(callback) { resized.push(callback) }
+        observe() {}
+        disconnect() {}
+      }
+    }
+    const restore = (name, descriptor) => {
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, name, descriptor)
+      else delete HTMLElement.prototype[name]
+    }
+    afterEach(() => {
+      restore('clientWidth', clientWidth)
+      restore('clientHeight', clientHeight)
+    })
+
+    const pageBox = () => screen.getByTitle('site').parentElement
+
+    it('keeps the page at a desktop width and draws it smaller', () => {
+      areaWidth = 734
+      stubStage()
+      renderWorkspace('fit')
+      expect(pageBox().style.width).toBe('1024px')
+      expect(pageBox().style.transform).toMatch(/^scale\(0\.69/)
+    })
+
+    it('fills the area as before when the area is wide enough', () => {
+      areaWidth = 1224
+      stubStage()
+      renderWorkspace('fit')
+      expect(pageBox().style.width).toBe('100%')
+      expect(pageBox().style.transform).toBe('')
+    })
+
+    it('does not reload the page when the area crosses that width', () => {
+      areaWidth = 1224
+      stubStage()
+      renderWorkspace('fit')
+      const frame = screen.getByTitle('site')
+
+      areaWidth = 734 // a side rail opened
+      act(() => resized.forEach((callback) => callback()))
+
+      expect(pageBox().style.width).toBe('1024px')
+      expect(screen.getByTitle('site')).toBe(frame)
+    })
   })
 })
