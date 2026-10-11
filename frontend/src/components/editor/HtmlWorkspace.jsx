@@ -754,6 +754,9 @@ function HtmlWorkspace({
     onElementSelect?.(null)
   }, [onElementSelect])
 
+  // Read when a handle is pulled: the handles are installed once per selection.
+  const deviceIdRef = useRef(deviceId)
+  useEffect(() => { deviceIdRef.current = deviceId }, [deviceId])
   const startSelectedElementResize = useCallback((e, dir) => {
     if (e.button !== undefined && e.button !== 0) return
     e.preventDefault()
@@ -790,11 +793,16 @@ function HtmlWorkspace({
         (Math.max(HTML_RESIZE_MIN, nextOuterW) * Math.max(HTML_RESIZE_MIN, nextOuterH)) /
         (start.outerW * start.outerH),
       )
-      if (dir.includes('e') || dir.includes('w')) el.style.setProperty('width', `${nextW}px`, 'important')
-      if (dir.includes('s') || dir.includes('n')) el.style.setProperty('height', `${nextH}px`, 'important')
-      if (Number.isFinite(fontScale)) {
-        el.style.setProperty('font-size', `${Math.max(1, Math.round(startFontSize * fontScale))}px`, 'important')
-      }
+      // The same writers the panel uses, so a pull on a phone is a phone value:
+      // the handles used to write the PC's inline style whatever the device,
+      // which resized the PC design from the phone view and, being inline
+      // !important, then outranked every phone value set for that element.
+      const patch = {}
+      if (dir.includes('e') || dir.includes('w')) patch.width = nextW
+      if (dir.includes('s') || dir.includes('n')) patch.height = nextH
+      if (Number.isFinite(fontScale)) patch.fontSize = Math.max(1, Math.round(startFontSize * fontScale))
+      if (isMobileDevice(deviceIdRef.current)) applyMobileElementPatch(el, patch)
+      else applyElementPatch(el, patch)
       updateSelectionResizeChrome(doc, el)
     }
 
