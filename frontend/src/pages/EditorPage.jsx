@@ -358,7 +358,7 @@ export default function EditorPage() {
     const c = (selectCurrentPage(s).components || []).find((x) => x.id === s.selectedId)
     if (!c || c.type !== 'html' || c.props?._boxManual) return ''
     const p = c.props || {}
-    return [p.code, p.tweakFont, p.tweakPadding, p.tweakZoom, p.shape].join(' ')
+    return [p.code, p.tweakFont, p.tweakPadding, p.tweakZoom, p.shape].join('\u0000')
   })
   const pcWidth = useEditorStore((s) => selectCurrentPage(s).canvasWidth || 1000)
   const pcFold = useEditorStore((s) => selectCurrentPage(s).canvasFold || 0)
