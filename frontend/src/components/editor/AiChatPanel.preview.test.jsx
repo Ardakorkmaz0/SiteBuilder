@@ -85,6 +85,39 @@ describe('an AI proposal drawn on the canvas', () => {
     expect(screen.getByText('Accept')).toBeTruthy()
   })
 
+  const finishWith = (text) => act(async () => {
+    run.finish.resolve({ text: 'Done.', toolCallCount: 1, calls: [{ name: 'updateProps', args: {}, result: { ok: true } }], say: [] })
+    void text
+  })
+
+  it('is applied when it is accepted as it was offered', async () => {
+    run.during = () => s().updateProps('h1', { text: 'Written by the model' })
+    openPanel()
+    await ask('Rewrite the heading')
+    await waitFor(() => expect(run.finish).not.toBeNull())
+    await finishWith()
+
+    await act(async () => { fireEvent.click(screen.getByText('Accept')) })
+
+    expect(headingText()).toBe('Written by the model')
+  })
+
+  // The proposal holds the whole design as it was when the run began. Accepted
+  // over a page edited in the meantime, it took those edits back without a word.
+  it('is not applied over edits made while it was waiting', async () => {
+    run.during = () => s().updateProps('h1', { text: 'Written by the model' })
+    openPanel()
+    await ask('Rewrite the heading')
+    await waitFor(() => expect(run.finish).not.toBeNull())
+    await finishWith()
+    act(() => { s().updateProps('h1', { text: 'Edited by hand meanwhile' }) })
+
+    await act(async () => { fireEvent.click(screen.getByText('Accept')) })
+
+    expect(headingText()).toBe('Edited by hand meanwhile')
+    expect(screen.getByText(/The page has changed since this proposal was prepared/)).toBeTruthy()
+  })
+
   it('is taken off the canvas when the request fails, too', async () => {
     run.during = () => s().updateProps('h1', { text: 'Half a change' })
     openPanel()

@@ -206,5 +206,5 @@ export const THEME_SWATCHES = [
   ['#4f46e5', 'Indigo'], ['#2563eb', 'Blue'], ['#0e7490', 'Teal'], ['#0d9488', 'Emerald'],
   ['#166534', 'Forest'], ['#65a30d', 'Lime'], ['#eab308', 'Gold'], ['#f59e0b', 'Amber'],
   ['#e8543f', 'Coral'], ['#dc2626', 'Red'], ['#db2777', 'Pink'], ['#86198f', 'Plum'],
-  ['#7c3aed', 'Violet'], ['#0f172a', 'Navy'], ['#111111', 'Black'], ['#9a6b4f', 'Mocha'],
+  ['#7c3aed', 'Violet'], ['#0f172a', 'Navy'], ['#111111', 'Jet black'], ['#9a6b4f', 'Mocha'],
 ]
