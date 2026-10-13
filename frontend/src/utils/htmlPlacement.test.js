@@ -3,6 +3,8 @@
 // in the wrong place (or not at all), so pin the tree-walk + insert logic.
 import { describe, expect, it, beforeEach } from 'vitest'
 import {
+  armDrag,
+  disarmDrag,
   closestPlaceableBlock,
   pageWrapper,
   placeableBlocks,
@@ -212,6 +214,29 @@ describe('a block lands where it is still standing after a save', () => {
     document.elementFromPoint = () => pic
     reorderToPoint(document, document.getElementById('moved'), 10, 190, { closestPlaceableBlock, insertPositionForY })
     expect(document.getElementById('moved').previousElementSibling.id).toBe('para')
+  })
+})
+
+// The rearrange tool makes blocks draggable while it is on.
+describe('a block the author made draggable (or not) keeps that', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '<div id="plain">a</div><div id="grab" draggable="true">b</div><div id="still" draggable="false">c</div>'
+    document.querySelectorAll('div').forEach(armDrag)
+  })
+
+  it('is draggable for the tool while it is on', () => {
+    expect([...document.querySelectorAll('div')].map((el) => el.getAttribute('draggable'))).toEqual(['true', 'true', 'true'])
+  })
+
+  it('gets its own value back when the tool is switched off', () => {
+    document.querySelectorAll('div').forEach(disarmDrag)
+    expect(document.body.innerHTML).toBe('<div id="plain">a</div><div id="grab" draggable="true">b</div><div id="still" draggable="false">c</div>')
+  })
+
+  it('is saved with its own value while the tool is still on', () => {
+    const saved = serializeDocument(document)
+    expect(saved).toContain('<div id="plain">a</div><div id="grab" draggable="true">b</div><div id="still" draggable="false">c</div>')
+    expect(saved).not.toContain('data-pwb-drag')
   })
 })
 
