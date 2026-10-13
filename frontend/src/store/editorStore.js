@@ -2412,12 +2412,12 @@ export const useEditorStore = create((set, get) => ({
   // the user had hand-sized back to auto-sizing. The automatic re-fit leaves the
   // flag alone (it never runs on a manual box in the first place).
   fitEmbedBox: (id, size, { record = true, releaseManual = false } = {}) => {
-    const page0 = selectCurrentPage(get())
-    const topLevel = isTopLevel(page0.components, id)
     if (record) get().record('fit-' + id)
     set((state) => {
       const page = selectCurrentPage(state)
-      const maxX = topLevel && !page.flowMode ? page.canvasWidth || CANVAS_WIDTH : undefined
+      // The page's width for a block on the page, its parent's for one inside
+      // a section or container: the same right edge a resize by hand stops at.
+      const maxX = layoutBoundsFor(page, id, 'layout').maxX
       const components = mapTree(page.components, id, (c) => ({
         ...c,
         layout: clampLayout({ x: 0, y: 0, ...(c.layout || {}), ...size }, { maxX }),
