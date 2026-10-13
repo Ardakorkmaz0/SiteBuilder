@@ -83,7 +83,17 @@ function SnippetSelect({ groups, snippets, onPick }) {
   )
 }
 
-function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange }, ref) {
+// A page that is an HTML document, not a canvas design: its file is that
+// document. The schema only holds the (empty) canvas behind it, so writing the
+// page from the schema showed and exported a blank page in its place.
+function documentOf(page, htmlMap) {
+  const html = page?.mode === 'html' ? htmlMap?.[page.id] : ''
+  return typeof html === 'string' && html.trim() ? html : ''
+}
+
+// `htmlMap`: each HTML page's document, by page id (the editor keeps them
+// beside the schema).
+function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = null }, ref) {
   const { t } = useLanguage()
   const schema = useEditorStore((state) => state.schema)
   const setCustomCss = useEditorStore((state) => state.setCustomCss)
@@ -96,13 +106,18 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange }, ref) {
       if (item.lang === 'html') {
         const page = schema?.pages?.[pageIndex++]
         const hasDraft = Object.prototype.hasOwnProperty.call(htmlDrafts, item.name)
+        const document = documentOf(page, htmlMap)
+        const written = document || item.content
         return {
           ...item,
           pageId: page?.id,
           editable: true,
           editableKind: 'html',
-          generatedContent: item.content,
-          content: hasDraft ? htmlDrafts[item.name] : item.content,
+          // Its own document: applied and exported as written, with its own
+          // stylesheet and script links left alone.
+          ownDocument: !!document,
+          generatedContent: written,
+          content: hasDraft ? htmlDrafts[item.name] : written,
         }
       }
       if (item.name === 'custom.css') return {
@@ -121,26 +136,33 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange }, ref) {
       }
       return item
     })
-  }, [htmlDrafts, rawGeneratedFiles, schema.customCss, schema.customJs, schema.pages])
+  }, [htmlDrafts, htmlMap, rawGeneratedFiles, schema.customCss, schema.customJs, schema.pages])
   const base = slugName(schema?.pages?.[0]?.name)
+  // One page as a file that stands on its own, and its smaller form. A
+  // person's own document is not ours to minify: it goes out as written.
+  const standalonePage = useCallback((page) => (
+    documentOf(page, htmlMap) || pageToResponsiveHtml(page || {}, page?.name || 'My Site', schema)
+  ), [htmlMap, schema])
+  const optimizedPage = useCallback((page) => (
+    documentOf(page, htmlMap) || minifyGeneratedHtml(pageToResponsiveHtml(page || {}, page?.name || 'My Site', schema))
+  ), [htmlMap, schema])
   const exportPreviewFiles = useMemo(() => {
     const page = schema?.pages?.[0] || {}
-    const standalone = pageToResponsiveHtml(page, page?.name || 'My Site', schema)
     return [
       {
         name: `${base}.single.html`,
         lang: 'html',
-        content: standalone,
+        content: standalonePage(page),
         exportPreview: true,
       },
       {
         name: `${base}.optimized.min.html`,
         lang: 'html',
-        content: minifyGeneratedHtml(standalone),
+        content: optimizedPage(page),
         exportPreview: true,
       },
     ]
-  }, [base, schema])
+  }, [base, optimizedPage, schema, standalonePage])
   const files = useMemo(() => [...generatedFiles, ...exportPreviewFiles], [generatedFiles, exportPreviewFiles])
   const [activeSelection, setActiveSelection] = useState({
     pageId: currentPageId,
@@ -194,7 +216,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange }, ref) {
     for (const item of dirtyHtmlFiles) {
       onApplyHtml({
         pageId: item.pageId,
-        html: inlineProjectHtml(item.content, rawGeneratedFiles),
+        html: item.ownDocument ? item.content : inlineProjectHtml(item.content, rawGeneratedFiles),
         nextMode,
       })
     }
@@ -273,15 +295,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange }, ref) {
 
   function downloadSingleHtml() {
     setExportMenuOpen(false)
-    saveAs(
-      `${base}.html`,
-      pageToResponsiveHtml(
-        schema?.pages?.[0] || {},
-        schema?.pages?.[0]?.name || 'My Site',
-        schema,
-      ),
-      'text/html',
-    )
+    saveAs(`${base}.html`, standalonePage(schema?.pages?.[0]), 'text/html')
   }
 
   function downloadOptimizedHtml() {
@@ -294,10 +308,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange }, ref) {
       let suffix = 2
       while (used.has(name)) name = `${baseName}-${suffix++}.html`
       used.add(name)
-      return {
-        name,
-        content: minifyGeneratedHtml(pageToResponsiveHtml(page, page.name || 'My Site', schema)),
-      }
+      return { name, content: optimizedPage(page) }
     })
     if (output.length <= 1) {
       saveAs(`${base}.min.html`, output[0]?.content || '', 'text/html')
@@ -323,7 +334,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange }, ref) {
     if (!onApplyHtml || file?.editableKind !== 'html') return
     onApplyHtml({
       pageId: file.pageId,
-      html: inlineProjectHtml(file.content, rawGeneratedFiles),
+      html: file.ownDocument ? file.content : inlineProjectHtml(file.content, rawGeneratedFiles),
       nextMode: 'source',
     })
     setHtmlDrafts((drafts) => {
