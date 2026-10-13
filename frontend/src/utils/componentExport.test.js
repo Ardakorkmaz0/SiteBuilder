@@ -203,6 +203,38 @@ describe('exportComponent — what travels', () => {
   })
 })
 
+// The editor shows a page the way its scripts left it (an opened panel, a
+// block that has animated in) and notes on each element what it replaced. That
+// is the editor's view. Shared as it stood, a block went out with the
+// script's state as if the author had written it, the note still attached,
+// and with content only a script had built — which the taker's first save
+// then removed again.
+describe('exportComponent — the block as its author wrote it', () => {
+  it('leaves the borrowed state, the editor’s notes and script-built content behind', () => {
+    const el = page(
+      `<section id="faq" class="faq is-open pwb-in" data-anim-in="fade-up" data-pwb-state='{"was":{"class":"faq"},"now":{"class":"faq is-open pwb-in"}}' data-pwb-motion-rest="">
+        <h2 data-pwb-anim-inline="">Questions</h2>
+        <p id="answer" style="height: 120px;" data-pwb-state='{"was":{"style":"height:0"},"now":{"style":"height: 120px;"}}'>Answer</p>
+        <div id="built" data-pwb-injected="live-state" data-pwb-chrome="">Built by a script</div>
+      </section>`,
+      '.faq { padding: 8px }',
+    )
+
+    const out = exportComponent(document, el)
+
+    expect(out.ok).toBe(true)
+    const shared = new DOMParser().parseFromString(out.html, 'text/html').body.firstElementChild
+    expect(shared.className).toBe('faq')
+    expect(shared.getAttribute('data-anim-in')).toBe('fade-up')
+    expect(shared.querySelector('#answer').getAttribute('style')).toBe('height:0')
+    expect(shared.querySelector('#built')).toBeNull()
+    expect(out.html).not.toMatch(/data-pwb-(state|motion-rest|anim-inline|injected|chrome)/)
+    // The page it was taken from is as it was.
+    expect(el.className).toBe('faq is-open pwb-in')
+    expect(el.querySelector('#built')).not.toBeNull()
+  })
+})
+
 describe('exportComponent — what is refused', () => {
   const refuses = (html) => {
     const el = page(html, '.x { color: red; }')

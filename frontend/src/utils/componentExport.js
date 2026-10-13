@@ -19,6 +19,11 @@
 // actually matters when the author is not the site owner.
 
 import { cleanElementHtml } from './elementSpotlight.js'
+import { restoreAuthoredState } from './htmlLiveState.js'
+
+// Marks the editor leaves on a page it is showing (serializeDocument strips
+// the same ones from a saved file).
+const EDITOR_MARK_ATTRS = ['data-pwb-motion-rest', 'data-pwb-anim-inline', 'data-pwb-chrome']
 
 // Every scoped rule carries this, so two copies of the same shared block on one
 // page cannot fight, and neither can the host's own `.card`.
@@ -284,6 +289,16 @@ export function exportComponent(doc, el, { allowScripts = false, scope = nextSco
   // A clone, always: the page being exported must be untouched by exporting it.
   const holder = doc.createElement('div')
   holder.innerHTML = cleanElementHtml(el)
+  // The block as its author wrote it, not as the editor is showing it: the
+  // editor draws a page the way its scripts left it and notes on each element
+  // what it replaced (htmlLiveState). Shared like that, a block went out with
+  // a script's state as if it were authored, the notes still attached, and
+  // content only a script had built — which the taker's first save removed.
+  holder.querySelectorAll('[data-pwb-injected]').forEach((node) => node.remove())
+  restoreAuthoredState(holder)
+  for (const node of holder.querySelectorAll('*')) {
+    EDITOR_MARK_ATTRS.forEach((name) => node.removeAttribute(name))
+  }
   const root = holder.firstElementChild
   if (!root) {
     return { ok: false, problems: [{ kind: 'empty', detail: 'Nothing to share.' }], warnings }
