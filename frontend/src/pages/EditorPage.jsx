@@ -332,6 +332,17 @@ function RailSlot({ side, label, open, narrow, onOpen, onClose, children }) {
 // keep this component mounted with only the id swapped: the first site's undo
 // steps, selection and pending state stayed, and Undo then wrote the first
 // site's page over the second's. Keyed by the id, every site starts clean.
+// A component anywhere on a page: on it, or inside a section, container or tab.
+function findComponentDeep(components, id) {
+  if (!id) return null
+  for (const component of components || []) {
+    if (component.id === id) return component
+    const nested = findComponentDeep(component.children, id)
+    if (nested) return nested
+  }
+  return null
+}
+
 export default function EditorPage() {
   const { id } = useParams()
   return <SiteEditor key={id} />
@@ -365,7 +376,8 @@ function SiteEditor() {
   // effect below so the box keeps hugging the content after an edit, not just
   // at drop time.
   const selectedEmbedSizeKey = useEditorStore((s) => {
-    const c = (selectCurrentPage(s).components || []).find((x) => x.id === s.selectedId)
+    // Anywhere on the page: a block inside a section is fitted like one on it.
+    const c = findComponentDeep(selectCurrentPage(s).components, s.selectedId)
     if (!c || c.type !== 'html' || c.props?._boxManual) return ''
     const p = c.props || {}
     return [p.code, p.tweakFont, p.tweakPadding, p.tweakZoom, p.shape].join('\u0000')
@@ -1181,7 +1193,7 @@ function SiteEditor() {
   // the re-fit) so one Undo doesn't first restore an intermediate size.
   async function fitEmbedNow(componentId) {
     const page = selectCurrentPage(useEditorStore.getState())
-    const comp = (page.components || []).find((c) => c.id === componentId)
+    const comp = findComponentDeep(page.components, componentId)
     if (!comp || comp.type !== 'html') return
     // The user hand-sized this one — their size wins until they press Fit.
     if (comp.props?._boxManual) return
@@ -1197,8 +1209,8 @@ function SiteEditor() {
     const room = Math.max(Math.round(comp.layout?.w || 360), Math.round(designed?.w || 0))
     await fitHtmlEmbedLayout(comp, room, (patch) => {
       // Re-check the component still exists (fast undo / delete during measure).
-      const fresh = selectCurrentPage(useEditorStore.getState()).components || []
-      if (fresh.some((c) => c.id === componentId)) {
+      const fresh = selectCurrentPage(useEditorStore.getState()).components
+      if (findComponentDeep(fresh, componentId)) {
         useEditorStore.getState().fitEmbedBox(componentId, patch, { record: false })
       }
     }, { font: canvasFontFamily(useEditorStore.getState().schema) })
