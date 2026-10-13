@@ -2726,6 +2726,7 @@ function SiteEditor() {
                       <CodePanel
                         ref={codePanelRef}
                         currentPageId={currentPageId}
+                        htmlMap={pageHtmlMap}
                         onApplyHtml={applyComponentSourceHtml}
                         onDraftDirtyChange={setWorkspaceDirty}
                       />
