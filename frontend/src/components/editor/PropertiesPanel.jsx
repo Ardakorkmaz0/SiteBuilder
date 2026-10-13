@@ -1037,13 +1037,13 @@ export default function PropertiesPanel({
             className="rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-3"
           >
             <p className="truncate text-[10px] text-[var(--studio-success)]">
-              {page.canonicalUrl || `https://example.com/${String(page.name || 'page').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+              {pageSetting('canonicalUrl') || `https://example.com/${String(page.name || 'page').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
             </p>
             <p className="mt-1 line-clamp-1 text-sm font-medium text-[var(--studio-accent-hover)]">
-              {page.seoTitle || page.name || t('Untitled page')}
+              {pageSetting('seoTitle') || page.name || t('Untitled page')}
             </p>
             <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-[var(--studio-text-muted)]">
-              {page.seoDescription || t('Add a description to preview how this page may appear in search results.')}
+              {pageSetting('seoDescription') || t('Add a description to preview how this page may appear in search results.')}
             </p>
           </div>
         </PanelGroup>
