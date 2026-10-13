@@ -100,6 +100,9 @@ function captureEditorPreviewState() {
 }
 
 function restoreEditorPreviewState(snapshot) {
+  // The steps the run recorded are gone with it. The next edit is a step of
+  // its own, not a continuation of the run's last one.
+  useEditorStore.getState().endHistoryGesture()
   useEditorStore.setState({
     schema: snapshot.schema,
     currentPageId: snapshot.currentPageId,
@@ -581,6 +584,10 @@ export default function AiChatPanel({
         setPendingChange({
           kind: 'schema',
           editor: previewResult,
+          // The undo list as the proposal found it. Any edit (or undo) made
+          // while the proposal waits replaces that list, which is how accept
+          // can tell: measurements the editor takes by itself do not.
+          basePast: previewBase.past,
           calls: previewCalls,
           summary,
         })
@@ -640,6 +647,13 @@ export default function AiChatPanel({
     if (pendingChange.kind === 'html') onApplyHtml?.(pendingChange.html)
     if (pendingChange.kind === 'schema') {
       const store = useEditorStore.getState()
+      // The proposal is the whole design as it was when the run began, with
+      // the assistant's changes in it. Accepted over a page that has been
+      // edited since, it silently took those edits back.
+      if (store.past !== pendingChange.basePast) {
+        setError(t('The page has changed since this proposal was prepared. Reject it and ask again, so the changes you made in the meantime are not lost.'))
+        return
+      }
       store.record('ai-preview')
       const pageId = pendingChange.editor.schema.pages.some((page) => page.id === pendingChange.editor.currentPageId)
         ? pendingChange.editor.currentPageId
@@ -1011,7 +1025,8 @@ export default function AiChatPanel({
                     <button
                       key={hex}
                       type="button"
-                      title={name}
+                      title={t(name)}
+                      aria-label={t(name)}
                       onClick={() =>
                         setPickedColors((cur) =>
                           cur.includes(hex)
