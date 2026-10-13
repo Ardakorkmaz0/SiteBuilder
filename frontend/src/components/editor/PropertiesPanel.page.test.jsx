@@ -178,6 +178,18 @@ describe('Page panel on an uploaded HTML page', () => {
     expect(useEditorStore.getState().schema.pages[0].language).toBe('en')
   })
 
+  // The preview under the fields read the schema, where an HTML page keeps
+  // none of this: it stayed on the page's name and the "add a description"
+  // hint whatever the document said or the person typed.
+  it('previews the search result from the document too', () => {
+    renderPanel({ htmlMode: true, htmlPageSettings: settings, onHtmlPageSettings: () => {} })
+
+    const preview = screen.getByLabelText('Search result preview')
+    expect(preview.textContent).toContain('https://example.com/about')
+    expect(preview.textContent).toContain('About us')
+    expect(preview.textContent).toContain('Who we are')
+  })
+
   it('leaves out the controls that only act on the component canvas', () => {
     renderPanel({ htmlMode: true, htmlPageSettings: settings, onHtmlPageSettings: () => {} })
 
