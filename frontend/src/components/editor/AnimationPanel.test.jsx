@@ -9,6 +9,9 @@ import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import AnimationPanel from './AnimationPanel.jsx'
 import { useEditorStore } from '../../store/editorStore.js'
 
+// The tests further down swap the store's updateProps for a spy.
+const realUpdateProps = useEditorStore.getState().updateProps
+
 const SELECTED_ELEMENT = {
   tag: 'h1',
   motion: { animIn: 'none', animHover: 'none', animSpeed: 'normal' },
@@ -170,5 +173,69 @@ describe('taking the animation back off', () => {
     await user.click(screen.getByRole('button', { name: 'Remove animation' }))
 
     expect(onApply).toHaveBeenCalledWith({ animIn: 'none', animHover: 'none' })
+  })
+})
+
+// Nearly everything on a page sits inside a section, a container or a tab.
+// The panel looked the selection up among the page's own blocks only, so for
+// a block inside a section it found nothing: the animation it already had was
+// not shown, "Remove animation" never appeared, and "Use" quietly put the
+// speed back to normal.
+describe('a block inside a section', () => {
+  function selectNested() {
+    globalThis.ResizeObserver = class {
+      observe() {}
+      disconnect() {}
+    }
+    useEditorStore.getState().loadSchema({
+      theme: {},
+      pages: [{
+        id: 'p1',
+        name: 'Home',
+        components: [{
+          id: 'band',
+          type: 'region',
+          props: {},
+          styles: {},
+          layout: { x: 0, y: 0, w: 1000, h: 300 },
+          children: [{
+            id: 'inner',
+            type: 'heading',
+            props: { text: 'Inside', animIn: 'zoom', animHover: 'lift', animSpeed: 'slow' },
+            styles: {},
+            layout: { x: 20, y: 20, w: 300, h: 60 },
+          }],
+        }],
+      }],
+    })
+    useEditorStore.setState({ updateProps: realUpdateProps })
+    useEditorStore.getState().selectComponent('inner')
+  }
+  const inner = () => useEditorStore.getState().schema.pages[0].components[0].children[0]
+
+  it('shows the animation it has, and lets it be removed', async () => {
+    const user = userEvent.setup()
+    selectNested()
+    renderPanel()
+    localStorage.setItem('pwb_last_anim', 'zoom')
+
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(screen.getByRole('button', { name: 'In use' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Remove animation' }))
+    expect(inner().props.animIn).toBe('none')
+    expect(inner().props.animHover).toBe('none')
+  })
+
+  it('keeps the speed it was given when another entrance is chosen', async () => {
+    const user = userEvent.setup()
+    selectNested()
+    renderPanel()
+
+    await user.click(screen.getByRole('button', { name: 'Fade up' }))
+    await user.click(screen.getByRole('button', { name: 'Use this animation' }))
+
+    expect(inner().props.animIn).toBe('fade-up')
+    expect(inner().props.animSpeed).toBe('slow')
   })
 })
