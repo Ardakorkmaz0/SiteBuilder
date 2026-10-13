@@ -371,6 +371,28 @@ export function flashNode(doc, node, duration = 1500) {
   }, duration)
 }
 
+// The rearrange tool makes every block draggable while it is on. A block the
+// author had already marked (draggable="true", or "false" to hold one still)
+// gets its own value back afterwards: the marker remembers it. Without that,
+// switching the tool off — or saving while it was on — took the author's
+// attribute away with ours.
+const DRAG_ATTR = 'data-pwb-drag'
+
+export function armDrag(el) {
+  if (!el || el.hasAttribute(DRAG_ATTR)) return
+  const own = el.getAttribute('draggable')
+  el.setAttribute(DRAG_ATTR, own === null ? '' : `was:${own}`)
+  el.setAttribute('draggable', 'true')
+}
+
+export function disarmDrag(el) {
+  if (!el?.hasAttribute?.(DRAG_ATTR)) return
+  const marker = el.getAttribute(DRAG_ATTR)
+  el.removeAttribute(DRAG_ATTR)
+  if (marker.startsWith('was:')) el.setAttribute('draggable', marker.slice(4))
+  else el.removeAttribute('draggable')
+}
+
 // Serialize a (possibly live) document to an HTML string, stripping any
 // placement chrome so hover/flash hints never leak into the saved site.
 export function serializeDocument(doc) {
@@ -390,10 +412,7 @@ export function serializeDocument(doc) {
     })
   // The rearrange tool sets draggable on blocks; never let that leak into
   // saved HTML. Drop the marker + the draggable attribute it added.
-  root.querySelectorAll('[data-pwb-drag]').forEach((el) => {
-    el.removeAttribute('data-pwb-drag')
-    el.removeAttribute('draggable')
-  })
+  root.querySelectorAll(`[${DRAG_ATTR}]`).forEach(disarmDrag)
   // Strip the transient SVG connection lines drawn by the link tool — both the
   // current marker and any stale ones baked in by older app versions — and the
   // drag drop-position indicator, in case a commit races its removal.
