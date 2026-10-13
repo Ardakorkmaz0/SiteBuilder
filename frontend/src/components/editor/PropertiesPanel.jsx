@@ -1827,8 +1827,10 @@ export default function PropertiesPanel({
             <button
               type="button"
               onClick={() =>
+                // releaseManual: asking for the fit hands a block sized by hand
+                // back to automatic sizing, as the toolbar's button does.
                 fitHtmlEmbedLayout(component, Math.round(component.layout?.w || 360), (patch) =>
-                  fitEmbedBox(component.id, patch),
+                  fitEmbedBox(component.id, patch, { releaseManual: true }),
                 { font: canvasFontFamily(useEditorStore.getState().schema) })
               }
               title={t('Measure the block and snap the box to its real size')}
