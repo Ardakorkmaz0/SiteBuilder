@@ -17,6 +17,8 @@ import CodeActivityOverlay from './CodeActivityOverlay.jsx'
 import MobileBrowserChrome from './MobileBrowserChrome.jsx'
 import { browserFrameH, browserFrameW, mobileBrowserChromeH } from './browserFrameMetrics.js'
 import {
+  armDrag,
+  disarmDrag,
   DRAG_MIME,
   closestPlaceableBlock,
   placeableBlocks,
@@ -558,6 +560,10 @@ function HtmlWorkspace({
   liveCodeControls = null,
   onShare,
   onLinkArmedChange,
+  // Told true while text typed into the page is not an undo step yet, and
+  // false once it is: until then the editor's Undo has nothing recorded and
+  // looked dead, though pressing it does take the typing back.
+  onTypingChange,
   onStartBlank,
   onOpenTemplates,
   onImportFile,
@@ -715,6 +721,15 @@ function HtmlWorkspace({
   // undoing a delete made after typing brought the block back and quietly
   // threw the typing away.
   const typedSinceCommitRef = useRef(false)
+  const onTypingChangeRef = useRef(onTypingChange)
+  useEffect(() => { onTypingChangeRef.current = onTypingChange }, [onTypingChange])
+  const setTypingPending = useCallback((pending) => {
+    if (typedSinceCommitRef.current === pending) return
+    typedSinceCommitRef.current = pending
+    onTypingChangeRef.current?.(pending)
+  }, [])
+  // The page being left takes its pending typing with it.
+  useEffect(() => () => onTypingChangeRef.current?.(false), [])
   // Edit seed / surface, readable from the live-state listener. A panel or
   // in-page edit commits a new `html` prop; that must not rebind the snapshot
   // to the serialized file or the edit iframe reloads from the old seed.
@@ -1009,10 +1024,10 @@ function HtmlWorkspace({
   // leaves the page, so whatever comes next is undone separately from it.
   const flushTyping = useCallback(() => {
     if (!typedSinceCommitRef.current) return
-    typedSinceCommitRef.current = false
+    setTypingPending(false)
     const live = readHtmlRef.current()
     if (live !== htmlRef.current) onCommitRef.current?.(live)
-  }, [])
+  }, [setTypingPending])
   useEffect(() => {
     if (mode !== 'edit') return undefined
     window.addEventListener('pointerdown', flushTyping, true)
@@ -1481,11 +1496,8 @@ function HtmlWorkspace({
     // the single page wrapper, which would drag everything. dragstart resolves
     // the exact block grabbed via closestPlaceableBlock(e.target).
     const blocks = () => placeableBlocks(doc.body)
-    const arm = () => blocks().forEach((el) => { el.draggable = true; el.setAttribute('data-pwb-drag', '') })
-    const disarm = () => doc.body.querySelectorAll('[data-pwb-drag]').forEach((el) => {
-      el.removeAttribute('draggable')
-      el.removeAttribute('data-pwb-drag')
-    })
+    const arm = () => blocks().forEach(armDrag)
+    const disarm = () => doc.body.querySelectorAll('[data-pwb-drag]').forEach(disarmDrag)
     arm()
     const onDragStart = (e) => {
       const block = closestPlaceableBlock(e.target, doc.body)
@@ -1708,8 +1720,8 @@ function HtmlWorkspace({
   // the browser's own default (the Save-page dialog) when the editor took them.
   // A fresh document has nothing typed into it yet.
   function attachTypingSteps(doc) {
-    typedSinceCommitRef.current = false
-    doc.addEventListener('input', () => { typedSinceCommitRef.current = true })
+    setTypingPending(false)
+    doc.addEventListener('input', () => setTypingPending(true))
     doc.addEventListener('pointerdown', flushTyping, true)
     doc.defaultView?.addEventListener('blur', flushTyping)
   }

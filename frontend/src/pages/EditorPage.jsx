@@ -480,6 +480,9 @@ function SiteEditor() {
   const [aiPanelLayout, setAiPanelLayout] = useState(readAiPanelLayout)
   const [moreOpen, setMoreOpen] = useState(false)
   const [tourOpen, setTourOpen] = useState(false)
+  // Text typed into an HTML page that is not an undo step yet (it becomes one
+  // at the next action). Undo takes it back, so Undo must not look dead.
+  const [htmlTyping, setHtmlTyping] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [templateOpen, setTemplateOpen] = useState(false)
@@ -1364,11 +1367,13 @@ function SiteEditor() {
   // The walkthrough runs itself once, on a first visit to the editor, and
   // only after the site is on screen — a tour pointing at a spinner teaches
   // nothing. Afterwards it lives in the ⋯ menu.
+  // Not over the AI wizard, which a new empty site opens by itself: the first
+  // tour bubble landed on top of it. The tour starts once the wizard is closed.
   useEffect(() => {
-    if (loading || tourWasSeen()) return undefined
+    if (loading || wizardOpen || tourWasSeen()) return undefined
     const timer = window.setTimeout(() => setTourOpen(true), 700)
     return () => window.clearTimeout(timer)
-  }, [loading])
+  }, [loading, wizardOpen])
 
   // An uploaded page's settings ARE its document: the panel reads the head and
   // writes back into it, so a hand edit in Source shows up in the controls and
@@ -2038,7 +2043,7 @@ function SiteEditor() {
         <div className="ml-auto flex min-w-0 items-center gap-1">
           <AiBar open={aiOpen} onOpenChange={setAiOpen} />
           <span className="mx-1 hidden h-5 w-px bg-[var(--studio-border)] lg:block" aria-hidden />
-          <button type="button" onClick={() => (currentPageIsHtml ? undoOnHtmlPage() : undo())} disabled={currentPageIsHtml ? !htmlPast.length && !canUndo : !canUndo} title={t('Undo (Ctrl+Z)')} className="studio-icon-btn hidden md:inline-flex">
+          <button type="button" onClick={() => (currentPageIsHtml ? undoOnHtmlPage() : undo())} disabled={currentPageIsHtml ? !htmlPast.length && !canUndo && !htmlTyping : !canUndo} title={t('Undo (Ctrl+Z)')} className="studio-icon-btn hidden md:inline-flex">
             <UndoIcon size={16} />
           </button>
           <button type="button" onClick={() => (currentPageIsHtml ? redoOnHtmlPage() : redo())} disabled={currentPageIsHtml ? !htmlFuture.length && !canRedo : !canRedo} title={t('Redo (Ctrl+Shift+Z)')} className="studio-icon-btn hidden md:inline-flex">
@@ -2083,7 +2088,12 @@ function SiteEditor() {
             <span className="hidden xl:inline">{t('Auto-save')}</span>
             <span className="sr-only xl:hidden">{t('Auto-save')}</span>
           </button>
-          <button type="button" data-tour="publish" onClick={() => { if (!published && guestGate('publish')) return; save(!published) }} disabled={saving} className={published ? 'studio-btn studio-btn-secondary' : 'studio-btn studio-btn-primary'} title={published ? t('Unpublish') : t('Publish')}>
+          <button type="button" data-tour="publish" onClick={() => {
+            if (!published && guestGate('publish')) return
+            // Taking a site down breaks its address for everyone who has it.
+            if (published && !window.confirm(t('Take this site offline? Its address will stop working for visitors until you publish it again.'))) return
+            save(!published)
+          }} disabled={saving} className={published ? 'studio-btn studio-btn-secondary' : 'studio-btn studio-btn-primary'} title={published ? t('Unpublish') : t('Publish')}>
             {published ? t('Published') : t('Publish')}
           </button>
 
@@ -2292,6 +2302,7 @@ function SiteEditor() {
                 <HtmlWorkspace
                   key={`${currentPageId}:${workspaceSession}`}
                   ref={workspaceRef}
+                  onTypingChange={setHtmlTyping}
                   persistKey={id}
                   html={siteHtml}
                   colorMode={currentPage ? colorModeFor({ theme, colorMode: colorModeSetting, pages: storePages }, currentPage, pageHtmlMap) : null}

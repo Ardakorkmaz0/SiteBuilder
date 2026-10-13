@@ -51,6 +51,8 @@ beforeEach(() => {
   }
   // A signed-in account: the publish gate is for guests.
   useAuthStore.setState({ user: { id: 1, username: 'owner', is_guest: false }, token: 't' })
+  // Taking a site offline asks first; these tests say yes.
+  vi.spyOn(window, 'confirm').mockReset().mockReturnValue(true)
 })
 
 async function openEditor() {
@@ -84,6 +86,32 @@ async function drainWrites() {
     await act(async () => { await new Promise((r) => setTimeout(r, 50)) })
   }
 }
+
+// Unpublishing breaks the site's address for everyone who has it.
+describe('taking a published site offline', () => {
+  it('asks first, and leaves the site up when the answer is no', async () => {
+    startsPublished = true
+    window.confirm.mockReturnValue(false)
+    await openEditor()
+
+    await act(async () => { fireEvent.click(publishButton()) })
+    await act(async () => { await new Promise((r) => setTimeout(r, 200)) })
+
+    expect(window.confirm).toHaveBeenCalledTimes(1)
+    expect(updateSite).not.toHaveBeenCalled()
+  }, 30000)
+
+  it('does not ask before publishing', async () => {
+    startsPublished = false
+    await openEditor()
+
+    await act(async () => { fireEvent.click(publishButton()) })
+    await waitFor(() => expect(updateSite).toHaveBeenCalledTimes(1), SLOW)
+
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(updateSite.mock.calls[0][1].published).toBe(true)
+  }, 30000)
+})
 
 describe('a save that was already waiting when the publish switch was pressed', () => {
   it('does not take a site down that was just published', async () => {
