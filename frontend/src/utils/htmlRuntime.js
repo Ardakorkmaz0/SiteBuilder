@@ -67,6 +67,16 @@ const INTERACTIVE_SCRIPT = `
           (location.protocol === 'file:' && url.protocol === 'file:');
       } catch (e) { return false; }
     }
+    // The page's own language, where this script has words for it: a screen
+    // reader on a Turkish site was read "Open navigation menu", and its
+    // visitor "Message sent.".
+    function turkish() {
+      return /^tr(-|$)/i.test(document.documentElement.getAttribute('lang') || '');
+    }
+    function navLabel(open) {
+      if (turkish()) return open ? 'Gezinme menüsünü kapat' : 'Gezinme menüsünü aç';
+      return open ? 'Close navigation menu' : 'Open navigation menu';
+    }
     function selectTab(tabsRoot, tabId) {
       var tabs = tabsRoot.querySelectorAll('[role="tab"][data-builder-tab]');
       for (var i = 0; i < tabs.length; i++) {
@@ -181,7 +191,7 @@ const INTERACTIVE_SCRIPT = `
           var open = navRoot.getAttribute('data-mobile-open') !== 'true';
           navRoot.setAttribute('data-mobile-open', open ? 'true' : 'false');
           navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-          navToggle.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
+          navToggle.setAttribute('aria-label', navLabel(open));
           navToggle.textContent = open ? '×' : '☰';
         }
         return;
@@ -205,7 +215,7 @@ const INTERACTIVE_SCRIPT = `
         var openNavToggle = openNav.querySelector('[data-builder-mobile-nav-toggle]');
         if (openNavToggle) {
           openNavToggle.setAttribute('aria-expanded', 'false');
-          openNavToggle.setAttribute('aria-label', 'Open navigation menu');
+          openNavToggle.setAttribute('aria-label', navLabel(false));
           openNavToggle.textContent = '☰';
         }
       }
@@ -347,10 +357,10 @@ const INTERACTIVE_SCRIPT = `
       result.style.color = ok ? '#15803d' : '#b91c1c';
       // In the page's own language where we have it: the visitor of a Turkish
       // site read "Message sent." under a Turkish form.
-      var turkish = /^tr(-|$)/i.test(document.documentElement.getAttribute('lang') || '');
+      var tr = turkish();
       result.textContent = ok
-        ? (turkish ? 'Mesajınız gönderildi.' : 'Message sent.')
-        : (turkish ? 'Mesaj gönderilemedi.' : 'Message could not be sent.');
+        ? (tr ? 'Mesajınız gönderildi.' : 'Message sent.')
+        : (tr ? 'Mesaj gönderilemedi.' : 'Message could not be sent.');
     }
     function onSubmit(event) {
       var form = event.target;
@@ -434,6 +444,11 @@ const INTERACTIVE_SCRIPT = `
         }
       });
       window.addEventListener('message', relayBlockForm);
+      // The menu button is written into the page with an English label.
+      var navToggles = document.querySelectorAll('[data-builder-mobile-nav-toggle]');
+      for (var n = 0; n < navToggles.length; n++) {
+        navToggles[n].setAttribute('aria-label', navLabel(navToggles[n].getAttribute('aria-expanded') === 'true'));
+      }
       initSticky();
       syncThemeToggles();
       initPalette();

@@ -68,6 +68,30 @@ describe('standalone published navigation', () => {
   })
 })
 
+describe('the mobile menu button', () => {
+  const nav = '<div data-builder-mobile-nav><button data-builder-mobile-nav-toggle aria-label="Open navigation menu" aria-expanded="false">☰</button><div class="links"><a href="#x">X</a></div></div>'
+
+  it('is named in Turkish on a Turkish page, closed and open', () => {
+    const dom = new JSDOM(`<html lang="tr"><head></head><body>${nav}</body></html>`, { url: 'https://portfolio.example/', runScripts: 'outside-only' })
+    documents.push(dom)
+    dom.window.eval(builderInteractiveJs())
+    dom.window.document.dispatchEvent(new dom.window.Event('DOMContentLoaded'))
+    const button = dom.window.document.querySelector('button')
+
+    expect(button.getAttribute('aria-label')).toBe('Gezinme menüsünü aç')
+    button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(button.getAttribute('aria-label')).toBe('Gezinme menüsünü kapat')
+  })
+
+  it('keeps its English name elsewhere', () => {
+    const { win, doc } = page(nav)
+    const button = doc.querySelector('button')
+    expect(button.getAttribute('aria-label')).toBe('Open navigation menu')
+    button.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(button.getAttribute('aria-label')).toBe('Close navigation menu')
+  })
+})
+
 describe('standalone published inbox', () => {
   const formMarkup = '<form><input name="name" value="Ada"><input type="password" name="password" value="secret"><input type="hidden" name="website" value=""><button>Send</button></form>'
 
