@@ -18,11 +18,13 @@
 // proposes a javascript: href — sanitize_url drops it before save.
 
 import { selectCurrentPage, useEditorStore } from '../store/editorStore.js'
+import { useAuthStore } from '../store/authStore.js'
 import { registry } from '../components/registry.jsx'
 import {
   AI_PROVIDERS,
   GROQ_ENDPOINT,
   LOCAL_PROXY_PATH,
+  NVIDIA_RELAY_PATH,
   OPENROUTER_ENDPOINT,
   buildGeminiEndpoint,
   getApiKey,
@@ -47,6 +49,7 @@ import { SYSTEM_PROMPT } from './aiSystemPrompt.js'
 export {
   AI_PROVIDERS,
   fetchLocalStatus,
+  fetchNvidiaModels,
   getApiKey,
   getEndpoint,
   getModel,
@@ -1361,6 +1364,24 @@ function describeApiError(status, rawText, providerId = getProvider()) {
   const meLabel = me?.label?.replace(/ \(.*\)$/, '') || 'AI provider'
   const other = AI_PROVIDERS.find((p) => p.id !== providerId)
   const otherLabel = other?.label?.replace(/ \(.*\)$/, '') || 'the other provider'
+  // A relayed provider is reached through this app's server, which can refuse
+  // for reasons of its own. "Your key was rejected" would be the wrong thing
+  // to say when it is the app's sign-in that is missing.
+  if (me?.relayed) {
+    // The relay's own refusal carries its code; the provider's does not.
+    if ((status === 401 || status === 403) && ['not_authenticated', 'authentication_failed'].includes(parsed?.code)) {
+      return `Sign in to this app again to use ${meLabel}: its requests go through this app's server.`
+    }
+    if (status === 401 || status === 403) {
+      return `Your ${meLabel} API key was rejected (${status}). Open Settings → AI Assistant and paste a fresh key.`
+    }
+    if (status === 404) {
+      return `${meLabel} does not offer the selected model (any more). Open Settings → Model and pick another one from the list.`
+    }
+    if (status === 413) {
+      return `This page is too large to send to ${meLabel} in one request. Try a smaller page or another provider.`
+    }
+  }
   // OpenRouter retires free models from time to time. When that happens the
   // message is "No endpoints found for <model>" — point the user at Settings
   // instead of leaving them puzzled.
@@ -1401,6 +1422,7 @@ async function callProvider(apiKey, history, currentTurnText) {
   if (provider === 'groq') return callGroq(apiKey, history, currentTurnText)
   if (provider === 'openrouter') return callOpenRouter(apiKey, history, currentTurnText)
   if (provider === 'local') return callLocal(apiKey, history, currentTurnText)
+  if (provider === 'nvidia') return callNvidia(apiKey, history, currentTurnText)
   return callGemini(apiKey, history, currentTurnText)
 }
 
@@ -1536,6 +1558,32 @@ async function callOpenAICompatible(history, currentTurnText, opts) {
     throw new Error(describeApiError(res.status, text, opts.providerId))
   }
   throw new Error(`${opts.providerId} did not respond after the retry. Please try again.`)
+}
+
+// NVIDIA's API cannot be called from a browser (it sends no CORS headers), so
+// the request goes to this app's server, which passes it on (ai_relay.py).
+// Two different credentials travel, and they must not be mixed up: the
+// Authorization header is the app's own sign-in, which the relay requires,
+// and the NVIDIA key rides in the body, where the relay takes it out and
+// sends it to NVIDIA alone.
+function nvidiaRelay(apiKey) {
+  const token = useAuthStore.getState().token
+  return {
+    url: `${resolveBackendBase()}${NVIDIA_RELAY_PATH}/chat/`,
+    headers: token ? { Authorization: `Token ${token}` } : {},
+    extraBody: { _apiKey: apiKey },
+  }
+}
+
+async function callNvidia(apiKey, history, currentTurnText) {
+  const relay = nvidiaRelay(apiKey)
+  return callOpenAICompatible(history, currentTurnText, {
+    url: relay.url,
+    providerId: 'nvidia',
+    modelId: getModel('nvidia'),
+    extraHeaders: relay.headers,
+    extraBody: relay.extraBody,
+  })
 }
 
 async function callGroq(apiKey, history, currentTurnText) {
@@ -1916,6 +1964,12 @@ async function callHtmlModeOnce(prompt, { history = [], currentHtml = '' }) {
       'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://localhost',
       'X-Title': 'PersonelWebSiteBuilder',
     }
+  } else if (provider === 'nvidia') {
+    const relay = nvidiaRelay(apiKey)
+    url = relay.url
+    modelId = getModel('nvidia')
+    extraHeaders = relay.headers
+    extraBody = relay.extraBody
   } else {
     // local
     const base = getEndpoint('local') || 'http://localhost:11434/v1'
@@ -1924,7 +1978,8 @@ async function callHtmlModeOnce(prompt, { history = [], currentHtml = '' }) {
     extraBody = { _localBase: base }
   }
   const headers = { 'Content-Type': 'application/json', ...extraHeaders }
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+  // A relayed provider's key is in the body; its header is the app's sign-in.
+  if (apiKey && provider !== 'nvidia') headers.Authorization = `Bearer ${apiKey}`
   const res = await fetch(url, {
     method: 'POST',
     headers,
@@ -2516,12 +2571,18 @@ async function completeText(systemPrompt, userText, { temperature = 0.4, maxToke
         'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://localhost',
         'X-Title': 'PersonelWebSiteBuilder',
       }
+    } else if (providerId === 'nvidia') {
+      const relay = nvidiaRelay(apiKey)
+      url = relay.url
+      extraHeaders = relay.headers
+      extraBody = relay.extraBody
     } else {
       url = `${resolveBackendBase()}${LOCAL_PROXY_PATH}/proxy/`
       extraBody = { _localBase: getEndpoint('local') || 'http://localhost:11434/v1' }
     }
     const headers = { 'Content-Type': 'application/json', ...extraHeaders }
-    if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+    // A relayed provider's key is in the body; its header is the app's sign-in.
+    if (apiKey && providerId !== 'nvidia') headers.Authorization = `Bearer ${apiKey}`
     req = {
       url,
       headers,

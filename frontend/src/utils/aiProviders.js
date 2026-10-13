@@ -44,6 +44,18 @@ export const AI_PROVIDERS = [
     keyUrl: 'https://aistudio.google.com/app/apikey',
     keyHint: 'Free tier: 1 000-1 500 requests/day. Sign up at aistudio.google.com.',
   },
+  {
+    id: 'nvidia',
+    label: 'NVIDIA NIM',
+    keyUrl: 'https://build.nvidia.com/settings/api-keys',
+    keyHint:
+      'Free developer key from build.nvidia.com (it starts with nvapi-). Many open models behind one key; limits vary by model. The list changes — paste any current id from build.nvidia.com/models if the one you picked has been retired.',
+    customModel: true,
+    // NVIDIA refuses calls from a browser, so this one goes through this
+    // app's server (see ai_relay.py) instead of straight to the provider.
+    relayed: true,
+    keyPlaceholder: 'nvapi-...',
+  },
 ]
 
 const PROVIDER_MODELS = {
@@ -113,6 +125,40 @@ const PROVIDER_MODELS = {
       note: 'Mistral 12B with tool calling.',
     },
   ],
+  // A starting list only: NVIDIA's catalogue moves, and the Settings panel
+  // fills the suggestions from the live list (fetchNvidiaModels).
+  nvidia: [
+    {
+      id: 'nvidia/nemotron-3-super-120b-a12b',
+      label: 'Nemotron 3 Super 120B (recommended)',
+      note: 'NVIDIA’s own agentic model, built for tool calling.',
+    },
+    {
+      id: 'moonshotai/kimi-k2.6',
+      label: 'Kimi K2.6',
+      note: 'Moonshot’s long-context reasoning model.',
+    },
+    {
+      id: 'z-ai/glm-5.3',
+      label: 'GLM 5.3',
+      note: 'Strong at coding and UI work.',
+    },
+    {
+      id: 'deepseek-ai/deepseek-v4.1-flash',
+      label: 'DeepSeek V4.1 Flash',
+      note: 'Fast general-purpose model.',
+    },
+    {
+      id: 'mistralai/mistral-large-2-instruct',
+      label: 'Mistral Large 2',
+      note: 'Reliable on tool arguments.',
+    },
+    {
+      id: 'openai/gpt-oss-20b',
+      label: 'GPT-OSS 20B',
+      note: 'Small and quick; fine for simple edits.',
+    },
+  ],
   gemini: [
     {
       id: 'gemini-2.0-flash-lite',
@@ -139,12 +185,14 @@ const KEY_STORAGE_BY_PROVIDER = {
   groq: 'pwb_groq_key',
   local: 'pwb_local_key', // optional — some local proxies still want one
   openrouter: 'pwb_openrouter_key',
+  nvidia: 'pwb_nvidia_key',
 }
 const MODEL_STORAGE_BY_PROVIDER = {
   gemini: 'pwb_gemini_model',
   groq: 'pwb_groq_model',
   local: 'pwb_local_model',
   openrouter: 'pwb_openrouter_model',
+  nvidia: 'pwb_nvidia_model',
 }
 const ENDPOINT_STORAGE_BY_PROVIDER = {
   local: 'pwb_local_endpoint',
@@ -157,6 +205,10 @@ const DEFAULT_ENDPOINT_BY_PROVIDER = {
 // Django proxy path — the frontend hits this same-origin instead of talking
 // to Ollama directly, so CORS / OLLAMA_ORIGINS pain goes away.
 export const LOCAL_PROXY_PATH = '/api/ai/local'
+
+// NVIDIA's API sends no CORS headers, so a browser cannot call it. The request
+// goes to this app's server, which adds the key and passes the answer back.
+export const NVIDIA_RELAY_PATH = '/api/ai/nvidia'
 
 export function resolveBackendBase() {
   const envBase = import.meta.env?.VITE_API_URL
@@ -241,6 +293,42 @@ export function readCachedLocalModels() {
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed?.models) ? parsed.models : []
   } catch { return [] }
+}
+
+const NVIDIA_MODELS_CACHE_KEY = 'pwb_nvidia_models_cache'
+const NVIDIA_MODELS_MAX_AGE_MS = 6 * 60 * 60 * 1000
+
+export function readCachedNvidiaModels() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(NVIDIA_MODELS_CACHE_KEY) || 'null')
+    if (!parsed || Date.now() - Number(parsed.at) > NVIDIA_MODELS_MAX_AGE_MS) return []
+    return Array.isArray(parsed.models) ? parsed.models.filter((id) => typeof id === 'string') : []
+  } catch { return [] }
+}
+
+// What NVIDIA offers right now, through the relay (the list is public but,
+// like the rest of that API, closed to browsers). `authToken` is the app's
+// own sign-in. Returns the ids, or [] when it cannot be had: these are only
+// suggestions for the model field.
+export async function fetchNvidiaModels(authToken) {
+  const cached = readCachedNvidiaModels()
+  if (cached.length) return cached
+  try {
+    const res = await fetch(`${resolveBackendBase()}${NVIDIA_RELAY_PATH}/models/`, {
+      headers: authToken ? { Authorization: `Token ${authToken}` } : {},
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    const models = Array.isArray(data?.models) ? data.models.filter((id) => typeof id === 'string') : []
+    if (models.length) {
+      try {
+        localStorage.setItem(NVIDIA_MODELS_CACHE_KEY, JSON.stringify({ at: Date.now(), models }))
+      } catch { /* storage unavailable */ }
+    }
+    return models
+  } catch {
+    return []
+  }
 }
 
 export function getProvider() {

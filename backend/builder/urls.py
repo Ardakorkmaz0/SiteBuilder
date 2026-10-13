@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from .ai_relay import NvidiaChatRelayView, NvidiaModelsRelayView
 from .admin_api import (
     AdminAccountDetailView,
     AdminAccountListView,
@@ -104,6 +105,8 @@ urlpatterns = [
     path('public/reviews/<uuid:token>/', PublicReviewView.as_view(), name='public-review'),
     path('ai/local/status/', LocalAiStatusView.as_view(), name='local-ai-status'),
     path('ai/local/proxy/', LocalAiProxyView.as_view(), name='local-ai-proxy'),
+    path('ai/nvidia/chat/', NvidiaChatRelayView.as_view(), name='nvidia-ai-chat'),
+    path('ai/nvidia/models/', NvidiaModelsRelayView.as_view(), name='nvidia-ai-models'),
     # Community components
     path('public/components/', SharedComponentListView.as_view(), name='shared-components'),
     path('public/components/<int:component_id>/', SharedComponentDetailView.as_view(), name='shared-component'),

@@ -46,9 +46,9 @@ describe('extractJsonObject (single-component AI patch parsing)', () => {
 })
 
 describe('AI_PROVIDERS', () => {
-  it('exposes the four providers the editor knows about', () => {
+  it('exposes the five providers the editor knows about', () => {
     const ids = AI_PROVIDERS.map((p) => p.id).sort()
-    expect(ids).toEqual(['gemini', 'groq', 'local', 'openrouter'])
+    expect(ids).toEqual(['gemini', 'groq', 'local', 'nvidia', 'openrouter'])
   })
 
   it('puts OpenRouter first so it is the default for new users', () => {

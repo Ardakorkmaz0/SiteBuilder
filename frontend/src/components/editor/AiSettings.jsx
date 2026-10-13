@@ -7,11 +7,16 @@
 //
 // The key is stored in localStorage and sent from the browser straight to the
 // provider — the Django backend never sees it. Saved per browser, not per site.
+// The one exception is a `relayed` provider (NVIDIA, which refuses browser
+// calls): its key passes through this app's server on the way, unstored, and
+// the panel says so instead of repeating the sentence above.
 import { useEffect, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useAuthStore } from '../../store/authStore.js'
 import {
   AI_PROVIDERS,
   fetchLocalStatus,
+  fetchNvidiaModels,
   getApiKey,
   getEndpoint,
   getModel,
@@ -130,9 +135,26 @@ export default function AiSettings({ showHeading = true }) {
   const discoveredModels = (provider === 'local' && localStatus?.ok && Array.isArray(localStatus.models))
     ? localStatus.models.map((id) => ({ id, label: id, note: '' }))
     : []
+  // NVIDIA's catalogue moves: our short list first, then everything it
+  // offers right now, so a retired suggestion is never the only choice.
+  const [nvidiaModels, setNvidiaModels] = useState([])
+  const authToken = useAuthStore((s) => s.token)
+  useEffect(() => {
+    if (provider !== 'nvidia') return undefined
+    let cancelled = false
+    fetchNvidiaModels(authToken).then((ids) => { if (!cancelled) setNvidiaModels(ids) })
+    return () => { cancelled = true }
+  }, [provider, authToken])
   const models = provider === 'local' && discoveredModels.length
     ? discoveredModels
-    : knownModels
+    : provider === 'nvidia'
+      ? [
+          ...knownModels,
+          ...nvidiaModels
+            .filter((id) => !knownModels.some((m) => m.id === id))
+            .map((id) => ({ id, label: id, note: '' })),
+        ]
+      : knownModels
 
   // Ping the backend proxy each time the user opens the panel on the local
   // provider — that's how we know which models they have pulled AND whether
@@ -236,7 +258,9 @@ export default function AiSettings({ showHeading = true }) {
             >
               {(providerInfo?.keyUrl || '').replace(/^https?:\/\//, '').replace(/\/.*/, '')}
             </a>
-            . {t('The key stays in your browser and is sent directly to the provider — never to our server.')}
+            . {providerInfo?.relayed
+              ? t('This provider does not accept calls from a browser, so your key is sent through this app’s server on its way there. It is passed on and not stored.')
+              : t('The key stays in your browser and is sent directly to the provider — never to our server.')}
           </p>
           <label className="block">
             <span className={FIELD_LABEL}>
@@ -247,7 +271,7 @@ export default function AiSettings({ showHeading = true }) {
                 type={reveal ? 'text' : 'password'}
                 value={value}
                 onChange={(e) => changeApiKey(e.target.value.trim())}
-                placeholder="AIza... / gsk_... / sk-..."
+                placeholder={providerInfo?.keyPlaceholder || 'AIza... / gsk_... / sk-...'}
                 className={FIELD_MONO}
                 autoComplete="off"
                 spellCheck={false}
@@ -311,7 +335,7 @@ export default function AiSettings({ showHeading = true }) {
               list="ai-model-suggestions"
               value={model}
               onChange={(e) => setModelState(e.target.value)}
-              placeholder="llama3.1 / qwen2.5 / your-pulled-model"
+              placeholder={provider === 'local' ? 'llama3.1 / qwen2.5 / your-pulled-model' : 'vendor/model-name'}
               className={FIELD_MONO}
               autoComplete="off"
               spellCheck={false}
@@ -324,8 +348,11 @@ export default function AiSettings({ showHeading = true }) {
               ))}
             </datalist>
             <span className={HINT}>
-              {t(models.find((m) => m.id === model)?.note ||
-                'Type any model you have pulled with Ollama or loaded in LM Studio.')}
+              {t(models.find((m) => m.id === model)?.note || (
+                provider === 'local'
+                  ? 'Type any model you have pulled with Ollama or loaded in LM Studio.'
+                  : 'Pick one from the list, or type any model id this provider offers.'
+              ))}
             </span>
           </>
         ) : (

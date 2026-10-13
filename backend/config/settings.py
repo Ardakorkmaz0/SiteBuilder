@@ -273,6 +273,9 @@ REST_FRAMEWORK = {
         # the door on everybody else. Its own scope, wide enough for a room
         # full of people arriving at once but still a cap on minting rows.
         'guest': os.getenv('DJANGO_THROTTLE_GUEST', '30/min'),
+        # Calls passed on to an AI provider that refuses browsers (ai_relay.py).
+        # Per account; one request of the assistant is several of these.
+        'ai_relay': os.getenv('DJANGO_THROTTLE_AI_RELAY', '40/min'),
     },
 }
 

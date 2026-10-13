@@ -327,7 +327,7 @@ export default function AiChatPanel({
           + `/clear — ${t('wipe this chat')}\n`
           + `/undo — ${t('undo the last canvas change')}\n`
           + `/redo — ${t('redo the last undo')}\n`
-          + `/provider <openrouter|groq|local|gemini> — ${t('switch AI provider')}\n`
+          + `/provider <${AI_PROVIDERS.map((p) => p.id).join('|')}> — ${t('switch AI provider')}\n`
           + `/template <github|dark|apple|minimal-landing|portfolio|blog|dashboard|marketing> — ${t('apply preset')}\n`
           + `/help — ${t('show this list')}`,
         },
