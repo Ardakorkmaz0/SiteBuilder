@@ -472,6 +472,17 @@ function toEdgeInTree(components, id, toEnd) {
 
 const isTopLevel = (components, id) => components.some((c) => c.id === id)
 
+// A selection can reach into a container (click a block in one, then
+// shift-click others). Blocks in different parents are placed in different
+// coordinate spaces, and aligning them to each other compared numbers that do
+// not mean the same thing. Only the blocks that share a parent with the last
+// one picked take part.
+function sameParentIds(components, ids, primaryId) {
+  const parentOf = (id) => findParentInTree(components, id)?.id ?? null
+  const anchor = parentOf(ids.includes(primaryId) ? primaryId : ids[0])
+  return ids.filter((id) => parentOf(id) === anchor)
+}
+
 // Resolve the box (x:0, y:0, w, h) the alignment math should treat as "the
 // parent" — artboard for top-level, parent.layout for nested children. Flow
 // mode top-level returns null so horizontal alignment isn't attempted there
@@ -1947,7 +1958,7 @@ export const useEditorStore = create((set, get) => ({
     set((state) => {
       const page = selectCurrentPage(state)
       const key = page.flowMode ? 'layout' : state.viewport === 'mobile' ? 'mobileLayout' : 'layout'
-      const items = ids
+      const items = sameParentIds(page.components, ids, state.selectedId)
         .map((id) => {
           const c = findInTree(page.components, id)
           // Sections (regions) are structural full-width bands — nudging their
@@ -2000,7 +2011,7 @@ export const useEditorStore = create((set, get) => ({
       const page = selectCurrentPage(state)
       const key = page.flowMode ? 'layout' : state.viewport === 'mobile' ? 'mobileLayout' : 'layout'
       const sizeKey = axis === 'x' ? 'w' : 'h'
-      const items = ids
+      const items = sameParentIds(page.components, ids, state.selectedId)
         .map((id) => {
           const c = findInTree(page.components, id)
           // Same structural exemption as alignSelection: bands stay put.

@@ -108,3 +108,31 @@ describe('a narrower phone', () => {
     expect(laid.x + laid.w).toBeLessThanOrEqual(320)
   })
 })
+
+describe('aligning a selection that reaches into a container', () => {
+  // A block inside a container is placed by the container's own coordinates.
+  // Aligned together with blocks on the page, its x (20, from the container's
+  // edge) was taken for a page position and the page blocks jumped to it.
+  it('aligns the blocks that share a parent with the last one picked, and leaves the rest', () => {
+    load([
+      box('wrap', 'container', { x: 500, y: 40, w: 400, h: 300 }, {
+        children: [box('inner', 'text', { x: 20, y: 30, w: 200, h: 50 }, { props: { text: 'Inside' } })],
+      }),
+      box('a', 'text', { x: 100, y: 400, w: 200, h: 60 }, { props: { text: 'A' } }),
+      box('b', 'text', { x: 300, y: 600, w: 200, h: 60 }, { props: { text: 'B' } }),
+      box('c', 'text', { x: 620, y: 800, w: 200, h: 60 }, { props: { text: 'C' } }),
+    ])
+    s().selectMany(['inner', 'a', 'b', 'c'])
+
+    s().alignSelection('left')
+
+    expect(byId('a').layout.x).toBe(100)
+    expect(byId('b').layout.x).toBe(100)
+    expect(byId('c').layout.x).toBe(100)
+    expect(byId('inner').layout.x).toBe(20)
+
+    s().distributeSelection('y')
+    expect(byId('inner').layout.y).toBe(30)
+    expect(byId('b').layout.y).toBe(600)
+  })
+})
