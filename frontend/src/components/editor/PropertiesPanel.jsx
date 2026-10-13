@@ -1343,6 +1343,10 @@ export default function PropertiesPanel({
     return { id: s.id, label: `${'— '.repeat(s.depth)}${base}${n > 1 ? ` (${n})` : ''}` }
   })
   const componentPresets = presetsForType(component.type)
+  // Pages a component can be copied onto: the ones with a canvas. An HTML page
+  // is its document; a copy "onto" it landed in the canvas design hidden
+  // behind that document and was never seen again.
+  const copyTargets = schema.pages.filter((p) => p.id !== page.id && p.mode !== 'html')
   const scrollBehavior = component.props?.scrollBehavior || 'normal'
   const scaleSingleSize = (factor) => {
     setLayout(component.id, scaledLayoutSize(layout, factor))
@@ -2024,10 +2028,11 @@ export default function PropertiesPanel({
                   onChange={(v) => updateProps(component.id, { animSpeed: v })}
                   options={[['fast', t('Fast')], ['normal', t('Normal')], ['slow', t('Slow')]]}
                 />
-                <LabeledPx
+                {/* Milliseconds: a plain number (the length field put "px" beside it). */}
+                <LabeledNumber
                   label={t('Delay (ms)')}
                   value={component.props?.animDelay ?? 0}
-                  onChange={(v) => updateProps(component.id, { animDelay: parseInt(v, 10) || 0 })}
+                  onChange={(v) => updateProps(component.id, { animDelay: Math.max(0, Math.round(Number(v)) || 0) })}
                 />
               </div>
             )}
@@ -2198,15 +2203,14 @@ export default function PropertiesPanel({
                   if (e.target.value) copyComponentToPage(component.id, e.target.value)
                   e.target.value = ''
                 }}
-                disabled={schema.pages.length < 2}
+                disabled={!copyTargets.length}
                 title={t('Copy this component onto another page')}
                 className="studio-input min-w-0 px-2 py-1.5 text-xs font-medium disabled:opacity-40"
               >
                 <option value="" disabled>
                   {t('Copy page...')}
                 </option>
-                {schema.pages
-                  .filter((p) => p.id !== page.id)
+                {copyTargets
                   .map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
