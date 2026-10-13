@@ -152,3 +152,28 @@ describe('Ctrl+Z pressed in the page', () => {
     expect(pressUndo(doc)).toBe(false)
   })
 })
+
+// Typing is not an undo step until the next action, so the editor's Undo had
+// nothing recorded and was drawn disabled — though pressing it takes the
+// typing back. The workspace says when there is typing to take back.
+describe('typing that is not an undo step yet', () => {
+  it('is reported while it is pending, and once more when it has been recorded', () => {
+    const onTypingChange = vi.fn()
+    const onCommit = vi.fn()
+    const iframe = mountEditing({ onTypingChange, onCommit })
+    const doc = iframe.contentDocument
+
+    doc.getElementById('t').textContent = 'Hi there'
+    act(() => { doc.dispatchEvent(new Event('input', { bubbles: true })) })
+    act(() => { doc.dispatchEvent(new Event('input', { bubbles: true })) })
+
+    expect(onTypingChange.mock.calls.filter(([pending]) => pending === true)).toHaveLength(1)
+
+    // Any press in the editor around the page records the typing first.
+    act(() => { window.dispatchEvent(new Event('pointerdown')) })
+
+    expect(onTypingChange).toHaveBeenLastCalledWith(false)
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(onCommit.mock.calls[0][0]).toContain('Hi there')
+  })
+})
