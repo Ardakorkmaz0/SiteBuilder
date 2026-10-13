@@ -1398,6 +1398,7 @@ export const TURKISH_TRANSLATIONS = {
   'binary asset (read-only)': 'ikili dosya (salt okunur)',
   'Code files': 'Kod dosyaları',
   'Source workspace': 'Kaynak çalışma alanı',
+  'Page schema & custom code': 'Sayfa şeması ve özel kod',
   'Source file': 'Kaynak dosya',
   'HTML, custom CSS and JavaScript are editable. Shared assets are generated read-only.': 'HTML, özel CSS ve JavaScript düzenlenebilir. Paylaşılan dosyalar salt okunur üretilir.',
   'Single HTML': 'Tek HTML',
