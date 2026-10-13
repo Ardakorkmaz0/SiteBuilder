@@ -345,7 +345,12 @@ const INTERACTIVE_SCRIPT = `
         form.appendChild(result);
       }
       result.style.color = ok ? '#15803d' : '#b91c1c';
-      result.textContent = ok ? 'Message sent.' : 'Message could not be sent.';
+      // In the page's own language where we have it: the visitor of a Turkish
+      // site read "Message sent." under a Turkish form.
+      var turkish = /^tr(-|$)/i.test(document.documentElement.getAttribute('lang') || '');
+      result.textContent = ok
+        ? (turkish ? 'Mesajınız gönderildi.' : 'Message sent.')
+        : (turkish ? 'Mesaj gönderilemedi.' : 'Message could not be sent.');
     }
     function onSubmit(event) {
       var form = event.target;

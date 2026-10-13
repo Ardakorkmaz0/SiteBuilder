@@ -87,6 +87,19 @@ describe('standalone published inbox', () => {
     expect(form.hasAttribute('data-pwb-submitting')).toBe(false)
   })
 
+  // The visitor of a Turkish site read "Message sent." under a Turkish form.
+  it('answers in Turkish on a page whose language is Turkish', async () => {
+    const { win, doc } = page(formMarkup)
+    doc.documentElement.setAttribute('lang', 'tr')
+    win.fetch.mockRejectedValueOnce(new Error('offline'))
+    const form = doc.querySelector('form')
+    submit(win, form)
+    await vi.waitFor(() => expect(form.textContent).toContain('Mesaj gönderilemedi.'))
+    submit(win, form)
+    await vi.waitFor(() => expect(form.textContent).toContain('Mesajınız gönderildi.'))
+    expect(form.textContent).not.toContain('Message')
+  })
+
   it('shows an honest failure and permits a retry after a network error', async () => {
     const { win, doc } = page(formMarkup)
     win.fetch.mockRejectedValueOnce(new Error('offline'))
