@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { runAiHtmlPrompt } from '../../utils/aiAssistant.js'
+import { coerceToHtmlDocument, detectHtmlIntent, repairDroppedSections, runAiHtmlPrompt } from '../../utils/aiAssistant.js'
 import {
   buildWizardPrompt,
   wizardMeta,
@@ -118,7 +118,11 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
     try {
       const result = await runAiHtmlPrompt(buildWizardPrompt(answers))
       if (run !== generationRef.current) return // superseded / closed
-      setHtml(result.html)
+      // Markup without a document around it gets one; prose with no markup at
+      // all is not a site.
+      const doc = coerceToHtmlDocument(result.html, { title: answers.brand.trim() || 'My Site' })
+      if (!doc) throw new Error(t('The model did not return usable HTML. Try rephrasing — being specific about sections and style helps a lot.'))
+      setHtml(doc.html)
       setProviderUsed(result.providerUsed)
       setPhase('preview')
     } catch (e) {
@@ -137,7 +141,17 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
     try {
       const result = await runAiHtmlPrompt(wish, { currentHtml: html })
       if (run !== generationRef.current) return
-      setHtml(result.html)
+      // A weaker model answers "add a pricing section" with that section alone,
+      // or rewrites the page around it. Taken as the page, the site that had
+      // just been generated was gone: the fragment goes INTO the page, and an
+      // "add" that dropped what was there gets it back (as in the chat panel).
+      const doc = coerceToHtmlDocument(result.html, { currentHtml: html })
+      if (!doc) {
+        setError('The model did not return usable HTML. Try rephrasing — being specific about sections and style helps a lot.')
+        return
+      }
+      const keepsAll = doc.grafted || detectHtmlIntent(wish) !== 'add'
+      setHtml(keepsAll ? doc.html : repairDroppedSections(html, doc.html).html)
       setProviderUsed(result.providerUsed)
       setRefineText('')
     } catch (e) {
