@@ -285,11 +285,12 @@ function UnsavedLeaveDialog({ open, saving, onSave, onDiscard, onStay }) {
 // z-40 keeps the strips clickable above a narrow-screen drawer backdrop, so
 // tapping the opposite strip switches drawers in one tap.
 function CollapsedRail({ side, label, onOpen }) {
+  const { t } = useLanguage()
   return (
     <button
       type="button"
       onClick={onOpen}
-      title={`Show ${label}`}
+      title={t('Show {label}', { label })}
       className={`studio-panel relative z-40 flex w-7 shrink-0 flex-col items-center gap-2 py-3 text-[var(--studio-text-faint)] transition hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)] ${
         side === 'left' ? 'border-r' : 'border-l'
       }`}
@@ -2255,7 +2256,7 @@ function SiteEditor() {
                   component's snippet into the document where the user points. */}
               {!aiWorkspaceOpen && <RailSlot
                 side="left"
-                label="Files"
+                label={t('Files')}
                 open={leftOpen}
                 narrow={isNarrow}
                 onOpen={() => setRail('left', true)}
@@ -2454,7 +2455,7 @@ function SiteEditor() {
             <>
               {!aiWorkspaceOpen && canvasMode !== 'source' && <RailSlot
                 side="left"
-                label="Files"
+                label={t('Files')}
                 open={leftOpen}
                 narrow={isNarrow}
                 onOpen={() => setRail('left', true)}
@@ -2627,7 +2628,7 @@ function SiteEditor() {
                     {canvasMode === 'view'
                       ? t('Read-only preview of this page')
                       : canvasMode === 'source'
-                        ? 'Page schema & custom code'
+                        ? t('Page schema & custom code')
                         : brushMode
                           ? t('Brush tool: choose target + color, then click items')
                           : linkMode
@@ -2819,7 +2820,7 @@ function SiteEditor() {
             <div className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm shadow-lg">
               <span>{registry[activeType].icon}</span>
               <span className="font-medium text-gray-700">
-                {registry[activeType].label}
+                {t(registry[activeType].label)}
               </span>
             </div>
           ) : null}
