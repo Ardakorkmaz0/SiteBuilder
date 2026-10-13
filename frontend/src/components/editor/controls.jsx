@@ -633,16 +633,27 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
   else if (href.startsWith('#')) kind = 'section'
   else kind = 'url'
 
+  // "External URL" picked and nothing typed yet. Picking the type used to
+  // write "https://" into the link on the spot — a link to nowhere, saved and
+  // published if the person then looked elsewhere. The link keeps what it had
+  // until an address is typed; this remembers which value it was picked over,
+  // so it lets go by itself once the link changes.
+  const [urlPickedOver, setUrlPickedOver] = useState(null)
+  const typingUrl = urlPickedOver !== null && urlPickedOver === href
+  if (typingUrl) kind = 'url'
+
   const pickable = Array.isArray(sections) && sections.length > 0
   const sectionId = href.replace(/^#/, '')
   const knownSection = pickable && sections.some((s) => s.id === sectionId)
 
   const setKind = (k) => {
+    const wasUrl = kind === 'url' && !typingUrl
+    setUrlPickedOver(null)
     if (k === 'none') onChange('')
     else if (k === 'top') onChange('#top')
     else if (k === 'page') onChange('#' + (pages[0]?.id || ''))
     else if (k === 'section') onChange('#' + (pickable ? sections[0].id : 'section'))
-    else onChange(/^https?:/i.test(href) ? href : 'https://')
+    else if (!wasUrl) setUrlPickedOver(href)
   }
 
   return (
@@ -705,10 +716,13 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
         <input
           type="text"
           className={inputCls}
-          value={href}
+          value={typingUrl ? '' : href}
           placeholder="https://…"
+          autoFocus={typingUrl}
           onChange={(e) => onChange(e.target.value)}
           onBlur={(e) => {
+            // Left without typing: the link is what it was.
+            if (typingUrl && !e.target.value.trim()) { setUrlPickedOver(null); return }
             const complete = completeExternalUrl(e.target.value)
             if (complete !== e.target.value) onChange(complete)
           }}

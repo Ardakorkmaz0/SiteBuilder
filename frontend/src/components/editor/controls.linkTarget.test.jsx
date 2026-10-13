@@ -54,3 +54,39 @@ describe('section links on the component canvas', () => {
     expect(screen.queryByText(/goes nowhere/)).toBeNull()
   })
 })
+
+// Picking "External URL" used to write "https://" into the link on the spot: a
+// link to nowhere, saved (and published) if the person then looked elsewhere.
+describe('choosing "External URL"', () => {
+  const pickUrl = () => fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'url' } })
+
+  it('opens an empty address box and leaves the link as it was until something is typed', () => {
+    const onChange = renderControl('#top')
+
+    pickUrl()
+
+    expect(onChange).not.toHaveBeenCalled()
+    const box = screen.getByPlaceholderText('https://…')
+    expect(box).toHaveValue('')
+    fireEvent.change(box, { target: { value: 'example.com' } })
+    expect(onChange).toHaveBeenLastCalledWith('example.com')
+  })
+
+  it('goes back to what the link was when the box is left empty', () => {
+    const onChange = renderControl('')
+
+    pickUrl()
+    fireEvent.blur(screen.getByPlaceholderText('https://…'))
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getAllByRole('combobox')[0]).toHaveValue('none')
+    expect(screen.queryByPlaceholderText('https://…')).toBeNull()
+  })
+
+  it('keeps an address the link already has', () => {
+    const onChange = renderControl('https://example.com/a')
+    pickUrl()
+    expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByPlaceholderText('https://…')).toHaveValue('https://example.com/a')
+  })
+})
