@@ -90,11 +90,20 @@ function styleAttr(component, extra = '') {
   return idAttr + motionRevealAttr(component.props) + styleOnly(component, style)
 }
 
+// "Hide on PC" and "Hide on mobile" are per-screen switches: a block hidden on
+// one size still belongs to the page on the other. Only a block hidden on both
+// is left out; the rest carry a class the two media rules below act on.
+const shown = (list) => (Array.isArray(list) ? list : []).filter((c) => c && !(c.hidden && c.hiddenMobile))
+const visibilityClass = (c) => (c?.hidden ? ' rh-off-pc' : c?.hiddenMobile ? ' rh-off-mobile' : '')
+
 // Hover motion rides on the class list, and every case below builds its own
 // class attribute — so it is folded into the element's FIRST tag on the way
 // out, rather than in a dozen template strings a new case would forget.
 function withHoverMotion(html, props) {
-  const suffix = motionClassSuffix(props)
+  return withClassSuffix(html, motionClassSuffix(props))
+}
+
+function withClassSuffix(html, suffix) {
   if (!suffix) return html
   return html.replace(
     /^(<[a-zA-Z][a-zA-Z0-9-]*)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?>)/,
@@ -225,7 +234,7 @@ function section(c) {
 // band — background, children and all — rendered as an empty string, which is
 // what made a Section-built site show up blank in the dashboard thumbnails.
 function regionBand(c) {
-  const kids = (Array.isArray(c.children) ? c.children : []).filter((ch) => !ch.hidden)
+  const kids = shown(c.children)
   const rows = readingRows(kids)
     .map((row) => {
       const multi = row.length > 1
@@ -251,7 +260,7 @@ function item(c, multi, colOverride) {
 }
 
 function itemEl(c, multi, colOverride) {
-  return withHoverMotion(itemElHtml(c, multi, colOverride), c?.props)
+  return withClassSuffix(withHoverMotion(itemElHtml(c, multi, colOverride), c?.props), visibilityClass(c))
 }
 
 function itemElHtml(c, multi, colOverride) {
@@ -313,13 +322,13 @@ function itemElHtml(c, multi, colOverride) {
     case 'accordion':
       return `<details class="${cls}"${styleAttr(c, `${col};border:1px solid #e5e7eb;border-radius:10px;padding:2px 16px`)}><summary style="cursor:pointer;font-weight:600;padding:12px 0">${multiline(p.title)}</summary><div style="padding-bottom:14px;color:#4b5563">${multiline(p.text)}</div></details>`
     case 'container': {
-      const kids = (Array.isArray(c.children) ? c.children : []).filter((ch) => !ch.hidden)
+      const kids = shown(c.children)
       // Auto-layout containers flow their children as flex/grid. Same shared
       // rules the canvas and the published export use, so a Stack/Row/Grid
       // does not silently fall back to absolute boxes here.
       if (isAutoLayout(p)) {
         const inner = kids
-          .map((ch) => `<div style="${autoLayoutChildCss(ch, p)}">${item(ch, false, 'flex:1 1 auto')}</div>`)
+          .map((ch) => `<div class="${visibilityClass(ch).trim()}" style="${autoLayoutChildCss(ch, p)}">${item(ch, false, 'flex:1 1 auto')}</div>`)
           .join('')
         return `<div class="${cls}"${styleAttr(c, `${col};${autoLayoutContainerCss(p)}`)}>${inner}</div>`
       }
@@ -377,7 +386,7 @@ function tabsHtml(c, cls, col) {
   const tabs = (Array.isArray(p.tabs) ? p.tabs : []).filter((t) => t && t.id)
   const safeTabs = tabs.length ? tabs : [{ id: 't1', label: 'Tab' }]
   const activeId = safeTabs.some((t) => t.id === p.activeId) ? p.activeId : safeTabs[0].id
-  const kids = (Array.isArray(c.children) ? c.children : []).filter((ch) => !ch.hidden)
+  const kids = shown(c.children)
   const strip = safeTabs
     .map(
       (t) =>
@@ -413,7 +422,7 @@ function tabsHtml(c, cls, col) {
 // `colorMode`: the site's two palettes (colorMode.js), when it has a switch.
 export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = null } = {}) {
   const page = withColorModePage(schema?.pages?.[0] || {}, colorMode)
-  const components = (page.components || []).filter((c) => !c.hidden)
+  const components = shown(page.components)
   const bg = cssVal(page.background || '#ffffff')
   const maxW = Math.max(320, Math.min(1280, Math.round(page.canvasWidth || 1120)))
 
@@ -444,10 +453,11 @@ export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = 
         flush()
         // Full-width bands never pass through itemEl, so they fold in their own
         // hover motion — the reveal attribute already rides along in styleAttr.
-        if (c.type === 'navbar') body += '\n    ' + withHoverMotion(navbar(c), c.props)
-        else if (c.type === 'section') body += '\n    ' + withHoverMotion(section(c), c.props)
-        else if (c.type === 'region') body += '\n    ' + withHoverMotion(regionBand(c), c.props)
-        else body += `\n    ${withHoverMotion(`<hr class="rh-divider"${styleAttr(c)} />`, c.props)}`
+        const band = c.type === 'navbar' ? navbar(c)
+          : c.type === 'section' ? section(c)
+            : c.type === 'region' ? regionBand(c)
+              : `<hr class="rh-divider"${styleAttr(c)} />`
+        body += '\n    ' + withClassSuffix(withHoverMotion(band, c.props), visibilityClass(c))
       }
       flushInline()
     }
@@ -499,7 +509,9 @@ export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = 
       h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.12; }
       h2 { font-size: clamp(24px, 4vw, 34px); line-height: 1.2; }
       h3 { line-height: 1.25; }
+      @media (min-width: 769px) { .rh-off-pc { display: none !important; } }
       @media (max-width: 768px) {
+        .rh-off-mobile { display: none !important; }
         .rh-row { flex-direction: column; align-items: stretch; }
         .rh-col { min-width: 0; }
         .rh-row .rh-btn { align-self: center; }
