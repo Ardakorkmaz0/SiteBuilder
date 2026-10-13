@@ -2748,7 +2748,8 @@ export const useEditorStore = create((set, get) => ({
       if (!pageId || pageId === page.id) return {}
       const target = state.schema.pages.find((p) => p.id === pageId)
       const src = findInTree(page.components, id)
-      if (!target || !src) return {}
+      // An HTML page is its document: it has no canvas for a copy to land on.
+      if (!target || target.mode === 'html' || !src) return {}
       // Keep the section names only if the other page does not already use them.
       const copy = cloneTree(src, { keepAnchors: subtreeAnchorsFree(src, target.components, state.schema.pages) })
       return {
