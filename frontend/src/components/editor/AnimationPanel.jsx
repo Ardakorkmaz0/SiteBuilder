@@ -128,6 +128,16 @@ function PageThumbnail({ boxW = 208, boxH = 132 }) {
   )
 }
 
+function findComponent(components, id) {
+  if (!id) return null
+  for (const component of components || []) {
+    if (component.id === id) return component
+    const nested = findComponent(component.children, id)
+    if (nested) return nested
+  }
+  return null
+}
+
 function PreviewTile({ label, reveal, children }) {
   return (
     <div className="min-w-0 flex-1">
@@ -157,11 +167,11 @@ export default function AnimationPanel({ html = null }) {
   const htmlMode = !!html
   const storeSelectedId = useEditorStore((s) => s.selectedId)
   const updateProps = useEditorStore((s) => s.updateProps)
-  const storeSelected = useEditorStore((s) => {
-    const id = s.selectedId
-    if (!id) return null
-    return (selectCurrentPage(s)?.components || []).find((c) => c.id === id) || null
-  })
+  // Anywhere on the page: nearly every block sits inside a section, a
+  // container or a tab, and looked up among the page's own blocks only, such a
+  // selection was "nothing" here — its animation was not shown as in use,
+  // could not be removed, and Use reset its speed.
+  const storeSelected = useEditorStore((s) => findComponent(selectCurrentPage(s)?.components, s.selectedId))
   // One shape for both worlds, so everything below stops caring which it is.
   const selectedId = htmlMode ? (html.info ? 'html-element' : null) : storeSelectedId
   const motion = htmlMode
