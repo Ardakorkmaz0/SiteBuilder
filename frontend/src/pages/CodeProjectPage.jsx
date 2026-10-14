@@ -59,6 +59,7 @@ function LivePane({ url, reloadKey, onReload, onOpenWindow }) {
           type="button"
           onClick={onReload}
           title={t('Reload the embedded preview')}
+          aria-label={t('Reload the embedded preview')}
           className="shrink-0 rounded-lg border border-[#d1d5db] px-2 py-0.5 text-[11px] text-[#374151] hover:bg-[#f3f4f6]"
         >
           ↻
@@ -673,6 +674,7 @@ export default function CodeProjectPage() {
                   type="button"
                   onClick={() => setRightOpen(false)}
                   title={t('Hide panel')}
+                  aria-label={t('Hide panel')}
                   className="rounded-md px-1.5 py-0.5 text-xs text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#374151]"
                 >
                   »

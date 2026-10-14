@@ -2258,6 +2258,7 @@ function SizeQuickControls({ onScale, onPreset }) {
         type="button"
         onClick={() => onScale(0.9)}
         title={t('10% smaller')}
+        aria-label={t('10% smaller')}
         className="rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] px-1.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#e5e7eb]"
       >
         -
@@ -2266,6 +2267,7 @@ function SizeQuickControls({ onScale, onPreset }) {
         type="button"
         onClick={() => onScale(1.1)}
         title={t('10% larger')}
+        aria-label={t('10% larger')}
         className="rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] px-1.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#e5e7eb]"
       >
         +

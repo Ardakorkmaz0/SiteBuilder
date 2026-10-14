@@ -262,6 +262,7 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
             type="button"
             onClick={onClose}
             title={t('Close')}
+            aria-label={t('Close')}
             className="rounded-lg px-2 py-1 text-sm text-[var(--studio-text-faint,#9ca3af)] hover:bg-[var(--studio-control-hover,#f3f4f6)] hover:text-[var(--studio-text,#374151)]"
           >
             ✕
