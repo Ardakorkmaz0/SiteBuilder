@@ -146,3 +146,47 @@ describe('the bilingual catalogue', () => {
     expect(untranslated).toEqual([])
   }, 120000)
 })
+
+// Every template, rendered in Turkish, next to its English render: text that
+// is word-for-word the same in both was never translated. A sentence that
+// wraps over source lines, a search box's "Section title…" and a feature
+// list's "✓ Feature" used to slip through, and so did a few whole paragraphs.
+describe('a Turkish template', () => {
+  // Names stay names: products, a coffee, an address book.
+  const NAMES = new Set([
+    'HTML & CSS', 'hello@example.com', 'shop@example.com', 'linkedin.com/in/example',
+    'Atlas Dashboard', 'Mono E-commerce', 'Fieldnotes App', 'Beacon Identity',
+    'Pulse Landing', 'Orbit Design System', 'Flat white',
+  ])
+
+  function texts(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    doc.querySelectorAll('script, style, noscript, code, pre').forEach((element) => element.remove())
+    const out = []
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) out.push(node.nodeValue.replace(/\s+/g, ' ').trim())
+    doc.body.querySelectorAll('[placeholder], [aria-label], [alt], [title]').forEach((element) => {
+      for (const attribute of ['placeholder', 'aria-label', 'alt', 'title']) {
+        if (element.hasAttribute(attribute)) out.push(element.getAttribute(attribute))
+      }
+    })
+    out.push(doc.title)
+    return out
+  }
+
+  it('has no English left in it', () => {
+    const untranslated = new Set()
+    for (const category of TEMPLATE_LIBRARY) {
+      for (const template of category.variants) {
+        const source = template.build('Zeytin')
+        const english = texts(localizeTemplateHtml(source, 'en'))
+        const turkish = texts(localizeTemplateHtml(source, 'tr'))
+        english.forEach((text, index) => {
+          const words = text.replace(/Zeytin/g, '').match(/[A-Za-z]{3,}/g) || []
+          if (text === turkish[index] && words.length >= 2 && !NAMES.has(text)) untranslated.add(text)
+        })
+      }
+    }
+    expect([...untranslated]).toEqual([])
+  }, 30000)
+})
