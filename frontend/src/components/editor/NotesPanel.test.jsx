@@ -33,4 +33,17 @@ describe('the notes panel', () => {
     expect(editorShortcut).toHaveBeenCalledTimes(1)
     window.removeEventListener('keydown', editorShortcut)
   })
+
+  it('names the note field and says which day is picked and which have notes', () => {
+    localStorage.setItem('pwb_notes', JSON.stringify({}))
+    renderPanel()
+    const field = screen.getByRole('textbox', { name: 'Note for this day' })
+    fireEvent.change(field, { target: { value: 'Pricing done' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    const today = new Date()
+    const picked = screen.getByRole('button', { pressed: true })
+    expect(picked).toHaveAttribute('aria-current', 'date')
+    expect(picked).toHaveAccessibleName(new RegExp(`^${today.getDate()} .+, has notes$`))
+  })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NoteIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 
@@ -29,6 +29,7 @@ export default function NotesPanel({ open, onClose }) {
   const [cursor, setCursor] = useState(() => new Date())
   const [selected, setSelected] = useState(todayKey)
   const [draft, setDraft] = useState('')
+  const draftRef = useRef(null)
 
   useEffect(() => {
     try { localStorage.setItem(KEY, JSON.stringify(notes)) } catch { /* ignore */ }
@@ -127,11 +128,16 @@ export default function NotesPanel({ open, onClose }) {
             const isSelected = key === selected
             const isToday = key === todayKey()
             const hasNotes = !!notes[key]?.length
+            // The dot under a day and its highlight are only seen: say them.
+            const dayName = `${i + 1} ${t(MONTHS[month])}`
             return (
               <button
                 key={key}
                 type="button"
                 onClick={() => setSelected(key)}
+                aria-pressed={isSelected}
+                aria-current={isToday ? 'date' : undefined}
+                aria-label={hasNotes ? t('{date}, has notes', { date: dayName }) : dayName}
                 className={`relative rounded-lg py-1 text-xs transition ${
                   isSelected
                     ? 'bg-[var(--studio-accent)] font-bold text-white'
@@ -173,10 +179,14 @@ export default function NotesPanel({ open, onClose }) {
               <span className="min-w-0 flex-1 whitespace-pre-wrap text-sm text-[var(--studio-text)]">{n.text}</span>
               <button
                 type="button"
-                onClick={() => removeNote(n.id)}
+                onClick={() => {
+                  removeNote(n.id)
+                  // The button goes with the note; the keyboard goes to the note field.
+                  draftRef.current?.focus()
+                }}
                 title={t('Delete note')}
                 aria-label={t('Delete note')}
-                className="hidden rounded px-1 text-xs text-[var(--studio-text-faint)] hover:text-[var(--studio-danger)] group-hover:block"
+                className="rounded px-1 text-xs text-[var(--studio-text-faint)] opacity-0 hover:text-[var(--studio-danger)] focus-visible:opacity-100 group-hover:opacity-100"
               >
                 ✕
               </button>
@@ -189,11 +199,13 @@ export default function NotesPanel({ open, onClose }) {
       <div className="border-t border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-2">
         <div className="flex gap-2">
           <input
+            ref={draftRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') addNote()
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) addNote()
             }}
+            aria-label={t('Note for this day')}
             placeholder={t('e.g. "Finished the pricing section today"')}
             className="ms-input flex-1 text-sm"
           />

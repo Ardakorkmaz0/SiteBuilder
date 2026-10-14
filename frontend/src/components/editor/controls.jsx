@@ -277,7 +277,7 @@ function ImageLibrary({ value, onPick }) {
               onClick={() => remove(img.id)}
               title={t('Delete from library')}
               aria-label={t('Delete from library')}
-              className="absolute right-0.5 top-0.5 rounded-full bg-white/90 px-1 text-[10px] text-[#a4262c] opacity-0 shadow group-hover:opacity-100"
+              className="absolute right-0.5 top-0.5 rounded-full bg-white/90 px-1 text-[10px] text-[#a4262c] opacity-0 shadow focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
             >
               ×
             </button>
