@@ -7,6 +7,7 @@ import { DEFAULT_THEME } from '../../utils/theme.js'
 import { apiError } from '../../utils/errors.js'
 import { CheckIcon, FileCodeIcon, LayersIcon, PaletteIcon } from '../icons.jsx'
 import { useDialogMotion } from '../../ui/useDialogMotion.js'
+import { useIsGuest } from '../../store/authStore.js'
 
 const LEGACY_CATEGORY_MAP = {
   other: 'other',
@@ -82,6 +83,9 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
   const [importHtml, setImportHtml] = useState('')
   const [importName, setImportName] = useState('')
   const [publishNow, setPublishNow] = useState(false)
+  // A guest cannot publish: ticked, the box made the server refuse to create
+  // the site at all. The editor's Publish button explains the account part.
+  const isGuest = useIsGuest()
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
@@ -176,7 +180,7 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
         html,
         schema,
         category: TEMPLATE_SITE_CATEGORY_MAP[category.id] || LEGACY_CATEGORY_MAP[category.id] || 'other',
-        published: publishNow,
+        published: publishNow && !isGuest,
       })
       onCreated?.(site)
     } catch (e) {
@@ -380,10 +384,12 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
                     <div className="flex justify-between gap-3 p-3"><dt className="text-[var(--studio-text-muted)]">{t('Content language')}</dt><dd className="font-semibold text-[var(--studio-text)]">{contentLanguage === 'tr' ? 'Türkçe' : 'English'}</dd></div>
                   )}
                 </dl>
-                <label className="flex items-start gap-2 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel-muted)] p-3 text-sm text-[var(--studio-text)]">
-                  <input type="checkbox" checked={publishNow} onChange={(event) => setPublishNow(event.target.checked)} className="mt-0.5" />
-                  <span><strong className="block">{t('Publish immediately')}</strong><span className="text-xs text-[var(--studio-text-muted)]">{t('Leave this off to review the site in the editor first.')}</span></span>
-                </label>
+                {!isGuest && (
+                  <label className="flex items-start gap-2 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel-muted)] p-3 text-sm text-[var(--studio-text)]">
+                    <input type="checkbox" checked={publishNow} onChange={(event) => setPublishNow(event.target.checked)} className="mt-0.5" />
+                    <span><strong className="block">{t('Publish immediately')}</strong><span className="text-xs text-[var(--studio-text-muted)]">{t('Leave this off to review the site in the editor first.')}</span></span>
+                  </label>
+                )}
               </div>
               {effectiveMode === 'blank' ? (
                 <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[var(--studio-border-strong)] bg-[var(--studio-panel-muted)] p-6 text-center text-sm text-[var(--studio-text-faint)]">
