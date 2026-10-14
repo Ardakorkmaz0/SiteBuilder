@@ -66,6 +66,15 @@ def _domain_verification_token():
     return secrets.token_hex(16)
 
 
+# Letters slugify cannot spell out: dotless ı has no decomposition, so
+# "ZZ Yayın Testi" became zz-yayn-testi and "Kadıköy Kafe" kadkoy-kafe. The
+# same table as the editor's page addresses (frontend pageSlug.js).
+_SLUG_LETTERS = str.maketrans({
+    'ı': 'i', 'İ': 'i', 'ş': 's', 'Ş': 's', 'ğ': 'g', 'Ğ': 'g', 'ç': 'c', 'Ç': 'c',
+    'ö': 'o', 'Ö': 'o', 'ü': 'u', 'Ü': 'u', 'ß': 'ss', 'æ': 'ae', 'ø': 'o', 'å': 'a', 'đ': 'd', 'ł': 'l',
+})
+
+
 class Site(models.Model):
     # YouTube-style discovery categories the creator picks; drives the Explore
     # filter chips.
@@ -186,7 +195,7 @@ class Site(models.Model):
         super().save(*args, **kwargs)
 
     def _generate_unique_slug(self):
-        base = slugify(self.title) or 'site'
+        base = slugify((self.title or '').translate(_SLUG_LETTERS)) or 'site'
         slug = base
         counter = 2
         while Site.objects.filter(slug=slug).exclude(pk=self.pk).exists():
