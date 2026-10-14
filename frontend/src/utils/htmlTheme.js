@@ -12,6 +12,51 @@ const SECONDARY_VARS = ['secondary', 'secondary-color', 'accent-2', 'accent2']
 
 const varPattern = (name) => new RegExp(`(--${name}\\s*:\\s*)[^;}{]+`, 'gi')
 
+// The parts of a page's stylesheets that belong to its OWN dark palette:
+// `.dark { … }`, `[data-theme="dark"] { … }`, `@media (prefers-color-scheme:
+// dark) { … }`. A theme sets the colours a page starts in. Swapped in here as
+// well, the same light values landed in the dark palette, and switching the
+// page to dark showed the light page again. Returns [start, end] offsets.
+function darkPaletteRanges(html) {
+  const ranges = []
+  const sheets = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi
+  let sheet
+  while ((sheet = sheets.exec(html))) {
+    // Comments blanked out, offsets kept: a `{` or the word "dark" inside
+    // one is not part of a rule.
+    const css = sheet[1].replace(/\/\*[\s\S]*?\*\//g, (note) => ' '.repeat(note.length))
+    const base = sheet.index + sheet[0].indexOf('>') + 1
+    const open = []
+    let prelude = 0
+    for (let i = 0; i < css.length; i += 1) {
+      const ch = css[i]
+      if (ch === '{') {
+        open.push({ at: i, dark: /\bdark\b/i.test(css.slice(prelude, i)) })
+        prelude = i + 1
+      } else if (ch === '}') {
+        const block = open.pop()
+        if (block?.dark) ranges.push([base + block.at, base + i])
+        prelude = i + 1
+      } else if (ch === ';') {
+        prelude = i + 1
+      }
+    }
+  }
+  return ranges
+}
+
+// Set a custom property wherever the page declares it, except inside its own
+// dark palette.
+function swapVariable(html, name, value) {
+  const pattern = varPattern(name)
+  if (!pattern.test(html)) return html
+  pattern.lastIndex = 0
+  const dark = darkPaletteRanges(html)
+  return html.replace(pattern, (whole, lead, offset) => (
+    dark.some(([start, end]) => offset > start && offset < end) ? whole : `${lead}${value}`
+  ))
+}
+
 // #rgb / #rrggbb → [h, s, l] each 0..1. Returns null for malformed input.
 function hexToHsl(hex) {
   let h = hex.replace('#', '')
@@ -75,7 +120,7 @@ export function applyPaletteToHtml(html, colors) {
   let touched = false
   const swap = (names, value) => {
     for (const n of names) {
-      const next = out.replace(varPattern(n), (m, p1) => `${p1}${value}`)
+      const next = swapVariable(out, n, value)
       if (next !== out) {
         out = next
         touched = true
@@ -116,9 +161,6 @@ const THEME_VAR_MAP = {
 const FONT_VARS = ['font', 'font-family', 'body-font', 'font-body', 'ff', 'site-font', 'base-font']
 const HEADING_FONT_VARS = ['heading-font', 'font-heading', 'display-font', 'title-font']
 const FONT_MARK = 'data-pwb-theme-font'
-
-const swapVar = (html, name, value) =>
-  html.replace(new RegExp(`(--${name}\\s*:\\s*)[^;}{]+`, 'gi'), (m, p1) => `${p1}${value}`)
 
 // The theme's optional typography, as rules for a document's own headings and
 // body. Only what was chosen: an empty field writes nothing, so the page's own
@@ -167,7 +209,7 @@ export function applyThemeToDocument(html, theme) {
     const value = theme[field]
     if (!value) continue
     for (const n of names) {
-      const next = swapVar(out, n, value)
+      const next = swapVariable(out, n, value)
       if (next !== out) {
         out = next
         colorTouched = true
@@ -175,7 +217,7 @@ export function applyThemeToDocument(html, theme) {
     }
   }
   if (theme.primaryColor) {
-    const next = swapVar(out, 'accent-soft', `${theme.primaryColor}1f`)
+    const next = swapVariable(out, 'accent-soft', `${theme.primaryColor}1f`)
     if (next !== out) {
       out = next
       colorTouched = true
@@ -183,13 +225,13 @@ export function applyThemeToDocument(html, theme) {
   }
   // The accent is the documents' second brand color, where they have one.
   if (theme.accentColor && theme.accentColor !== theme.primaryColor) {
-    for (const n of SECONDARY_VARS) out = swapVar(out, n, theme.accentColor)
+    for (const n of SECONDARY_VARS) out = swapVariable(out, n, theme.accentColor)
   }
   if (theme.fontFamily) {
-    for (const n of FONT_VARS) out = swapVar(out, n, theme.fontFamily)
+    for (const n of FONT_VARS) out = swapVariable(out, n, theme.fontFamily)
   }
   if (theme.headingFontFamily) {
-    for (const n of HEADING_FONT_VARS) out = swapVar(out, n, theme.headingFontFamily)
+    for (const n of HEADING_FONT_VARS) out = swapVariable(out, n, theme.headingFontFamily)
   }
   // No palette variables anywhere → recolor the dominant brand colors so the
   // theme still visibly lands on hand-written / exported pages.
