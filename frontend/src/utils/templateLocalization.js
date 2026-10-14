@@ -544,6 +544,23 @@ Object.assign(TEMPLATE_TEXT_TR, {
   'Send us your preferred time and we will help you choose a session.': 'Tercih ettiğiniz zamanı gönderin; seans seçmenize yardım edelim.',
   'Restorative movement for sustainable training weeks.': 'Sürdürülebilir antrenman haftaları için yenileyici hareket.',
   'Recovery studio': 'Toparlanma stüdyosu',
+  // Portfolio projects, the blog's About and the document-title suffixes:
+  // they were the English left on a Turkish site.
+  'Analytics product redesign — 28% faster task completion.': 'Analitik ürününün yeniden tasarımı — görevler %28 daha hızlı tamamlanıyor.',
+  'Headless storefront with a 95+ Lighthouse score.': '95+ Lighthouse puanlı headless mağaza.',
+  'Offline-first note taking for researchers.': 'Araştırmacılar için çevrimdışı da çalışan not uygulaması.',
+  'Brand system: logo, type, color, guidelines.': 'Marka sistemi: logo, yazı tipi, renk ve kılavuz.',
+  'Launch page that converted at 9.4%.': '%9,4 dönüşüm oranına ulaşan lansman sayfası.',
+  '120 components, theming, docs site.': '120 bileşen, tema desteği ve dokümantasyon sitesi.',
+  'State University': 'Devlet Üniversitesi',
+  'Who is writing this': 'Bunu kim yazıyor',
+  'I build software for a living and write about the parts that turn out to be harder than they look. No hot takes — just what actually worked, and what did not.': 'Geçimimi yazılım geliştirerek sağlıyorum ve göründüğünden zor çıkan kısımları yazıyorum. İddialı yorumlar yok; yalnızca gerçekten işe yarayanlar ve yaramayanlar.',
+  'Café': 'Kafe',
+  'Photography': 'Fotoğrafçılık',
+  'Wedding': 'Düğün',
+  'Links': 'Bağlantılar',
+  'Ship faster': 'Daha hızlı yayınla',
+  'Plan less, do more': 'Daha az planla, daha çok yap',
 })
 
 // The vertical catalogue owns its bilingual copy next to the template data.
@@ -552,6 +569,7 @@ Object.assign(TEMPLATE_TEXT_TR, {
 Object.assign(TEMPLATE_TEXT_TR, VERTICAL_TEMPLATE_TRANSLATIONS)
 
 const PHRASE_REPLACEMENTS_TR = [
+  ['Istanbul, Türkiye', 'İstanbul, Türkiye'],
   [' handles the boring parts — hosting, forms, analytics — so your team can focus on the product.', ' barındırma, formlar ve analiz gibi yorucu işleri üstlenir; ekibiniz ürüne odaklanır.'],
   [' turns scattered tasks into one calm timeline. Plan in seconds, focus for hours.', ' dağınık görevleri sakin bir zaman çizelgesinde toplar. Saniyeler içinde planlayın, saatlerce odaklanın.'],
   ['All rights reserved.', 'Tüm hakları saklıdır.'],
@@ -564,13 +582,26 @@ const PHRASE_REPLACEMENTS_TR = [
   ['Email address', 'E-posta adresi'],
 ]
 
+// The dictionary holds a sentence once. In the page it can wrap over source
+// lines, sit in a search box with "…" after it, or in a feature list with
+// "✓ " before it; those are still the same sentence.
+function dictionaryText(text) {
+  const plain = text.replace(/\s+/g, ' ')
+  if (TEMPLATE_TEXT_TR[plain]) return TEMPLATE_TEXT_TR[plain]
+  const parts = plain.match(/^([✓✔•]\s+)?(.+?)(…|\.\.\.)?$/u)
+  if (parts && (parts[1] || parts[3]) && TEMPLATE_TEXT_TR[parts[2]]) {
+    return `${parts[1] || ''}${TEMPLATE_TEXT_TR[parts[2]]}${parts[3] || ''}`
+  }
+  return null
+}
+
 function translateText(value) {
   const raw = String(value || '')
   const leading = raw.match(/^\s*/)?.[0] || ''
   const trailing = raw.match(/\s*$/)?.[0] || ''
   const text = raw.trim()
   if (!text) return raw
-  let translated = TEMPLATE_TEXT_TR[text] || text
+  let translated = dictionaryText(text) ?? text
   for (const [source, target] of PHRASE_REPLACEMENTS_TR) {
     translated = translated.replaceAll(source, target)
   }
