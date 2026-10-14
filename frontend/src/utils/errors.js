@@ -107,9 +107,15 @@ export function apiError(err, fallback = 'Something went wrong.') {
   const localizedDetail = translatedIfKnown(language, detail)
   if (localizedDetail) return localizedDetail
 
-  const fieldMessage = firstLeaf(Object.fromEntries(
-    Object.entries(data).filter(([key]) => !['code', 'detail', 'error_codes'].includes(key)),
-  ))
+  // Field messages come with a validation error (or an older answer with no
+  // code). A refusal with its own code carries facts beside its sentence: the
+  // action a guest tried, the owner to ask. Read as a message, the guest
+  // refusal's "share_link" was the whole error on the Turkish screen.
+  const fieldMessage = !data.code || data.code === 'validation_error'
+    ? firstLeaf(Object.fromEntries(
+      Object.entries(data).filter(([key]) => !['code', 'detail', 'error_codes'].includes(key)),
+    ))
+    : ''
 
   if (data.code === 'validation_error') {
     // The server's own sentence first, when it can be said in this language:

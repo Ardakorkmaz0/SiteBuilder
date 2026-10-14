@@ -11,7 +11,7 @@ import SiteControlCenter from './editor/SiteControlCenter.jsx'
 import AiChatPanel from './editor/AiChatPanel.jsx'
 import PublicToolbar from './preview/PublicToolbar.jsx'
 import { Navbar } from './renderer/components.jsx'
-import { listSites } from '../api/sites.js'
+import { listSiteComments, listSites } from '../api/sites.js'
 import { listExplore, listFavorites } from '../api/explore.js'
 
 vi.mock('../api/explore.js', () => ({
@@ -36,6 +36,7 @@ vi.mock('../api/sites.js', () => ({
   configureDomain: vi.fn(),
   deleteSiteSubmission: vi.fn(),
   getDomainSetup: vi.fn(),
+  getShareState: vi.fn().mockResolvedValue({ mode: 'link', people: [] }),
   getSiteAnalytics: vi.fn(),
   listSiteComments: vi.fn(),
   listSites: vi.fn().mockResolvedValue([]),
@@ -297,6 +298,32 @@ describe('responsive and accessibility guards', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Readiness' }))
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('names the page a client comment was left on', async () => {
+    vi.mocked(listSiteComments).mockResolvedValue([
+      { id: 1, author_name: 'Ada', author_email: '', page_id: 'home', body: 'Bigger title', resolved: false },
+      { id: 2, author_name: 'Bo', author_email: 'bo@example.com', page_id: 'gone', body: 'Typo', resolved: false },
+      { id: 3, author_name: 'Cy', author_email: '', page_id: '', body: 'Nice', resolved: false },
+    ])
+    renderWithShell(
+      <SiteControlCenter
+        open
+        initialTab="feedback"
+        onClose={vi.fn()}
+        site={{ id: 1, title: 'Test site', site_options: {}, review_token: 'token' }}
+        schema={{ pages: [{ id: 'home', name: 'Home', mode: 'html', components: [] }] }}
+        pageHtmlMap={{ home: '<html><body><h1>Hello</h1></body></html>' }}
+        onSitePatch={vi.fn()}
+        onHtmlContentChange={vi.fn()}
+        onSchemaContentChange={vi.fn()}
+      />,
+    )
+
+    const first = (await screen.findByText('Bigger title')).closest('article')
+    expect(within(first).getByText('Home')).toBeInTheDocument()
+    expect(within(screen.getByText('Typo').closest('article')).getByText('bo@example.com · (deleted page)')).toBeInTheDocument()
+    expect(within(screen.getByText('Nice').closest('article')).getByText('General')).toBeInTheDocument()
   })
 
   it('renders AI as a docked workspace and keeps the compact interface available', () => {

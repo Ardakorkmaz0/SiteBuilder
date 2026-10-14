@@ -63,6 +63,16 @@ describe('apiError', () => {
     } } })).toBe('This username is already taken.')
   })
 
+  it('does not read a refusal\'s facts as its message', () => {
+    // What a guest gets for a share link, and a non-member for a private project.
+    expect(apiError({ response: { status: 403, data: {
+      detail: 'Create an account to do this — your work is kept.', code: 'guest_forbidden', action: 'share_link',
+    } } })).toBe('Bunun için bir hesap oluşturun; yaptıklarınız korunur.')
+    expect(apiError({ response: { status: 403, data: {
+      detail: 'A sentence nobody translated.', code: 'share_private', owner: 'ada', signed_in: true,
+    } } })).toBe('A sentence nobody translated.')
+  })
+
   it('keeps English messages when English is selected', () => {
     localStorage.setItem('pwb_language', 'en')
     expect(apiError({ response: { data: { code: 'permission_denied', detail: 'Forbidden' } } }))
