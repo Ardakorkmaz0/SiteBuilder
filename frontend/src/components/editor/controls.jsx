@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { PRESET_IMAGES } from '../../utils/presetImages.js'
 import { deleteImage, listImages, uploadImage } from '../../api/images.js'
 import {
@@ -290,28 +290,37 @@ function ImageLibrary({ value, onPick }) {
 
 // `fallback` is the colour in use while the setting is empty, so the swatch
 // shows what the page shows.
+// A wrapping label named only the swatch; the code field beside it was
+// announced as its placeholder ("#000000"), so every colour of a theme
+// sounded the same. The name now goes to the code field, and the swatch says
+// it picks that colour.
 export function LabeledColor({ label, value, onChange, fallback }) {
+  const { t } = useLanguage()
+  const labelId = useId()
   const shown = value || fallback || ''
   const hex = /^#[0-9a-fA-F]{6}$/.test(shown) ? shown : '#000000'
   return (
-    <label className="block min-w-0">
-      <span className={labelCls}>{label}</span>
+    <div className="block min-w-0">
+      <span id={labelId} className={labelCls}>{label}</span>
       <div className="flex min-w-0 items-center gap-2">
         <input
           type="color"
           className="h-8 w-10 cursor-pointer rounded-lg border border-[#d1d5db]"
+          aria-label={typeof label === 'string' ? t('Pick a colour: {label}', { label }) : undefined}
+          aria-labelledby={typeof label === 'string' ? undefined : labelId}
           value={hex}
           onChange={(e) => onChange(e.target.value)}
         />
         <input
           type="text"
           className={inputCls}
+          aria-labelledby={labelId}
           value={value ?? ''}
           placeholder={fallback || '#000000'}
           onChange={(e) => onChange(e.target.value)}
         />
       </div>
-    </label>
+    </div>
   )
 }
 
@@ -677,6 +686,7 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
       {kind === 'page' && (
         <select
           className={inputCls}
+          aria-label={t('Go to page')}
           value={href.slice(1)}
           onChange={(e) => onChange('#' + e.target.value)}
         >
@@ -716,6 +726,7 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
         <input
           type="text"
           className={inputCls}
+          aria-label={t('section id (e.g. contact)')}
           value={sectionId}
           placeholder={t('section id (e.g. contact)')}
           onChange={(e) => onChange('#' + e.target.value.replace(/^#/, ''))}
@@ -730,6 +741,9 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
         <input
           type="text"
           className={inputCls}
+          // A label names only its first control; the address field said
+          // nothing but its placeholder to a screen reader.
+          aria-label={t('External URL')}
           value={typingUrl ? '' : href}
           placeholder="https://…"
           autoFocus={typingUrl}

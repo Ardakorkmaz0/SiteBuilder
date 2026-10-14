@@ -1,7 +1,7 @@
 // "Section on this page" used to be a bare text box. Element ids on the canvas
 // are generated component ids, so what people typed (#about, #contact — what a
 // new navbar ships with) matched nothing and the link went nowhere, silently.
-import { fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import { LinkTargetControl } from './controls.jsx'
@@ -88,5 +88,22 @@ describe('choosing "External URL"', () => {
     pickUrl()
     expect(onChange).not.toHaveBeenCalled()
     expect(screen.getByPlaceholderText('https://…')).toHaveValue('https://example.com/a')
+  })
+})
+
+// A <label> names only its first control. The page picker and the address
+// field after it were announced by their placeholder or not at all.
+describe('every field of a link has a name', () => {
+  it('names the page picker, the address and a typed section id', () => {
+    renderControl('#p1', { sections: null })
+    expect(screen.getByRole('combobox', { name: 'Go to page' })).toHaveValue('p1')
+    cleanup()
+
+    renderControl('https://example.com')
+    expect(screen.getByRole('textbox', { name: 'External URL' })).toHaveValue('https://example.com')
+    cleanup()
+
+    renderControl('#contact', { sections: null })
+    expect(screen.getByRole('textbox', { name: 'section id (e.g. contact)' })).toHaveValue('contact')
   })
 })
