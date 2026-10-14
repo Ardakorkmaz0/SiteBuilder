@@ -1254,10 +1254,24 @@ function SiteEditor() {
       { pageId: currentPageId, html: siteHtml, at: nextHistoryStamp() },
     ])
     setHtmlFuture([])
+    // A new edit ends what could be redone in the OTHER undo list too: after
+    // undoing a page delete, a change to the document left Redo lit, and it
+    // deleted the page again on top of the newer work.
+    if (useEditorStore.getState().future.length) useEditorStore.setState({ future: [], futureAt: [] })
     setSiteHtml(next)
     markHtmlDirty()
     if (reseedWorkspace) workspaceRef.current?.setDocument?.(next)
   }
+
+  // …and the other way round: a new step recorded in the store (a page
+  // renamed, a theme edit) ends what could be redone in the documents' list.
+  // A recorded step is the one store change that grows `past` and empties
+  // `future` without touching the design; undo and redo both replace it.
+  useEffect(() => useEditorStore.subscribe((state, before) => {
+    if (state.past !== before.past && state.schema === before.schema && !state.future.length) {
+      setHtmlFuture((list) => (list.length ? [] : list))
+    }
+  }), [])
 
   // Undo entries carry the page they belong to, so undoing after a page
   // switch restores the right document (and reseeds only when visible).
