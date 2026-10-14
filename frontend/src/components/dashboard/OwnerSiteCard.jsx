@@ -73,7 +73,10 @@ export default function OwnerSiteCard({
           <PinIcon size={11} /> {t('Pinned')}
         </span>
       )}
-      <Link to={`/editor/${site.id}`} className="block overflow-hidden rounded-t-[calc(var(--studio-radius-lg)-1px)] border-b border-[var(--studio-border)] bg-[var(--studio-control)]">
+      {/* The picture is a mouse shortcut to "Continue editing" below. It has no
+          words of its own, so the keyboard and screen readers skip it rather
+          than meet a link called nothing. */}
+      <Link to={`/editor/${site.id}`} tabIndex={-1} aria-hidden="true" className="block overflow-hidden rounded-t-[calc(var(--studio-radius-lg)-1px)] border-b border-[var(--studio-border)] bg-[var(--studio-control)]">
         <SitePreview site={site} source="owner" height={160} framed={false} />
       </Link>
 
@@ -145,7 +148,7 @@ export default function OwnerSiteCard({
           <span className="ml-auto">{t('{count} pages', { count: health.page_count || 1 })}</span>
         </div>
         <div className="mt-auto flex items-center gap-2 border-t border-[var(--studio-border)] pt-3.5">
-          <Link to={`/editor/${site.id}`} className="studio-btn studio-btn-accent min-h-9 flex-1 px-3">
+          <Link to={`/editor/${site.id}`} aria-label={`${t('Continue editing')}: ${site.title}`} className="studio-btn studio-btn-accent min-h-9 flex-1 px-3">
             {t('Continue editing')} <ArrowRightIcon size={14} />
           </Link>
           {site.published && address && (
