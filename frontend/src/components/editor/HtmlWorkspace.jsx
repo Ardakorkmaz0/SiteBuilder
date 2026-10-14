@@ -41,6 +41,7 @@ import {
   setThinElementHover,
   thinSelectableAtPoint,
   visibleAnchorIndex,
+  disarmMetaRefresh,
 } from '../../utils/htmlPlacement.js'
 import {
   applyElementPatch,
@@ -1863,7 +1864,7 @@ function HtmlWorkspace({
   // as a block that could not be selected.
   const readingIsCurrent = generated?.seed === editSeed
   const editDocument = useMemo(() => {
-    const seeded = withEditorViewportMeta(editSeed)
+    const seeded = disarmMetaRefresh(withEditorViewportMeta(editSeed))
     const live = generated?.seed === editSeed ? generated.live : ''
     if (!live) return seeded
     return withLiveState(seeded, liveStateDiff(editSeed, live))
