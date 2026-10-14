@@ -177,6 +177,9 @@ class TestTheModelList:
     def test_it_lists_what_nvidia_offers_and_asks_once(self, api, upstream):
         upstream['state']['answer'] = _Answer({'data': [
             {'id': 'z-ai/glm-5.3'}, {'id': 'moonshotai/kimi-k3'}, {'id': 'bad id with spaces'}, {'nope': 1},
+            # Not chat models: suggesting them would only end in an error.
+            {'id': 'nvidia/nv-embedqa-mistral-7b-v2'}, {'id': 'meta/llama-guard-4-12b'},
+            {'id': 'nvidia/nemotron-4-340b-reward'}, {'id': 'nvidia/nemotron-parse'}, {'id': 'nvidia/nvclip'},
         ]})
 
         first = api.get(MODELS).json()

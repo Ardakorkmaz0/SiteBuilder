@@ -54,6 +54,12 @@ MAX_RESPONSE_BYTES = 4_000_000
 # use, nothing that could end the header line.
 _KEY_RE = re.compile(r'^[A-Za-z0-9._\-]{8,300}$')
 _MODEL_RE = re.compile(r'^[A-Za-z0-9._:/\-]{1,160}$')
+# Models the list carries that cannot hold a conversation: embedders,
+# rerankers, safety classifiers, reward scorers, document parsers, detectors.
+_NOT_CHAT_RE = re.compile(
+    r'embed|rerank|retriever|guard|safety|reward|parse|clip|detector|deplot|calibration',
+    re.IGNORECASE,
+)
 
 
 class _NoRedirects(urllib.request.HTTPRedirectHandler):
@@ -215,7 +221,8 @@ class NvidiaModelsRelayView(APIView):
         rows = listing.get('data') if isinstance(listing, dict) else None
         models = sorted({
             row['id'] for row in rows or []
-            if isinstance(row, dict) and isinstance(row.get('id'), str) and _MODEL_RE.match(row['id'])
+            if isinstance(row, dict) and isinstance(row.get('id'), str)
+            and _MODEL_RE.match(row['id']) and not _NOT_CHAT_RE.search(row['id'])
         })
         cache.set('ai_relay:nvidia:models', models, MODELS_CACHE_SECONDS)
         return Response({'ok': True, 'models': models})
