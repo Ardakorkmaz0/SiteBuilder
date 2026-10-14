@@ -202,12 +202,14 @@ class TestApi:
         # The page id 'good' makes the swap visible without comparing the
         # full normalised schema dict.
         assert resp.data['schema']['pages'][0]['id'] == 'good'
-        # The restore should have created ONE new row — the "restore"
-        # checkpoint of the good state. The "before restore" snapshot is
-        # de-duplicated against v2 (which already captured the bad state),
-        # so it doesn't burn a slot.
+        # Two new rows: the recovery point (the bad state, recorded even
+        # though v2 holds the same thing — it is what the panel lists under
+        # "Recovery points", and de-duplicated away that list was left with
+        # only the copy of what had just been loaded), then that copy.
         rows = list(SiteVersion.objects.filter(site_id=site_id).order_by('created_at'))
-        assert len(rows) == 3
+        assert len(rows) == 4
+        assert (rows[-2].source, rows[-2].label) == ('save', 'before restore')
+        assert rows[-2].schema['pages'][0]['id'] != 'good'
         assert rows[-1].source == 'restore'
         assert rows[-1].schema['pages'][0]['id'] == 'good'
 
