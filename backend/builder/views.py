@@ -3,6 +3,7 @@ import json
 from datetime import timedelta
 from ipaddress import ip_address
 import re
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -137,6 +138,9 @@ def _verify_recaptcha(token):
 # own via the X-Local-Base-Url request header; we still default to Ollama
 # because that's the most common local runtime on Windows.
 DEFAULT_LOCAL_BASE = 'http://localhost:11434/v1'
+# Local models do CPU/GPU inference and can be slow; this is how long one
+# answer may take before the editor is told so.
+LOCAL_AI_TIMEOUT = 120
 
 
 def _local_ai_blocked():
@@ -1065,7 +1069,7 @@ class LocalAiProxyView(APIView):
             )
             # Local models do CPU/GPU inference — give them headroom; the
             # browser-side throttle keeps this honest.
-            with _open_local_ai(req, timeout=120) as resp:
+            with _open_local_ai(req, timeout=LOCAL_AI_TIMEOUT) as resp:
                 text = resp.read().decode('utf-8')
                 try:
                     parsed = json.loads(text)
@@ -1082,7 +1086,19 @@ class LocalAiProxyView(APIView):
                 {'error': {'message': text or e.reason, 'code': e.code}},
                 status=e.code,
             )
+        except (socket.timeout, TimeoutError):
+            # A model still thinking when the time is up: an answer the editor
+            # can show, not a server error.
+            return Response(
+                {'error': {'message': 'The local AI took too long to answer.'}},
+                status=status.HTTP_504_GATEWAY_TIMEOUT,
+            )
         except urllib.error.URLError as e:
+            if isinstance(e.reason, (socket.timeout, TimeoutError)):
+                return Response(
+                    {'error': {'message': 'The local AI took too long to answer.'}},
+                    status=status.HTTP_504_GATEWAY_TIMEOUT,
+                )
             return Response(
                 {
                     'error': {
@@ -1266,9 +1282,15 @@ class PublicConfigView(APIView):
     """Runtime public config for the SPA — the PUBLIC feature keys only (Google
     client id, reCAPTCHA site key). The frontend reads this instead of build-time
     env so the superadmin can flip features on from the Settings page without a
-    rebuild. No secrets here."""
+    rebuild. No secrets here.
+
+    It reads no user, so it authenticates none: the SPA sends its saved token
+    with every request, and a stale one (a guest account that is gone, a token
+    signed out elsewhere) made even this answer 401 — the sign-in buttons, the
+    captcha and the AI switches then never arrived."""
 
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def get(self, request):
         return Response({
