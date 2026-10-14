@@ -5,6 +5,7 @@ import { fetchMe } from '../api/auth.js'
 import { listSites, createSite, deleteSite, cloneSite, getSite } from '../api/sites.js'
 import { useAuthStore } from '../store/authStore.js'
 import { apiError } from '../utils/errors.js'
+import { useGuestGate } from '../utils/useGuestGate.jsx'
 import { formatRelativeActivity, orderSites } from '../utils/siteSort.js'
 import { useScrollRestore } from '../utils/useScrollRestore.js'
 import OwnerSiteCard from '../components/dashboard/OwnerSiteCard.jsx'
@@ -145,6 +146,10 @@ export default function ProfilePage() {
     }
   }
 
+  // A guest at the site limit is told what an account changes, with the way to
+  // one, instead of a line of red text.
+  const { gate: guestGate, dialog: guestDialog } = useGuestGate()
+
   async function onCreate(event) {
     event.preventDefault()
     if (!newTitle.trim()) return
@@ -153,8 +158,9 @@ export default function ProfilePage() {
       const site = await createSite(newTitle.trim())
       navigate(`/editor/${site.id}`)
     } catch (requestError) {
-      setError(apiError(requestError))
       setCreating(false)
+      if (requestError?.response?.data?.code === 'guest_forbidden' && guestGate('limit')) return
+      setError(apiError(requestError))
     }
   }
 
@@ -185,6 +191,7 @@ export default function ProfilePage() {
       const copy = await cloneSite(site.slug)
       setSites((previous) => [{ ...copy, favorite_count: 0 }, ...previous])
     } catch (requestError) {
+      if (requestError?.response?.data?.code === 'guest_forbidden' && guestGate('limit')) return
       setError(apiError(requestError))
     } finally {
       setBusyAction('')
@@ -548,6 +555,7 @@ export default function ProfilePage() {
           </section>
         </div>
       </main>
+      {guestDialog}
     </div>
   )
 }
