@@ -6,6 +6,7 @@
 // user input: text is HTML-escaped, URLs go through sanitizeUrl, style keys are
 // whitelisted by sanitizeStyles, and CSS values are stripped of `;{}<` so a
 // value can't break out of its rule.
+import { pageSlug } from './pageSlug.js'
 import { sanitizeStyles, sanitizeUrl, sanitizeImageSrc } from './sanitize.js'
 import { ICONS, iconSvg } from './icons.js'
 import { fieldHtml } from './formField.js'
@@ -867,11 +868,7 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
 
 // Make unique, friendly file names from page names (first page -> index.html).
 function slug(name) {
-  const s = String(name || 'page')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  return s || 'page'
+  return pageSlug(name) || 'page'
 }
 
 // A single, self-contained .html file. It preserves the same renderer semantics

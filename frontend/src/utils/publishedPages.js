@@ -10,27 +10,14 @@ import { schemaToSingleHtml } from './schemaToFiles.js'
 import { pageSeoTitle, withPageSeoTags } from './seoTags.js'
 import { withBuilderInteractiveHtml } from './htmlRuntime.js'
 import { colorModeFor, withColorModeHtml } from './colorMode.js'
+import { pageSlug } from './pageSlug.js'
 
 // The address of a page under /s/<slug>/. The home page has none: it IS the
 // site. The server slugifies and de-duplicates again, so this is the wish, not
 // the guarantee.
-// Dotless ı has no canonical decomposition, so NFKD alone drops it and
-// "Çalışmalar" becomes "cal-smalar". The letters that matter most here are
-// mapped by hand; NFKD then handles the accents of every other language.
-const TRANSLITERATE = { ı: 'i', İ: 'i', ş: 's', Ş: 's', ğ: 'g', Ğ: 'g', ç: 'c', Ç: 'c', ö: 'o', Ö: 'o', ü: 'u', Ü: 'u', ß: 'ss', æ: 'ae', ø: 'o', å: 'a', đ: 'd', ł: 'l' }
-
 export function pagePath(page, index) {
   if (index === 0) return ''
-  const slug = String(page?.name || '')
-    .trim()
-    .replace(/[^ -]/g, (char) => TRANSLITERATE[char] ?? char)
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .slice(0, 140)
-    .replace(/^-+|-+$/g, '')
-  return slug || `page-${index + 1}`
+  return pageSlug(page?.name) || `page-${index + 1}`
 }
 
 // The address every page WILL have, in page order. Two pages cannot share one:
