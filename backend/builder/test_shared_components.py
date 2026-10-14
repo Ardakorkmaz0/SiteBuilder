@@ -540,3 +540,75 @@ class TestChangingVisibility:
         assert res.data['code'] == 'invalid_visibility'
         component.refresh_from_db()
         assert component.visibility == 'public'
+
+
+class TestCopiesBeyondTheComponentList:
+    """A copy is not always a top-level component: on an HTML page it is part
+    of the document, moved into a section it is a section's child, and on a
+    published site it is part of the page visitors receive. A takedown has to
+    reach it in every one of those places."""
+
+    def _html_site(self, owner):
+        html = '<!DOCTYPE html><html><body><h1>Benim sayfam</h1></body></html>'
+        return Site.objects.create(
+            owner=owner, title='HTML', slug='html-site', html=html,
+            schema={'theme': {}, 'pages': [{'id': 'page_home', 'name': 'Home', 'mode': 'html', 'html': html, 'components': []}]},
+        )
+
+    def test_on_an_html_page_it_goes_into_the_document(self, author, taker):
+        component = SharedComponent.objects.create(author=author, **GOOD)
+        site = self._html_site(taker)
+
+        res = client_for(taker).post(
+            reverse('shared-component-use', args=[component.pk]), {'site_id': site.pk}, format='json',
+        )
+
+        assert res.status_code == 200
+        site.refresh_from_db()
+        page = site.schema['pages'][0]
+        assert page['components'] == []
+        assert f'data-pwb-shared-from="{component.pk}"' in page['html']
+        assert page['html'].index('Pro') < page['html'].index('</body>')
+        assert '<h1>Benim sayfam</h1>' in page['html']
+        # The home page's document is mirrored to site.html.
+        assert site.html == page['html']
+
+    def test_a_purge_reaches_html_pages_nested_blocks_and_the_published_page(self, author, taker, moderator):
+        from .models import PublishedPage
+
+        drop = SharedComponent.objects.create(author=author, **GOOD)
+        keep = SharedComponent.objects.create(author=author, **{**GOOD, 'title': 'Innocent'})
+        html_site = self._html_site(taker)
+        client_for(taker).post(reverse('shared-component-use', args=[drop.pk]), {'site_id': html_site.pk}, format='json')
+        html_site.refresh_from_db()
+
+        canvas = Site.objects.create(owner=taker, title='Canvas', slug='canvas-site', published=True, schema={
+            'theme': {}, 'pages': [{'id': 'page_home', 'name': 'Home', 'components': [{
+                'id': 'region_1', 'type': 'region', 'props': {}, 'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 980, 'h': 360},
+                'children': [
+                    {'id': 'h1', 'type': 'html', 'props': {'code': '<p>x</p>', '_sharedFrom': drop.pk}, 'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 100, 'h': 40}},
+                    {'id': 'h2', 'type': 'html', 'props': {'code': '<p>y</p>', '_sharedFrom': keep.pk}, 'styles': {}, 'layout': {'x': 0, 'y': 50, 'w': 100, 'h': 40}},
+                ],
+            }]}],
+        })
+        PublishedPage.objects.create(site=canvas, path='', html=(
+            '<html><body><iframe data-pwb-shared-from="%d" srcdoc="&lt;p&gt;x&lt;/p&gt; </iframe> >"></iframe>'
+            '<iframe data-pwb-shared-from="%d" srcdoc="y"></iframe></body></html>' % (drop.pk, keep.pk)
+        ))
+
+        res = client_for(moderator).post(
+            reverse('admin-component-moderate', args=[drop.pk]), {'action': 'purge'}, format='json',
+        )
+
+        assert res.status_code == 200
+        assert res.data['sites_touched'] == 2
+        html_site.refresh_from_db()
+        assert 'data-pwb-shared-from' not in html_site.schema['pages'][0]['html']
+        assert '<h1>Benim sayfam</h1>' in html_site.schema['pages'][0]['html']
+        assert 'data-pwb-shared-from' not in html_site.html
+        canvas.refresh_from_db()
+        children = canvas.schema['pages'][0]['components'][0]['children']
+        assert [child['props']['_sharedFrom'] for child in children] == [keep.pk]
+        live = PublishedPage.objects.get(site=canvas).html
+        assert f'data-pwb-shared-from="{drop.pk}"' not in live
+        assert f'data-pwb-shared-from="{keep.pk}"' in live

@@ -476,7 +476,11 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
     // supply the active breakpoint's height through a custom property. A
     // literal inline `height` outranks the mobile media rule; a `var()` does
     // not freeze the desktop value and needs no `!important`.
-    return `<iframe srcdoc="${safe}" scrolling="no" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" style="display:block;width:100%;border:0;background:transparent;${styleStr};overflow:hidden;height:var(--pwb-embed-height,${h}px)"></iframe>`
+    // A block taken from the community library says where it came from, so a
+    // moderator's takedown can remove it from the published page too
+    // (backend shared_marks.py), not only from the draft.
+    const shared = Number.isInteger(p._sharedFrom) && p._sharedFrom > 0 ? ` data-pwb-shared-from="${p._sharedFrom}"` : ''
+    return `<iframe${shared} srcdoc="${safe}" scrolling="no" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" style="display:block;width:100%;border:0;background:transparent;${styleStr};overflow:hidden;height:var(--pwb-embed-height,${h}px)"></iframe>`
   }
   const tag = tagFor(c.type)
   const base = baseRules(c.type)
