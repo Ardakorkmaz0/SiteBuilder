@@ -1729,7 +1729,7 @@ function SiteEditor() {
   function convertToResponsiveHtml() {
     if (
       !window.confirm(
-        t('Convert the design into a genuinely responsive HTML site? Your component design is kept (use "Remove HTML" to go back). Nothing is saved until you press Save.'),
+        t('Convert the design into a genuinely responsive HTML site? Your component design is kept (use "Remove HTML" to go back).'),
       )
     )
       return
@@ -1753,7 +1753,7 @@ function SiteEditor() {
     if (
       siteHtml.trim() &&
       !window.confirm(
-        t('Start this page from an empty HTML document? Its current content is replaced (Undo brings it back). Nothing is saved until you press Save.'),
+        t('Start this page from an empty HTML document? Its current content is replaced (Undo brings it back).'),
       )
     )
       return
@@ -1803,7 +1803,7 @@ function SiteEditor() {
     if (
       pageHasWork() &&
       !window.confirm(
-        t('Start from the “{name}” template? This page current content changes (Undo brings it back). Nothing is saved until you press Save.', { name: t(tpl.name) }),
+        t('Start from the “{name}” template? This page’s current content changes (Undo brings it back).', { name: t(tpl.name) }),
       )
     )
       return
