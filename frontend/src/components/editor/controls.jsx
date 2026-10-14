@@ -6,6 +6,7 @@ import {
   updateHtmlHrefAtPath,
   updateHtmlTextAtPath,
 } from '../../utils/htmlQuickEdit.js'
+import { looksLikePageLink } from '../../utils/pageLinks.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { apiError } from '../../utils/errors.js'
 import { completeExternalUrl } from '../../utils/linkTargets.js'
@@ -625,11 +626,14 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
   const { t } = useLanguage()
   const href = typeof value === 'string' ? value : ''
   const pageIds = new Set(pages.map((p) => p.id))
+  // A link to a page that has since been deleted. It used to show as a
+  // "section on this page" named after the old page id.
+  const deletedPage = pages.length > 0 && looksLikePageLink(href) && !pageIds.has(href.slice(1))
   let kind
   if (!href) kind = 'none'
   else if (/^(https?:|mailto:|tel:)/i.test(href)) kind = 'url'
   else if (href === '#' || href === '#top') kind = 'top'
-  else if (href.startsWith('#') && pageIds.has(href.slice(1))) kind = 'page'
+  else if (href.startsWith('#') && (pageIds.has(href.slice(1)) || deletedPage)) kind = 'page'
   else if (href.startsWith('#')) kind = 'section'
   else kind = 'url'
 
@@ -676,12 +680,22 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
           value={href.slice(1)}
           onChange={(e) => onChange('#' + e.target.value)}
         >
+          {deletedPage && (
+            <option value={href.slice(1)} disabled>
+              {t('(deleted page)')}
+            </option>
+          )}
           {pages.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
         </select>
+      )}
+      {kind === 'page' && deletedPage && (
+        <span role="alert" className="mt-1 block text-[11px] text-[var(--studio-danger)]">
+          {t('The page this link went to was deleted. Choose another page.')}
+        </span>
       )}
       {kind === 'section' && pickable && (
         <select
