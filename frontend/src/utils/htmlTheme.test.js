@@ -109,6 +109,28 @@ describe('applyThemeToDocument', () => {
     expect(count(twice)).toBe(count(once))
   })
 
+  it('leaves the page\'s own dark palette alone', () => {
+    const doc = `<head><style>
+:root { --bg:#ffffff; --accent:#0000ff; }
+/* the dark palette */
+[data-theme="dark"] { --bg:#111111; --accent:#8888ff; }
+@media (prefers-color-scheme: dark) { :root { --bg:#000000; } }
+body.dark-mode { --accent:#9999ff; }
+.darkness { --bg:#eeeeee; }
+</style></head><body>x</body>`
+    const out = applyThemeToDocument(doc, THEME)
+    expect(out).toContain(':root { --bg:#fffaf7; --accent:#e8543f; }')
+    expect(out).toContain('[data-theme="dark"] { --bg:#111111; --accent:#8888ff; }')
+    expect(out).toContain(':root { --bg:#000000; }')
+    expect(out).toContain('body.dark-mode { --accent:#9999ff; }')
+    // Only a whole word "dark" marks a dark palette.
+    expect(out).toContain('.darkness { --bg:#fffaf7; }')
+
+    const recolored = applyPaletteToHtml(doc, ['#e8543f'])
+    expect(recolored).toContain('--accent:#e8543f; }')
+    expect(recolored).toContain('--accent:#8888ff;')
+  })
+
   it('returns null for empty input', () => {
     expect(applyThemeToDocument('', THEME)).toBeNull()
     expect(applyThemeToDocument('<body>x</body>', null)).toBeNull()
