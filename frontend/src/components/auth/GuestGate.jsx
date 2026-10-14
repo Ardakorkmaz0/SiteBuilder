@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 
 // What a guest identity cannot do, in the words of the thing they just tried.
 // Kept here rather than at each call site so the answer is the same wherever
@@ -22,16 +23,19 @@ export default function GuestGateDialog({ action, onClose }) {
   const { t } = useLanguage()
   const navigate = useNavigate()
   useEscapeToClose(true, onClose)
+  const dialogRef = useInitialDialogFocus(true)
   return (
     <div
       className="studio-theme-surface studio-overlay fixed inset-0 z-[200] flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={t('An account is needed')}
-        className="w-full max-w-md overflow-hidden rounded-[var(--studio-radius-2xl)] border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] shadow-[var(--studio-shadow-lg)]"
+        className="w-full max-w-md overflow-hidden outline-none rounded-[var(--studio-radius-2xl)] border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] shadow-[var(--studio-shadow-lg)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="space-y-3 p-6">

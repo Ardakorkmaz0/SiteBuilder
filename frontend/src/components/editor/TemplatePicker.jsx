@@ -9,6 +9,7 @@ import { localizeTemplateHtml } from '../../utils/templateLocalization.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { EyeIcon, SearchIcon, StarIcon } from '../icons.jsx'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 
 const DESIGN_W = 1200
 const DESIGN_H = 860
@@ -78,6 +79,7 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
   const [pagination, setPagination] = useState({ key: '', count: INITIAL_VISIBLE_TEMPLATES })
   useEscapeToClose(open, onClose)
   useEscapeToClose(open && !!preview, () => setPreview(null))
+  const dialogRef = useInitialDialogFocus(open)
 
   if (!open) return null
 
@@ -150,10 +152,12 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
   return (
     <div className="studio-theme-surface studio-overlay fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="template-gallery-title"
-        className="flex h-[min(52rem,calc(100dvh-1rem))] w-full max-w-6xl flex-col overflow-hidden rounded-[var(--studio-radius-2xl)] border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] shadow-[var(--studio-shadow-lg)] sm:h-[min(52rem,calc(100dvh-2rem))]"
+        className="flex outline-none h-[min(52rem,calc(100dvh-1rem))] w-full max-w-6xl flex-col overflow-hidden rounded-[var(--studio-radius-2xl)] border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] shadow-[var(--studio-shadow-lg)] sm:h-[min(52rem,calc(100dvh-2rem))]"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="shrink-0 border-b border-[var(--studio-border)] bg-[var(--studio-panel-raised)]">

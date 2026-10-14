@@ -15,6 +15,7 @@ import { useLanguage } from '../../i18n/useLanguage.js'
 import { aiErrorText } from '../../utils/aiErrorText.js'
 import { aiProviderReady } from '../../utils/aiProviders.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 
 const STEPS = ['Type', 'About', 'Style', 'Sections']
 
@@ -98,6 +99,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
 
   // `close` also abandons a generation in flight, so Esc does what ✕ does.
   useEscapeToClose(open, () => close())
+  const dialogRef = useInitialDialogFocus(open)
 
   if (!open) return null
 
@@ -182,7 +184,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
 
   return (
     <div className="studio-theme-surface studio-overlay fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6">
-      <div role="dialog" aria-modal="true" aria-labelledby="ai-wizard-title" className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--studio-border)] bg-[var(--studio-panel)] text-[var(--studio-text)] shadow-2xl">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="ai-wizard-title" className="flex outline-none max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--studio-border)] bg-[var(--studio-panel)] text-[var(--studio-text)] shadow-2xl">
         {/* Header */}
         <div className="flex shrink-0 items-center gap-3 border-b border-[#e5e7eb] px-5 py-3">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--studio-accent)] text-white">

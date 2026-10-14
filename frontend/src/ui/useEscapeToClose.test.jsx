@@ -61,6 +61,77 @@ describe('useEscapeToClose', () => {
   })
 })
 
+function CodeDialog({ open, onClose = () => {} }) {
+  useEscapeToClose(open, onClose)
+  return open ? <div role="dialog"><button type="button" autoFocus>Copy</button></div> : null
+}
+
+function Toolbar({ open, withOpener = true }) {
+  return (
+    <>
+      {withOpener && <button type="button">Code</button>}
+      <input aria-label="Search" />
+      <CodeDialog open={open} />
+    </>
+  )
+}
+
+describe('closing a dialog', () => {
+  it('gives focus back to what opened it', () => {
+    const { getByRole, rerender } = render(<Toolbar open={false} />)
+    getByRole('button', { name: 'Code' }).focus()
+
+    rerender(<Toolbar open />)
+    expect(document.activeElement).toBe(getByRole('button', { name: 'Copy' }))
+    rerender(<Toolbar open={false} />)
+
+    expect(document.activeElement).toBe(getByRole('button', { name: 'Code' }))
+  })
+
+  it('leaves focus where the close put it on purpose', () => {
+    const { getByRole, rerender } = render(<Toolbar open={false} />)
+    getByRole('button', { name: 'Code' }).focus()
+    rerender(<Toolbar open />)
+
+    getByRole('textbox', { name: 'Search' }).focus()
+    rerender(<Toolbar open={false} />)
+
+    expect(document.activeElement).toBe(getByRole('textbox', { name: 'Search' }))
+  })
+
+  it('comes back to the menu button when the dialog came from a menu item', () => {
+    function Menu({ menuOpen, dialogOpen }) {
+      return (
+        <>
+          <button type="button">More</button>
+          {menuOpen && <div role="menu"><button type="button" role="menuitem">Settings</button></div>}
+          <CodeDialog open={dialogOpen} />
+        </>
+      )
+    }
+    const { getByRole, rerender } = render(<Menu menuOpen={false} dialogOpen={false} />)
+    getByRole('button', { name: 'More' }).focus()
+    rerender(<Menu menuOpen dialogOpen={false} />)
+    getByRole('menuitem', { name: 'Settings' }).focus()
+
+    rerender(<Menu menuOpen={false} dialogOpen />)
+    rerender(<Menu menuOpen={false} dialogOpen={false} />)
+
+    expect(document.activeElement).toBe(getByRole('button', { name: 'More' }))
+  })
+
+  it('leaves focus alone when nothing had it as the dialog opened', () => {
+    const { getByRole, rerender } = render(<Toolbar open={false} />)
+    getByRole('button', { name: 'Code' }).focus()
+    getByRole('button', { name: 'Code' }).blur()
+    rerender(<Toolbar open />)
+
+    rerender(<Toolbar open={false} withOpener={false} />)
+
+    expect(document.activeElement).toBe(document.body)
+  })
+})
+
 describe('the AI wizard', () => {
   it('closes on Esc, as a dialog', () => {
     localStorage.setItem('pwb_language', 'en')
