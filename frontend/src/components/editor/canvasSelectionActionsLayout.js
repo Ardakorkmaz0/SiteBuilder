@@ -88,8 +88,18 @@ export function selectionActionsPosition({
   const canPlaceAbove = aboveTop >= edge
   const canPlaceBelow = belowTop + height <= safeCanvasHeight - edge
 
-  if (canPlaceAbove || !canPlaceBelow) {
-    return { left: Math.round(left), top: Math.round(Math.max(edge, aboveTop)), placement: 'above' }
+  if (canPlaceAbove) {
+    return { left: Math.round(left), top: Math.round(aboveTop), placement: 'above' }
   }
-  return { left: Math.round(left), top: Math.round(belowTop), placement: 'below' }
+  // No room above (a section at the top of the page): a tall element holds
+  // the bar inside its own top edge. Below it, the bar sat over the NEXT
+  // block and hid its top edge, which was then hard to click.
+  const insideTop = y + gap
+  if (targetH >= height * 2 + gap * 2) {
+    return { left: Math.round(left), top: Math.round(insideTop), placement: 'inside' }
+  }
+  if (canPlaceBelow) {
+    return { left: Math.round(left), top: Math.round(belowTop), placement: 'below' }
+  }
+  return { left: Math.round(left), top: Math.round(Math.max(edge, aboveTop)), placement: 'above' }
 }

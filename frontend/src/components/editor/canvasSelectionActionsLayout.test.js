@@ -49,6 +49,20 @@ describe('selection action bar placement', () => {
       targetHeight: 44,
     })).toEqual({ left: 8, top: 56, placement: 'below' })
   })
+
+  it('sits inside the top edge of a tall element at the top, not over the block below it', () => {
+    const position = selectionActionsPosition({
+      canvasWidth: 1000,
+      canvasHeight: 900,
+      targetX: 0,
+      targetY: 0,
+      targetWidth: 1000,
+      targetHeight: 375,
+    })
+    expect(position.placement).toBe('inside')
+    expect(position.top).toBeGreaterThan(0)
+    expect(position.top).toBeLessThan(375 / 2)
+  })
 })
 
 // How the bar is counter-scaled is a positioning question, not a cosmetic one.
