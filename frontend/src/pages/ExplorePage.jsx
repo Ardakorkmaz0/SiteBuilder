@@ -5,6 +5,7 @@ import { cloneSite, listSites } from '../api/sites.js'
 import { pinSite } from '../api/admin.js'
 import { useAuthStore } from '../store/authStore.js'
 import { apiError } from '../utils/errors.js'
+import { GUEST_SITE_LIMIT, useGuestGate } from '../utils/useGuestGate.jsx'
 import { orderSites } from '../utils/siteSort.js'
 import { forgetScroll, useScrollRestore } from '../utils/useScrollRestore.js'
 import ExploreCard from '../components/dashboard/ExploreCard.jsx'
@@ -87,7 +88,13 @@ export default function ExplorePage() {
   const displayName = user?.display_name || user?.username || t('Creator')
   const lastEdited = latestSite ? formattedDate(latestSite.updated_at, language) : ''
 
+  // A guest at the site limit is told what an account changes, with the way to
+  // one, instead of a line of red text — and before filling in three wizard
+  // steps for a site the server will not make.
+  const { isGuest, gate: guestGate, dialog: guestDialog } = useGuestGate()
+
   function openCreate(event) {
+    if (isGuest && ownSites.length >= GUEST_SITE_LIMIT && guestGate('limit')) return
     const trigger = event.currentTarget
     const { left, top, width, height } = trigger.getBoundingClientRect()
     setCreateOrigin({ left, top, width, height, trigger })
@@ -209,8 +216,9 @@ export default function ExplorePage() {
       const copy = await cloneSite(site.slug)
       navigate(`/editor/${copy.id}`)
     } catch (requestError) {
-      setError(apiError(requestError))
       setRemixingId(null)
+      if (requestError?.response?.data?.code === 'guest_forbidden' && guestGate('limit')) return
+      setError(apiError(requestError))
     }
   }
 
@@ -422,6 +430,7 @@ export default function ExplorePage() {
         onClose={() => setCreateOpen(false)}
         onCreated={(site) => navigate(`/editor/${site.id}`)}
       />
+      {guestDialog}
     </div>
   )
 }

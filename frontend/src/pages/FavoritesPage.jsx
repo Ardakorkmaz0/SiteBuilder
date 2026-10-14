@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { listFavorites, addFavorite, removeFavorite } from '../api/explore.js'
 import { cloneSite } from '../api/sites.js'
 import { apiError } from '../utils/errors.js'
+import { useGuestGate } from '../utils/useGuestGate.jsx'
 import { useScrollRestore } from '../utils/useScrollRestore.js'
 import DashboardHeader from '../components/dashboard/DashboardHeader.jsx'
 import DashboardSearch from '../components/dashboard/DashboardSearch.jsx'
@@ -71,6 +72,10 @@ export default function FavoritesPage() {
     }
   }
 
+  // A guest at the site limit is told what an account changes, with the way to
+  // one, instead of a line of red text.
+  const { gate: guestGate, dialog: guestDialog } = useGuestGate()
+
   async function onRemix(site) {
     if (remixingId) return
     setRemixingId(site.id)
@@ -79,8 +84,9 @@ export default function FavoritesPage() {
       const copy = await cloneSite(site.slug)
       navigate(`/editor/${copy.id}`)
     } catch (e) {
-      setError(apiError(e))
       setRemixingId(null)
+      if (e?.response?.data?.code === 'guest_forbidden' && guestGate('limit')) return
+      setError(apiError(e))
     }
   }
 
@@ -163,6 +169,7 @@ export default function FavoritesPage() {
         )}
         </section>
       </main>
+      {guestDialog}
     </div>
   )
 }

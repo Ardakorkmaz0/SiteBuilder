@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { addFavorite, listExplore, removeFavorite } from '../api/explore.js'
-import { listSites } from '../api/sites.js'
+import { cloneSite, listSites } from '../api/sites.js'
 import LanguageProvider from '../i18n/LanguageProvider.jsx'
 import ExplorePage from './ExplorePage.jsx'
 import { useAuthStore } from '../store/authStore.js'
@@ -110,5 +110,31 @@ describe('ExplorePage feed recovery', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Feed unavailable')
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(screen.queryByText('Nothing here yet')).not.toBeInTheDocument()
+  })
+})
+
+describe('ExplorePage templates', () => {
+  it('tells a guest at the site limit what an account changes, not a line of red text', async () => {
+    useAuthStore.setState({ user: { id: 300, username: 'guest-x7k2m4pq', is_guest: true }, token: 'guest-session' })
+    vi.mocked(cloneSite).mockReset().mockRejectedValue({
+      response: { status: 403, data: { code: 'guest_forbidden', action: 'site_limit', detail: 'Create an account to make more sites — the ones you have are kept.' } },
+    })
+    render(<LanguageProvider><MemoryRouter><ExplorePage /></MemoryRouter></LanguageProvider>)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Use as template' }))
+
+    expect(await screen.findByRole('dialog', { name: 'An account is needed' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('says so before the new-site wizard when a guest already keeps three sites', async () => {
+    useAuthStore.setState({ user: { id: 300, username: 'guest-x7k2m4pq', is_guest: true }, token: 'guest-session' })
+    vi.mocked(listSites).mockResolvedValue([1, 2, 3].map((id) => ({ id, title: `Site ${id}`, slug: `site-${id}`, updated_at: '2026-10-01T10:00:00Z' })))
+    render(<LanguageProvider><MemoryRouter><ExplorePage /></MemoryRouter></LanguageProvider>)
+    await screen.findByText('Site 1')
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Create new site' })[0])
+
+    expect(await screen.findByRole('dialog', { name: 'An account is needed' })).toBeInTheDocument()
   })
 })
