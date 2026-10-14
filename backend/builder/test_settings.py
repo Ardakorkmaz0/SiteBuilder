@@ -39,7 +39,8 @@ class TestPublicConfig:
         s.save()
         resp = client.get('/api/public/config/')
         assert resp.status_code == 200
-        assert resp.data == {'google_client_id': 'db-client-id', 'recaptcha_site_key': 'db-site-key'}
+        assert resp.data['google_client_id'] == 'db-client-id'
+        assert resp.data['recaptcha_site_key'] == 'db-site-key'
 
     def test_falls_back_to_env(self, client, settings):
         settings.GOOGLE_OAUTH_CLIENT_ID = 'env-client-id'

@@ -38,6 +38,7 @@ from django.db.models.functions import TruncDate
 
 from . import runtime_config
 from .api_errors import error_response
+from .ai_policy import local_ai_available, provider_refusal, public_ai_policy
 from .access import SHARE_OPEN, SHARE_PRIVATE, is_public, is_reachable, public_sites, share_access
 from .accounts import normalise_username
 from .models import (
@@ -143,14 +144,20 @@ def _local_ai_blocked():
     public (DEBUG=False) server they'd be an SSRF hole — an attacker could make
     the server fetch arbitrary internal URLs (e.g. cloud metadata). They're also
     useless in prod: the server can't reach a visitor's localhost Ollama. So we
-    hard-disable them outside DEBUG. Returns a 403 Response when blocked, else
-    None (dev → proceed)."""
-    if settings.DEBUG:
-        return None
-    return Response(
-        {'detail': 'Local AI is only available when running the app on your own machine.'},
-        status=status.HTTP_403_FORBIDDEN,
-    )
+    hard-disable them outside DEBUG — and when the superadmin switched the
+    provider (or the whole assistant) off. Returns a 403 Response when blocked,
+    else None (dev → proceed)."""
+    if not local_ai_available():
+        return Response(
+            {'detail': 'Local AI is only available when running the app on your own machine.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    refusal = provider_refusal('local')
+    if refusal:
+        return Response(
+            {'detail': refusal, 'code': 'ai_provider_disabled'}, status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
 
 
 def _signed_in(user):
@@ -1267,6 +1274,7 @@ class PublicConfigView(APIView):
         return Response({
             'google_client_id': runtime_config.google_client_id(),
             'recaptcha_site_key': runtime_config.recaptcha_site_key(),
+            'ai': public_ai_policy(),
         })
 
 

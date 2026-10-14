@@ -32,6 +32,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from .ai_policy import provider_refusal
+
 NVIDIA_CHAT_URL = 'https://integrate.api.nvidia.com/v1/chat/completions'
 NVIDIA_MODELS_URL = 'https://integrate.api.nvidia.com/v1/models'
 
@@ -81,6 +83,15 @@ def _error(message, http_status, **extra):
     return Response({'error': {'message': message, **extra}}, status=http_status)
 
 
+def _switched_off():
+    """The superadmin's switch (ai_policy): an editor tab opened before NVIDIA
+    was switched off must not keep using it."""
+    refusal = provider_refusal('nvidia')
+    if refusal is None:
+        return None
+    return _error(refusal, status.HTTP_403_FORBIDDEN, code='ai_provider_disabled')
+
+
 def _take_slot(user_id):
     """Reserve a place for this call. Returns the cache keys to release, or
     None when the relay is full or this account already has a call running."""
@@ -108,6 +119,9 @@ class NvidiaChatRelayView(APIView):
     throttle_scope = 'ai_relay'
 
     def post(self, request):
+        refused = _switched_off()
+        if refused is not None:
+            return refused
         body = request.data.copy() if isinstance(request.data, dict) else None
         if body is None:
             return _error('The request must be a JSON object.', status.HTTP_400_BAD_REQUEST)
@@ -210,6 +224,9 @@ class NvidiaModelsRelayView(APIView):
     throttle_scope = 'ai_relay'
 
     def get(self, request):  # noqa: ARG002
+        refused = _switched_off()
+        if refused is not None:
+            return refused
         cached = cache.get('ai_relay:nvidia:models')
         if cached is not None:
             return Response({'ok': True, 'models': cached})
