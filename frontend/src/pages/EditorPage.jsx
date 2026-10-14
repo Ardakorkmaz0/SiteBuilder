@@ -113,6 +113,7 @@ import {
 import { localizeTemplateHtml } from '../utils/templateLocalization.js'
 import { useLanguage } from '../i18n/useLanguage.js'
 import { useUiTheme } from '../ui/useUiTheme.js'
+import { useEscapeToClose } from '../ui/useEscapeToClose.js'
 import MobileEditorPreview from '../components/editor/MobileEditorPreview.jsx'
 import SiteControlCenter from '../components/editor/SiteControlCenter.jsx'
 
@@ -493,6 +494,7 @@ function SiteEditor() {
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPanelLayout, setAiPanelLayout] = useState(readAiPanelLayout)
   const [moreOpen, setMoreOpen] = useState(false)
+  useEscapeToClose(moreOpen, () => setMoreOpen(false))
   const [tourOpen, setTourOpen] = useState(false)
   // Text typed into an HTML page that is not an undo step yet (it becomes one
   // at the next action). Undo takes it back, so Undo must not look dead.

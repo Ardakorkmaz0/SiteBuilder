@@ -111,6 +111,7 @@ export default function PublicToolbar({
   const [reported, setReported] = useState(false)
   const [reportError, setReportError] = useState('')
   const [moreOpen, setMoreOpen] = useState(false)
+  useEscapeToClose(moreOpen, () => setMoreOpen(false))
   const navigate = useNavigate()
   const goBack = useGoBack('/')
   const token = useAuthStore((s) => s.token)
