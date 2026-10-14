@@ -23,6 +23,7 @@ import HtmlElementPanel from '../components/editor/HtmlElementPanel.jsx'
 import CodeFileEditor from '../components/editor/CodeFileEditor.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useEscapeToClose } from '../ui/useEscapeToClose.js'
 
 // Slim strip shown when a side rail is collapsed (mirrors the editor's).
 function CollapsedRail({ side, label, onOpen }) {
@@ -129,6 +130,7 @@ export default function CodeProjectPage() {
   // ● Live setup helper: detected dev-server candidates + whether the URL is up.
   const [detected, setDetected] = useState(null)
   const [detectOpen, setDetectOpen] = useState(false)
+  useEscapeToClose(detectOpen, () => setDetectOpen(false))
   const [detecting, setDetecting] = useState(false)
   const [liveUp, setLiveUp] = useState(false)
   // What kind of project this is, so the editor can set expectations up front:

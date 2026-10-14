@@ -144,4 +144,16 @@ describe('BrowserFrame', () => {
     if (previousDescriptor) Object.defineProperty(document, 'fullscreenElement', previousDescriptor)
     else delete document.fullscreenElement
   })
+
+  it('closes its menu on Esc and puts the keyboard back on the menu button', async () => {
+    const user = userEvent.setup()
+    renderFrame()
+
+    await user.click(screen.getByRole('button', { name: 'Browser menu' }))
+    expect(screen.getByRole('menuitem', { name: 'Enter full screen' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('menuitem', { name: 'Enter full screen' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Browser menu' })).toHaveFocus()
+  })
 })
