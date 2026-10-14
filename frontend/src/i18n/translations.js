@@ -3152,6 +3152,7 @@ export const TURKISH_TRANSLATIONS = {
   'Submission not found.': 'Gönderim bulunamadı.',
   "A superuser's rights can't be changed here.": 'Süper yöneticinin yetkileri buradan değiştirilemez.',
   'Pick a colour: {label}': 'Renk seç: {label}',
+  'Close notes': 'Notları kapat',
 }
 
 // Editor-only libraries (the section blocks and component variants) carry

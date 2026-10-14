@@ -119,6 +119,13 @@ export default function HistoryPanel({
       className="studio-theme-surface fixed right-2 top-[60px] z-[115] flex h-[calc(100vh-68px)] max-h-[720px] w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-2xl border border-[var(--studio-border-strong)] bg-[var(--studio-panel)] sm:right-4 sm:top-[68px] sm:h-[calc(100vh-84px)] sm:w-[440px]"
       style={{ boxShadow: 'var(--studio-shadow-menu)' }}
       onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        // A panel beside the work, not a dialog: Esc from inside it closes it;
+        // Esc on the canvas still clears the selection while it stays open.
+        if (e.key !== 'Escape' || e.nativeEvent.isComposing) return
+        e.stopPropagation()
+        onClose?.()
+      }}
     >
       <div className="flex min-h-[60px] items-center gap-2.5 border-b border-[var(--studio-border)] bg-[var(--studio-panel-raised)] px-3 py-2.5">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--studio-border)] bg-[var(--studio-control)] text-[var(--studio-text-muted)]">
