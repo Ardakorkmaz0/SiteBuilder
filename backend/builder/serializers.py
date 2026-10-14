@@ -7,6 +7,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ErrorDetail
 
 from .access import DAILY_PUBLISH_LIMIT, publish_blocked
+from .ai_policy import AI_PROVIDER_IDS, MAX_HIDDEN_MODELS, MODEL_ID_RE, local_ai_available
 from .accounts import normalise_email, normalise_username
 from .guests import GUEST_SITE_LIMIT, GUEST_USERNAME_PREFIX, is_guest
 from .models import (
@@ -307,6 +308,8 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
     )
     recaptcha_secret_set = serializers.SerializerMethodField()
     email_password_set = serializers.SerializerMethodField()
+    # Whether this server can offer the local runtime at all (see ai_policy).
+    ai_local_available = serializers.SerializerMethodField()
 
     class Meta:
         model = SiteSettings
@@ -314,9 +317,45 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             'google_oauth_client_id', 'recaptcha_site_key', 'recaptcha_secret_key',
             'email_host', 'email_port', 'email_host_user', 'email_host_password',
             'email_use_tls', 'default_from_email', 'frontend_url',
-            'recaptcha_secret_set', 'email_password_set', 'updated_at',
+            'ai_enabled', 'ai_disabled_providers', 'ai_hidden_models', 'ai_default_provider', 'ai_notice',
+            'recaptcha_secret_set', 'email_password_set', 'ai_local_available', 'updated_at',
         )
         read_only_fields = ('updated_at',)
+
+    def get_ai_local_available(self, obj):  # noqa: ARG002
+        return local_ai_available()
+
+    def validate_ai_disabled_providers(self, value):
+        if not isinstance(value, list) or not all(isinstance(p, str) for p in value):
+            raise serializers.ValidationError('A list of provider ids is required.')
+        unknown = [p for p in value if p not in AI_PROVIDER_IDS]
+        if unknown:
+            raise serializers.ValidationError(f'Unknown provider: {unknown[0]}')
+        return [p for p in AI_PROVIDER_IDS if p in value]
+
+    def validate_ai_hidden_models(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('An object of provider id → model ids is required.')
+        cleaned = {}
+        for provider, models in value.items():
+            if provider not in AI_PROVIDER_IDS:
+                raise serializers.ValidationError(f'Unknown provider: {provider}')
+            if not isinstance(models, list) or len(models) > MAX_HIDDEN_MODELS:
+                raise serializers.ValidationError(f'At most {MAX_HIDDEN_MODELS} model ids per provider.')
+            ids = []
+            for model in models:
+                if not isinstance(model, str) or not MODEL_ID_RE.match(model):
+                    raise serializers.ValidationError(f'Not a model id: {model!r}'[:200])
+                if model not in ids:
+                    ids.append(model)
+            if ids:
+                cleaned[provider] = ids
+        return cleaned
+
+    def validate_ai_default_provider(self, value):
+        if value and value not in AI_PROVIDER_IDS:
+            raise serializers.ValidationError(f'Unknown provider: {value}')
+        return value
 
     def get_recaptcha_secret_set(self, obj):
         return bool(obj.recaptcha_secret_key)

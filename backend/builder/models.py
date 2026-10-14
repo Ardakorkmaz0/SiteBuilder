@@ -574,6 +574,14 @@ class SiteSettings(models.Model):
     default_from_email = models.CharField(max_length=255, blank=True, default='')
     # Where the SPA lives — used to build the password-reset link.
     frontend_url = models.CharField(max_length=255, blank=True, default='')
+    # The editor's AI assistant (see ai_policy.py): one switch for all of it,
+    # providers taken out of the list, suggested models hidden per provider,
+    # the provider a new user starts on, and a line shown in the AI panel.
+    ai_enabled = models.BooleanField(default=True)
+    ai_disabled_providers = models.JSONField(default=list, blank=True)
+    ai_hidden_models = models.JSONField(default=dict, blank=True)
+    ai_default_provider = models.CharField(max_length=32, blank=True, default='')
+    ai_notice = models.CharField(max_length=300, blank=True, default='')
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
