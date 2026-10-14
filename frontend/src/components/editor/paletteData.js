@@ -10,6 +10,7 @@ import { componentPresetProps, componentPresetStyles, presetsForType } from '../
 import { fieldSize, fieldSnippet } from '../../utils/formField.js'
 import { THEME_TOGGLE_CSS, themeToggleHtml } from '../../utils/themeToggle.js'
 import { turkishSnippet } from '../../utils/coreSnippetsTr.js'
+import { defaultPropsFor } from '../../utils/componentDefaults.js'
 
 // Form fields drop as real field components, every part editable, not as a
 // block of HTML only the code view could change. Their swatches and the HTML
@@ -20,12 +21,11 @@ const FIELD_TYPES = new Set(['input', 'select'])
 const FIELD_HTML_VARIANTS = new Set(['inline'])
 
 function fieldVariants(type) {
-  const base = registry[type]?.defaultProps || {}
   const presets = presetsForType(type)
   const list = presets.length ? presets : [{ id: 'default', label: 'Default' }]
   const native = list.map((preset) => {
-    const props = { ...base, ...(componentPresetProps(type, preset.id, 'en') || {}) }
-    const propsTr = { ...base, ...(componentPresetProps(type, preset.id, 'tr') || {}) }
+    const props = { ...defaultPropsFor(type, 'en'), ...(componentPresetProps(type, preset.id, 'en') || {}) }
+    const propsTr = { ...defaultPropsFor(type, 'tr'), ...(componentPresetProps(type, preset.id, 'tr') || {}) }
     const size = fieldSize(type, props)
     return {
       id: preset.id,

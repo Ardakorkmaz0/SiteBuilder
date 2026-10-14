@@ -44,6 +44,7 @@ import { TEMPLATES } from './aiTemplates.js'
 import { SYSTEM_PROMPT } from './aiSystemPrompt.js'
 import { aiSystemAddendum, getAiPreferences, temperatureFor } from './aiPreferences.js'
 import { loadAiPolicy } from './aiPolicy.js'
+import { DEFAULT_PROPS_TR } from './componentDefaults.js'
 
 // ---------------------------------------------------------------------------
 // Re-exports: stable public surface for AiBar / AiChatPanel / PropertiesPanel
@@ -276,6 +277,13 @@ function placeholderStrings() {
   for (const def of Object.values(registry)) {
     for (const [k, v] of Object.entries(def?.defaultProps || {})) {
       if (COPY_PROPS.includes(k)) add(v)
+    }
+  }
+  // The Turkish starting copy is filler just the same.
+  for (const props of Object.values(DEFAULT_PROPS_TR)) {
+    for (const [k, v] of Object.entries(props)) {
+      if (COPY_PROPS.includes(k)) add(v)
+      if (k === 'links' && Array.isArray(v)) v.forEach((l) => add(l?.label))
     }
   }
   for (const tpl of Object.values(TEMPLATES)) {
