@@ -809,7 +809,7 @@ export function HtmlContentControl({ label, value, onChange, pages = [] }) {
               {fields.texts.map((field) => (
                 <LabeledTextarea
                   key={`text-${field.path}`}
-                  label={t(field.label)}
+                  label={field.labelKey ? t(field.labelKey, field.labelVars) : t(field.label)}
                   value={field.text}
                   rows={2}
                   onChange={(text) => onChange(updateHtmlTextAtPath(code, field.path, text))}

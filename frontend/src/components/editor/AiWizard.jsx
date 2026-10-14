@@ -13,6 +13,7 @@ import {
 import { HTML_ALLOW, PUBLIC_HTML_SANDBOX, withViewportMeta } from '../../utils/htmlRuntime.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { aiErrorText } from '../../utils/aiErrorText.js'
+import { aiProviderReady } from '../../utils/aiProviders.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 const STEPS = ['Type', 'About', 'Style', 'Sections']
@@ -175,6 +176,9 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
   const noProvider = /No AI provider/i.test(typeof error === 'string' ? error : error.key)
   const canNext =
     step !== 1 || answers.brand.trim() || answers.description.trim()
+  // Said before the questions, not after them: without a key the last step
+  // could only end in an error.
+  const ready = aiProviderReady()
 
   return (
     <div className="studio-theme-surface studio-overlay fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6">
@@ -218,6 +222,20 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
 
         {/* Body */}
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          {phase === 'form' && !ready && (
+            <div role="status" className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--studio-border)] bg-[var(--studio-warning-soft)] px-3 py-2 text-xs text-[var(--studio-warning)]">
+              <span className="min-w-0 flex-1">
+                {t('The wizard needs an AI key to build your site. Add a free key in the AI settings (the AI button at the top), or start from a ready-made template.')}
+              </span>
+              <button
+                type="button"
+                onClick={() => { close(); onOpenTemplates?.() }}
+                className="shrink-0 rounded-lg border border-current px-2 py-1 font-semibold"
+              >
+                {t('Browse templates')}
+              </button>
+            </div>
+          )}
           {phase === 'form' && step === 0 && (
             <>
               <h3 className="mb-3 text-sm font-semibold text-[#111827]">{t('What kind of site is this?')}</h3>
@@ -461,7 +479,9 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
               <button
                 type="button"
                 onClick={generate}
-                className="rounded-lg bg-[var(--studio-accent)] px-5 py-2 text-sm font-bold text-white hover:bg-[var(--studio-accent-fill-hover)]"
+                disabled={!ready}
+                title={ready ? '' : t('Add an AI key first')}
+                className="rounded-lg bg-[var(--studio-accent)] px-5 py-2 text-sm font-bold text-white hover:bg-[var(--studio-accent-fill-hover)] disabled:opacity-50"
               >
                 {t('✨ Generate my site')}
               </button>
