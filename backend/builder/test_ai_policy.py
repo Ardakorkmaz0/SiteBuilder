@@ -167,3 +167,29 @@ class TestTheSettingsPage:
     def test_only_a_superuser_may_change_them(self, member):
         assert member.put(SETTINGS, {'ai_enabled': False}, format='json').status_code == 403
         assert SiteSettings.load().ai_enabled is True
+
+
+@pytest.mark.django_db
+class TestThePublicConfigWithAStaleToken:
+    def test_a_token_that_no_longer_exists_does_not_take_the_config_away(self):
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Token 0000000000000000000000000000000000000000')
+        response = client.get(CONFIG)
+        assert response.status_code == 200
+        assert response.json()['ai']['enabled'] is True
+
+
+@pytest.mark.django_db
+class TestASlowLocalModel:
+    def test_running_out_of_time_is_an_answer_not_a_server_error(self, settings, monkeypatch):
+        from . import views
+
+        settings.DEBUG = True
+
+        def too_slow(request_or_url, timeout):
+            raise TimeoutError('timed out')
+
+        monkeypatch.setattr(views, '_open_local_ai', too_slow)
+        response = APIClient().post('/api/ai/local/proxy/', {'model': 'm', 'messages': []}, format='json')
+        assert response.status_code == 504
+        assert response.json()['error']['message'] == 'The local AI took too long to answer.'
