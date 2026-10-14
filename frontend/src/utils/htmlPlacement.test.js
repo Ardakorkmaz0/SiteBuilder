@@ -4,6 +4,8 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import {
   armDrag,
+  disarmMetaRefresh,
+  normalizeDocument,
   disarmDrag,
   closestPlaceableBlock,
   pageWrapper,
@@ -477,5 +479,22 @@ describe('serializeDocument keeps the document and drops the chrome', () => {
     applyMobileElementPatch(doc.querySelector('header'), { color: '#fff' })
     const html = serializeDocument(doc)
     expect((html.match(/@media \(max-width: 767px\)/g) || []).length).toBe(1)
+  })
+})
+
+describe('a page that redirects itself', () => {
+  it('stays put while it is edited, and redirects as written once saved', () => {
+    const page = '<!DOCTYPE html>\n<html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=https://example.com/"><title>x</title></head><body><p>Hi</p></body></html>'
+    const edited = disarmMetaRefresh(page)
+    expect(edited).not.toMatch(/\shttp-equiv=/)
+    const doc = new DOMParser().parseFromString(edited, 'text/html')
+    expect(doc.querySelector('meta[http-equiv]')).toBeNull()
+
+    const saved = serializeDocument(doc)
+    expect(saved).toContain('<meta http-equiv="refresh" content="0; url=https://example.com/">')
+    // Untouched, it reads back exactly as the page itself does: no false "unsaved".
+    expect(saved).toBe(normalizeDocument(page))
+    // Other http-equiv tags are left awake.
+    expect(disarmMetaRefresh('<meta http-equiv="X-UA-Compatible" content="IE=edge">')).toContain(' http-equiv="X-UA-Compatible"')
   })
 })

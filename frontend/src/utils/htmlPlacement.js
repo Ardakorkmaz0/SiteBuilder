@@ -395,9 +395,38 @@ export function disarmDrag(el) {
 
 // Serialize a (possibly live) document to an HTML string, stripping any
 // placement chrome so hover/flash hints never leak into the saved site.
+// A page that redirects itself (<meta http-equiv="refresh">) did so inside the
+// Edit frame too: the frame went off to the other address, or reloaded on a
+// timer, while the person was editing it. While it is edited the tag is put
+// to sleep under another attribute name; serializeDocument wakes it, so the
+// saved and published page still redirects as written. View mode is the page
+// as it runs, and keeps it.
+const SLEEPING_EQUIV = 'data-pwb-http-equiv'
+
+export function disarmMetaRefresh(html) {
+  return String(html || '').replace(
+    /(<meta\b[^>]*?\s)http-equiv(\s*=\s*["']?\s*refresh)/gi,
+    `$1${SLEEPING_EQUIV}$2`,
+  )
+}
+
+function rearmMetaRefresh(root) {
+  root.querySelectorAll(`meta[${SLEEPING_EQUIV}]`).forEach((meta) => {
+    // Rebuilt attribute by attribute, in their own order: an attribute added
+    // at the end serializes differently, and the untouched page would then
+    // read as an unsaved change.
+    const awake = meta.ownerDocument.createElement('meta')
+    for (const { name, value } of [...meta.attributes]) {
+      awake.setAttribute(name === SLEEPING_EQUIV ? 'http-equiv' : name, value)
+    }
+    meta.replaceWith(awake)
+  })
+}
+
 export function serializeDocument(doc) {
   if (!doc?.documentElement) return ''
   const root = doc.documentElement.cloneNode(true)
+  rearmMetaRefresh(root)
   root
     .querySelectorAll(`style[${CHROME_STYLE_ATTR}], style[${EDIT_CHROME_ATTR}]`)
     .forEach((el) => el.remove())
