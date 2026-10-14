@@ -21,7 +21,9 @@ import { useGuestGate } from '../../utils/useGuestGate.jsx'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 // Tab → why it needs an account, for the gate dialog.
-const GUEST_TABS = { inbox: 'inbox', analytics: 'analytics', domain: 'domain' }
+// The editor's Share button asks a guest for an account first; the Share tab
+// here let them straight in, to a panel whose every request is refused.
+const GUEST_TABS = { inbox: 'inbox', analytics: 'analytics', feedback: 'share_link', domain: 'domain' }
 
 const TABS = [
   ['readiness', 'Readiness'],
@@ -31,6 +33,14 @@ const TABS = [
   ['feedback', 'Share'],
   ['domain', 'Domain'],
 ]
+
+// A comment remembers the page it was written on by id; the owner knows the
+// page by its name. One the site no longer has is said to be deleted.
+function commentPageLabel(pages, pageId, translate) {
+  if (!pageId) return translate('General')
+  const page = (pages || []).find((item) => item?.id === pageId)
+  return page ? page.name || translate('Untitled page') : translate('(deleted page)')
+}
 
 function EmptyState({ children }) {
   return <div className="rounded-2xl border border-dashed border-[#d1d5db] px-5 py-10 text-center text-sm text-[var(--studio-text-muted)]">{children}</div>
@@ -261,7 +271,7 @@ export default function SiteControlCenter({
                   resort for a link that leaked. */}
               <SharePanel siteId={site.id} reviewUrl={reviewUrl} onCopy={copy} copied={copied} />
               <button type="button" onClick={resetReviewLink} className="text-xs font-semibold text-[var(--studio-danger)]">{t('Replace the link (the old one stops working)')}</button>
-              {!comments.length ? <EmptyState>{t('No client comments yet.')}</EmptyState> : comments.map((row) => <article key={row.id} className={`rounded-2xl border bg-white p-4 ${row.resolved ? 'opacity-60' : ''}`}><div className="flex justify-between gap-3"><div><strong className="text-sm">{row.author_name}</strong><div className="text-xs text-[var(--studio-text-faint)]">{row.author_email} · {row.page_id || t('General')}</div></div><button type="button" onClick={() => toggleComment(row)} className="text-xs font-semibold text-[#4f46e5]">{t(row.resolved ? 'Reopen' : 'Resolve')}</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#374151]">{row.body}</p></article>)}
+              {!comments.length ? <EmptyState>{t('No client comments yet.')}</EmptyState> : comments.map((row) => <article key={row.id} className={`rounded-2xl border bg-white p-4 ${row.resolved ? 'opacity-60' : ''}`}><div className="flex justify-between gap-3"><div><strong className="text-sm">{row.author_name}</strong><div className="text-xs text-[var(--studio-text-faint)]">{[row.author_email, commentPageLabel(schema.pages, row.page_id, t)].filter(Boolean).join(' · ')}</div></div><button type="button" onClick={() => toggleComment(row)} className="text-xs font-semibold text-[#4f46e5]">{t(row.resolved ? 'Reopen' : 'Resolve')}</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#374151]">{row.body}</p></article>)}
             </div>
           )}
 
