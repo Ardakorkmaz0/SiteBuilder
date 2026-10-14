@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useEditorStore } from '../../store/editorStore.js'
 import { pageFileName } from '../../utils/pageFiles.js'
+import { countLinksToPage } from '../../utils/pageLinks.js'
 import { FileIcon, FileCodeIcon, FolderIcon, LinkIcon, LayersIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 
@@ -164,7 +165,12 @@ export default function PageFilesPanel({
               type="button"
               title={t('Delete page')}
               onClick={() => {
-                if (window.confirm(t('Delete "{name}" ({file})?', { name: page.name, file: fname }))) deletePage(page.id)
+                // Links to it from the other pages stop working: say how many.
+                const links = countLinksToPage(pages, page.id, htmlMap)
+                const question = links
+                  ? t('Delete "{name}" ({file})? {count} link(s) on other pages lead to it and will stop working until you point them elsewhere.', { name: page.name, file: fname, count: links })
+                  : t('Delete "{name}" ({file})?', { name: page.name, file: fname })
+                if (window.confirm(question)) deletePage(page.id)
               }}
               className="rounded px-1 text-xs text-[#9ca3af] hover:bg-white hover:text-red-600"
             >
