@@ -48,13 +48,19 @@ say "Backend güncelleniyor"
 ssh "$HOST" "cd $REMOTE_APP && git pull --ff-only && sudo docker compose up -d --build"
 
 # --- 3. Arayüzü yükle -------------------------------------------------------
-# Önce eskisini siliyoruz: hash'li dosya adları biriktiği için silinmezse
-# /srv altı her dağıtımda büyür ve hangi sürümün canlı olduğu belirsizleşir.
+# Yeni paket eskisinin ÜSTÜNE açılır; eski parçalar hemen silinmez. Dağıtımdan
+# önce açılmış bir sekme, sonradan yüklenen parçaları (editör, sihirbaz, şablon
+# galerisi…) kendi eski adlarıyla ister. Eskiden hepsi silindiği için o sekme
+# "Bu ekranda bir sorun oluştu" ekranına düşüyordu: sunucu olmayan dosya yerine
+# index.html döndürüyor. Hash'li adlar çakışmaz; birikmesin diye yalnızca
+# KEEP_DAYS günden eski parçalar silinir. Hangi sürümün canlı olduğunu
+# index.html söyler (aşağıdaki doğrulama ona bakar).
+KEEP_DAYS="${SITEBUILDER_KEEP_ASSET_DAYS:-14}"
 say "Arayüz yükleniyor"
 cd "$ROOT/frontend"
 tar czf /tmp/sb-dist.tgz -C dist .
 scp -q /tmp/sb-dist.tgz "$HOST:/tmp/"
-ssh "$HOST" "sudo rm -rf $REMOTE_WEB/* && sudo tar xzf /tmp/sb-dist.tgz -C $REMOTE_WEB && rm /tmp/sb-dist.tgz"
+ssh "$HOST" "sudo tar xzf /tmp/sb-dist.tgz -C $REMOTE_WEB && sudo find $REMOTE_WEB/assets -type f -mtime +$KEEP_DAYS -delete && rm /tmp/sb-dist.tgz"
 rm -f /tmp/sb-dist.tgz
 
 # --- 4. CANLIDAN doğrula ----------------------------------------------------
