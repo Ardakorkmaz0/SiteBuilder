@@ -249,7 +249,7 @@ export default function SiteControlCenter({
             <div className="space-y-3">
               <div className="rounded-2xl border border-[color-mix(in_srgb,var(--studio-info)_30%,var(--studio-border))] bg-[var(--studio-info-soft)] p-4 text-sm text-[var(--studio-info)]">{t('Edit text and image descriptions without opening the design canvas. Changes remain undoable and are saved with the site.')}</div>
               {!contentEntries.length ? <EmptyState>{t('No editable content found.')}</EmptyState> : contentEntries.map((entry) => (
-                <label key={entry.id} className="block rounded-2xl border border-[#e5e7eb] bg-white p-4"><span className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-[var(--studio-text-muted)]"><span>{entry.pageName}</span><span>{entry.label}</span></span>{entry.value.length > 90 ? <textarea className="ms-input min-h-24" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} /> : <input className="ms-input" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} />}</label>
+                <label key={entry.id} className="block rounded-2xl border border-[#e5e7eb] bg-white p-4"><span className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-[var(--studio-text-muted)]"><span>{entry.pageName}</span><span>{entry.labelKey ? t(entry.labelKey, entry.labelVars) : entry.label}</span></span>{entry.value.length > 90 ? <textarea className="ms-input min-h-24" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} /> : <input className="ms-input" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} />}</label>
               ))}
             </div>
           )}
