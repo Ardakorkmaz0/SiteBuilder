@@ -10,11 +10,12 @@
 // The one exception is a `relayed` provider (NVIDIA, which refuses browser
 // calls): its key passes through this app's server on the way, unstored, and
 // the panel says so instead of repeating the sentence above.
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useAuthStore } from '../../store/authStore.js'
 import {
   AI_PROVIDERS,
+  availableProviders,
   fetchLocalStatus,
   fetchNvidiaModels,
   getApiKey,
@@ -22,12 +23,23 @@ import {
   getModel,
   getModelsFor,
   getProvider,
+  isModelHidden,
   pickBestLocalModel,
   setApiKey,
   setEndpoint,
   setModel,
   setProvider,
+  testAiConnection,
 } from '../../utils/aiAssistant.js'
+import { useAiPolicy } from '../../utils/aiPolicy.js'
+import { aiErrorText } from '../../utils/aiErrorText.js'
+import {
+  AI_CONTENT_LANGUAGES,
+  AI_CREATIVITY,
+  MAX_INSTRUCTIONS,
+  getAiPreferences,
+  setAiPreferences,
+} from '../../utils/aiPreferences.js'
 
 const FIELD =
   'w-full rounded-lg border border-[var(--studio-border-strong)] bg-[var(--studio-panel)] px-2 py-1 text-sm text-[var(--studio-text)] focus:bg-[var(--studio-control)] focus:outline-none'
@@ -116,8 +128,131 @@ function ReadyBanner({ ready, provider, model }) {
   )
 }
 
+// How the assistant behaves, the way a chat app lets you set it: the language
+// it writes in, how free it is, standing instructions, and whether it may move
+// to another provider when one is out of quota. Saved as it changes.
+function BehaviourSettings() {
+  const { t } = useLanguage()
+  const [prefs, setPrefs] = useState(() => getAiPreferences())
+  const change = (patch) => setPrefs(setAiPreferences(patch))
+  const creativity = AI_CREATIVITY.find((c) => c.id === prefs.creativity) || AI_CREATIVITY[1]
+  // Hints sit outside the labels and are linked to their field, so a field's
+  // name stays short for a screen reader and the hint is read after it.
+  const id = useId()
+  return (
+    <div className="space-y-3 border-t border-[var(--studio-border)] pt-3">
+      <h4 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--studio-text-muted)]">{t('Behaviour')}</h4>
+      <div>
+        <label htmlFor={`${id}-lang`} className={FIELD_LABEL}>{t('Language of the site copy')}</label>
+        <select id={`${id}-lang`} aria-describedby={`${id}-lang-hint`} value={prefs.contentLanguage} onChange={(e) => change({ contentLanguage: e.target.value })} className={FIELD}>
+          {AI_CONTENT_LANGUAGES.map((l) => <option key={l.id} value={l.id}>{t(l.label)}</option>)}
+        </select>
+        <span id={`${id}-lang-hint`} className={HINT}>
+          {prefs.contentLanguage === 'auto'
+            ? t('Written in the language you ask in. Changes to a page keep the language its text is already in. Replies come in the language of the editor.')
+            : t('Every text the AI writes for visitors is in this language, unless a request asks for another.')}
+        </span>
+      </div>
+      <div>
+        <span className={FIELD_LABEL}>{t('Creativity')}</span>
+        <div className="studio-segment" role="radiogroup" aria-label={t('Creativity')} aria-describedby={`${id}-creativity-hint`}>
+          {AI_CREATIVITY.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="radio"
+              aria-checked={prefs.creativity === c.id}
+              onClick={() => change({ creativity: c.id })}
+              className={prefs.creativity === c.id ? 'studio-segment-btn studio-segment-btn-active flex-1' : 'studio-segment-btn flex-1'}
+            >
+              {t(c.label)}
+            </button>
+          ))}
+        </div>
+        <span id={`${id}-creativity-hint`} className={HINT}>{t(creativity.hint)}</span>
+      </div>
+      <div>
+        <label htmlFor={`${id}-instructions`} className={FIELD_LABEL}>{t('Standing instructions')}</label>
+        <textarea
+          id={`${id}-instructions`}
+          aria-describedby={`${id}-instructions-hint`}
+          value={prefs.instructions}
+          onChange={(e) => change({ instructions: e.target.value })}
+          maxLength={MAX_INSTRUCTIONS}
+          rows={3}
+          placeholder={t('e.g. Use a warm, informal tone. My business is a bakery in Izmir. Never use the word "cheap".')}
+          className={`${FIELD} resize-y`}
+        />
+        <span id={`${id}-instructions-hint`} className={HINT}>
+          {t('Sent with every request, like custom instructions in a chat app.')} {prefs.instructions.length}/{MAX_INSTRUCTIONS}
+        </span>
+      </div>
+      <div className="flex items-start gap-2 text-xs text-[var(--studio-text)]">
+        <input
+          id={`${id}-failover`}
+          type="checkbox"
+          checked={prefs.failover}
+          onChange={(e) => change({ failover: e.target.checked })}
+          aria-describedby={`${id}-failover-hint`}
+          className="mt-0.5 h-3.5 w-3.5"
+        />
+        <div>
+          <label htmlFor={`${id}-failover`}>{t('Switch to another provider when this one is out of quota')}</label>
+          <span id={`${id}-failover-hint`} className={HINT}>{t('Only providers you have a key for. Turn it off to always use the one chosen above.')}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// One tiny request to the chosen provider and model: does the key work, does
+// the model answer, and how fast.
+function ConnectionTest({ provider, model, apiKey }) {
+  const { t } = useLanguage()
+  const [state, setState] = useState(null) // null | 'testing' | { ok, ms, error }
+  const runRef = useRef(null)
+  useEffect(() => () => runRef.current?.abort(), [])
+  // A different provider, model or key is a different question.
+  const asked = `${provider}|${model}|${apiKey}`
+  const [answeredFor, setAnsweredFor] = useState('')
+  const shown = answeredFor === asked ? state : null
+  async function run() {
+    runRef.current?.abort()
+    const controller = new AbortController()
+    runRef.current = controller
+    setState('testing')
+    setAnsweredFor(asked)
+    const result = await testAiConnection(provider, { signal: controller.signal })
+    if (controller.signal.aborted) return
+    setState(result)
+  }
+  const tone = shown && shown !== 'testing' ? (shown.ok ? 'success' : 'danger') : null
+  return (
+    <div className="flex items-start gap-2">
+      <button
+        type="button"
+        onClick={run}
+        disabled={shown === 'testing'}
+        className="shrink-0 rounded-lg border border-[var(--studio-border-strong)] px-2 py-1 text-[11px] font-semibold text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)] disabled:cursor-wait disabled:opacity-60"
+      >
+        {shown === 'testing' ? t('Testing…') : t('Test connection')}
+      </button>
+      {tone && (
+        <span role="status" className="min-w-0 flex-1 text-[11px] leading-snug" style={{ color: `var(--studio-${tone})` }}>
+          {shown.ok
+            ? t('Working — answered in {seconds}s.', { seconds: (shown.ms / 1000).toFixed(1) })
+            : (aiErrorText(shown.error, t) || t('No answer.'))}
+        </span>
+      )}
+    </div>
+  )
+}
+
 export default function AiSettings({ showHeading = true }) {
   const { t } = useLanguage()
+  // The server's switches: re-render when they arrive or change.
+  const policy = useAiPolicy()
+  const offered = availableProviders()
   const [provider, setProviderState] = useState(() => getProvider())
   const [value, setValue] = useState(() => getApiKey(provider))
   const [reveal, setReveal] = useState(false)
@@ -133,7 +268,7 @@ export default function AiSettings({ showHeading = true }) {
   // the user has actually pulled with `ollama pull`) with our suggestions.
   // For other providers `models` stays the curated dropdown.
   const discoveredModels = (provider === 'local' && localStatus?.ok && Array.isArray(localStatus.models))
-    ? localStatus.models.map((id) => ({ id, label: id, note: '' }))
+    ? localStatus.models.filter((id) => !isModelHidden('local', id)).map((id) => ({ id, label: id, note: '' }))
     : []
   // NVIDIA's catalogue moves: our short list first, then everything it
   // offers right now, so a retired suggestion is never the only choice.
@@ -151,7 +286,7 @@ export default function AiSettings({ showHeading = true }) {
       ? [
           ...knownModels,
           ...nvidiaModels
-            .filter((id) => !knownModels.some((m) => m.id === id))
+            .filter((id) => !knownModels.some((m) => m.id === id) && !isModelHidden('nvidia', id))
             .map((id) => ({ id, label: id, note: '' })),
         ]
       : knownModels
@@ -223,6 +358,26 @@ export default function AiSettings({ showHeading = true }) {
     if (providerInfo?.configurableEndpoint) setEndpoint(endpoint, provider)
   }, [endpoint, provider, providerInfo?.configurableEndpoint])
   const modelLabel = models.find((m) => m.id === model)?.label.replace(' (recommended)', '') || model
+  // Switched off on the server since this panel opened: show the provider the
+  // editor actually uses now.
+  if (offered.length && !offered.some((p) => p.id === provider)) {
+    const next = getProvider()
+    if (next !== provider) pickProvider(next)
+  }
+  if (!offered.length) {
+    return (
+      <section className="space-y-3">
+        {showHeading && (
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--studio-text-muted)]">
+            {t('AI Assistant')}
+          </h3>
+        )}
+        <p className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-control)] p-2 text-xs text-[var(--studio-text-muted)]">
+          {policy.notice || t('The AI assistant is switched off on this server.')}
+        </p>
+      </section>
+    )
+  }
   return (
     <section className="space-y-3">
       {showHeading && (
@@ -238,7 +393,7 @@ export default function AiSettings({ showHeading = true }) {
       <label className="block">
         <span className={FIELD_LABEL}>{t('Provider')}</span>
         <select value={provider} onChange={(e) => pickProvider(e.target.value)} className={FIELD}>
-          {AI_PROVIDERS.map((p) => (
+          {offered.map((p) => (
             <option key={p.id} value={p.id}>
               {t(p.label)}
             </option>
@@ -348,11 +503,13 @@ export default function AiSettings({ showHeading = true }) {
               ))}
             </datalist>
             <span className={HINT}>
-              {t(models.find((m) => m.id === model)?.note || (
-                provider === 'local'
-                  ? 'Type any model you have pulled with Ollama or loaded in LM Studio.'
-                  : 'Pick one from the list, or type any model id this provider offers.'
-              ))}
+              {isModelHidden(provider, model)
+                ? t('This model is switched off on this server. Pick another one.')
+                : t(models.find((m) => m.id === model)?.note || (
+                  provider === 'local'
+                    ? 'Type any model you have pulled with Ollama or loaded in LM Studio.'
+                    : 'Pick one from the list, or type any model id this provider offers.'
+                ))}
             </span>
           </>
         ) : (
@@ -372,6 +529,8 @@ export default function AiSettings({ showHeading = true }) {
           </>
         )}
       </label>
+      {(!needsKey || value) && <ConnectionTest provider={provider} model={model} apiKey={value} />}
+      <BehaviourSettings />
     </section>
   )
 }

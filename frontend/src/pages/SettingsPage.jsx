@@ -4,6 +4,7 @@ import { getSettings, updateSettings } from '../api/admin.js'
 import { apiError } from '../utils/errors.js'
 import { useGoBack } from '../utils/useGoBack.js'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
+import AdminAiSettings from '../components/admin/AdminAiSettings.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
 
 // Superuser-only runtime settings: Google sign-in, reCAPTCHA, SMTP email, and the
@@ -100,7 +101,7 @@ export default function SettingsPage() {
       <main className="mx-auto max-w-3xl px-6 py-10">
         <h1 className="text-2xl font-semibold text-[var(--studio-text)]">{t('Server settings')}</h1>
         <p className="mb-6 mt-1 text-sm text-[var(--studio-text-muted)]">
-          {t("Configure Google sign-in, reCAPTCHA and email here instead of editing the server's env file. A blank field falls back to the server environment. Infrastructure (secret key, database, allowed hosts) stays in env by design.")}
+          {t("Configure the AI assistant, Google sign-in, reCAPTCHA and email here instead of editing the server's env file. A blank field falls back to the server environment. Infrastructure (secret key, database, allowed hosts) stays in env by design.")}
         </p>
 
         {error && (
@@ -110,6 +111,9 @@ export default function SettingsPage() {
         {data === null && !error ? (
           <p className="text-sm text-[var(--studio-text-muted)]">{t('Loading…')}</p>
         ) : data ? (
+          <div className="space-y-6">
+          {/* Saves switch by switch, on its own: outside the form below. */}
+          <AdminAiSettings data={data} onSaved={setData} />
           <form onSubmit={onSave} className="space-y-6">
             <section className="ms-card space-y-4 p-6">
               <h2 className="text-base font-semibold text-[var(--studio-text)]">{t('Google sign-in')}</h2>
@@ -160,6 +164,7 @@ export default function SettingsPage() {
               {saved && <span className="text-sm font-medium text-[var(--studio-success)]">{t('Saved. Changes are live immediately.')}</span>}
             </div>
           </form>
+          </div>
         ) : null}
       </main>
     </div>

@@ -4,6 +4,7 @@ import { registry } from '../registry.jsx'
 import PanelTabs from './PanelTabs.jsx'
 import PanelGroup from './PanelGroup.jsx'
 import AiComponentEdit from './AiComponentEdit.jsx'
+import { useAiAvailable } from '../../utils/aiProviders.js'
 import { LINKABLE_TYPES } from '../renderer/constants.js'
 import { DEFAULT_THEME, FONT_OPTIONS, THEME_PRESETS, canvasFontFamily, hasOwnTheme, normalizeTheme, presetTheme, sameTheme } from '../../utils/theme.js'
 import SavedThemes, { ThemeSwatchButton } from './SavedThemes.jsx'
@@ -665,6 +666,8 @@ export default function PropertiesPanel({
     try { localStorage.setItem(PROPS_TAB_KEY, tab) } catch { /* ignore */ }
   }
   const [aiEditOpen, setAiEditOpen] = useState(false)
+  // The server can switch the assistant off (Settings → AI assistant).
+  const aiOn = useAiAvailable()
   const [actionsOpen, setActionsOpen] = useState(false)
   const pageTabs = PAGE_TABS
   const [pageTab, setPageTabState] = useState(() => {
@@ -1633,7 +1636,7 @@ export default function PropertiesPanel({
               {isFlow ? t('all screens') : t(isMobile ? 'Mobile' : 'PC')}
             </span>
           </div>
-          <button
+          {aiOn && <button
             type="button"
             aria-expanded={aiEditOpen}
             aria-label={t('Ask AI to edit this')}
@@ -1646,9 +1649,9 @@ export default function PropertiesPanel({
             }`}
           >
             <SparklesIcon size={15} />
-          </button>
+          </button>}
         </div>
-        {aiEditOpen && (
+        {aiOn && aiEditOpen && (
           <div className="mt-3">
             <AiComponentEdit
               component={component}

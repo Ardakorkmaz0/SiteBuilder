@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { aiEditComponent } from '../../utils/aiAssistant.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { aiErrorText } from '../../utils/aiErrorText.js'
 import { SparklesIcon } from '../icons.jsx'
 
 // ✨ Ask-AI affordance for the SELECTED component. Type a prompt ("make it a
@@ -36,7 +37,7 @@ export default function AiComponentEdit({ component, onApply }) {
         setPending({ styles, props })
       }
     } catch (e) {
-      setError(e?.message ? t(e.message) : t('AI request failed.'))
+      setError(aiErrorText(e, t) || t('AI request failed.'))
     } finally {
       setBusy(false)
     }

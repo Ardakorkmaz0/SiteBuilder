@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  AI_PROVIDERS,
   fetchLocalStatus,
   getApiKey,
   getModel,
@@ -8,18 +9,30 @@ import {
   setModel,
 } from '../../utils/aiAssistant.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useAiPolicy } from '../../utils/aiPolicy.js'
 
 // Compact toolbar button that opens the AI chat panel.
 // Replaces the earlier single-line prompt input — the chat panel itself
 // holds the input, history, and per-turn tool calls.
+// Ready to send: a key for the active provider, or a provider that needs none
+// (the local runtime used to show "setup" for ever, having no key to find).
+function activeProviderReady() {
+  const provider = getProvider()
+  if (AI_PROVIDERS.find((p) => p.id === provider)?.needsKey === false) return true
+  return !!getApiKey(provider)
+}
+
 export default function AiBar({ open = false, onOpenChange }) {
   const { t } = useLanguage()
-  const [hasKey, setHasKey] = useState(() => !!getApiKey())
+  // Read on every render; these only make it render again: the window coming
+  // back into focus (a key pasted elsewhere), a storage event, and the
+  // server's switches (they can change which provider is active).
+  const [, setTick] = useState(0)
+  useAiPolicy()
+  const hasKey = activeProviderReady()
 
-  // Re-check the saved key whenever the window is focused — covers the user
-  // pasting it in the Settings panel and coming back here.
   useEffect(() => {
-    const refresh = () => setHasKey(!!getApiKey())
+    const refresh = () => setTick((n) => n + 1)
     window.addEventListener('focus', refresh)
     window.addEventListener('storage', refresh)
     return () => {

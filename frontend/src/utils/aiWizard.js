@@ -75,8 +75,10 @@ export const WIZARD_ACCENTS = [
 const byId = (list, id) => list.find((x) => x.id === id)
 
 // Compose the single generation prompt. Everything the user typed is quoted
-// back to the model verbatim; the system prompt already forces English copy
-// and the shared design system, so this only has to carry the SPECIFICS.
+// back to the model verbatim; the system prompt carries the shared design
+// system and the language rules, so this only has to carry the SPECIFICS.
+// The prompt itself is the editor's, in English: the site follows the
+// language the user wrote their own details in.
 export function buildWizardPrompt(answers = {}) {
   const type = byId(WIZARD_SITE_TYPES, answers.type) || WIZARD_SITE_TYPES[0]
   const mood = byId(WIZARD_MOODS, answers.mood) || WIZARD_MOODS[0]
@@ -94,7 +96,7 @@ export function buildWizardPrompt(answers = {}) {
   ]
   if (answers.tagline?.trim()) lines.push(`Tagline / role: ${answers.tagline.trim()}.`)
   if (answers.description?.trim()) {
-    lines.push(`About (base ALL copy on this, expanded into specific, concrete English content): ${answers.description.trim()}`)
+    lines.push(`About (base ALL copy on this, expanded into specific, concrete content): ${answers.description.trim()}`)
   }
   if (answers.email?.trim()) lines.push(`Contact email for CTAs and the contact section: ${answers.email.trim()}.`)
   if (answers.socials?.trim()) lines.push(`Social profiles to link: ${answers.socials.trim()}.`)
@@ -102,6 +104,10 @@ export function buildWizardPrompt(answers = {}) {
   lines.push(`Sections, in this exact order: ${sections}. No other sections.`)
   lines.push('Write specific, believable copy for every section based on the details above — concrete numbers, names and offers, never lorem ipsum or generic filler.')
   if (answers.extra?.trim()) lines.push(`Extra wishes: ${answers.extra.trim()}.`)
+  lines.push(
+    'Language: these instructions are the editor\'s. Write the site in the language the user wrote the About text and extra wishes in. '
+    + 'If there are none (or only names), treat this as an [editor action] and follow the LANGUAGE rules.',
+  )
   return lines.join('\n')
 }
 
