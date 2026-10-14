@@ -40,6 +40,7 @@ from django.db.models.functions import TruncDate
 from . import runtime_config
 from .api_errors import error_response
 from .ai_policy import local_ai_available, provider_refusal, public_ai_policy
+from .shared_marks import insert_before_body_end, strip_marked, wrap_marked
 from .access import SHARE_OPEN, SHARE_PRIVATE, is_public, is_reachable, public_sites, share_access
 from .accounts import normalise_username
 from .models import (
@@ -47,6 +48,7 @@ from .models import (
     Favorite,
     FormSubmission,
     Profile,
+    PublishedPage,
     Report,
     ReviewComment,
     SharedComponent,
@@ -2021,6 +2023,25 @@ class UseSharedComponentView(APIView):
         target = next((p for p in pages if p.get('id') == page_id), pages[0])
 
         style = '<style>\n' + component.css + '\n</style>\n' if component.css.strip() else ''
+        # An HTML page shows its document, not a component list: a block added
+        # to its components was invisible there and on the published page. It
+        # goes into the document instead, wrapped and marked so a takedown can
+        # still find it (shared_marks.py).
+        if target.get('mode') == 'html' or str(target.get('html') or '').strip():
+            target['html'] = insert_before_body_end(
+                target.get('html') or '', wrap_marked(style + component.html, component.pk),
+            )
+            site.schema = validate_and_clean_schema(schema)
+            update = ['schema', 'updated_at']
+            # The home page's document is mirrored to site.html.
+            if target is pages[0]:
+                site.html = target['html']
+                update.append('html')
+            site.save(update_fields=update)
+            SharedComponent.objects.filter(pk=component.pk).update(use_count=F('use_count') + 1)
+            component.refresh_from_db(fields=['use_count'])
+            component.recompute_hot_score(save=True)
+            return Response({'site_id': site.pk, 'page_id': target.get('id'), 'block_id': ''})
         block_id = 'html_shared_%s_%s' % (component.pk, int(timezone.now().timestamp()))
         block = {
             'id': block_id,
@@ -2169,6 +2190,23 @@ class AdminComponentReportResolveView(APIView):
         return Response({'detail': 'Report updated.', 'status': report.status})
 
 
+def _without_copies(components, component_id):
+    """`components` with every copy of the block removed, nested ones too
+    (a block moved into a section is its child). Returns (list, removed)."""
+    kept = []
+    removed = 0
+    for block in components:
+        if (isinstance(block, dict) and isinstance(block.get('props'), dict)
+                and block['props'].get('_sharedFrom') == component_id):
+            removed += 1
+            continue
+        if isinstance(block, dict) and isinstance(block.get('children'), list):
+            block['children'], inner = _without_copies(block['children'], component_id)
+            removed += inner
+        kept.append(block)
+    return kept, removed
+
+
 def _purge_shared_copies(component_id):
     """Delete every block that was taken from this component, wherever it went.
 
@@ -2183,7 +2221,7 @@ def _purge_shared_copies(component_id):
     """
     marked = 0
     sites_touched = 0
-    for site in Site.objects.only('id', 'schema').iterator():
+    for site in Site.objects.only('id', 'schema', 'html').iterator():
         schema = site.schema if isinstance(site.schema, dict) else None
         if not schema:
             continue
@@ -2191,23 +2229,31 @@ def _purge_shared_copies(component_id):
         removed_here = 0
         for page in pages:
             components = page.get('components')
-            if not isinstance(components, list):
-                continue
-            kept = [
-                block for block in components
-                if not (isinstance(block, dict)
-                        and isinstance(block.get('props'), dict)
-                        and block['props'].get('_sharedFrom') == component_id)
-            ]
-            removed_here += len(components) - len(kept)
-            page['components'] = kept
-        if removed_here:
+            if isinstance(components, list):
+                page['components'], removed = _without_copies(components, component_id)
+                removed_here += removed
+            # On an HTML page the copy is part of the document.
+            if isinstance(page.get('html'), str):
+                page['html'], removed = strip_marked(page['html'], component_id)
+                removed_here += removed
+        site_html, _ = strip_marked(site.html, component_id)
+        # What visitors receive is the published copy of each page: a copy
+        # deleted only from the draft stayed live until the owner republished.
+        live_removed = 0
+        for published in PublishedPage.objects.filter(site_id=site.pk).only('id', 'html'):
+            cleaned, removed = strip_marked(published.html, component_id)
+            if removed:
+                published.html = cleaned
+                published.save(update_fields=['html', 'updated_at'])
+                live_removed += removed
+        if removed_here or live_removed or site_html != site.html:
             # Straight back, without re-running the save gate: this only ever
-            # deletes list entries, so there is no new content to validate and
-            # nothing else on the page should shift because of a takedown.
+            # deletes content, so there is nothing new to validate and nothing
+            # else on the page should shift because of a takedown.
             site.schema = schema
-            site.save(update_fields=['schema', 'updated_at'])
-            marked += removed_here
+            site.html = site_html
+            site.save(update_fields=['schema', 'html', 'updated_at'])
+            marked += removed_here or live_removed
             sites_touched += 1
     return sites_touched, marked
 
