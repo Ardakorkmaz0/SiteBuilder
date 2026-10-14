@@ -992,6 +992,18 @@ function SiteEditor() {
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
   )
+  // What a screen reader is told about dragging. The library's own English
+  // told people to press the space bar, which no sensor here answers to, and
+  // read out internal ids ("comp_8f2k was moved over droppable area …").
+  const dragAccessibility = useMemo(() => ({
+    screenReaderInstructions: { draggable: t('Drag with the mouse or a finger.') },
+    announcements: {
+      onDragStart: () => t('Picked up.'),
+      onDragOver: ({ over }) => (over ? t('Over a place it can go.') : t('Not over a place it can go.')),
+      onDragEnd: () => t('Dropped.'),
+      onDragCancel: () => t('Dragging cancelled.'),
+    },
+  }), [t])
 
   // Keyboard shortcuts: undo/redo, duplicate, delete, arrow-nudge.
   useEffect(() => {
@@ -2308,6 +2320,7 @@ function SiteEditor() {
 
       <DndContext
         sensors={sensors}
+        accessibility={dragAccessibility}
         collisionDetection={nestedFirstCollision}
         onDragStart={onDragStart}
         onDragMove={onDragMove}
