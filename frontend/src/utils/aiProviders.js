@@ -9,6 +9,8 @@
 // panel; it's persisted in localStorage and sent straight to the provider.
 // The Django backend only handles the Local AI proxy (no key needed there).
 
+import { readAiPolicy, useAiPolicy } from './aiPolicy.js'
+
 // Providers are kept side by side so the user picks whichever has free quota
 // left. OpenRouter is the default because its free tier rotates through the
 // strongest open-weight models (Qwen3 80B today, others tomorrow) — auto
@@ -37,6 +39,9 @@ export const AI_PROVIDERS = [
     needsKey: false,
     configurableEndpoint: true,
     customModel: true,
+    // Reached through this app's server, which can serve it only when the app
+    // runs on the user's own machine: offered only once the server says so.
+    serverDecides: true,
   },
   {
     id: 'gemini',
@@ -331,25 +336,73 @@ export async function fetchNvidiaModels(authToken) {
   }
 }
 
+// The providers the server lets the editor offer (aiPolicy.js), in display
+// order. Every list, the failover and the active provider go through this, so
+// a provider switched off on the Settings page is gone everywhere at once.
+export function availableProviders() {
+  const policy = readAiPolicy()
+  if (!policy.enabled) return []
+  // Not heard from the server (yet): everything a browser can reach by itself.
+  if (!Array.isArray(policy.providers)) return AI_PROVIDERS.filter((p) => !p.serverDecides)
+  return AI_PROVIDERS.filter((p) => policy.providers.includes(p.id))
+}
+
+export function isProviderAvailable(providerId) {
+  return availableProviders().some((p) => p.id === providerId)
+}
+
+// Is the assistant usable at all: switched on, with at least one provider.
+export function aiAvailable() {
+  return availableProviders().length > 0
+}
+
+// The same, for a component: re-renders when the server's switches change.
+export function useAiAvailable() {
+  useAiPolicy()
+  return aiAvailable()
+}
+
+// The saved choice while it is offered. When it is not (switched off, or never
+// made): a provider the user already has a key for, then the server's start
+// provider, then the first one listed.
 export function getProvider() {
-  try {
-    const saved = localStorage.getItem(PROVIDER_STORAGE)
-    if (saved && AI_PROVIDERS.some((p) => p.id === saved)) return saved
-  } catch { /* ignore */ }
-  return DEFAULT_PROVIDER
+  let saved = ''
+  try { saved = localStorage.getItem(PROVIDER_STORAGE) || '' } catch { /* ignore */ }
+  const known = AI_PROVIDERS.some((p) => p.id === saved)
+  const usable = availableProviders()
+  if (known && usable.some((p) => p.id === saved)) return saved
+  const withKey = usable.find((p) => p.needsKey !== false && getApiKey(p.id))
+  if (withKey) return withKey.id
+  const start = readAiPolicy().defaultProvider
+  if (start && usable.some((p) => p.id === start)) return start
+  if (usable.length) return usable[0].id
+  return known ? saved : DEFAULT_PROVIDER
 }
 
 export function setProvider(providerId) {
   try {
-    if (providerId && AI_PROVIDERS.some((p) => p.id === providerId)) {
+    if (providerId && isProviderAvailable(providerId)) {
       localStorage.setItem(PROVIDER_STORAGE, providerId)
     }
   } catch { /* ignore */ }
 }
 
+// A suggested model the server's superadmin hid (aiPolicy.js): it leaves the
+// lists, and a saved choice of it falls back to the first one still offered.
+export function isModelHidden(providerId, modelId) {
+  const hidden = readAiPolicy().hiddenModels?.[providerId]
+  return Array.isArray(hidden) && hidden.includes(modelId)
+}
+
 // Read the models exposed for a given provider. Defaults to the active
 // provider when no argument is supplied.
 export function getModelsFor(providerId = getProvider()) {
+  return (PROVIDER_MODELS[providerId] || []).filter((m) => !isModelHidden(providerId, m.id))
+}
+
+// Every suggested model, hidden ones included: the Settings page lists them
+// so the superadmin can hide or show each one.
+export function suggestedModelsFor(providerId) {
   return PROVIDER_MODELS[providerId] || []
 }
 
@@ -403,7 +456,7 @@ export function getModel(providerId = getProvider()) {
       try { localStorage.setItem(storageKey, replacement) } catch { /* ignore */ }
       saved = replacement
     }
-    if (saved) {
+    if (saved && !isModelHidden(providerId, saved)) {
       const provider = AI_PROVIDERS.find((p) => p.id === providerId)
       // customModel providers (local, openrouter) accept any string — the
       // dropdown is suggestions, not validation.

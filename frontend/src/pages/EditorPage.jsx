@@ -22,6 +22,8 @@ import {
 } from '../components/registry.jsx'
 import AiBar from '../components/editor/AiBar.jsx'
 import AiChatPanel from '../components/editor/AiChatPanel.jsx'
+import { loadAiPolicy } from '../utils/aiPolicy.js'
+import { useAiAvailable } from '../utils/aiProviders.js'
 import Sidebar from '../components/editor/Sidebar.jsx'
 import ShortcutsHelp from '../components/editor/ShortcutsHelp.jsx'
 import {
@@ -487,6 +489,17 @@ function SiteEditor() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [templateOpen, setTemplateOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
+  // What the server lets the assistant offer (Settings → AI assistant). Asked
+  // for on open and whenever the tab comes back into focus, so a switch the
+  // superadmin flipped reaches an editor that was already open. With the
+  // assistant off, its button, panel, wizard and the ✨ edits are not shown.
+  const aiOn = useAiAvailable()
+  useEffect(() => {
+    const refresh = () => { loadAiPolicy({ fresh: true }).catch(() => {}) }
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [])
   const [historyOpen, setHistoryOpen] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
   const [controlCenterOpen, setControlCenterOpen] = useState(false)
@@ -2013,7 +2026,7 @@ function SiteEditor() {
         ? { label: t('Unsaved'), tone: 'var(--studio-warning)' }
         : { label: t('Saved'), tone: 'var(--studio-success)' }
   const effectiveAiPanelLayout = isNarrow ? 'compact' : aiPanelLayout
-  const aiWorkspaceOpen = aiOpen && effectiveAiPanelLayout === 'workspace'
+  const aiWorkspaceOpen = aiOn && aiOpen && effectiveAiPanelLayout === 'workspace'
   const applyAiDocument = (html) => {
     const placed = workspaceRef.current?.applyAiHtml?.(html) ?? html
     commitHtml(placed)
@@ -2055,7 +2068,7 @@ function SiteEditor() {
         </div>
 
         <div className="ml-auto flex min-w-0 items-center gap-1">
-          <AiBar open={aiOpen} onOpenChange={setAiOpen} />
+          {aiOn && <AiBar open={aiOpen} onOpenChange={setAiOpen} />}
           <span className="mx-1 hidden h-5 w-px bg-[var(--studio-border)] lg:block" aria-hidden />
           <button type="button" onClick={() => (currentPageIsHtml ? undoOnHtmlPage() : undo())} disabled={currentPageIsHtml ? !htmlPast.length && !canUndo && !htmlTyping : !canUndo} title={t('Undo (Ctrl+Z)')} className="studio-icon-btn hidden md:inline-flex">
             <UndoIcon size={16} />
@@ -2127,7 +2140,7 @@ function SiteEditor() {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
                 <div style={{ position: 'fixed', top: menuPos.more?.top, right: menuPos.more?.right }} className="studio-menu z-50 max-h-[calc(100vh-70px)] w-72 overflow-y-auto p-1.5">
-                  <button type="button" onClick={() => { setMoreOpen(false); setWizardOpen(true) }} className="studio-menu-item font-semibold text-[var(--studio-accent-hover)]"><SparklesIcon size={15} /> {t('AI Site Wizard')}</button>
+                  {aiOn && <button type="button" onClick={() => { setMoreOpen(false); setWizardOpen(true) }} className="studio-menu-item font-semibold text-[var(--studio-accent-hover)]"><SparklesIcon size={15} /> {t('AI Site Wizard')}</button>}
                   <button type="button" onClick={() => { setMoreOpen(false); if (guestGate('share_link')) return; setControlCenterTab('feedback'); setControlCenterOpen(true) }} className="studio-menu-item"><LinkIcon size={15} /> {t('Share this project')}</button>
                   <button type="button" onClick={() => { setMoreOpen(false); setControlCenterTab('readiness'); setControlCenterOpen(true) }} className="studio-menu-item"><CogIcon size={15} /> {t('Site control center')}</button>
                   <div className="studio-divider my-1 border-t" />
@@ -2852,7 +2865,7 @@ function SiteEditor() {
         </DragOverlay>
       </DndContext>
 
-      {aiOpen && effectiveAiPanelLayout === 'compact' && (
+      {aiOn && aiOpen && effectiveAiPanelLayout === 'compact' && (
         <AiChatPanel
           open
           presentation="compact"
@@ -2897,7 +2910,7 @@ function SiteEditor() {
         onSchemaContentChange={applyManagedSchema}
       />}
 
-      {wizardOpen && (
+      {aiOn && wizardOpen && (
         <Suspense fallback={null}>
           <AiWizard
             open={wizardOpen}

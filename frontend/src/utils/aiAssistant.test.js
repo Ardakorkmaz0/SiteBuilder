@@ -7,6 +7,7 @@
 // readyProviders being deterministic in AI_PROVIDERS order with the active
 // one first — covered as a comment on the implementation.
 import { describe, expect, it, beforeEach } from 'vitest'
+import { OPEN_POLICY, setAiPolicy, useAiPolicyStore } from './aiPolicy.js'
 import {
   AI_PROVIDERS,
   pickBestLocalModel,
@@ -112,8 +113,13 @@ describe('provider/key/model/endpoint persistence', () => {
   it('persists and reads back the provider selection', () => {
     setProvider('groq')
     expect(getProvider()).toBe('groq')
+    // The local runtime is offered only where the server says it can serve it.
+    setProvider('local')
+    expect(getProvider()).toBe('groq')
+    setAiPolicy({ enabled: true, providers: ['openrouter', 'groq', 'local', 'gemini', 'nvidia'] })
     setProvider('local')
     expect(getProvider()).toBe('local')
+    useAiPolicyStore.setState({ policy: OPEN_POLICY })
   })
 
   it('rejects unknown provider ids silently', () => {

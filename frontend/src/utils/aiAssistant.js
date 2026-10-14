@@ -26,6 +26,7 @@ import {
   LOCAL_PROXY_PATH,
   NVIDIA_RELAY_PATH,
   OPENROUTER_ENDPOINT,
+  availableProviders,
   buildGeminiEndpoint,
   getApiKey,
   getEndpoint,
@@ -41,6 +42,8 @@ import { insertBeforeClosingTag } from './htmlInsert.js'
 import { HOVER_TYPES, REVEAL_TYPES, SPEED_TYPES } from './motion.js'
 import { TEMPLATES } from './aiTemplates.js'
 import { SYSTEM_PROMPT } from './aiSystemPrompt.js'
+import { aiSystemAddendum, getAiPreferences, temperatureFor } from './aiPreferences.js'
+import { loadAiPolicy } from './aiPolicy.js'
 
 // ---------------------------------------------------------------------------
 // Re-exports: stable public surface for AiBar / AiChatPanel / PropertiesPanel
@@ -48,8 +51,12 @@ import { SYSTEM_PROMPT } from './aiSystemPrompt.js'
 
 export {
   AI_PROVIDERS,
+  aiAvailable,
+  availableProviders,
   fetchLocalStatus,
   fetchNvidiaModels,
+  isModelHidden,
+  isProviderAvailable,
   getApiKey,
   getEndpoint,
   getModel,
@@ -143,6 +150,7 @@ function schemaSnapshot() {
     pages: s.schema.pages.map((p) => ({
       id: p.id,
       name: p.name,
+      language: p.language || undefined,
       mode: p.mode,
       flowMode: p.flowMode,
       canvasWidth: p.canvasWidth,
@@ -1353,59 +1361,158 @@ function parseRetryDelayMs(parsed, defaultMs) {
   return defaultMs
 }
 
+// ---- Errors the user reads ---------------------------------------------------
+// Every message the assistant shows on failure is built here, in English, with
+// its key and values kept on the error (`i18n`) so the panel can show it in
+// the user's language. The English text stays the message: logs and tests
+// read it.
+export function aiError(key, vars = {}, options) {
+  const text = key.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? String(vars[name]) : m))
+  const err = new Error(text, options)
+  err.i18n = { key, vars }
+  return err
+}
+
+// A request the user stopped (the chat's Stop button). Never a reason to try
+// another provider: the user asked for nothing more to happen.
+export function isAbortError(err) {
+  return err?.name === 'AbortError'
+}
+
+function abortError() {
+  const err = aiError('Stopped.')
+  err.name = 'AbortError'
+  return err
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw abortError()
+}
+
+// A wait the Stop button can cut short.
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(abortError()); return }
+    const onAbort = () => { clearTimeout(timer); reject(abortError()) }
+    const timer = setTimeout(() => { signal?.removeEventListener?.('abort', onAbort); resolve() }, ms)
+    signal?.addEventListener?.('abort', onAbort, { once: true })
+  })
+}
+
+function providerLabel(providerId) {
+  return AI_PROVIDERS.find((p) => p.id === providerId)?.label?.replace(/ \(.*\)$/, '') || providerId || 'AI provider'
+}
+
+// fetch, with a network failure said in words the user (and the failover) can
+// act on. A browser reports "Failed to fetch" for anything from a dropped
+// connection to a provider that is down; neither is the user's mistake, and
+// the next provider may well answer.
+async function providerFetch(url, init, providerId) {
+  throwIfAborted(init?.signal)
+  try {
+    return await fetch(url, init)
+  } catch (e) {
+    if (isAbortError(e) || init?.signal?.aborted) throw abortError()
+    if (providerId === 'local') {
+      throw aiError('Could not reach the local AI. Make sure Ollama (or LM Studio) is running.', {}, { cause: e })
+    }
+    throw aiError('Could not reach {provider}. Check your connection, or try again in a moment.', { provider: providerLabel(providerId) }, { cause: e })
+  }
+}
+
+// Reasoning models (Qwen3, DeepSeek R1, Nemotron) may write their thinking into
+// the answer between <think> tags. It is not the answer: in the chat it is
+// noise, in HTML mode it comes before the document, and in a JSON reply its
+// first brace was taken for the patch.
+export function stripThinking(text) {
+  if (typeof text !== 'string') return ''
+  return text
+    .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
+    // An opening tag that never closed: the answer ended mid-thought.
+    .replace(/<think(?:ing)?>[\s\S]*$/i, '')
+    .trim()
+}
+
+// Every system prompt ends with the user's language rule and standing
+// instructions (aiPreferences.js).
+function withAddendum(prompt) {
+  return `${prompt}\n${aiSystemAddendum()}`
+}
+
 // Map a raw provider error blob to a one-line, human-friendly message that
 // fits the chat panel without overwhelming the user with JSON. `providerId`
 // drives the wording (so a Groq 429 doesn't say "Gemini quota hit").
 function describeApiError(status, rawText, providerId = getProvider()) {
   let parsed
   try { parsed = JSON.parse(rawText) } catch { parsed = null }
-  const apiMessage = parsed?.error?.message || parsed?.error?.error || ''
+  const apiMessage = parsed?.error?.message || parsed?.error?.error || parsed?.detail || ''
   const me = AI_PROVIDERS.find((p) => p.id === providerId)
-  const meLabel = me?.label?.replace(/ \(.*\)$/, '') || 'AI provider'
-  const other = AI_PROVIDERS.find((p) => p.id !== providerId)
-  const otherLabel = other?.label?.replace(/ \(.*\)$/, '') || 'the other provider'
+  const provider = providerLabel(providerId)
+  // Where to send the user instead: another provider the server offers,
+  // preferably one they already have a key for.
+  const others = availableProviders().filter((p) => p.id !== providerId)
+  const other = others.find((p) => p.needsKey !== false && getApiKey(p.id)) || others[0]
+  // Switched off on the Settings page after this tab loaded its list: say so,
+  // and ask for the list again so the provider leaves the menus.
+  const code = parsed?.error?.code || parsed?.code
+  if (status === 403 && code === 'ai_provider_disabled') {
+    loadAiPolicy({ fresh: true }).catch(() => {})
+    return aiError('{provider} is switched off on this server. Choose another provider in the AI settings.', { provider })
+  }
+  // The local proxy answers 502 when nothing listens on the user's machine.
+  if (providerId === 'local' && status === 502) {
+    return aiError('Could not reach the local AI. Make sure Ollama (or LM Studio) is running.')
+  }
   // A relayed provider is reached through this app's server, which can refuse
   // for reasons of its own. "Your key was rejected" would be the wrong thing
   // to say when it is the app's sign-in that is missing.
   if (me?.relayed) {
     // The relay's own refusal carries its code; the provider's does not.
-    if ((status === 401 || status === 403) && ['not_authenticated', 'authentication_failed'].includes(parsed?.code)) {
-      return `Sign in to this app again to use ${meLabel}: its requests go through this app's server.`
+    if ((status === 401 || status === 403) && ['not_authenticated', 'authentication_failed'].includes(code)) {
+      return aiError("Sign in to this app again to use {provider}: its requests go through this app's server.", { provider })
     }
     if (status === 401 || status === 403) {
-      return `Your ${meLabel} API key was rejected (${status}). Open Settings → AI Assistant and paste a fresh key.`
+      return aiError('Your {provider} API key was rejected ({status}). Open the AI settings and paste a fresh key.', { provider, status })
     }
     if (status === 404) {
-      return `${meLabel} does not offer the selected model (any more). Open Settings → Model and pick another one from the list.`
+      return aiError('{provider} does not offer the selected model (any more). Open the AI settings and pick another model.', { provider })
     }
     if (status === 413) {
-      return `This page is too large to send to ${meLabel} in one request. Try a smaller page or another provider.`
+      return aiError('This page is too large to send to {provider} in one request. Try a smaller page or another provider.', { provider })
     }
   }
   // OpenRouter retires free models from time to time. When that happens the
   // message is "No endpoints found for <model>" — point the user at Settings
   // instead of leaving them puzzled.
   if (/no endpoints found/i.test(apiMessage)) {
-    return `${meLabel} retired the selected model. Open Settings → Model dropdown and pick a fresh one (Qwen3 80B is the safe default), or paste any current id from openrouter.ai/models.`
+    return aiError('{provider} retired the selected model. Open the AI settings and pick another model, or paste any current id from its model list.', { provider })
   }
   if (status === 429) {
-    const waitMs = parseRetryDelayMs(parsed, 30_000)
-    const waitSec = Math.ceil(waitMs / 1000)
-    return `${meLabel} quota hit (per-minute or per-day). Wait ~${waitSec}s and try again, or switch to ${otherLabel} in Settings (Properties → AI Assistant).`
+    const seconds = Math.ceil(parseRetryDelayMs(parsed, 30_000) / 1000)
+    return other
+      ? aiError('{provider} quota hit (per-minute or per-day). Wait ~{seconds}s and try again, or switch to {other} in the AI settings.', { provider, seconds, other: providerLabel(other.id) })
+      : aiError('{provider} quota hit (per-minute or per-day). Wait ~{seconds}s and try again.', { provider, seconds })
   }
   if (status === 400 && /api key|invalid/i.test(apiMessage)) {
-    return `Your ${meLabel} API key is invalid or missing the right permissions. Re-paste it in Settings.`
+    return aiError('Your {provider} API key is invalid or missing the right permissions. Paste it again in the AI settings.', { provider })
   }
   if (status === 401) {
-    return `Your ${meLabel} API key was rejected (401). Open Settings → AI Assistant and paste a fresh key.`
+    return aiError('Your {provider} API key was rejected ({status}). Open the AI settings and paste a fresh key.', { provider, status })
   }
   if (status === 403) {
-    return `Your ${meLabel} API key was rejected (403). Check that the key is active and has the Generative Language / Chat Completions API enabled.`
+    return aiError('Your {provider} API key was rejected ({status}). Check that the key is active and allowed to use this API.', { provider, status })
+  }
+  // The relay and the local proxy stop waiting on a model after a while.
+  if (status === 504) {
+    return aiError('{provider} took too long to answer. Try again, or ask for something smaller.', { provider })
   }
   if (status >= 500) {
-    return `${meLabel} is having trouble right now (${status}). Try again in a moment or switch to ${otherLabel}.`
+    return other
+      ? aiError('{provider} is having trouble right now ({status}). Try again in a moment or switch to {other}.', { provider, status, other: providerLabel(other.id) })
+      : aiError('{provider} is having trouble right now ({status}). Try again in a moment.', { provider, status })
   }
-  return apiMessage || `${meLabel} ${status}: ${rawText.slice(0, 200)}`
+  // The provider's own words: nothing to translate them from.
+  return new Error(apiMessage || `${provider} ${status}: ${rawText.slice(0, 200)}`)
 }
 
 // Universal turn shape we hand around so the rest of the file doesn't have to
@@ -1417,49 +1524,50 @@ function describeApiError(status, rawText, providerId = getProvider()) {
 // response back into a list of `parts` shaped like Gemini's (so the calling
 // loop is unchanged).
 
-async function callProvider(apiKey, history, currentTurnText) {
+async function callProvider(apiKey, history, currentTurnText, signal) {
   const provider = getProvider()
-  if (provider === 'groq') return callGroq(apiKey, history, currentTurnText)
-  if (provider === 'openrouter') return callOpenRouter(apiKey, history, currentTurnText)
-  if (provider === 'local') return callLocal(apiKey, history, currentTurnText)
-  if (provider === 'nvidia') return callNvidia(apiKey, history, currentTurnText)
-  return callGemini(apiKey, history, currentTurnText)
+  if (provider === 'groq') return callGroq(apiKey, history, currentTurnText, signal)
+  if (provider === 'openrouter') return callOpenRouter(apiKey, history, currentTurnText, signal)
+  if (provider === 'local') return callLocal(apiKey, history, currentTurnText, signal)
+  if (provider === 'nvidia') return callNvidia(apiKey, history, currentTurnText, signal)
+  return callGemini(apiKey, history, currentTurnText, signal)
 }
 
 // ---- Gemini transport --------------------------------------------------
-async function callGemini(apiKey, history, currentTurnText) {
+async function callGemini(apiKey, history, currentTurnText, signal) {
   const modelId = getModel('gemini')
   const url = `${buildGeminiEndpoint(modelId)}?key=${encodeURIComponent(apiKey)}`
   const contents = historyToGeminiContents(history, currentTurnText)
   const body = JSON.stringify({
-    systemInstruction: { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+    systemInstruction: { role: 'user', parts: [{ text: withAddendum(SYSTEM_PROMPT) }] },
     contents,
     tools: [{ functionDeclarations: toolDeclarations() }],
     toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
-    generationConfig: { temperature: 0.2 },
+    generationConfig: { temperature: temperatureFor('tools') },
   })
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const res = await fetch(url, {
+    const res = await providerFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
-    })
+      signal,
+    }, 'gemini')
     if (res.ok) {
       const data = await res.json()
       const candidate = data?.candidates?.[0]
-      return candidate?.content?.parts || []
+      // Thinking parts (`thought: true`) are the model's notes, not its answer.
+      return (candidate?.content?.parts || []).filter((part) => !part?.thought)
     }
     const text = await res.text()
     if (res.status === 429 && attempt === 0) {
       let parsed
       try { parsed = JSON.parse(text) } catch { parsed = null }
-      const waitMs = Math.min(8000, parseRetryDelayMs(parsed, 4000))
-      await new Promise((r) => setTimeout(r, waitMs))
+      await sleep(Math.min(8000, parseRetryDelayMs(parsed, 4000)), signal)
       continue
     }
-    throw new Error(describeApiError(res.status, text, 'gemini'))
+    throw describeApiError(res.status, text, 'gemini')
   }
-  throw new Error('Gemini did not respond after the retry. Please try again.')
+  throw aiError('{provider} did not respond after the retry. Please try again.', { provider: providerLabel('gemini') })
 }
 
 function historyToGeminiContents(history, currentTurnText) {
@@ -1488,9 +1596,10 @@ function historyToGeminiContents(history, currentTurnText) {
 }
 
 // ---- Generic OpenAI-compatible transport -------------------------------
-// Shared by Groq and the local Ollama / LM Studio path. `opts.url` is the
-// chat-completions endpoint, `opts.apiKey` is optional (local providers may
-// not need one), `opts.providerId` is just used for friendly error wording.
+// Shared by Groq, OpenRouter, NVIDIA (through the relay) and the local runtime
+// (through the local proxy). `opts.url` is the chat-completions endpoint,
+// `opts.apiKey` is optional (local providers may not need one, the relay
+// takes its key in the body), `opts.providerId` drives the error wording.
 async function callOpenAICompatible(history, currentTurnText, opts) {
   const messages = historyToOpenAiMessages(history, currentTurnText)
   const body = JSON.stringify({
@@ -1501,26 +1610,13 @@ async function callOpenAICompatible(history, currentTurnText, opts) {
       function: { name: t.name, description: t.description, parameters: t.parameters },
     })),
     tool_choice: 'auto',
-    temperature: 0.2,
+    temperature: temperatureFor('tools'),
     ...(opts.extraBody || {}),
   })
   const headers = { 'Content-Type': 'application/json', ...(opts.extraHeaders || {}) }
   if (opts.apiKey) headers.Authorization = `Bearer ${opts.apiKey}`
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    let res
-    try {
-      res = await fetch(opts.url, { method: 'POST', headers, body })
-    } catch (e) {
-      // Network-level failure (typical for unreachable local servers /
-      // missing CORS headers). Give the user a hint they can actually act on.
-      if (opts.providerId === 'local') {
-        throw new Error(
-          `Could not reach the local AI at ${opts.url}. Make sure Ollama (or LM Studio) is running and started with OLLAMA_ORIGINS="*" so the browser can call it.`,
-          { cause: e },
-        )
-      }
-      throw new Error(e?.message || 'Network error', { cause: e })
-    }
+    const res = await providerFetch(opts.url, { method: 'POST', headers, body, signal: opts.signal }, opts.providerId)
     if (res.ok) {
       const data = await res.json()
       const choice = data?.choices?.[0]?.message
@@ -1533,31 +1629,32 @@ async function callOpenAICompatible(history, currentTurnText, opts) {
           parts.push({ functionCall: { name: tc.function?.name || '', args } })
         }
       }
+      const content = stripThinking(typeof choice.content === 'string' ? choice.content : '')
       // Some local models (Llama 3.1 8B in particular) "think aloud" and
       // print the intended call as JSON inside the assistant text instead of
       // using the tool_calls field. Recover those so the canvas still
       // updates. If we extract any call from the text we DROP the original
       // text so the chat doesn't show both the JSON and the action.
-      if (parts.length === 0 && typeof choice.content === 'string' && choice.content.trim()) {
-        const recovered = extractTextCalls(choice.content)
+      if (parts.length === 0 && content) {
+        const recovered = extractTextCalls(content)
         if (recovered.length) {
           for (const r of recovered) parts.push({ functionCall: r })
         } else {
-          parts.push({ text: choice.content })
+          parts.push({ text: content })
         }
-      } else if (typeof choice.content === 'string' && choice.content.trim()) {
-        parts.push({ text: choice.content })
+      } else if (content) {
+        parts.push({ text: content })
       }
       return parts
     }
     const text = await res.text()
     if (res.status === 429 && attempt === 0) {
-      await new Promise((r) => setTimeout(r, 4000))
+      await sleep(4000, opts.signal)
       continue
     }
-    throw new Error(describeApiError(res.status, text, opts.providerId))
+    throw describeApiError(res.status, text, opts.providerId)
   }
-  throw new Error(`${opts.providerId} did not respond after the retry. Please try again.`)
+  throw aiError('{provider} did not respond after the retry. Please try again.', { provider: providerLabel(opts.providerId) })
 }
 
 // NVIDIA's API cannot be called from a browser (it sends no CORS headers), so
@@ -1575,7 +1672,16 @@ function nvidiaRelay(apiKey) {
   }
 }
 
-async function callNvidia(apiKey, history, currentTurnText) {
+// OpenRouter asks for these so traffic from this app appears in its analytics
+// correctly; both are optional but it's polite to send them.
+function openRouterHeaders() {
+  return {
+    'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://localhost',
+    'X-Title': 'Sitebuilder',
+  }
+}
+
+async function callNvidia(apiKey, history, currentTurnText, signal) {
   const relay = nvidiaRelay(apiKey)
   return callOpenAICompatible(history, currentTurnText, {
     url: relay.url,
@@ -1583,34 +1689,32 @@ async function callNvidia(apiKey, history, currentTurnText) {
     modelId: getModel('nvidia'),
     extraHeaders: relay.headers,
     extraBody: relay.extraBody,
+    signal,
   })
 }
 
-async function callGroq(apiKey, history, currentTurnText) {
+async function callGroq(apiKey, history, currentTurnText, signal) {
   return callOpenAICompatible(history, currentTurnText, {
     url: GROQ_ENDPOINT,
     apiKey,
     providerId: 'groq',
     modelId: getModel('groq'),
+    signal,
   })
 }
 
-async function callOpenRouter(apiKey, history, currentTurnText) {
+async function callOpenRouter(apiKey, history, currentTurnText, signal) {
   return callOpenAICompatible(history, currentTurnText, {
     url: OPENROUTER_ENDPOINT,
     apiKey,
     providerId: 'openrouter',
     modelId: getModel('openrouter'),
-    // OpenRouter asks for these so traffic from this app appears in its
-    // analytics correctly; both are optional but it's polite to send them.
-    extraHeaders: {
-      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://localhost',
-      'X-Title': 'PersonelWebSiteBuilder',
-    },
+    extraHeaders: openRouterHeaders(),
+    signal,
   })
 }
 
-async function callLocal(apiKey, history, currentTurnText) {
+async function callLocal(apiKey, history, currentTurnText, signal) {
   const base = getEndpoint('local') || 'http://localhost:11434/v1'
   // Last-mile model validation: if Settings ever ran a status fetch this
   // session, the installed models are cached. If the saved id isn't in that
@@ -1637,6 +1741,7 @@ async function callLocal(apiKey, history, currentTurnText) {
     providerId: 'local',
     modelId: savedModel,
     extraBody: { _localBase: base },
+    signal,
   })
 }
 
@@ -1766,7 +1871,7 @@ function inferToolFromArgs(args, lowerProse = '') {
 }
 
 function historyToOpenAiMessages(history, currentTurnText) {
-  const out = [{ role: 'system', content: SYSTEM_PROMPT }]
+  const out = [{ role: 'system', content: withAddendum(SYSTEM_PROMPT) }]
   // OpenAI-compatible APIs require a tool_call_id to thread tool results back
   // to the assistant turn that requested them.
   let pendingCallIds = []
@@ -1809,26 +1914,40 @@ function historyToOpenAiMessages(history, currentTurnText) {
 // runAiPrompt — failover loop + the per-provider round loop
 // ---------------------------------------------------------------------------
 
-// Walk the configured providers in display order and return the ones that are
+// Walk the providers the server offers, in display order, and return the ones
 // ready to take a request (have a key, or are key-less like the local
-// runtime). The currently-active provider is moved to the front so it's
-// tried first when runAiPrompt is called.
+// runtime). The currently-active provider is moved to the front so it's tried
+// first. Only the server's list counts: the local runtime used to be "ready"
+// everywhere because it needs no key, so on the live site, where the server
+// refuses it, every failover ended on it with a nonsense "key rejected" and
+// never reached the providers after it. With failover switched off in the AI
+// settings, only the active provider is tried.
 function readyProviders() {
   const active = getProvider()
-  const ready = AI_PROVIDERS.filter((p) => p.needsKey === false || !!getApiKey(p.id))
+  const ready = availableProviders().filter((p) => p.needsKey === false || !!getApiKey(p.id))
   ready.sort((a, b) => (a.id === active ? -1 : b.id === active ? 1 : 0))
+  if (!getAiPreferences().failover) return ready.filter((p) => p.id === active)
   return ready
 }
 
 function isFailoverWorthy(err) {
+  if (isAbortError(err)) return false
   const m = String(err?.message || err || '').toLowerCase()
   return (
     m.includes('quota') ||
     m.includes('429') ||
-    m.includes('rate') ||
-    m.includes('could not reach the local') ||
-    m.includes('did not respond after the retry')
+    m.includes('rate limit') ||
+    m.includes('rate-limit') ||
+    m.includes('could not reach') ||
+    m.includes('did not respond after the retry') ||
+    m.includes('switched off on this server') ||
+    m.includes('relay is busy') ||
+    m.includes('took too long')
   )
+}
+
+function noProviderError() {
+  return aiError('No AI provider is set up yet. Open the AI settings and paste a free key for one of the providers.')
 }
 
 // Generation mode: ask the model for a complete HTML document instead of
@@ -1836,37 +1955,38 @@ function isFailoverWorthy(err) {
 // but write decent HTML, so this turns their weakness into a path that works.
 // Returns { html, providerUsed } — caller writes the html to site.html and
 // the editor switches to HtmlWorkspace automatically (isHtmlSite truthy).
-export async function runAiHtmlPrompt(prompt, { history = [], currentHtml = '' } = {}) {
+export async function runAiHtmlPrompt(prompt, { history = [], currentHtml = '', signal } = {}) {
   const candidates = readyProviders()
-  if (!candidates.length) {
-    throw new Error('No AI provider is set up yet. Open Settings (Properties → AI Assistant) and paste any free key, or pick Local AI if you have Ollama running.')
-  }
-  // Try the active provider first, then failover on quota / unreachable.
+  if (!candidates.length) throw noProviderError()
+  // Try the active provider first, then failover on quota / unreachable. The
+  // user's own choice comes back whatever happens, unless another provider
+  // answered: then that one stays, as in the chat.
+  const original = getProvider()
   let lastErr = null
   for (const p of candidates) {
-    const original = getProvider()
-    if (original !== p.id) {
+    if (getProvider() !== p.id) {
       setProvider(p.id)
       try { window.dispatchEvent(new Event('storage')) } catch { /* ignore */ }
     }
     try {
-      const html = await callHtmlModeOnce(prompt, { history, currentHtml })
+      const html = await callHtmlModeOnce(prompt, { history, currentHtml, signal })
       return { html, providerUsed: p.id }
     } catch (e) {
       lastErr = e
-      if (!isFailoverWorthy(e)) {
-        if (original !== p.id) setProvider(original)
-        throw e
-      }
+      if (!isFailoverWorthy(e)) break
     }
   }
-  throw lastErr || new Error('All providers failed to generate HTML.')
+  if (getProvider() !== original) {
+    setProvider(original)
+    try { window.dispatchEvent(new Event('storage')) } catch { /* ignore */ }
+  }
+  throw lastErr || aiError('All providers failed to generate HTML.')
 }
 
 const HTML_SYSTEM_PROMPT = `You are a website-builder backend that emits ONE complete, self-contained HTML5 document per request. Output the document text directly — no code fences, no commentary, no explanation. Start with <!DOCTYPE html> and end with </html>.
 
 Rules:
-- All visible copy must be in English even if the user writes in another language. Translate user-provided text to English before placing it.
+- The language of the copy is set out in the LANGUAGE section at the end; set <html lang> to it (e.g. "tr", "en").
 - One file: inline ALL CSS in a single <style> in <head>. Inline any small JS in a <script> at the end of <body>. Do NOT link external stylesheets/scripts except for fonts.googleapis.com.
 - ALWAYS include <meta charset="UTF-8"> and <meta name="viewport" content="width=device-width, initial-scale=1.0"> in <head>.
 - Use semantic tags: <header>, <nav>, <main>, <section>, <article>, <footer>.
@@ -1907,12 +2027,30 @@ THE LATEST USER MESSAGE IS THE PRIMARY INTENT. Older turns are reference only. I
 // One-shot HTML generation against the active provider, reusing the existing
 // transport plumbing. Unlike runAiPromptOnce there are no tools and no rounds
 // — the model's first text response IS the answer.
-async function callHtmlModeOnce(prompt, { history = [], currentHtml = '' }) {
+const HTML_MAX_TOKENS = 8192
+
+// The one request shape every key-based OpenAI-compatible provider shares;
+// `providerId` picks the address and the credentials. Gemini has its own.
+function openAiRequestFor(providerId, apiKey) {
+  if (providerId === 'groq') return { url: GROQ_ENDPOINT, headers: { Authorization: `Bearer ${apiKey}` }, extraBody: {} }
+  if (providerId === 'openrouter') {
+    return { url: OPENROUTER_ENDPOINT, headers: { ...openRouterHeaders(), Authorization: `Bearer ${apiKey}` }, extraBody: {} }
+  }
+  // A relayed provider's key is in the body; its header is the app's sign-in.
+  if (providerId === 'nvidia') return nvidiaRelay(apiKey)
+  return {
+    url: `${resolveBackendBase()}${LOCAL_PROXY_PATH}/proxy/`,
+    headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+    extraBody: { _localBase: getEndpoint('local') || 'http://localhost:11434/v1' },
+  }
+}
+
+async function callHtmlModeOnce(prompt, { history = [], currentHtml = '', signal }) {
   const provider = getProvider()
   const providerInfo = AI_PROVIDERS.find((p) => p.id === provider)
   const apiKey = getApiKey(provider)
   if (!apiKey && providerInfo?.needsKey !== false) {
-    throw new Error(`Set your ${providerInfo?.label || provider} API key in the editor settings.`)
+    throw aiError('Set your {provider} API key in the AI settings.', { provider: providerLabel(provider) })
   }
   // Build a flat user message: prior chat history (cap 10), current HTML
   // snapshot (if any), and the latest request. Cheaper than per-turn role
@@ -1930,74 +2068,58 @@ async function callHtmlModeOnce(prompt, { history = [], currentHtml = '' }) {
   // section" request and drop half the content.
   const contract = seed ? INTENT_CONTRACTS[detectHtmlIntent(prompt)] : ''
   const fullPrompt = `${HIST ? `Recent chat:\n${HIST}\n` : ''}${seed}\nUser request: ${prompt}${contract}\n\nReturn the full HTML document now.`
+  const system = withAddendum(HTML_SYSTEM_PROMPT)
+  const temperature = temperatureFor('html')
 
-  // For Gemini we hit the same generateContent endpoint without tools.
+  let text
+  let cutShort
   if (provider === 'gemini') {
-    const modelId = getModel('gemini')
-    const url = `${buildGeminiEndpoint(modelId)}?key=${encodeURIComponent(apiKey)}`
-    const res = await fetch(url, {
+    // Gemini: the same generateContent endpoint, without tools.
+    const url = `${buildGeminiEndpoint(getModel('gemini'))}?key=${encodeURIComponent(apiKey)}`
+    const res = await providerFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        systemInstruction: { role: 'user', parts: [{ text: HTML_SYSTEM_PROMPT }] },
+        systemInstruction: { role: 'user', parts: [{ text: system }] },
         contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 8192 },
+        generationConfig: { temperature, maxOutputTokens: HTML_MAX_TOKENS },
       }),
-    })
-    if (!res.ok) throw new Error(describeApiError(res.status, await res.text(), 'gemini'))
+      signal,
+    }, 'gemini')
+    if (!res.ok) throw describeApiError(res.status, await res.text(), 'gemini')
     const data = await res.json()
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    return cleanHtmlResponse(text)
-  }
-  // Groq / OpenRouter / Local all speak OpenAI-compatible chat-completions.
-  let url
-  let extraHeaders = {}
-  let extraBody = {}
-  let modelId
-  if (provider === 'groq') {
-    url = GROQ_ENDPOINT
-    modelId = getModel('groq')
-  } else if (provider === 'openrouter') {
-    url = OPENROUTER_ENDPOINT
-    modelId = getModel('openrouter')
-    extraHeaders = {
-      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://localhost',
-      'X-Title': 'PersonelWebSiteBuilder',
-    }
-  } else if (provider === 'nvidia') {
-    const relay = nvidiaRelay(apiKey)
-    url = relay.url
-    modelId = getModel('nvidia')
-    extraHeaders = relay.headers
-    extraBody = relay.extraBody
+    const candidate = data?.candidates?.[0]
+    text = (candidate?.content?.parts || []).filter((part) => !part?.thought).map((part) => part?.text || '').join('')
+    cutShort = candidate?.finishReason === 'MAX_TOKENS'
   } else {
-    // local
-    const base = getEndpoint('local') || 'http://localhost:11434/v1'
-    url = `${resolveBackendBase()}${LOCAL_PROXY_PATH}/proxy/`
-    modelId = getModel('local')
-    extraBody = { _localBase: base }
+    const req = openAiRequestFor(provider, apiKey)
+    const res = await providerFetch(req.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...req.headers },
+      body: JSON.stringify({
+        model: getModel(provider),
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: fullPrompt },
+        ],
+        temperature,
+        max_tokens: HTML_MAX_TOKENS,
+        ...req.extraBody,
+      }),
+      signal,
+    }, provider)
+    if (!res.ok) throw describeApiError(res.status, await res.text(), provider)
+    const data = await res.json()
+    text = data?.choices?.[0]?.message?.content || ''
+    cutShort = data?.choices?.[0]?.finish_reason === 'length'
   }
-  const headers = { 'Content-Type': 'application/json', ...extraHeaders }
-  // A relayed provider's key is in the body; its header is the app's sign-in.
-  if (apiKey && provider !== 'nvidia') headers.Authorization = `Bearer ${apiKey}`
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: modelId,
-      messages: [
-        { role: 'system', content: HTML_SYSTEM_PROMPT },
-        { role: 'user', content: fullPrompt },
-      ],
-      temperature: 0.4,
-      max_tokens: 8192,
-      ...extraBody,
-    }),
-  })
-  if (!res.ok) throw new Error(describeApiError(res.status, await res.text(), provider))
-  const data = await res.json()
-  const text = data?.choices?.[0]?.message?.content || ''
-  return cleanHtmlResponse(text)
+  // A document cut off at the length limit has lost its bottom: whatever was
+  // still to come (footer, scripts, closing tags) never arrived. Taken as the
+  // page, it quietly replaced the user's whole page with its top half.
+  if (cutShort) {
+    throw aiError('The answer was cut off before the page was complete (it hit the length limit), so nothing was changed. Ask for a smaller change, or for one section at a time.')
+  }
+  return cleanHtmlResponse(stripThinking(text))
 }
 
 // Models often wrap the document in a ```html ... ``` fence even when told
@@ -2179,11 +2301,9 @@ export function historyToTurns(history, limit = JOURNAL_CALLS) {
   return out
 }
 
-export async function runAiPrompt(prompt, { maxRounds = 5, history = [], onProgress } = {}) {
+export async function runAiPrompt(prompt, { maxRounds = 5, history = [], onProgress, signal } = {}) {
   const candidates = readyProviders()
-  if (!candidates.length) {
-    throw new Error('No AI provider is set up yet. Open Settings (Properties → AI Assistant) and paste any free key, or pick Local AI if you have Ollama running.')
-  }
+  if (!candidates.length) throw noProviderError()
   // Try each ready provider in turn; bail out on the first one that succeeds.
   // Non-quota errors bubble up immediately so we don't mask real bugs.
   const tried = []
@@ -2213,13 +2333,10 @@ export async function runAiPrompt(prompt, { maxRounds = 5, history = [], onProgr
       try { window.dispatchEvent(new Event('storage')) } catch { /* ignore */ }
     }
     try {
-      const result = await runAiPromptOnce(prompt, { maxRounds, history, onProgress })
+      const result = await runAiPromptOnce(prompt, { maxRounds, history, onProgress, signal })
       if (switchedFrom && switchedFrom !== p.id) {
-        const fromLabel = AI_PROVIDERS.find((x) => x.id === switchedFrom)?.label || switchedFrom
-        const toLabel = p.label
-        const cleanFrom = fromLabel.replace(/ \(.*\)$/, '')
-        const cleanTo = toLabel.replace(/ \(.*\)$/, '')
-        result.text = `(Switched from ${cleanFrom} to ${cleanTo} — first one’s quota was full.) ${result.text || ''}`
+        // Said by the panel, in the user's language, above the answer.
+        result.switched = { from: providerLabel(switchedFrom), to: providerLabel(p.id) }
       }
       return result
     } catch (e) {
@@ -2241,16 +2358,12 @@ export async function runAiPrompt(prompt, { maxRounds = 5, history = [], onProgr
           setProvider(switchedFrom)
           try { window.dispatchEvent(new Event('storage')) } catch { /* ignore */ }
         }
-        const tail = tried
-          .map((t) => t.label.replace(/ \(.*\)$/, ''))
-          .join(', ')
-        const missing = AI_PROVIDERS
-          .filter((x) => x.needsKey !== false && !getApiKey(x.id))
-          .map((x) => x.label.replace(/ \(.*\)$/, ''))
-        const hint = missing.length
-          ? ` Add a free ${missing[0]} key in Settings (Properties → AI Assistant) so auto-failover has somewhere to fall back to.`
-          : ' Wait ~60s and try again.'
-        throw new Error(`All ready providers are out of quota or unreachable (tried: ${tail}).${hint}`, { cause: e })
+        if (tried.length === 1) throw e
+        const providers = tried.map((t) => providerLabel(t.id)).join(', ')
+        const missing = availableProviders().filter((x) => x.needsKey !== false && !getApiKey(x.id))
+        throw missing.length
+          ? aiError('All ready providers are out of quota or unreachable (tried: {providers}). Add a free {missing} key in the AI settings so the assistant has somewhere to fall back to.', { providers, missing: providerLabel(missing[0].id) }, { cause: e })
+          : aiError('All ready providers are out of quota or unreachable (tried: {providers}). Wait about a minute and try again.', { providers }, { cause: e })
       }
     }
   }
@@ -2261,7 +2374,7 @@ export async function runAiPrompt(prompt, { maxRounds = 5, history = [], onProgr
   throw lastErr
 }
 
-async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress } = {}) {
+async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress, signal } = {}) {
   const report = (event) => {
     try { onProgress?.(event) } catch { /* a broken listener must not kill the turn */ }
   }
@@ -2269,8 +2382,7 @@ async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress
   const providerInfo = AI_PROVIDERS.find((p) => p.id === provider)
   const apiKey = getApiKey(provider)
   if (!apiKey && providerInfo?.needsKey !== false) {
-    const providerLabel = providerInfo?.label || provider
-    throw new Error(`Set your ${providerLabel} API key in the editor settings.`)
+    throw aiError('Set your {provider} API key in the AI settings.', { provider: providerLabel(provider) })
   }
 
   const snapshot = schemaSnapshot()
@@ -2323,10 +2435,14 @@ async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress
   let limit = maxRounds
   for (let round = 0; round < limit; round += 1) {
     const isFirst = round === 0
+    // Stopped between two rounds: what landed so far is discarded by the
+    // caller with the rest of the run.
+    throwIfAborted(signal)
     const parts = await callProvider(
       apiKey,
       turns,
       isFirst ? initialPromptText : '',
+      signal,
     )
     const functionCalls = parts.filter((p) => p.functionCall)
     const textParts = parts.filter((p) => typeof p.text === 'string' && p.text.length > 0)
@@ -2533,68 +2649,49 @@ async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress
 // a JSON patch applied to ONE component — its styles and/or props — so the AI
 // touches only the selected element, never the rest of the page.
 
-// Generic single-shot completion. Returns the raw model text. Mirrors
-// callHtmlModeOnce's transport, plus the chat's ONE-shot 429 retry, with a
-// caller-supplied system prompt + `provider` override (so aiEditComponent can
-// fail over across providers without mutating the active one).
-async function completeText(systemPrompt, userText, { temperature = 0.4, maxTokens = 900, provider } = {}) {
+// Generic single-shot completion. Returns the model's text (its thinking
+// removed). Mirrors callHtmlModeOnce's transport, plus the chat's ONE-shot 429
+// retry, with a caller-supplied system prompt + `provider` override (so
+// aiEditComponent can fail over across providers without mutating the active
+// one). `kind` picks the temperature from the user's creativity setting.
+async function completeText(systemPrompt, userText, { kind = 'edit', maxTokens = 900, provider, signal, addendum = true } = {}) {
   const providerId = provider || getProvider()
   const providerInfo = AI_PROVIDERS.find((p) => p.id === providerId)
   const apiKey = getApiKey(providerId)
   if (!apiKey && providerInfo?.needsKey !== false) {
-    throw new Error(`Set your ${providerInfo?.label || providerId} API key in the editor settings (the AI button).`)
+    throw aiError('Set your {provider} API key in the AI settings.', { provider: providerLabel(providerId) })
   }
+  const system = addendum ? withAddendum(systemPrompt) : systemPrompt
+  const temperature = temperatureFor(kind)
 
   // One request shape per provider family (Gemini generateContent vs the
-  // OpenAI-compatible chat/completions used by Groq / OpenRouter / local).
+  // OpenAI-compatible chat/completions used by Groq / OpenRouter / NVIDIA / local).
   let req
   if (providerId === 'gemini') {
     req = {
       url: `${buildGeminiEndpoint(getModel('gemini'))}?key=${encodeURIComponent(apiKey)}`,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        systemInstruction: { role: 'user', parts: [{ text: systemPrompt }] },
+        systemInstruction: { role: 'user', parts: [{ text: system }] },
         contents: [{ role: 'user', parts: [{ text: userText }] }],
         generationConfig: { temperature, maxOutputTokens: maxTokens },
       }),
-      parse: (d) => d?.candidates?.[0]?.content?.parts?.[0]?.text || '',
+      parse: (d) => (d?.candidates?.[0]?.content?.parts || []).filter((part) => !part?.thought).map((part) => part?.text || '').join(''),
     }
   } else {
-    let url
-    let extraHeaders = {}
-    let extraBody = {}
-    if (providerId === 'groq') {
-      url = GROQ_ENDPOINT
-    } else if (providerId === 'openrouter') {
-      url = OPENROUTER_ENDPOINT
-      extraHeaders = {
-        'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://localhost',
-        'X-Title': 'PersonelWebSiteBuilder',
-      }
-    } else if (providerId === 'nvidia') {
-      const relay = nvidiaRelay(apiKey)
-      url = relay.url
-      extraHeaders = relay.headers
-      extraBody = relay.extraBody
-    } else {
-      url = `${resolveBackendBase()}${LOCAL_PROXY_PATH}/proxy/`
-      extraBody = { _localBase: getEndpoint('local') || 'http://localhost:11434/v1' }
-    }
-    const headers = { 'Content-Type': 'application/json', ...extraHeaders }
-    // A relayed provider's key is in the body; its header is the app's sign-in.
-    if (apiKey && providerId !== 'nvidia') headers.Authorization = `Bearer ${apiKey}`
+    const target = openAiRequestFor(providerId, apiKey)
     req = {
-      url,
-      headers,
+      url: target.url,
+      headers: { 'Content-Type': 'application/json', ...target.headers },
       body: JSON.stringify({
         model: getModel(providerId),
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: system },
           { role: 'user', content: userText },
         ],
         temperature,
         max_tokens: maxTokens,
-        ...extraBody,
+        ...target.extraBody,
       }),
       parse: (d) => d?.choices?.[0]?.message?.content || '',
     }
@@ -2604,18 +2701,39 @@ async function completeText(systemPrompt, userText, { temperature = 0.4, maxToke
   // else (or a second 429) throws with the friendly describeApiError message,
   // which aiEditComponent treats as failover-worthy.
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: req.body })
-    if (res.ok) return req.parse(await res.json())
+    const res = await providerFetch(req.url, { method: 'POST', headers: req.headers, body: req.body, signal }, providerId)
+    if (res.ok) return stripThinking(req.parse(await res.json()))
     const rawText = await res.text()
     if (res.status === 429 && attempt === 0) {
       let parsed = null
       try { parsed = JSON.parse(rawText) } catch { /* not JSON */ }
-      await new Promise((r) => setTimeout(r, Math.min(6000, parseRetryDelayMs(parsed, 4000))))
+      await sleep(Math.min(6000, parseRetryDelayMs(parsed, 4000)), signal)
       continue
     }
-    throw new Error(describeApiError(res.status, rawText, providerId))
+    throw describeApiError(res.status, rawText, providerId)
   }
-  throw new Error(describeApiError(429, '', providerId))
+  throw describeApiError(429, '', providerId)
+}
+
+// "Test connection" in the AI settings: one tiny request to the chosen
+// provider and model, nothing else. Answers { ok, ms } or { ok: false, error }
+// (an Error, so the panel can show it in the user's language).
+export async function testAiConnection(providerId = getProvider(), { signal } = {}) {
+  const started = Date.now()
+  try {
+    const reply = await completeText(
+      'You are a connection check. Reply with the single word OK and nothing else.',
+      'Connection check: reply with OK.',
+      // Reasoning models spend tokens thinking before the answer.
+      { provider: providerId, kind: 'text', maxTokens: 256, signal, addendum: false },
+    )
+    if (!reply.trim()) {
+      return { ok: false, error: aiError('{provider} answered, but with an empty reply. Try another model.', { provider: providerLabel(providerId) }) }
+    }
+    return { ok: true, ms: Date.now() - started }
+  } catch (e) {
+    return { ok: false, error: e }
+  }
 }
 
 // Pull the first JSON object out of a model reply (tolerates ```json fences +
@@ -2639,26 +2757,25 @@ Rules:
 - Change ONLY what the instruction asks; keep everything else. Include a key ONLY when you want to change it.
 - CSS keys are camelCase (backgroundColor, borderRadius, fontSize, boxShadow, padding). Colours as hex.
 - To change wording, set the SAME prop key the component already uses for its text (see the current props).
-- All user-facing text must be in English. Output valid JSON only.`
+- New text is in the language of the component's current text, unless the instruction asks for another language (see LANGUAGE below).
+- Output valid JSON only.`
 
 // Single-shot completion with provider failover: active provider first, then
 // any other configured key, switching on quota/429/unreachable (same resilience
 // as the chat) so a full Gemini free tier doesn't dead-end a ✨ edit.
-async function completeWithFailover(systemPrompt, userText) {
+async function completeWithFailover(systemPrompt, userText, { signal } = {}) {
   const candidates = readyProviders()
-  if (!candidates.length) {
-    throw new Error('No AI provider is set up yet. Open the AI button and paste any free key (OpenRouter is recommended — the biggest free pool).')
-  }
+  if (!candidates.length) throw noProviderError()
   let lastErr = null
   for (const p of candidates) {
     try {
-      return await completeText(systemPrompt, userText, { provider: p.id })
+      return await completeText(systemPrompt, userText, { provider: p.id, signal })
     } catch (e) {
       lastErr = e
       if (!isFailoverWorthy(e)) throw e // a real bug — surface it, don't mask
     }
   }
-  throw lastErr || new Error('All AI providers are out of quota or unreachable.')
+  throw lastErr || aiError('All AI providers are out of quota or unreachable.')
 }
 
 // Ask the model to edit a SINGLE component (component-canvas mode). Returns
@@ -2687,7 +2804,7 @@ marginTop (number px), marginBottom (number px),
 borderWidth (number px), borderColor (hex), borderStyle ("solid"|"dashed"|"dotted"|"none"),
 boxShadow (a CSS shadow string or "none"), opacity (0..1), display ("block"|"flex"|"inline-block"|"inline"),
 justifyContent, alignItems, gap (number px).
-Rules: change ONLY what the instruction asks; include a key ONLY when you want to change it. Colours as hex. All user-facing text in English. Output valid JSON only.`
+Rules: change ONLY what the instruction asks; include a key ONLY when you want to change it. Colours as hex. New text is in the language of the element's current text unless the instruction asks for another (see LANGUAGE below). Output valid JSON only.`
 
 // Ask the model to edit the SELECTED HTML element (HTML-upload mode). Returns a
 // flat patch shaped for applyElementPatch (color/background/fontSize/text/…).

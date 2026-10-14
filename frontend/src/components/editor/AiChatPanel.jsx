@@ -5,11 +5,14 @@ import {
   coerceToHtmlDocument,
   contentPreservationRatio,
   detectHtmlIntent,
+  availableProviders,
   executeTool,
   getApiKey,
   getModel,
   getModelsFor,
   getProvider,
+  isAbortError,
+  looksLikeChangeRequest,
   recoverIntentFromPrompt,
   repairDroppedSections,
   runAiHtmlPrompt,
@@ -36,7 +39,11 @@ const QUICK_SECTIONS = [
 ]
 import { useEditorStore } from '../../store/editorStore.js'
 import { buildAiSuggestions, readSuggestionContext } from '../../utils/aiSuggestions.js'
+import { loadAiPolicy, useAiPolicy } from '../../utils/aiPolicy.js'
+import { markEditorAction } from '../../utils/aiPreferences.js'
+import { aiErrorText } from '../../utils/aiErrorText.js'
 import AiSettings from './AiSettings.jsx'
+import ChatText from './ChatText.jsx'
 import { LayersIcon, FileCodeIcon, PaletteIcon, PlusIcon, CogIcon, LightbulbIcon, SparklesIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 
@@ -148,6 +155,17 @@ export default function AiChatPanel({
   // The model's own checklist for a multi-part request, ticked as it goes.
   const [planSteps, setPlanSteps] = useState([])
   const [error, setError] = useState('')
+  // The run in progress, for the Stop button (and for closing the panel,
+  // which stops it too: nothing would be left to show its result).
+  const runRef = useRef(null)
+  useEffect(() => () => runRef.current?.abort(), [])
+  // The server's switches and notice, asked for again each time the panel
+  // opens so a provider switched off a minute ago is not offered here.
+  const policy = useAiPolicy()
+  useEffect(() => {
+    if (open) loadAiPolicy({ fresh: true }).catch(() => {})
+  }, [open])
+  const showError = (e) => setError(aiErrorText(e, t))
   const scrollerRef = useRef(null)
   const textareaRef = useRef(null)
   // Provider/key/model live behind this toggle instead of in another panel:
@@ -206,7 +224,7 @@ export default function AiChatPanel({
       logApplied(t('Recolored the theme by updating the page colors directly — instant, no AI call, and nothing else was touched. Undo brings the old colors back.'))
       return
     }
-    send(`Restyle the site to use this color palette: primary ${picked[0]}${picked[1] ? `, secondary ${picked[1]}` : ''}. Keep every piece of content exactly as it is; change only the CSS.`)
+    send(`Restyle the site to use this color palette: primary ${picked[0]}${picked[1] ? `, secondary ${picked[1]}` : ''}. Keep every piece of content exactly as it is; change only the CSS.`, { editorAction: true })
   }
 
   function applyQuickFont(f) {
@@ -220,7 +238,7 @@ export default function AiChatPanel({
       ])
       return
     }
-    send(`Use the Google Font "${f}" across the site for headings and body text. Keep all content and layout exactly the same; change only the typography.`)
+    send(`Use the Google Font "${f}" across the site for headings and body text. Keep all content and layout exactly the same; change only the typography.`, { editorAction: true })
   }
 
   // The header rebuilds whenever a storage event fires so that if the toolbar
@@ -277,11 +295,11 @@ export default function AiChatPanel({
     // refuses while it is busy or a change is awaiting review, and a card that
     // vanished on a refused click would never come back.
     if (busy || pendingChange) {
-      send(s.prompt)
+      send(s.prompt, { editorAction: true })
       return
     }
     setUsedSuggestions((ids) => (ids.includes(s.id) ? ids : [...ids, s.id]))
-    send(s.prompt)
+    send(s.prompt, { editorAction: true })
   }
 
   // Auto-scroll to bottom on new message.
@@ -330,7 +348,7 @@ export default function AiChatPanel({
           + `/clear — ${t('wipe this chat')}\n`
           + `/undo — ${t('undo the last canvas change')}\n`
           + `/redo — ${t('redo the last undo')}\n`
-          + `/provider <${AI_PROVIDERS.map((p) => p.id).join('|')}> — ${t('switch AI provider')}\n`
+          + `/provider <${availableProviders().map((p) => p.id).join('|')}> — ${t('switch AI provider')}\n`
           + `/template <github|dark|apple|minimal-landing|portfolio|blog|dashboard|marketing> — ${t('apply preset')}\n`
           + `/help — ${t('show this list')}`,
         },
@@ -365,9 +383,9 @@ export default function AiChatPanel({
     }
     if (cmd === 'provider') {
       const next = arg.toLowerCase()
-      const valid = AI_PROVIDERS.some((p) => p.id === next)
+      const valid = availableProviders().some((p) => p.id === next)
       if (!valid) {
-        setError(t('Unknown provider "{provider}". Use one of: {list}', { provider: arg, list: AI_PROVIDERS.map((p) => p.id).join(', ') }))
+        setError(t('Unknown provider "{provider}". Use one of: {list}', { provider: arg, list: availableProviders().map((p) => p.id).join(', ') }))
         return true
       }
       setProvider(next)
@@ -407,8 +425,11 @@ export default function AiChatPanel({
     setError('')
   }
 
-  async function send(textOverride) {
-    const raw = (textOverride ?? draft).trim()
+  // `editorAction`: the prompt was written by the editor (a quick action, a
+  // suggestion card), not typed. The model is told, so its language rule can
+  // fall back to the editor's language instead of the prompt's English.
+  async function send(textOverride, { editorAction = false } = {}) {
+    const raw = (typeof textOverride === 'string' ? textOverride : draft).trim()
     if (!raw || busy) return
     if (pendingChange) {
       setError(t('Accept or reject the current AI preview before sending another request.'))
@@ -431,11 +452,15 @@ export default function AiChatPanel({
     }
     setError('')
     const userMsg = { id: rand(), role: 'user', text: trimmed }
+    const modelPrompt = editorAction ? markEditorAction(trimmed) : trimmed
     setMessages((m) => [...m, userMsg])
-    setDraft('')
+    // An editor action leaves whatever the user was typing where it was.
+    if (!editorAction) setDraft('')
     setProgress([])
     setPlanSteps([])
     setBusy(true)
+    const run = new AbortController()
+    runRef.current = run
     try {
       // ----- HTML mode: ask the model for a full HTML document --------------
       if (effectiveAiMode === 'html') {
@@ -449,7 +474,7 @@ export default function AiChatPanel({
           .filter((m) => m.role === 'user' || m.role === 'assistant')
           .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', text: m.text || '' }))
           .slice(0, -1)
-        const { html: generated } = await runAiHtmlPrompt(trimmed, { history, currentHtml })
+        const { html: generated } = await runAiHtmlPrompt(modelPrompt, { history, currentHtml, signal: run.signal })
         // Weak models sometimes return a bare fragment instead of the full
         // document. coerce: graft fragments onto the current page (the apply
         // step places them at the user's viewport) or wrap them standalone.
@@ -527,8 +552,9 @@ export default function AiChatPanel({
       let rescued = null
       let previewResult
       try {
-        aiResult = await runAiPrompt(trimmed, {
+        aiResult = await runAiPrompt(modelPrompt, {
           history,
+          signal: run.signal,
           // Narrate the turn as it happens: what the model says it is about to
           // do, then each action as it lands.
           onProgress: (event) => {
@@ -574,7 +600,13 @@ export default function AiChatPanel({
         restoreEditorPreviewState(previewBase)
         useEditorStore.getState().endPreview()
       }
-      const { text, toolCallCount } = aiResult
+      // Another provider answered because the chosen one was out of quota:
+      // said first, in the user's language.
+      const switchedNote = aiResult.switched
+        ? `${t('(Switched from {from} to {to} — the first one was out of quota.)', aiResult.switched)} `
+        : ''
+      const text = aiResult.text ? `${switchedNote}${aiResult.text}` : aiResult.text
+      const { toolCallCount } = aiResult
       const schemaChanged = JSON.stringify(previewBase.schema) !== JSON.stringify(previewResult.schema)
       if (schemaChanged) {
         const previewCalls = rescued ? [rescued.call] : callsArr
@@ -623,16 +655,31 @@ export default function AiChatPanel({
       } else {
         setMessages((m) => [
           ...m,
-          { id: rand(), role: 'assistant', text: text || t('Done.'), toolCallCount },
+          { id: rand(), role: 'assistant', text: text || t('Done.'), toolCallCount, askedForChange: looksLikeChangeRequest(trimmed) },
         ])
       }
     } catch (e) {
-      setError(e?.message || String(e))
+      if (isAbortError(e)) {
+        setMessages((m) => [...m, {
+          id: rand(),
+          role: 'assistant',
+          text: t('Stopped. Nothing from this request was applied.'),
+          // For the model, next turn: it must not build on what it started.
+          note: 'The user STOPPED this request before it finished. Nothing from it was applied.',
+        }])
+      } else {
+        showError(e)
+      }
     } finally {
+      if (runRef.current === run) runRef.current = null
       setBusy(false)
       setProgress([])
       setPlanSteps([])
     }
+  }
+
+  function stopRun() {
+    runRef.current?.abort()
   }
 
   function clearChat() {
@@ -753,6 +800,13 @@ export default function AiChatPanel({
           ×
         </button>
       </div>
+
+      {/* A line from the server's superadmin (Settings → AI assistant). */}
+      {policy.notice && (
+        <div role="status" className="border-b border-[var(--studio-border)] bg-[var(--studio-warning-soft)] px-3 py-2 text-xs text-[var(--studio-warning)]">
+          {policy.notice}
+        </div>
+      )}
 
       <div className="flex items-center gap-2 border-b border-[var(--studio-border)] bg-[var(--studio-panel)] px-3 py-2">
           <div className="studio-segment min-w-0 flex-1">
@@ -889,6 +943,7 @@ export default function AiChatPanel({
               allFailed={m.allFailed}
               calls={m.calls}
               plan={m.plan}
+              askedForChange={m.askedForChange}
             />
           ),
         )}
@@ -1100,7 +1155,7 @@ export default function AiChatPanel({
                     disabled={busy}
                     onClick={() => {
                       setQuickPanel(null)
-                      send(prompt)
+                      send(prompt, { editorAction: true })
                     }}
                     className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-panel)] px-2.5 py-1 text-[12px] text-[var(--studio-text)] hover:border-[var(--studio-border-strong)] hover:bg-[var(--studio-control-hover)] disabled:opacity-40"
                   >
@@ -1145,14 +1200,25 @@ export default function AiChatPanel({
         />
         <div className="mt-1 flex items-center justify-between text-[11px] text-[var(--studio-text-muted)]">
           <span>{t('Press Ctrl+Z to undo any change the AI made.')}</span>
-          <button
-            type="button"
-            onClick={send}
-            disabled={!hasKey || busy || !draft.trim()}
-            className="rounded-lg bg-[var(--studio-text)] px-3 py-1 text-xs font-semibold text-[var(--studio-panel)] hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[var(--studio-text-faint)]"
-          >
-            {busy ? '…' : t('Send')}
-          </button>
+          {busy ? (
+            <button
+              type="button"
+              onClick={stopRun}
+              title={t('Stop this request. Nothing from it is applied.')}
+              className="rounded-lg border border-[var(--studio-border-strong)] bg-[var(--studio-panel)] px-3 py-1 text-xs font-semibold text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]"
+            >
+              {t('Stop')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => send()}
+              disabled={!hasKey || !draft.trim()}
+              className="rounded-lg bg-[var(--studio-text)] px-3 py-1 text-xs font-semibold text-[var(--studio-panel)] hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[var(--studio-text-faint)]"
+            >
+              {t('Send')}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1231,7 +1297,7 @@ function UserBubble({ text }) {
   )
 }
 
-function AssistantBubble({ text, toolCallCount, allFailed, calls, plan }) {
+function AssistantBubble({ text, toolCallCount, allFailed, calls, plan, askedForChange }) {
   const { t } = useLanguage()
   // The model's sign-off is prose it wrote before knowing the outcome, and a
   // cheerful "Done." over three rejected calls is exactly the lie the user
@@ -1247,7 +1313,7 @@ function AssistantBubble({ text, toolCallCount, allFailed, calls, plan }) {
   // Failure-aware tinting: red border + light pink background so a wall of
   // ✗ pills above this bubble can't be mistaken for a successful change.
   const base =
-    'max-w-[85%] whitespace-pre-wrap break-words rounded-[12px] rounded-tl-[2px] border px-3 py-2 text-sm leading-snug shadow-sm'
+    'max-w-[85%] break-words rounded-[12px] rounded-tl-[2px] border px-3 py-2 text-sm leading-snug shadow-sm'
   const bubbleCls = allFailed
     ? `${base} text-[var(--studio-danger)]`
     : `${base} border-[var(--studio-border)] bg-[var(--studio-panel)] text-[var(--studio-text)]`
@@ -1263,7 +1329,7 @@ function AssistantBubble({ text, toolCallCount, allFailed, calls, plan }) {
         className={plan ? `${base} border-dashed border-[var(--studio-border)] text-[var(--studio-text-muted)]` : bubbleCls}
         style={plan ? undefined : failedStyle}
       >
-        {text || t('Done.')}
+        <ChatText text={text || t('Done.')} />
       </div>
       {tally.applied + tally.failed > 0 && (
         <span className="text-[10px] text-[var(--studio-text-faint)]">
@@ -1276,7 +1342,9 @@ function AssistantBubble({ text, toolCallCount, allFailed, calls, plan }) {
           )}
         </span>
       )}
-      {toolCallCount === 0 && (
+      {/* Only where a change was asked for: an answer to a question changes
+          nothing by design, and the red line read as a failure there. */}
+      {toolCallCount === 0 && askedForChange !== false && (
         <span className="text-[10px] italic text-[var(--studio-danger)]">
           {t('No tools called — the canvas was not changed.')}
         </span>

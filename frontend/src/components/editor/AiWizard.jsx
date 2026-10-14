@@ -12,6 +12,7 @@ import {
 } from '../../utils/aiWizard.js'
 import { HTML_ALLOW, PUBLIC_HTML_SANDBOX, withViewportMeta } from '../../utils/htmlRuntime.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { aiErrorText } from '../../utils/aiErrorText.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 const STEPS = ['Type', 'About', 'Style', 'Sections']
@@ -127,7 +128,8 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
       setPhase('preview')
     } catch (e) {
       if (run !== generationRef.current) return
-      setError(e?.message || t('Generation failed.'))
+      // The assistant's errors carry their key, for the user's language.
+      setError(e?.i18n || e?.message || 'Generation failed.')
       setPhase('error')
     }
   }
@@ -156,7 +158,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
       setRefineText('')
     } catch (e) {
       if (run !== generationRef.current) return
-      setError(e?.message || t('Refine failed.'))
+      setError(e?.i18n || e?.message || 'Refine failed.')
     } finally {
       if (run === generationRef.current) setRefining(false)
     }
@@ -168,7 +170,9 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
     onClose?.()
   }
 
-  const noProvider = /No AI provider/i.test(error)
+  // `error` is an English text or an assistant error's { key, vars }.
+  const errorText = typeof error === 'string' ? t(error) : aiErrorText({ i18n: error }, t)
+  const noProvider = /No AI provider/i.test(typeof error === 'string' ? error : error.key)
   const canNext =
     step !== 1 || answers.brand.trim() || answers.description.trim()
 
@@ -371,7 +375,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
 
           {phase === 'error' && (
             <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-center">
-              <p className="max-w-md text-sm font-medium text-[#b91c1c]">{t(error)}</p>
+              <p className="max-w-md text-sm font-medium text-[#b91c1c]">{errorText}</p>
               {noProvider ? (
                 <p className="max-w-md text-xs text-[#6b7280]">
                   {t('Open the AI chat (AI button in the header) → Settings, and paste any free key — or start from a ready-made template instead.')}
@@ -410,7 +414,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
                 allow={HTML_ALLOW}
                 className="min-h-[320px] w-full flex-1 rounded-lg border border-[#e5e7eb] bg-white"
               />
-              {error && <p className="text-xs font-medium text-[#b91c1c]">{t(error)}</p>}
+              {error && <p className="text-xs font-medium text-[#b91c1c]">{errorText}</p>}
               <div className="flex items-center gap-2">
                 <input
                   className={inputCls}
