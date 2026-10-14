@@ -3088,6 +3088,7 @@ export const TURKISH_TRANSLATIONS = {
   'Sign in to this app again to use {provider}: its requests go through this app\'s server.': '{provider} kullanmak için bu uygulamaya yeniden giriş yapın: istekleri bu uygulamanın sunucusundan geçer.',
   'Stopped.': 'Durduruldu.',
   'Local AI': 'Yerel AI',
+  'Your work before a load': 'Yüklemeden önceki çalışmanız',
   'Delete "{name}" ({file})? {count} link(s) on other pages lead to it and will stop working until you point them elsewhere.': '“{name}” ({file}) silinsin mi? Diğer sayfalardaki {count} bağlantı bu sayfaya gidiyor; siz başka bir yere yönlendirene kadar çalışmayacaklar.',
   '(deleted page)': '(silinmiş sayfa)',
   'The page this link went to was deleted. Choose another page.': 'Bu bağlantının gittiği sayfa silinmiş. Başka bir sayfa seçin.',

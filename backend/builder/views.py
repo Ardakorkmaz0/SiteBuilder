@@ -632,7 +632,11 @@ class SiteViewSet(viewsets.ModelViewSet):
         # Wrap the snapshot-of-current + restore in a transaction so a crash
         # mid-way can never leave the site in a half-restored state.
         with transaction.atomic():
-            SiteVersion.snapshot(site, source='save', label='before restore')
+            # Always recorded, even when it matches the latest snapshot: it is
+            # the recovery point the load promises, and it is looked for under
+            # "Recovery points". De-duplicated away, the only row there was the
+            # copy of what had just been loaded.
+            SiteVersion.snapshot(site, source='save', label='before restore', force=True)
             site.schema = version.schema
             site.html = version.html
             site.save()

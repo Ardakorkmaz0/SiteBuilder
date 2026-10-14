@@ -249,7 +249,7 @@ export default function HistoryPanel({
                   <li key={v.id} className="flex items-center gap-2 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 transition hover:border-[var(--studio-border-strong)]">
                     <SourceBadge source={v.source} pinned={v.pinned} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[12px] font-medium text-[var(--studio-text)]">{v.label || labelForSource(v.source, t)}</p>
+                      <p className="truncate text-[12px] font-medium text-[var(--studio-text)]">{rowTitle(v, t)}</p>
                       <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}</p>
                     </div>
                     <SlotBtn disabled={busy} onClick={() => togglePin(v)}>{v.pinned ? t('Unpin') : t('Pin')}</SlotBtn>
@@ -269,7 +269,7 @@ export default function HistoryPanel({
                     <li key={v.id} className="flex items-center gap-2 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 transition hover:border-[var(--studio-border-strong)]">
                       <SourceBadge source={v.source} pinned={v.pinned} />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[12px] font-medium text-[var(--studio-text)]">{v.label || labelForSource(v.source, t)}</p>
+                        <p className="truncate text-[12px] font-medium text-[var(--studio-text)]">{rowTitle(v, t)}</p>
                         <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}</p>
                       </div>
                       <SlotBtn disabled={busy} onClick={() => restore(v.id)}>{t('Load')}</SlotBtn>
@@ -344,8 +344,18 @@ function SourceBadge({ source, pinned = false }) {
   )
 }
 
-function labelForSource(source, translate) {
+// The server names the rows a load makes in English ("before restore",
+// "restored from v12"): those are its notes, not names someone gave a save,
+// so they are shown in the person's language. A save's own name is shown as
+// it was written.
+function rowTitle(row, translate) {
+  if (row.source === 'save' || row.source === 'restore') return labelForSource(row.source, translate, row.label)
+  return row.label || labelForSource(row.source, translate)
+}
+
+function labelForSource(source, translate, label = '') {
   if (source === 'restore') return translate('Restored from history')
+  if (source === 'save' && label === 'before restore') return translate('Your work before a load')
   if (source === 'save') return translate('Older saved snapshot')
   return translate('Auto-saved snapshot')
 }
