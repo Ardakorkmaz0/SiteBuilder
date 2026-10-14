@@ -138,6 +138,19 @@ class TestGlobalSearch:
         assert hidden_results['users'] == []
         assert hidden_results['sites'] == []
 
+    def test_guest_accounts_are_not_listed_as_people(self, client, alice):
+        from .guests import create_guest_user
+        _, token = alice
+        guest = create_guest_user()
+        _auth(client, token)
+
+        users = client.get('/api/search/', {'q': 'guest'}).data['users']
+        results = client.get('/api/search/', {'q': guest.username[:9], 'mode': 'results'}).data
+
+        assert users == []
+        assert results['users'] == []
+        assert results['counts']['users'] == 0
+
     def test_people_suggestions_exclude_sites_and_remain_capped(self, client, alice):
         owner, token = alice
         for index in range(7):

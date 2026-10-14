@@ -1426,7 +1426,10 @@ class GlobalSearchView(APIView):
             .order_by('-hot_score', '-updated_at', 'pk')
         )
         users = (
+            # A guest is an anonymous, temporary account with nothing public:
+            # listed, it was a row of "guest-x7k2…" names under People.
             User.objects.filter(is_active=True)
+            .exclude(profile__is_guest=True)
             .filter(
                 Q(username__icontains=query)
                 | Q(profile__display_name__icontains=query)
