@@ -1539,9 +1539,13 @@ class CloneSiteView(APIView):
         if src.moderation_blocked:
             return error_response('site_moderated', 'This site was taken down by a moderator.', status.HTTP_403_FORBIDDEN)
         refuse_past_site_limit(request.user)
+        # The copy is named in the language of the editor that asked for it
+        # ("Kafe (kopya)"); it always said "(copy)".
+        language = request.data.get('language') if isinstance(request.data, dict) else None
+        suffix = 'kopya' if language == 'tr' else 'copy'
         copy = Site.objects.create(
             owner=request.user,
-            title=f'{src.title} (copy)'[:100],
+            title=f'{src.title} ({suffix})'[:100],
             schema=src.schema,
             html=src.html,
             category=src.category,

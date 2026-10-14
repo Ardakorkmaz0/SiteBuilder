@@ -1,4 +1,5 @@
 import client from './client.js'
+import { detectInitialLanguage } from '../i18n/language.js'
 
 export const listSites = () => client.get('/sites/').then((r) => r.data)
 
@@ -18,8 +19,9 @@ export const patchSite = (id, payload) =>
 export const deleteSite = (id) => client.delete(`/sites/${id}/`)
 
 // "Use this": clone a public site into your account as a fresh draft.
+// The copy is named in the editor's language ("… (kopya)").
 export const cloneSite = (slug) =>
-  client.post(`/sites/clone/${slug}/`).then((r) => r.data)
+  client.post(`/sites/clone/${slug}/`, { language: detectInitialLanguage() }).then((r) => r.data)
 
 export const getPublicSite = (slug) =>
   client.get(`/public/sites/${slug}/`).then((r) => r.data)

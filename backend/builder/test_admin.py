@@ -54,6 +54,11 @@ class TestClone:
         assert resp.data['published'] is False
         assert resp.data['category'] == 'blog'
         assert '(copy)' in resp.data['title']
+        # Asked for from the Turkish editor, the copy is named in Turkish.
+        turkish = client.post(f'/api/sites/clone/{src.slug}/', {'language': 'tr'}, format='json')
+        assert turkish.status_code == 201
+        assert turkish.data['title'] == 'Cool Site (kopya)'
+        assert turkish.data['slug'].endswith('kopya')
         # owned by bob, and a distinct row
         clone = Site.objects.get(pk=resp.data['id'])
         assert clone.owner == bob[0]
