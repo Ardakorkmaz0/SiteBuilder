@@ -427,7 +427,7 @@ export default function ProfilePage() {
                   <button type="submit" disabled={saving} className="studio-btn studio-btn-primary min-h-9 px-4">
                     {saving ? t('Saving…') : t('Save profile')}
                   </button>
-                  {saved && <span className="flex items-center gap-1 text-xs font-semibold text-[var(--studio-success)]"><CheckIcon size={14} /> {t('Saved')}</span>}
+                  {saved && <span role="status" className="flex items-center gap-1 text-xs font-semibold text-[var(--studio-success)]"><CheckIcon size={14} /> {t('Saved')}</span>}
                 </div>
               </form>
             )}
