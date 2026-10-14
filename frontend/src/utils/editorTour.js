@@ -16,8 +16,9 @@ export const EDITOR_TOUR_STEPS = [
   {
     id: 'modes',
     target: '[data-tour="canvas-modes"]',
-    title: 'Edit, View, Source',
-    body: 'Edit is where you build. View plays the page for real, and Source is the code behind it.',
+    // In the toolbar's own order.
+    title: 'View, Edit, Source',
+    body: 'View plays the page for real, Edit is where you build, and Source is the code behind it.',
   },
   {
     id: 'devices',
