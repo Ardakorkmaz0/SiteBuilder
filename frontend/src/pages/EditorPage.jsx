@@ -1454,10 +1454,10 @@ function SiteEditor() {
     const map = { ...pageHtmlMap }
     if (live != null && live !== siteHtml) {
       map[currentPageId] = live
-      if (commit) {
-        setSiteHtml(live)
-        markHtmlDirty()
-      }
+      // As an undo step: the typing becomes one only when the pointer next
+      // goes down, and once the save has taken it as the page's own document
+      // there is nothing left to record then, so Undo could not reach it.
+      if (commit) commitHtml(live)
     }
     return map
   }
