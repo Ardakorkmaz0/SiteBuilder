@@ -65,15 +65,25 @@ export default function NotesPanel({ open, onClose }) {
   }
 
   return (
-    <div
+    <aside
+      aria-label={t('Notes')}
       className="studio-theme-surface fixed right-4 top-16 z-[120] flex max-h-[78vh] w-[340px] flex-col overflow-hidden rounded-xl border border-[var(--studio-border-strong)] bg-[var(--studio-panel)] text-[var(--studio-text)] shadow-2xl"
       onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        // A panel beside the work, not a dialog: Esc from inside it closes it;
+        // Esc on the canvas still clears the selection while it stays open.
+        if (e.key !== 'Escape' || e.nativeEvent.isComposing) return
+        e.stopPropagation()
+        onClose?.()
+      }}
     >
       <div className="flex items-center justify-between border-b border-[var(--studio-border)] bg-[var(--studio-panel-raised)] px-3 py-2">
         <span className="flex items-center gap-1.5 text-sm font-bold text-[var(--studio-text)]"><NoteIcon size={15} /> {t('Notes')}</span>
         <button
           type="button"
           onClick={onClose}
+          title={t('Close')}
+          aria-label={t('Close notes')}
           className="rounded-lg px-2 py-0.5 text-sm text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]"
         >
           ✕
@@ -194,6 +204,6 @@ export default function NotesPanel({ open, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </aside>
   )
 }
