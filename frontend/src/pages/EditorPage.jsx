@@ -2474,6 +2474,7 @@ function SiteEditor() {
                       type="button"
                       onClick={() => setRail('right', false)}
                       title={t('Hide panel')}
+                      aria-label={t('Hide panel')}
                       className="studio-icon-btn h-7 w-7 text-xs"
                     >
                       »
@@ -2862,6 +2863,7 @@ function SiteEditor() {
                     type="button"
                     onClick={() => setRail('right', false)}
                     title={t('Hide panel')}
+                    aria-label={t('Hide panel')}
                     className="rounded-md px-1.5 py-0.5 text-xs text-[var(--studio-text-faint)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]"
                   >
                     »

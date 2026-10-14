@@ -3153,6 +3153,8 @@ export const TURKISH_TRANSLATIONS = {
   "A superuser's rights can't be changed here.": 'Süper yöneticinin yetkileri buradan değiştirilemez.',
   'Pick a colour: {label}': 'Renk seç: {label}',
   'Close notes': 'Notları kapat',
+  'Previous month': 'Önceki ay',
+  'Next month': 'Sonraki ay',
 }
 
 // Editor-only libraries (the section blocks and component variants) carry

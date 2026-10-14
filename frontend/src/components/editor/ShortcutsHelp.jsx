@@ -60,6 +60,7 @@ export default function ShortcutsHelp({ onClose }) {
           <button
             type="button"
             onClick={onClose}
+            aria-label={t('Close')}
             className="rounded px-2 py-1 text-sm text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]"
           >
             ×

@@ -135,10 +135,13 @@ export default function PageFilesPanel({
             {t('empty')}
           </span>
         )}
-        <span className="hidden shrink-0 gap-0.5 group-hover:flex">
+        {/* Shown on hover, and while the keyboard is on this row: hidden
+            outright, they could not be reached without a mouse. */}
+        <span className="hidden shrink-0 gap-0.5 group-hover:flex group-focus-within:flex">
           <button
             type="button"
             title={t('Rename page')}
+            aria-label={`${t('Rename page')}: ${page.name}`}
             onClick={() => {
               setEditingId(page.id)
               setDraft(page.name || '')
@@ -151,6 +154,7 @@ export default function PageFilesPanel({
             <button
               type="button"
               title={t('Import an HTML file into this page')}
+              aria-label={`${t('Import an HTML file into this page')}: ${page.name}`}
               onClick={() => {
                 importTarget.current = page.id
                 importRef.current?.click()
@@ -164,6 +168,7 @@ export default function PageFilesPanel({
             <button
               type="button"
               title={t('Delete page')}
+              aria-label={`${t('Delete page')}: ${page.name}`}
               onClick={() => {
                 // Links to it from the other pages stop working: say how many.
                 const links = countLinksToPage(pages, page.id, htmlMap)

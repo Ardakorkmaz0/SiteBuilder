@@ -276,6 +276,7 @@ function ImageLibrary({ value, onPick }) {
               type="button"
               onClick={() => remove(img.id)}
               title={t('Delete from library')}
+              aria-label={t('Delete from library')}
               className="absolute right-0.5 top-0.5 rounded-full bg-white/90 px-1 text-[10px] text-[#a4262c] opacity-0 shadow group-hover:opacity-100"
             >
               ×
@@ -575,6 +576,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
                     disabled={i === 0}
                     className="rounded-lg px-1 text-xs text-[#6b7280] hover:bg-[#f3f4f6] disabled:opacity-30"
                     title={t('Move up')}
+                    aria-label={t('Move up')}
                   >
                     ↑
                   </button>
@@ -584,6 +586,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
                     disabled={i === tabs.length - 1}
                     className="rounded-lg px-1 text-xs text-[#6b7280] hover:bg-[#f3f4f6] disabled:opacity-30"
                     title={t('Move down')}
+                    aria-label={t('Move down')}
                   >
                     ↓
                   </button>

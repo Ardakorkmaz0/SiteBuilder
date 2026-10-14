@@ -96,6 +96,7 @@ export default function NotesPanel({ open, onClose }) {
           <button
             type="button"
             onClick={() => setCursor(new Date(year, month - 1, 1))}
+            aria-label={t('Previous month')}
             className="rounded-lg px-2 py-0.5 text-sm text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]"
           >
             ‹
@@ -106,6 +107,7 @@ export default function NotesPanel({ open, onClose }) {
           <button
             type="button"
             onClick={() => setCursor(new Date(year, month + 1, 1))}
+            aria-label={t('Next month')}
             className="rounded-lg px-2 py-0.5 text-sm text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]"
           >
             ›
@@ -173,6 +175,7 @@ export default function NotesPanel({ open, onClose }) {
                 type="button"
                 onClick={() => removeNote(n.id)}
                 title={t('Delete note')}
+                aria-label={t('Delete note')}
                 className="hidden rounded px-1 text-xs text-[var(--studio-text-faint)] hover:text-[var(--studio-danger)] group-hover:block"
               >
                 ✕

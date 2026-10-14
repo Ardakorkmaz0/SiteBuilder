@@ -590,6 +590,7 @@ export default function Sidebar({ onPickComponent, onArmPlacement, onCollapse, f
             type="button"
             onClick={onCollapse}
             title={t('Hide panel')}
+            aria-label={t('Hide panel')}
             className="px-2 py-2 text-xs text-[var(--studio-text-faint)] hover:text-[var(--studio-text)]"
           >
             «
