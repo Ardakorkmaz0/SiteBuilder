@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { EditIcon, EyeIcon, GlobeIcon, LayersIcon } from '../icons.jsx'
 import LanguageSwitcher from '../LanguageSwitcher.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { HTML_ALLOW, PUBLIC_HTML_SANDBOX, withBuilderInteractiveHtml, withViewportMeta } from '../../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../../utils/schemaToFiles.js'
 import { colorModeFor, withColorModeHtml } from '../../utils/colorMode.js'
@@ -31,6 +32,8 @@ export default function MobileEditorPreview({
 }) {
   const { t } = useLanguage()
   const [sheet, setSheet] = useState(null)
+  // A tablet with a keyboard reaches this layout too.
+  useEscapeToClose(!!sheet, () => setSheet(null))
   const [focused, setFocused] = useState(false)
   const [copied, setCopied] = useState(false)
   const currentPage = useMemo(

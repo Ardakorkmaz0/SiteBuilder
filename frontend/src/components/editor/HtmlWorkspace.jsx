@@ -71,6 +71,7 @@ import { readZoom, writeZoom, zoomScale } from './canvasZoom.js'
 import BrushControls from './BrushControls.jsx'
 import { EditIcon, MoveIcon, LinkIcon, PinIcon, LightbulbIcon, FileCodeIcon, WarningIcon, PaletteIcon, MoreHorizontalIcon, MonitorIcon, ChevronDownIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { shouldForwardIframeShortcut } from '../../utils/editorLeave.js'
 import { revealLine } from '../../utils/revealCodeLine.js'
 import CodeLineGlow from './CodeLineGlow.jsx'
@@ -627,6 +628,7 @@ function HtmlWorkspace({
   const [pendingReveal, setPendingReveal] = useState(null)
   const [glow, setGlow] = useState(null)
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
+  useEscapeToClose(workspaceMenuOpen, () => setWorkspaceMenuOpen(false))
   const clearGlow = useCallback(() => setGlow(null), [])
   const sourceDraftDirty = hasUnsavedSourceDraft(mode, sourceDraft, html)
   useEffect(() => () => onDraftDirtyChange?.(false), [onDraftDirtyChange])
@@ -640,6 +642,7 @@ function HtmlWorkspace({
   // 'rearrange' = drag blocks to reorder, 'link' = connect a link to a target.
   const [editTool, setEditTool] = useState(() => simpleMode ? 'text' : lsGet('htmltool', 'text'))
   const [toolMenuOpen, setToolMenuOpen] = useState(false)
+  useEscapeToClose(toolMenuOpen, () => setToolMenuOpen(false))
   // Bumped on every iframe load so the tool manager rebinds AFTER the document
   // is ready — needed when edit/link is restored on mount (the first effect run
   // happens before the iframe body exists).

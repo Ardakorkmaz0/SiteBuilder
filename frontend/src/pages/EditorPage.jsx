@@ -500,6 +500,7 @@ function SiteEditor() {
   // at the next action). Undo takes it back, so Undo must not look dead.
   const [htmlTyping, setHtmlTyping] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  useEscapeToClose(accountOpen, () => setAccountOpen(false))
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [templateOpen, setTemplateOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -550,6 +551,7 @@ function SiteEditor() {
     } catch { return 'edit' }
   }) // 'view' | 'edit' | 'source'
   const [canvasToolsOpen, setCanvasToolsOpen] = useState(false)
+  useEscapeToClose(canvasToolsOpen, () => setCanvasToolsOpen(false))
   const [browserFrameEnabled, setBrowserFrameEnabled] = useState(readBrowserFramePreference)
   const [liveCodeEnabled, setLiveCodeEnabled] = useState(readLiveCodePreference)
   const [liveCodeHold, setLiveCodeHold] = useState(readLiveCodeHold)

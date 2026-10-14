@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import Favicon from './BrowserFavicon.jsx'
 import { previewScaleStyle } from './previewScale.js'
 import { pageTitle, visiblePageAddress } from './browserPageAddress.js'
@@ -47,6 +48,8 @@ export default function BrowserFrame({
   const fullscreenViewportRef = useRef(null)
   const [pageMenuOpen, setPageMenuOpen] = useState(false)
   const [browserMenuOpen, setBrowserMenuOpen] = useState(false)
+  useEscapeToClose(pageMenuOpen, () => setPageMenuOpen(false))
+  useEscapeToClose(browserMenuOpen, () => setBrowserMenuOpen(false))
   const [editingAddress, setEditingAddress] = useState(false)
   const [addressDraft, setAddressDraft] = useState('')
   const [reloadNonce, setReloadNonce] = useState(0)

@@ -20,6 +20,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { ArrowLeftIcon, ArrowRightIcon, MoreHorizontalIcon } from '../icons.jsx'
 import Favicon from './BrowserFavicon.jsx'
 import { pageTitle, visiblePageAddress } from './browserPageAddress.js'
@@ -130,6 +131,8 @@ export default function MobileBrowserChrome({
   const [addressDraft, setAddressDraft] = useState('')
   const [pageMenuOpen, setPageMenuOpen] = useState(false)
   const [browserMenuOpen, setBrowserMenuOpen] = useState(false)
+  useEscapeToClose(pageMenuOpen, () => setPageMenuOpen(false))
+  useEscapeToClose(browserMenuOpen, () => setBrowserMenuOpen(false))
   const [reloadNonce, setReloadNonce] = useState(0)
 
   const skin = mobileBrowserSkin(model)
