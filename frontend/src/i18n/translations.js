@@ -3157,6 +3157,12 @@ export const TURKISH_TRANSLATIONS = {
   'Next month': 'Sonraki ay',
   '{date}, has notes': '{date}, not var',
   'Note for this day': 'Bu güne not',
+  'Drag with the mouse or a finger.': 'Fareyle ya da parmağınızla sürükleyin.',
+  'Picked up.': 'Tutuldu.',
+  'Over a place it can go.': 'Bırakılabilecek bir yerin üzerinde.',
+  'Not over a place it can go.': 'Bırakılabilecek bir yerin üzerinde değil.',
+  'Dropped.': 'Bırakıldı.',
+  'Dragging cancelled.': 'Sürükleme iptal edildi.',
 }
 
 // Editor-only libraries (the section blocks and component variants) carry
