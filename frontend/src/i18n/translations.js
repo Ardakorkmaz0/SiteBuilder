@@ -3155,6 +3155,8 @@ export const TURKISH_TRANSLATIONS = {
   'Close notes': 'Notları kapat',
   'Previous month': 'Önceki ay',
   'Next month': 'Sonraki ay',
+  '{date}, has notes': '{date}, not var',
+  'Note for this day': 'Bu güne not',
 }
 
 // Editor-only libraries (the section blocks and component variants) carry
