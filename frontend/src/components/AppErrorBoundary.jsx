@@ -1,6 +1,7 @@
 import { Component } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { isChunkLoadError } from '../utils/lazyChunk.js'
 
 // A render error anywhere below this point used to blank the whole app — React
 // unmounts the tree and the user is left staring at white, with no idea whether
@@ -35,6 +36,34 @@ class Boundary extends Component {
     const { error } = this.state
     const { t, children } = this.props
     if (!error) return children
+
+    // A tab older than the app: a part it asks for is not there any more.
+    // Trying again asks for the same missing file; only a reload helps, so
+    // that is the one thing offered. Leaving the editor sent its automatic
+    // save (when that is on) as this screen appeared.
+    if (isChunkLoadError(error)) {
+      return (
+        <div className="studio-theme-surface flex min-h-screen items-center justify-center bg-[var(--studio-shell)] p-6">
+          <div className="w-full max-w-md rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-6 shadow-[var(--studio-shadow)]">
+            <h1 className="text-lg font-bold text-[var(--studio-text)]">
+              {t('Sitebuilder has been updated')}
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--studio-text-muted)]">
+              {t('A new version was published while this tab was open, and part of the old one is no longer available. Reload the page to continue with the new version. With automatic saving on, your latest changes were saved as this screen opened.')}
+            </p>
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="rounded-lg bg-[var(--studio-accent-pressed)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--studio-accent)]"
+              >
+                {t('Reload the page')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
 
     return (
       <div className="studio-theme-surface flex min-h-screen items-center justify-center bg-[var(--studio-shell)] p-6">

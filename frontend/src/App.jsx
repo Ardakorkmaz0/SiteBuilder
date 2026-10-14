@@ -1,4 +1,5 @@
-import { lazy, Suspense, useLayoutEffect } from 'react'
+import { Suspense, useLayoutEffect } from 'react'
+import { lazyChunk } from './utils/lazyChunk.js'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
@@ -21,17 +22,17 @@ import { markSurface } from './ui/surface.js'
 // up front. React.lazy splits each off into its own chunk that streams in only
 // when the matching route mounts; the Suspense fallback keeps the UI from
 // flashing blank between chunks.
-const EditorPage = lazy(() => import('./pages/EditorPage.jsx'))
-const PreviewPage = lazy(() => import('./pages/PreviewPage.jsx'))
-const CodeProjectPage = lazy(() => import('./pages/CodeProjectPage.jsx'))
-const ProfilePage = lazy(() => import('./pages/ProfilePage.jsx'))
-const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage.jsx'))
-const FavoritesPage = lazy(() => import('./pages/FavoritesPage.jsx'))
-const SearchPage = lazy(() => import('./pages/SearchPage.jsx'))
-const CommunityPage = lazy(() => import('./pages/CommunityPage.jsx'))
-const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
-const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'))
-const ReviewPage = lazy(() => import('./pages/ReviewPage.jsx'))
+const EditorPage = lazyChunk(() => import('./pages/EditorPage.jsx'))
+const PreviewPage = lazyChunk(() => import('./pages/PreviewPage.jsx'))
+const CodeProjectPage = lazyChunk(() => import('./pages/CodeProjectPage.jsx'))
+const ProfilePage = lazyChunk(() => import('./pages/ProfilePage.jsx'))
+const PublicProfilePage = lazyChunk(() => import('./pages/PublicProfilePage.jsx'))
+const FavoritesPage = lazyChunk(() => import('./pages/FavoritesPage.jsx'))
+const SearchPage = lazyChunk(() => import('./pages/SearchPage.jsx'))
+const CommunityPage = lazyChunk(() => import('./pages/CommunityPage.jsx'))
+const AdminPage = lazyChunk(() => import('./pages/AdminPage.jsx'))
+const SettingsPage = lazyChunk(() => import('./pages/SettingsPage.jsx'))
+const ReviewPage = lazyChunk(() => import('./pages/ReviewPage.jsx'))
 
 // Records every ordinary page the user visits, so a workspace can send them
 // back out to where they actually were rather than one history step back —

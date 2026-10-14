@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { lazyChunk } from '../utils/lazyChunk.js'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   DndContext,
@@ -121,12 +122,12 @@ import SiteControlCenter from '../components/editor/SiteControlCenter.jsx'
 // opens that surface. Suspense fallback is a tiny spinner box, never the
 // whole screen, so the rest of the editor stays interactive while the panel
 // chunk arrives.
-const CodePanel = lazy(() => import('../components/editor/CodePanel.jsx'))
-const HtmlWorkspace = lazy(() => import('../components/editor/HtmlWorkspace.jsx'))
-const TemplatePicker = lazy(() => import('../components/editor/TemplatePicker.jsx'))
-const HistoryPanel = lazy(() => import('../components/editor/HistoryPanel.jsx'))
-const NotesPanel = lazy(() => import('../components/editor/NotesPanel.jsx'))
-const AiWizard = lazy(() => import('../components/editor/AiWizard.jsx'))
+const CodePanel = lazyChunk(() => import('../components/editor/CodePanel.jsx'))
+const HtmlWorkspace = lazyChunk(() => import('../components/editor/HtmlWorkspace.jsx'))
+const TemplatePicker = lazyChunk(() => import('../components/editor/TemplatePicker.jsx'))
+const HistoryPanel = lazyChunk(() => import('../components/editor/HistoryPanel.jsx'))
+const NotesPanel = lazyChunk(() => import('../components/editor/NotesPanel.jsx'))
+const AiWizard = lazyChunk(() => import('../components/editor/AiWizard.jsx'))
 
 // The viewport the editor reopens on: simply the last one the user switched to.
 const LAST_VIEWPORT_KEY = 'pwb_default_editor_viewport'
