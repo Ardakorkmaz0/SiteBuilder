@@ -15,6 +15,7 @@ import {
 } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { siteAddress } from '../../utils/siteAddress.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 function HealthPill({ complete, children }) {
   return (
@@ -41,6 +42,7 @@ export default function OwnerSiteCard({
   const { t } = useLanguage()
   const address = siteAddress(site)
   const [menuOpen, setMenuOpen] = useState(false)
+  useEscapeToClose(menuOpen, () => setMenuOpen(false))
   const menuRef = useRef(null)
   const health = site.project_health || {
     score: site.published ? 45 : 20,

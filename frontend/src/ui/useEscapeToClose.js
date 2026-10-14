@@ -1,4 +1,5 @@
-// Esc closes the dialog on top, and only that one.
+// Esc closes the dialog on top, and only that one. A dropdown menu registers
+// too: it is on top while it is open.
 //
 // Most editor dialogs had no Esc at all: the AI wizard, which opens by itself
 // on every new site, could only be left by finding its ✕ or Cancel. Each open
