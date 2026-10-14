@@ -9,6 +9,7 @@ import { componentToHtml } from '../../utils/componentToHtml.js'
 import { componentPresetProps, componentPresetStyles, presetsForType } from '../../utils/componentPresets.js'
 import { fieldSize, fieldSnippet } from '../../utils/formField.js'
 import { THEME_TOGGLE_CSS, themeToggleHtml } from '../../utils/themeToggle.js'
+import { turkishSnippet } from '../../utils/coreSnippetsTr.js'
 
 // Form fields drop as real field components, every part editable, not as a
 // block of HTML only the code view could change. Their swatches and the HTML
@@ -118,10 +119,11 @@ export function blockSize(id) {
   return BLOCK_SIZE[id] || LIBRARY_BLOCK_SIZE.get(id) || [1000, 360]
 }
 
-// Library snippets built from bilingual data carry a Turkish build; everything
-// else is language-neutral markup.
+// Library snippets built from bilingual data carry a Turkish build; the core
+// library (htmlVariants.js) is translated phrase by phrase (coreSnippetsTr.js).
 export function localizedHtml(item, language) {
-  return language === 'tr' && item?.htmlTr ? item.htmlTr : item?.html
+  if (language !== 'tr') return item?.html
+  return item?.htmlTr || turkishSnippet(item?.html)
 }
 
 export function previewSrcDoc(html, wide) {

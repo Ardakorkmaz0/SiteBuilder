@@ -1456,7 +1456,11 @@ export const useEditorStore = create((set, get) => ({
   },
 
   // ---- Components (operate on the current page) --------------------------
-  addComponent: (type, x = 24, y = 24, parentId = null, presetId = null, initialSize = null) => {
+  // `initialProps` go on top of the defaults: a palette snippet dropped into a
+  // section is an `html` component carrying that snippet, not the type's
+  // default (which used to be dropped instead — "Contact Me" in the theme's
+  // style, whatever variant was dragged).
+  addComponent: (type, x = 24, y = 24, parentId = null, presetId = null, initialSize = null, initialProps = null) => {
     const def = registry[type]
     if (!def) return
     get().record('add')
@@ -1491,7 +1495,7 @@ export const useEditorStore = create((set, get) => ({
       const makeProps = () => {
         // A preset's own look (a filled or underlined field) wins over the theme's.
         const base = themedProps(type, structuredClone(def.defaultProps), theme)
-        return presetProps ? { ...base, ...presetProps } : base
+        return { ...base, ...(presetProps || {}), ...(initialProps || {}) }
       }
       const kids = PARENT_TYPES.has(type) ? { children: [] } : {}
 

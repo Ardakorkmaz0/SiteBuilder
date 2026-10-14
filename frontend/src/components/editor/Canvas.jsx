@@ -341,7 +341,24 @@ export default function Canvas({
     e.stopPropagation()
     e.preventDefault()
     const rect = canvasElRef.current.getBoundingClientRect()
-    onPlaceAt((e.clientX - rect.left) / canvasScale, (e.clientY - rect.top) / canvasScale)
+    // A tap inside a section, container or tab panel places the item IN it,
+    // as a drag there does: placed on top of it instead, the item stayed
+    // behind when the section moved, reflowed or was deleted.
+    const holder = typeof document.elementsFromPoint === 'function'
+      ? document.elementsFromPoint(e.clientX, e.clientY)
+        .find((el) => el.hasAttribute?.('data-builder-droppable-id') && canvasElRef.current.contains(el))
+      : null
+    let inside = null
+    if (holder) {
+      const box = holder.getBoundingClientRect()
+      const scale = canvasScale * (Number(holder.dataset.builderFitScale) || 1)
+      inside = {
+        parentId: holder.getAttribute('data-builder-droppable-id'),
+        x: (e.clientX - box.left) / scale,
+        y: (e.clientY - box.top) / scale,
+      }
+    }
+    onPlaceAt((e.clientX - rect.left) / canvasScale, (e.clientY - rect.top) / canvasScale, inside)
   }
 
   function startMarquee(e) {

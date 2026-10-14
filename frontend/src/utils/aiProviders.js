@@ -356,6 +356,12 @@ export function aiAvailable() {
   return availableProviders().length > 0
 }
 
+// Can a request go out right now: a provider on offer that has a key, or one
+// that needs none.
+export function aiProviderReady() {
+  return availableProviders().some((p) => p.needsKey === false || !!getApiKey(p.id))
+}
+
 // The same, for a component: re-renders when the server's switches change.
 export function useAiAvailable() {
   useAiPolicy()

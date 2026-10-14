@@ -65,15 +65,23 @@ function isTextEditableElement(el) {
   return [...el.children].every((child) => INLINE_TEXT_TAGS.has(child.tagName))
 }
 
-function elementLabel(el) {
+// A field's label as a translation key and its values: the panel shows it in
+// the editor's language ("Başlık: …"), which a finished English string
+// ("Heading: …") could never be.
+function elementLabelParts(el) {
   const tag = el.tagName.toLowerCase()
   const text = normalizeText(readElementMultilineText(el)).slice(0, 42)
-  if (tag === 'a') return text ? `Link text: ${text}` : 'Link text'
-  if (/^h[1-6]$/.test(tag)) return `Heading: ${text || tag}`
-  if (tag === 'button') return text ? `Button: ${text}` : 'Button'
-  if (tag === 'p') return text ? `Paragraph: ${text}` : 'Paragraph'
-  if (tag === 'li') return text ? `List item: ${text}` : 'List item'
-  return text ? `${tag}: ${text}` : tag
+  if (tag === 'a') return text ? { key: 'Link text: {text}', vars: { text } } : { key: 'Link text', vars: {} }
+  if (/^h[1-6]$/.test(tag)) return { key: 'Heading: {text}', vars: { text: text || tag } }
+  if (tag === 'button') return text ? { key: 'Button: {text}', vars: { text } } : { key: 'Button', vars: {} }
+  if (tag === 'p') return text ? { key: 'Paragraph: {text}', vars: { text } } : { key: 'Paragraph', vars: {} }
+  if (tag === 'li') return text ? { key: 'List item: {text}', vars: { text } } : { key: 'List item', vars: {} }
+  return text ? { key: '{tag}: {text}', vars: { tag, text } } : { key: '{tag}', vars: { tag } }
+}
+
+function elementLabel(el) {
+  const { key, vars } = elementLabelParts(el)
+  return key.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? vars[name] : m))
 }
 
 function editableTextElements(root) {
@@ -92,6 +100,8 @@ export function listHtmlContentFields(code, { maxText = 36, maxLinks = 24 } = {}
     const texts = textElements.slice(0, maxText).map((el) => ({
       path: pathForElement(el, parsed.root),
       label: elementLabel(el),
+      labelKey: elementLabelParts(el).key,
+      labelVars: elementLabelParts(el).vars,
       text: readElementMultilineText(el),
     }))
     const links = linkElements.slice(0, maxLinks).map((el) => ({

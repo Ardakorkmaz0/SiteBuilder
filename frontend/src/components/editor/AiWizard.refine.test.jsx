@@ -46,6 +46,8 @@ async function refine(wish) {
 beforeEach(() => {
   localStorage.clear()
   localStorage.setItem('pwb_language', 'en')
+  // The wizard only generates with an AI key set up.
+  localStorage.setItem('pwb_groq_key', 'test-key')
   answers.queue = [SITE]
 })
 

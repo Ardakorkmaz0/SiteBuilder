@@ -23,7 +23,7 @@ import {
 import AiBar from '../components/editor/AiBar.jsx'
 import AiChatPanel from '../components/editor/AiChatPanel.jsx'
 import { loadAiPolicy } from '../utils/aiPolicy.js'
-import { useAiAvailable } from '../utils/aiProviders.js'
+import { aiProviderReady, useAiAvailable } from '../utils/aiProviders.js'
 import Sidebar from '../components/editor/Sidebar.jsx'
 import ShortcutsHelp from '../components/editor/ShortcutsHelp.jsx'
 import {
@@ -213,6 +213,17 @@ function nestedFirstCollision(args) {
     const areaB = br ? br.width * br.height : Number.MAX_SAFE_INTEGER
     return areaA - areaB || (b.data?.value || 0) - (a.data?.value || 0)
   })
+}
+
+// The props of a palette snippet dropped on the canvas as an `html` component.
+function paletteEmbedProps(item, w, h) {
+  return {
+    code: item.html,
+    _paletteType: item.type || '',
+    _siteFont: true,
+    _paletteVariant: item.preset || '',
+    _baseSize: { w, h },
+  }
 }
 
 function findDroppableElement(id) {
@@ -944,14 +955,15 @@ function SiteEditor() {
         // First-visit onboarding: a completely EMPTY site auto-opens the AI
         // wizard once — "describe it → get a full site" converts far better
         // than a blank canvas. The flag is set the moment it opens, so
-        // closing it never nags again.
+        // closing it never nags again. Only when the AI can actually answer:
+        // without a key, the questions led to a "no provider" error at the end.
         try {
           const key = 'pwb_wizard_auto_' + id
           const empty =
             !pages.some((p) => (p.components || []).length > 0) &&
             !pages.some((p) => (p.html || '').trim()) &&
             !(data.html || '').trim()
-          if (empty && !localStorage.getItem(key)) {
+          if (empty && aiProviderReady() && !localStorage.getItem(key)) {
             localStorage.setItem(key, '1')
             setWizardOpen(true)
           }
@@ -1126,6 +1138,15 @@ function SiteEditor() {
         x = (translated.left - rect.left) / (canvasScale * fitScale)
         y = (translated.top - rect.top) / (canvasScale * fitScale)
       }
+      // A palette snippet stays the snippet that was dragged: an `html`
+      // component inside the container, like one dropped on the page.
+      if (data.html) {
+        const w = data.w || 360
+        const h = data.h || 120
+        addComponent('html', Math.max(0, x), Math.max(0, y), over.id, null, { w, h }, paletteEmbedProps(data, w, h))
+        autoFitDroppedEmbed()
+        return
+      }
       addComponent(data.type, Math.max(0, x), Math.max(0, y), over.id, data.preset, { w: data.w, h: data.h })
       return
     }
@@ -1168,13 +1189,27 @@ function SiteEditor() {
 
   // Tap-to-place drop: same insert logic as a palette drag, but the position
   // comes from a click/tap on the free canvas (touch devices can't reliably
-  // start a drag). The component lands centred on the tapped point.
-  function placePendingAt(x, y) {
+  // start a drag). The component lands centred on the tapped point — inside
+  // the section, container or tab panel that was tapped, if any (`inside`:
+  // its id and the point in its own coordinates). A section never goes inside
+  // another one: it is a band of the page.
+  function placePendingAt(x, y, inside = null) {
     const d = pendingPlace
     if (!d) return
     setPendingPlace(null)
     const w = d.w || 360
     const h = d.h || 120
+    if (inside?.parentId && d.type !== 'region') {
+      const ix = Math.max(0, Math.round(inside.x - w / 2))
+      const iy = Math.max(0, Math.round(inside.y - h / 2))
+      if (d.html) {
+        addComponent('html', ix, iy, inside.parentId, null, { w, h }, paletteEmbedProps(d, w, h))
+        autoFitDroppedEmbed()
+        return
+      }
+      addComponent(d.type, ix, iy, inside.parentId, d.preset, { w: d.w, h: d.h })
+      return
+    }
     const px = Math.max(0, Math.round(x - w / 2))
     const py = Math.max(0, Math.round(y - h / 2))
     if (d.html) {

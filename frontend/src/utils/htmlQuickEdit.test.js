@@ -53,3 +53,15 @@ describe('htmlQuickEdit', () => {
     expect(next).toContain('<h1>New</h1>')
   })
 })
+
+describe('the field labels', () => {
+  it('carry a translation key and their values, for the editor\'s language', () => {
+    const fields = listHtmlContentFields('<h1>Merhaba</h1><p>Metin</p><a href="#">Git</a>')
+    expect(fields.texts.map((f) => [f.labelKey, f.labelVars])).toEqual([
+      ['Heading: {text}', { text: 'Merhaba' }],
+      ['Paragraph: {text}', { text: 'Metin' }],
+      ['Link text: {text}', { text: 'Git' }],
+    ])
+    expect(fields.texts[0].label).toBe('Heading: Merhaba')
+  })
+})
