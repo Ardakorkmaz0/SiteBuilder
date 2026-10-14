@@ -19,6 +19,7 @@ import { LabeledImage } from './controls.jsx'
 import { siteAddress, siteAddressUrl } from '../../utils/siteAddress.js'
 import { useGuestGate } from '../../utils/useGuestGate.jsx'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 
 // Tab → why it needs an account, for the gate dialog.
 // The editor's Share button asks a guest for an account first; the Share tab
@@ -115,6 +116,7 @@ export default function SiteControlCenter({
   const liveAddress = siteAddress(site)
   const liveAddressUrl = siteAddressUrl(site)
   useEscapeToClose(open, onClose)
+  const dialogRef = useInitialDialogFocus(open)
 
   if (!open) return null
 
@@ -167,7 +169,7 @@ export default function SiteControlCenter({
 
   return (
     <div className="studio-theme-surface studio-overlay fixed inset-0 z-[150] flex items-center justify-center p-0 md:p-5" onClick={onClose}>
-      <section role="dialog" aria-modal="true" aria-label={t('Site control center')} className="flex h-[100dvh] w-full max-w-6xl flex-col overflow-hidden border border-[var(--studio-border)] bg-[var(--studio-shell)] text-[var(--studio-text)] shadow-2xl md:h-[90vh] md:rounded-3xl" onClick={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t('Site control center')} className="flex outline-none h-[100dvh] w-full max-w-6xl flex-col overflow-hidden border border-[var(--studio-border)] bg-[var(--studio-shell)] text-[var(--studio-text)] shadow-2xl md:h-[90vh] md:rounded-3xl" onClick={(event) => event.stopPropagation()}>
         <header className="flex items-center gap-3 border-b border-[var(--studio-border)] bg-[var(--studio-panel-raised)] px-4 py-3 md:px-6">
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-lg font-bold text-[#111827]">{t('Site control center')}</h2>
