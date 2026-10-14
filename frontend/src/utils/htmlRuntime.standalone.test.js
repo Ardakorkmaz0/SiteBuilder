@@ -92,6 +92,30 @@ describe('the mobile menu button', () => {
   })
 })
 
+describe('a password field\'s eye', () => {
+  const field = (label) => `<div class="pwb-password"><input type="password"><button type="button" data-pwb-reveal aria-label="${label}" aria-pressed="false"></button></div>`
+
+  function turkishPage(body) {
+    const dom = new JSDOM(`<html lang="tr"><head></head><body>${body}</body></html>`, { url: 'https://portfolio.example/', runScripts: 'outside-only' })
+    documents.push(dom)
+    dom.window.eval(builderInteractiveJs())
+    dom.window.document.dispatchEvent(new dom.window.Event('DOMContentLoaded'))
+    return dom.window.document
+  }
+
+  it('is named in Turkish on a Turkish page, unless its author named it', () => {
+    const doc = turkishPage(field('Show password') + field('Parolayı göster'))
+    const [standard, renamed] = doc.querySelectorAll('button')
+    expect(standard.getAttribute('aria-label')).toBe('Şifreyi göster')
+    expect(renamed.getAttribute('aria-label')).toBe('Parolayı göster')
+  })
+
+  it('keeps its English name elsewhere', () => {
+    const { doc } = page(field('Show password'))
+    expect(doc.querySelector('button').getAttribute('aria-label')).toBe('Show password')
+  })
+})
+
 describe('standalone published inbox', () => {
   const formMarkup = '<form><input name="name" value="Ada"><input type="password" name="password" value="secret"><input type="hidden" name="website" value=""><button>Send</button></form>'
 
