@@ -160,7 +160,7 @@ export const registry = {
     icon: 'T',
     Render: Text,
     defaultSize: { w: 360, h: 80 },
-    defaultProps: { text: 'Hello, I am Arda' },
+    defaultProps: { text: 'Tell visitors who you are and what you do in a sentence or two.' },
     defaultStyles: {
       fontSize: '19px',
       lineHeight: '1.5',

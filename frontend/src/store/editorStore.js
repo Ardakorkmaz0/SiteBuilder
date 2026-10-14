@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { FIT_TYPES } from '../utils/boxFit.js'
+import { defaultPropsFor } from '../utils/componentDefaults.js'
 import { embedPhoneKey } from '../utils/htmlEmbedMeasure.js'
 import { registry, CANVAS_WIDTH, MOBILE_CANVAS_WIDTH } from '../components/registry.jsx'
 import {
@@ -1494,7 +1495,7 @@ export const useEditorStore = create((set, get) => ({
       const fullWidth = FULL_WIDTH_TYPES.has(type) && !verticalNavbar
       const makeProps = () => {
         // A preset's own look (a filled or underlined field) wins over the theme's.
-        const base = themedProps(type, structuredClone(def.defaultProps), theme)
+        const base = themedProps(type, defaultPropsFor(type), theme)
         return { ...base, ...(presetProps || {}), ...(initialProps || {}) }
       }
       const kids = PARENT_TYPES.has(type) ? { children: [] } : {}
@@ -1723,7 +1724,7 @@ export const useEditorStore = create((set, get) => ({
             if (ps) styles = { ...styles, ...ps }
           }
           if (it.styles) styles = { ...styles, ...it.styles }
-          const props = { ...themedProps(it.type, structuredClone(def.defaultProps), theme), ...(it.props || {}) }
+          const props = { ...themedProps(it.type, defaultPropsFor(it.type), theme), ...(it.props || {}) }
           const w = it.w ?? def.defaultSize?.w ?? 200
           const h = it.h ?? def.defaultSize?.h ?? 80
           return {
