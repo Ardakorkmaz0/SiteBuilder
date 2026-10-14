@@ -449,6 +449,11 @@ const INTERACTIVE_SCRIPT = `
       for (var n = 0; n < navToggles.length; n++) {
         navToggles[n].setAttribute('aria-label', navLabel(navToggles[n].getAttribute('aria-expanded') === 'true'));
       }
+      // So is a password field's eye; one the author renamed keeps its name.
+      if (turkish()) {
+        var reveals = document.querySelectorAll('[data-pwb-reveal][aria-label="Show password"]');
+        for (var r = 0; r < reveals.length; r++) reveals[r].setAttribute('aria-label', 'Şifreyi göster');
+      }
       initSticky();
       syncThemeToggles();
       initPalette();

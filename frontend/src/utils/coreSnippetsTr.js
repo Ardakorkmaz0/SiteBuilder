@@ -10,6 +10,7 @@
 // as it is: names, brands and addresses are the same in both languages.
 
 export const CORE_SNIPPET_TR = {
+  'Show password': 'Şifreyi göster',
   'Primary': 'Birincil',
   'Button': 'Düğme',
   'Continue  →': 'Devam  →',
