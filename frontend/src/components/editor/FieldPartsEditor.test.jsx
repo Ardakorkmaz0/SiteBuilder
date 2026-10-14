@@ -67,9 +67,8 @@ describe('the panel', () => {
     wrap(<PropertiesPanel />)
     act(() => useEditorStore.getState().setSelectedPart('field'))
     const part = screen.getByRole('region', { name: 'Field' })
-    const background = within(part).getByText('Background').closest('label')
-    expect(background.querySelector('input[type="color"]').value).toBe('#ffffff')
-    expect(background.querySelector('input[type="text"]')).toHaveAttribute('placeholder', '#ffffff')
+    expect(within(part).getByLabelText('Pick a colour: Background')).toHaveValue('#ffffff')
+    expect(within(part).getByRole('textbox', { name: 'Background' })).toHaveAttribute('placeholder', '#ffffff')
   })
 })
 
