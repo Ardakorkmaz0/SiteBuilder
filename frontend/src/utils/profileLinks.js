@@ -21,14 +21,16 @@ function linkLabel(href) {
 
 export function profileLinks(profile) {
   const out = []
+  // Text with a space in it is not an address or a handle. Before the server
+  // checked, such text was kept, and drew as a link to nowhere.
   const website = String(profile?.website || '').trim()
-  if (website) {
+  if (website && !/\s/.test(website)) {
     const href = sanitizeUrl(website.includes('://') ? website : `https://${website}`)
     if (href) out.push({ id: 'website', label: linkLabel(href), href })
   }
   for (const id of ['github', 'twitter', 'instagram']) {
     const raw = String(profile?.[id] || '').trim()
-    if (!raw) continue
+    if (!raw || /\s/.test(raw)) continue
     const href = raw.includes('://')
       ? sanitizeUrl(raw)
       : sanitizeUrl(SOCIAL_BASES[id] + raw.replace(/^@/, ''))

@@ -124,6 +124,25 @@ class TestProfileMeta:
             resp = client.patch('/api/profile/', {field: 'ftp://x.example'}, format='json')
             assert resp.status_code == 400, field
 
+    def test_links_must_be_addresses_or_handles(self, client, alice):
+        # Any text was kept, and the profile drew it as a link to nowhere.
+        _, token = alice
+        _auth(client, token)
+        resp = client.patch('/api/profile/', {'website': 'bu bir adres değil'}, format='json')
+        assert resp.status_code == 400
+        assert resp.data['website'] == ['Enter a web address, like yoursite.com.']
+        resp = client.patch('/api/profile/', {'github': 'two words'}, format='json')
+        assert resp.status_code == 400
+        assert resp.data['github'] == ['Enter a username like @ada, or a full link.']
+
+        for field, value in (
+            ('website', 'arda.dev'), ('website', 'https://çiçek.com.tr/portfolyo'), ('website', ''),
+            ('github', 'arda-korkmaz'), ('twitter', '@arda_k'), ('instagram', 'arda.studio'),
+            ('instagram', 'https://instagram.com/arda'),
+        ):
+            resp = client.patch('/api/profile/', {field: value}, format='json')
+            assert resp.status_code == 200, (field, value, resp.data)
+
     def test_public_profile_exposes_meta(self, client, alice):
         user, token = alice
         _auth(client, token)
