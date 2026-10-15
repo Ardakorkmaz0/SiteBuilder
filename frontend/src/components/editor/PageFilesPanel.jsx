@@ -22,6 +22,7 @@ export default function PageFilesPanel({
   onSelect,
   onActiveClick,
   onImportInto,
+  onBeforePageChange,
 }) {
   const { t } = useLanguage()
   const pages = useEditorStore((s) => s.schema.pages)
@@ -43,12 +44,16 @@ export default function PageFilesPanel({
 
   const createPage = (mode) => {
     if (!addPrompt) return
+    onBeforePageChange?.()
     addPage(t('New Page'), addPrompt.folder, mode)
     setAddPrompt(null)
   }
 
   const commitRename = () => {
-    if (editingId && draft.trim()) renamePage(editingId, draft.trim())
+    if (editingId && draft.trim()) {
+      onBeforePageChange?.()
+      renamePage(editingId, draft.trim())
+    }
     setEditingId(null)
   }
 
@@ -175,7 +180,10 @@ export default function PageFilesPanel({
                 const question = links
                   ? t('Delete "{name}" ({file})? {count} link(s) on other pages lead to it and will stop working until you point them elsewhere.', { name: page.name, file: fname, count: links })
                   : t('Delete "{name}" ({file})?', { name: page.name, file: fname })
-                if (window.confirm(question)) deletePage(page.id)
+                if (window.confirm(question)) {
+                  onBeforePageChange?.()
+                  deletePage(page.id)
+                }
               }}
               className="rounded px-1 text-xs text-[var(--studio-text-faint)] hover:bg-white hover:text-red-600"
             >

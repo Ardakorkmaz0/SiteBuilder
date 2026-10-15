@@ -36,7 +36,7 @@ export function zipFiles(files) {
     const size = data.length
 
     const local = [
-      ...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0),
+      ...u32(0x04034b50), ...u16(20), ...u16(0x800), ...u16(0),
       ...u16(0), ...u16(0), // mod time / date
       ...u32(crc), ...u32(size), ...u32(size),
       ...u16(nameBytes.length), ...u16(0),
@@ -44,7 +44,7 @@ export function zipFiles(files) {
     chunks.push(new Uint8Array(local), nameBytes, data)
 
     const cen = [
-      ...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(0),
+      ...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0x800), ...u16(0),
       ...u16(0), ...u16(0),
       ...u32(crc), ...u32(size), ...u32(size),
       ...u16(nameBytes.length), ...u16(0), ...u16(0),

@@ -90,8 +90,12 @@ export async function api(request, method, path, body, token = requestTokens.get
 
 // A site whose pages are HTML documents: [{ id?, name?, html }].
 export async function createHtmlSite(request, title, pages) {
-  const { data: site } = await api(request, 'POST', '/sites/', { title })
-  const { data: full } = await api(request, 'GET', `/sites/${site.id}/`)
+  const created = await api(request, 'POST', '/sites/', { title })
+  expect(created.status, JSON.stringify(created.data)).toBe(201)
+  const site = created.data
+  const loaded = await api(request, 'GET', `/sites/${site.id}/`)
+  expect(loaded.status, JSON.stringify(loaded.data)).toBe(200)
+  const full = loaded.data
   const home = full.schema.pages[0]
   const schemaPages = pages.map((page, index) => ({
     ...home,
@@ -99,7 +103,8 @@ export async function createHtmlSite(request, title, pages) {
     mode: 'html',
     html: page.html,
   }))
-  await api(request, 'PATCH', `/sites/${site.id}/`, { schema: { ...full.schema, pages: schemaPages } })
+  const seeded = await api(request, 'PATCH', `/sites/${site.id}/`, { schema: { ...full.schema, pages: schemaPages } })
+  expect(seeded.status, JSON.stringify(seeded.data)).toBe(200)
   return site.id
 }
 

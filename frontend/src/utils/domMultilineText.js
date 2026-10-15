@@ -17,7 +17,16 @@ export function readElementMultilineText(element) {
 export function writeElementMultilineText(element, value) {
   if (!element?.ownerDocument) return
   const document = element.ownerDocument
-  const lines = String(value ?? '').replace(/\r\n?/g, '\n').split('\n')
+  const text = String(value ?? '').replace(/\r\n?/g, '\n')
+  // Textareas are raw-text form controls: a BR is not a line break there and
+  // becomes literal "<br>" after a saved HTML parse. Update the live value as
+  // well as the default, because prior interaction separates the two.
+  if (element.tagName === 'TEXTAREA') {
+    element.defaultValue = text
+    element.value = text
+    return
+  }
+  const lines = text.split('\n')
   const nodes = []
 
   lines.forEach((line, index) => {

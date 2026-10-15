@@ -4,6 +4,8 @@
 // must gate on supportsProjectFolder(). Read-only path/classification helpers
 // are pure so they can be unit-tested under jsdom.
 
+import { writeFileContents } from './fileWritable.js'
+
 // Binary-ish assets — kept as handles and data-URL'd lazily when a preview
 // needs them (never read up front, so a big repo stays light).
 const ASSET_EXT = new Set([
@@ -76,8 +78,8 @@ export async function readProject(rootHandle) {
     if (isText) {
       try {
         content = await (await f.handle.getFile()).text()
-      } catch {
-        content = ''
+      } catch (error) {
+        throw new Error(`Could not read ${f.path}: ${error?.message || String(error)}`, { cause: error })
       }
     }
     files.push({ path: f.path, name: f.name, kind: f.kind, handle: f.handle, content })
@@ -172,9 +174,7 @@ export async function writeFileToHandle(handle, text) {
     if (perm !== 'granted') perm = await handle.requestPermission({ mode: 'readwrite' })
     if (perm !== 'granted') throw new Error('Write permission for the folder was declined.')
   }
-  const writable = await handle.createWritable()
-  await writable.write(String(text ?? ''))
-  await writable.close()
+  await writeFileContents(handle, String(text ?? ''))
 }
 
 // Pop the directory picker for a COPY target (a user gesture) — a fresh folder
@@ -201,14 +201,10 @@ export async function copyProjectTo(targetDir, files) {
       dir = await dir.getDirectoryHandle(part, { create: true })
     }
     const fileHandle = await dir.getFileHandle(fileName, { create: true })
-    const writable = await fileHandle.createWritable()
-    if (isTextKind(f.kind)) {
-      await writable.write(String(f.content ?? ''))
-    } else {
-      // Asset: stream the original bytes straight through.
-      await writable.write(await f.handle.getFile())
-    }
-    await writable.close()
+    // Read the source before locking the destination so a missing/unreadable
+    // asset cannot leave a copy target with an open writable stream.
+    const contents = isTextKind(f.kind) ? String(f.content ?? '') : await f.handle.getFile()
+    await writeFileContents(fileHandle, contents)
   }
 }
 

@@ -95,6 +95,7 @@ export default function CodeProjectPage() {
   const navigate = useNavigate()
   const goBack = useCallback(() => navigate(lastPageOutside('/')), [navigate])
   const rootHandle = useProjectStore((s) => s.rootHandle)
+  const projectSessionId = useProjectStore((s) => s.projectSessionId)
   const rootName = useProjectStore((s) => s.rootName)
   const files = useProjectStore((s) => s.files)
   const activePath = useProjectStore((s) => s.activePath)
@@ -121,6 +122,7 @@ export default function CodeProjectPage() {
   const [leftOpen, setLeftOpen] = useState(true)
   const [rightOpen, setRightOpen] = useState(true)
   const [copyMsg, setCopyMsg] = useState('')
+  const [workspaceDirty, setWorkspaceDirty] = useState(false)
   // The running dev server to preview server-rendered apps (Django/Rails/…) in
   // the ● Live tab. Persisted globally (one URL at a time is plenty).
   const [liveUrl, setLiveUrl] = useState(() => {
@@ -145,7 +147,29 @@ export default function CodeProjectPage() {
 
   const activeFile = activePath ? files.get(activePath) : null
   const isHtml = activeFile?.kind === 'html'
-  const hasUnsaved = dirty.size > 0
+  const unsavedCount = dirty.size + (workspaceDirty && !dirty.has(activePath) ? 1 : 0)
+  const hasUnsaved = unsavedCount > 0
+
+  // Source and in-place typing live inside HtmlWorkspace until committed.
+  // Snapshot that surface before a save or a file switch unmounts it.
+  const flushWorkspace = () => {
+    if (!isHtml) return
+    const html = workspaceRef.current?.getHtml?.()
+    if (typeof html === 'string') updateFile(activePath, html)
+  }
+  const openFile = (path) => {
+    if (path === activePath) return
+    flushWorkspace()
+    setSel(null)
+    setMatchedCss([])
+    setPending(null)
+    setReveal(null)
+    setActive(path)
+  }
+  const changeDevice = (device) => {
+    if (device !== htmlDevice) workspaceRef.current?.prepareFrameChange?.()
+    setHtmlDevice(device)
+  }
 
   const confirmDiscard = () =>
     !hasUnsaved || window.confirm(t('Discard the unsaved changes in this local project?'))
@@ -183,9 +207,9 @@ export default function CodeProjectPage() {
 
   // Selection + pending placement are tagged with the file they belong to, so
   // switching files drops them automatically — no effect, no cascading render.
-  const htmlSelection = sel && sel.path === activePath ? sel.info : null
-  const pendingType = pending && pending.path === activePath ? pending.type : null
-  const pendingHtml = pending && pending.path === activePath ? pending.html : null
+  const htmlSelection = sel && sel.session === projectSessionId && sel.path === activePath ? sel.info : null
+  const pendingType = pending && pending.session === projectSessionId && pending.path === activePath ? pending.type : null
+  const pendingHtml = pending && pending.session === projectSessionId && pending.path === activePath ? pending.html : null
 
   // Build the View/Edit document for the open html from the LIVE files map, so
   // editing a linked CSS/JS re-renders the preview. Reads files at call time
@@ -200,7 +224,7 @@ export default function CodeProjectPage() {
   // style it (computed from the LIVE element via the workspace, against the
   // current CSS files read fresh from the store so edits are reflected).
   const onElementSelect = (info) => {
-    setSel(info ? { path: activeFile.path, info } : null)
+    setSel(info ? { session: projectSessionId, path: activeFile.path, info } : null)
     if (!info) { setMatchedCss([]); return }
     const css = [...useProjectStore.getState().files.values()]
       .filter((f) => f.kind === 'css')
@@ -209,8 +233,8 @@ export default function CodeProjectPage() {
   }
   // Open a matched rule: switch to its CSS file and reveal the rule there.
   const openRule = (rule) => {
-    setReveal({ path: rule.path, index: rule.index, length: (rule.selector || '').length })
-    setActive(rule.path)
+    openFile(rule.path)
+    setReveal({ session: projectSessionId, path: rule.path, index: rule.index, length: (rule.selector || '').length })
   }
 
   // Saving writes the edits to disk; reload the live preview so the running dev
@@ -233,8 +257,20 @@ export default function CodeProjectPage() {
     if (!w || w.closed || !url) return
     try { w.location = url } catch { window.open(url, 'pwb-live-preview') }
   }
-  const saveActiveFile = async () => { await saveFile(activePath); reloadLive(); refreshLiveWindow() }
-  const saveEverything = async () => { await saveAll(); reloadLive(); refreshLiveWindow() }
+  const saveActiveFile = async () => {
+    flushWorkspace()
+    if (await saveFile(activePath) && useProjectStore.getState().projectSessionId === projectSessionId) {
+      reloadLive()
+      refreshLiveWindow()
+    }
+  }
+  const saveEverything = async () => {
+    flushWorkspace()
+    if (await saveAll() && useProjectStore.getState().projectSessionId === projectSessionId) {
+      reloadLive()
+      refreshLiveWindow()
+    }
+  }
 
   // The "what to expect" banner is dismissible per project (so it never nags
   // twice for the same folder). Read from localStorage at render — cheap, and
@@ -339,10 +375,12 @@ export default function CodeProjectPage() {
   }
 
   async function saveCopyToFolder() {
+    flushWorkspace()
     setError('')
     setCopyMsg('')
     try {
       const target = await chooseTargetFolder()
+      if (useProjectStore.getState().projectSessionId !== projectSessionId) return
       if (await saveCopy(target)) {
         setCopyMsg(t('Copied to “{name}”', { name: target.name }))
         setTimeout(() => setCopyMsg(''), 2500)
@@ -393,7 +431,7 @@ export default function CodeProjectPage() {
     )
   }
 
-  const activeDirty = activePath ? dirty.has(activePath) : false
+  const activeDirty = activePath ? dirty.has(activePath) || workspaceDirty : false
 
   return (
     <div className="studio-theme-surface flex h-screen flex-col bg-[var(--studio-shell)] text-[var(--studio-text)]">
@@ -414,9 +452,9 @@ export default function CodeProjectPage() {
         <span className="shrink-0 rounded-full bg-[var(--studio-control)] px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-[var(--studio-text-muted)]">
           {t('Code Project')}
         </span>
-        {dirty.size > 0 && (
+        {hasUnsaved && (
           <span className="shrink-0 whitespace-nowrap text-xs text-amber-500">
-            {t(dirty.size > 1 ? '{count} unsaved files' : '{count} unsaved file', { count: dirty.size })}
+            {t(unsavedCount > 1 ? '{count} unsaved files' : '{count} unsaved file', { count: unsavedCount })}
           </span>
         )}
         {copyMsg && <span className="shrink-0 whitespace-nowrap text-xs text-[#15803d]">{copyMsg}</span>}
@@ -524,13 +562,13 @@ export default function CodeProjectPage() {
             <>
               <div className="flex items-center rounded-lg border border-[#d1d5db] p-0.5 text-xs font-medium">
                 <button
-                  onClick={() => setHtmlDevice('fit')}
+                  onClick={() => changeDevice('fit')}
                   className={!isMobileDevice(htmlDevice) ? 'rounded-lg bg-[var(--studio-accent)] px-2.5 py-1 text-white' : 'px-2.5 py-1 text-[var(--studio-text)]'}
                 >
                   {t('PC')}
                 </button>
                 <button
-                  onClick={() => setHtmlDevice('iphone15pro')}
+                  onClick={() => changeDevice('iphone15pro')}
                   className={isMobileDevice(htmlDevice) ? 'rounded-lg bg-[var(--studio-accent)] px-2.5 py-1 text-white' : 'px-2.5 py-1 text-[var(--studio-text)]'}
                 >
                   {t('Mobile')}
@@ -538,7 +576,7 @@ export default function CodeProjectPage() {
               </div>
               <select
                 value={htmlDevice}
-                onChange={(e) => setHtmlDevice(e.target.value)}
+                onChange={(e) => changeDevice(e.target.value)}
                 title={t('Screen / device width')}
                 className="max-w-[140px] truncate rounded-lg border border-[#d1d5db] px-2 py-1 text-xs font-medium text-[#374151] focus:border-[#4f46e5] focus:outline-none"
               >
@@ -550,7 +588,7 @@ export default function CodeProjectPage() {
               </select>
             </>
           )}
-          <button onClick={openFolder} className="rounded-lg px-3 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6]">
+          <button onClick={openFolder} disabled={busy} className="rounded-lg px-3 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-50">
             {t('Open folder…')}
           </button>
           <button onClick={guardedCloseProject} className="rounded-lg px-3 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6]">
@@ -573,7 +611,7 @@ export default function CodeProjectPage() {
           </button>
           <button
             onClick={saveEverything}
-            disabled={saving || dirty.size === 0}
+            disabled={saving || !hasUnsaved}
             title={t('Write every changed file back to its folder on disk')}
             className="rounded-lg bg-[#16a34a] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#15803d] disabled:opacity-50"
           >
@@ -618,9 +656,9 @@ export default function CodeProjectPage() {
             component palette, whose picks splice a block into the document. */}
         {leftOpen ? (
           <Sidebar
-            onPickComponent={isHtml ? (type, html) => setPending({ path: activePath, type, html }) : undefined}
+            onPickComponent={isHtml ? (type, html) => setPending({ session: projectSessionId, path: activePath, type, html }) : undefined}
             onCollapse={() => setLeftOpen(false)}
-            filesPanel={<ProjectFilesPanel />}
+            filesPanel={<ProjectFilesPanel key={projectSessionId} onOpen={openFile} />}
           />
         ) : (
           <CollapsedRail side="left" label="Files" onOpen={() => setLeftOpen(true)} />
@@ -633,7 +671,7 @@ export default function CodeProjectPage() {
             </div>
           ) : isHtml ? (
             <HtmlWorkspace
-              key={activeFile.path}
+              key={`${projectSessionId}:${activeFile.path}`}
               ref={workspaceRef}
               persistKey={`code:${activeFile.path}`}
               html={activeFile.content ?? ''}
@@ -646,7 +684,8 @@ export default function CodeProjectPage() {
               assemble={assemble}
               assembleDeps={files}
               onCommit={(h) => updateFile(activeFile.path, h)}
-              onRequestSave={() => saveFile(activeFile.path)}
+              onDraftDirtyChange={setWorkspaceDirty}
+              onRequestSave={saveActiveFile}
               onElementSelect={onElementSelect}
               pendingType={pendingType}
               pendingHtml={pendingHtml}
@@ -655,10 +694,10 @@ export default function CodeProjectPage() {
             />
           ) : (
             <CodeFileEditor
-              key={activeFile.path}
+              key={`${projectSessionId}:${activeFile.path}`}
               file={activeFile}
               onChange={(c) => updateFile(activeFile.path, c)}
-              reveal={reveal && reveal.path === activeFile.path ? reveal : null}
+              reveal={reveal && reveal.session === projectSessionId && reveal.path === activeFile.path ? reveal : null}
             />
           )}
         </div>

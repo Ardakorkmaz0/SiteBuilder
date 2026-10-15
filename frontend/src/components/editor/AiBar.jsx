@@ -70,6 +70,7 @@ export default function AiBar({ open = false, onOpenChange }) {
         data-tour="ai"
         onClick={() => onOpenChange?.(!open)}
         aria-pressed={open}
+        aria-label={t('Open AI assistant')}
         title={hasKey ? t('Open AI assistant') : t('Set an AI provider key first')}
         className={`studio-btn studio-btn-secondary h-8 shrink-0 ${
           open ? 'bg-[var(--studio-control-hover)] text-[var(--studio-text)]' : ''

@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   assemblePreviewHtml,
+  htmlFilesToDocument,
   linkedFilesFor,
   matchingCssRules,
   needsBuildToRender,
@@ -13,6 +14,150 @@ import { serializeDocument } from './htmlPlacement.js'
 
 const mapOf = (...paths) =>
   new Map(paths.map((p) => [p, { path: p, kind: p.endsWith('.css') ? 'css' : 'js', content: '' }]))
+
+const sourceFile = (path, content, type = '') => ({
+  name: path.split('/').pop(),
+  webkitRelativePath: path,
+  type,
+  text: async () => content,
+  arrayBuffer: async () => new TextEncoder().encode(content).buffer,
+})
+const assetEntry = (path, content) => ({
+  path,
+  kind: 'asset',
+  handle: { getFile: async () => sourceFile(path, content, 'image/png') },
+})
+const parseHtml = (html) => new DOMParser().parseFromString(html, 'text/html')
+
+describe('portable HTML imports', () => {
+  it('preserves case and whitespace in JS and CSS closing-tag string values', async () => {
+    const script = 'const value = "</ScRiPt> | </ \\tSCRIPT>"'
+    const css = '.x::after{content:"</StYlE> | </ STYLE>"}'
+    const html = '<link rel="stylesheet" href="theme.css"><script src="app.js"></script>'
+    const imported = parseHtml(await htmlFilesToDocument([
+      sourceFile('index.html', html),
+      sourceFile('app.js', script),
+      sourceFile('theme.css', css),
+    ]))
+    const preview = parseHtml(await assemblePreviewHtml(html, 'index.html', new Map([
+      ['app.js', { path: 'app.js', kind: 'js', content: script }],
+      ['theme.css', { path: 'theme.css', kind: 'css', content: css }],
+    ])))
+    for (const doc of [imported, preview]) {
+      const evaluateValue = new Function(`${doc.querySelector('script').textContent}; return value`)
+      expect(evaluateValue()).toBe('</ScRiPt> | </ \tSCRIPT>')
+      expect(doc.querySelector('style').textContent).toBe('.x::after{content:"<\\/StYlE> | <\\/ STYLE>"}')
+    }
+  })
+  it('treats the selected upload folder as the site root for absolute references', async () => {
+    const out = await htmlFilesToDocument([
+      sourceFile('my-site/pages/index.html', '<link rel="stylesheet" href="/css/theme.css"><img src="/images/logo.png">'),
+      sourceFile('my-site/css/theme.css', 'body{color:green}'),
+      sourceFile('my-site/images/logo.png', 'right'),
+      sourceFile('my-site/other/logo.png', 'wrong'),
+    ])
+    const doc = parseHtml(out)
+    expect(doc.querySelector('style').textContent).toBe('body{color:green}')
+    expect(doc.querySelector('img').src).toBe('data:image/png;base64,cmlnaHQ=')
+  })
+
+  it('keeps data URL candidates intact while importing local srcset files', async () => {
+    const out = await htmlFilesToDocument([
+      sourceFile('index.html', '<img srcset="data:image/png;base64,aGVsbG8= 1x, large.png 2x">'),
+      sourceFile('large.png', 'large'),
+    ])
+    expect(parseHtml(out).querySelector('img').getAttribute('srcset')).toBe('data:image/png;base64,aGVsbG8= 1x, data:image/png;base64,bGFyZ2U= 2x')
+  })
+  it('resolves parent segments and prefers the stylesheet beside a nested page', async () => {
+    const out = await htmlFilesToDocument([
+      sourceFile('site/pages/index.html', '<link rel="stylesheet" href="../css/theme.css"><img src="../img/logo.png">'),
+      sourceFile('css/theme.css', 'body{color:red}'),
+      sourceFile('site/css/theme.css', 'body{color:green}'),
+      sourceFile('img/logo.png', 'wrong'),
+      sourceFile('site/img/logo.png', 'right'),
+    ])
+    const doc = parseHtml(out)
+    expect(doc.querySelector('style').textContent).toBe('body{color:green}')
+    expect(doc.querySelector('img').src).toBe('data:image/png;base64,cmlnaHQ=')
+  })
+
+  it('prefers a page-relative stylesheet to a same-named root file', async () => {
+    const out = await htmlFilesToDocument([
+      sourceFile('pages/index.html', '<link rel="stylesheet" href="theme.css">'),
+      sourceFile('theme.css', 'body{color:red}'),
+      sourceFile('pages/theme.css', 'body{color:green}'),
+    ])
+    expect(parseHtml(out).querySelector('style').textContent).toBe('body{color:green}')
+  })
+
+  it('decodes Unicode and spaces in browser-style asset references', async () => {
+    const out = await htmlFilesToDocument([
+      sourceFile('index.html', '<img src="g%C3%B6rsel%20bir.png">'),
+      sourceFile('görsel bir.png', 'image'),
+    ])
+    expect(parseHtml(out).querySelector('img').src).toBe('data:image/png;base64,aW1hZ2U=')
+  })
+
+  it('keeps external JS and CSS closing-tag text inside their original elements', async () => {
+    const script = 'window.example = "</script><p id=escaped-script>bad</p>"'
+    const css = '.example::after{content:"</style><p id=escaped-style>bad</p>"}'
+    const out = await htmlFilesToDocument([
+      sourceFile('index.html', '<link rel="stylesheet" href="theme.css"><script src="app.js"></script><p id="after">After</p>'),
+      sourceFile('theme.css', css),
+      sourceFile('app.js', script),
+    ])
+    const doc = parseHtml(out)
+    expect(doc.querySelector('#escaped-script')).toBeNull()
+    expect(doc.querySelector('#escaped-style')).toBeNull()
+    expect(doc.querySelector('#after').textContent).toBe('After')
+    expect(doc.querySelector('script').textContent).toContain('<\\/script>')
+    expect(doc.querySelector('style').textContent).toContain('<\\/style>')
+  })
+
+  it('preserves media restrictions when replacing a linked stylesheet', async () => {
+    const out = await htmlFilesToDocument([
+      sourceFile('index.html', '<link rel="stylesheet" href="print.css" media="print" title="Print theme">'),
+      sourceFile('print.css', 'body{display:none}'),
+    ])
+    expect(parseHtml(out).querySelector('style').getAttribute('media')).toBe('print')
+  })
+})
+
+describe('live preview file resolution', () => {
+  it('resolves parent segments before normalization and root paths from the project root', () => {
+    const files = mapOf('site/css/theme.css', 'site/pages/css/theme.css', 'css/theme.css')
+    expect(linkedFilesFor('site/pages/index.html', '<link rel="stylesheet" href="../css/theme.css">', files)).toEqual(['site/css/theme.css'])
+    expect(linkedFilesFor('site/pages/index.html', '<link rel="stylesheet" href="/css/theme.css">', files)).toEqual(['css/theme.css'])
+  })
+
+  it('does not choose an arbitrary file when basename fallback is ambiguous', () => {
+    expect(linkedFilesFor('index.html', '<script src="missing/app.js"></script>', mapOf('a/app.js', 'b/app.js'))).toEqual([])
+  })
+
+  it('inlines responsive images without corrupting existing data URL candidates', async () => {
+    const files = new Map([
+      ['small.png', assetEntry('small.png', 'small')],
+      ['large.png', assetEntry('large.png', 'large')],
+    ])
+    const html = '<img srcset="data:image/png;base64,aGVsbG8= 1x, large.png 2x"><source srcset="small.png 320w, large.png 640w">'
+    const out = await assemblePreviewHtml(html, 'index.html', files)
+    const doc = parseHtml(out)
+    expect(doc.querySelector('img').getAttribute('srcset')).toBe('data:image/png;base64,aGVsbG8= 1x, data:image/png;base64,bGFyZ2U= 2x')
+    expect(doc.querySelector('source').getAttribute('srcset')).toBe('data:image/png;base64,c21hbGw= 320w, data:image/png;base64,bGFyZ2U= 640w')
+    const edit = parseHtml(await assemblePreviewHtml(html, 'index.html', files, { forEdit: true }))
+    expect(edit.querySelector('source').getAttribute('srcset')).toBe('small.png 320w, large.png 640w')
+  })
+
+  it('keeps inlined preview JS and CSS from becoming HTML elements', async () => {
+    const files = new Map([
+      ['theme.css', { path: 'theme.css', kind: 'css', content: '.x{content:"</style><p id=bad-css>"}' }],
+      ['app.js', { path: 'app.js', kind: 'js', content: 'window.x="</script><p id=bad-js>"' }],
+    ])
+    const doc = parseHtml(await assemblePreviewHtml('<link rel="stylesheet" href="theme.css"><script src="app.js"></script>', 'index.html', files))
+    expect(doc.querySelector('#bad-js')).toBeNull()
+    expect(doc.querySelector('#bad-css')).toBeNull()
+  })
+})
 
 describe('linkedFilesFor', () => {
   it('resolves root-relative <link> and <script src>, skipping external URLs', () => {

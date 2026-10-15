@@ -134,4 +134,15 @@ describe('HtmlElementPanel', () => {
     await user.clear(screen.getByLabelText('Letter spacing (em)'))
     expect(props.onChange).toHaveBeenLastCalledWith({ letterSpacing: '' })
   })
+
+  it('distinguishes clearing an integer HTML style from choosing zero', async () => {
+    const props = renderPanel({ viewport: 'mobile', info: { width: 320 } })
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('tab', { name: 'Layout' }))
+    const width = screen.getByLabelText('Width (px, 0 = auto)')
+    await user.clear(width)
+    expect(props.onChange).toHaveBeenLastCalledWith({ width: '' })
+    await user.type(width, '0')
+    expect(props.onChange).toHaveBeenLastCalledWith({ width: 0 })
+  })
 })

@@ -139,14 +139,21 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
     })
   }, [htmlDrafts, htmlMap, rawGeneratedFiles, schema.customCss, schema.customJs, schema.pages])
   const base = slugName(schema?.pages?.[0]?.name)
+  const pendingExportHtml = useCallback((page) => {
+    const item = generatedFiles.find((entry) => entry.pageId === page?.id)
+    if (!item || item.content === item.generatedContent) return null
+    // Exports include Source edits before Apply. Authored HTML keeps its own
+    // asset links; canvas drafts embed the same assets as Apply HTML does.
+    return item.ownDocument ? item.content : inlineProjectHtml(item.content, rawGeneratedFiles)
+  }, [generatedFiles, rawGeneratedFiles])
   // One page as a file that stands on its own, and its smaller form. A
   // person's own document is not ours to minify: it goes out as written.
   const standalonePage = useCallback((page) => (
-    documentOf(page, htmlMap) || pageToResponsiveHtml(page || {}, page?.name || 'My Site', schema)
-  ), [htmlMap, schema])
+    pendingExportHtml(page) ?? (documentOf(page, htmlMap) || pageToResponsiveHtml(page || {}, page?.name || 'My Site', schema))
+  ), [htmlMap, pendingExportHtml, schema])
   const optimizedPage = useCallback((page) => (
-    documentOf(page, htmlMap) || minifyGeneratedHtml(pageToResponsiveHtml(page || {}, page?.name || 'My Site', schema))
-  ), [htmlMap, schema])
+    pendingExportHtml(page) ?? (documentOf(page, htmlMap) || minifyGeneratedHtml(pageToResponsiveHtml(page || {}, page?.name || 'My Site', schema)))
+  ), [htmlMap, pendingExportHtml, schema])
   const exportPreviewFiles = useMemo(() => {
     const page = schema?.pages?.[0] || {}
     return [
@@ -170,6 +177,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
     name: null,
   })
   const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState('')
   const [pendingReveal, setPendingReveal] = useState(null)
   const [glow, setGlow] = useState(null)
   const clearGlow = useCallback(() => setGlow(null), [])
@@ -185,7 +193,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
     ? activeSelection.name || currentPageFileName || 'index.html'
     : currentPageFileName || 'index.html'
   // A different file, or an edit, and the highlight no longer points anywhere.
-  const selectFile = (name) => { setGlow(null); setActiveSelection({ pageId: currentPageId, name }) }
+  const selectFile = (name) => { setGlow(null); setCopied(false); setCopyError(''); setActiveSelection({ pageId: currentPageId, name }) }
   const file = files.find((item) => item.name === active) || files[0]
   const lines = file?.content ? file.content.split('\n').length : 1
   const dirtyHtmlFiles = generatedFiles.filter((item) => (
@@ -277,11 +285,17 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
     </button>
   )
 
-  function copy() {
+  async function copy() {
     if (!file || !navigator.clipboard?.writeText) return
-    navigator.clipboard.writeText(file.content)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1200)
+    setCopied(false)
+    setCopyError('')
+    try {
+      await navigator.clipboard.writeText(file.content)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1200)
+    } catch {
+      setCopyError(t('Could not copy the code. Select and copy it manually.'))
+    }
   }
 
   function downloadCleanProject() {
@@ -574,6 +588,8 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
             </div>
           </div>
 
+          {copyError && <p role="alert" className="border-b border-white/10 px-4 py-2 text-xs text-amber-200">{copyError}</p>}
+
           {/* Applying hands the document to the HTML editor — a one-way door
               for the canvas, and it used to happen without a word. */}
           {file?.editableKind === 'html' && file.content !== file.generatedContent && (
@@ -623,7 +639,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
             <span>{t('{count} characters', { count: file?.content?.length || 0 })}</span>
             {file?.name === 'custom.js' && (
               <span className="ml-auto hidden text-amber-300/80 md:inline">
-                {t('Runs only inside the published-site sandbox')}
+                {t('Runs in preview and in the published-site sandbox')}
               </span>
             )}
           </div>

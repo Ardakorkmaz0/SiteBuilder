@@ -90,6 +90,7 @@ from .serializers import (
     PublicReviewCommentSerializer,
     PublicSiteSerializer,
     RegisterSerializer,
+    ReviewCommentStateSerializer,
     ReportSerializer,
     SearchUserSerializer,
     SharedComponentListSerializer,
@@ -97,6 +98,8 @@ from .serializers import (
     SiteSettingsSerializer,
     SiteSerializer,
     SiteVersionSerializer,
+    SiteViewEventSerializer,
+    SubmissionStateSerializer,
     UploadedImageSerializer,
     UserSerializer,
 )
@@ -741,7 +744,9 @@ class SiteViewSet(viewsets.ModelViewSet):
         if request.method == 'DELETE':
             row.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        row.is_read = bool(request.data.get('is_read', True))
+        serializer = SubmissionStateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        row.is_read = serializer.validated_data['is_read']
         row.save(update_fields=['is_read'])
         return Response(FormSubmissionSerializer(row).data)
 
@@ -750,7 +755,9 @@ class SiteViewSet(viewsets.ModelViewSet):
         if is_guest(request.user):
             return guest_blocked('analytics')
         site = self.get_object()
-        since = timezone.now() - timedelta(days=29)
+        # Daily bars cover today plus 29 complete calendar days. A rolling
+        # time-of-day cutoff silently excluded the first morning's visits.
+        since = timezone.localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=29)
         visits = SiteVisit.objects.filter(site=site, created_at__gte=since)
         daily = list(
             visits.annotate(day=TruncDate('created_at'))
@@ -785,7 +792,9 @@ class SiteViewSet(viewsets.ModelViewSet):
             row = ReviewComment.objects.get(site=site, pk=comment_id)
         except ReviewComment.DoesNotExist:
             return error_response('comment_not_found', 'Comment not found.', status.HTTP_404_NOT_FOUND)
-        row.resolved = bool(request.data.get('resolved', True))
+        serializer = ReviewCommentStateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        row.resolved = serializer.validated_data['resolved']
         row.save(update_fields=['resolved'])
         return Response(OwnerReviewCommentSerializer(row).data)
 
@@ -1186,7 +1195,10 @@ class SiteViewCountView(APIView):
 
     permission_classes = [AllowAny]
 
+    @transaction.atomic
     def post(self, request, slug):
+        event = SiteViewEventSerializer(data=request.data)
+        event.is_valid(raise_exception=True)
         is_owner = request.user.is_authenticated
         qs = public_sites().filter(slug=slug)
         if is_owner:
@@ -1204,14 +1216,14 @@ class SiteViewCountView(APIView):
             device = 'mobile'
         else:
             device = 'desktop'
-        raw_referrer = str(request.data.get('referrer') or '')[:500]
+        raw_referrer = event.validated_data['referrer']
         try:
             referrer = (urllib.parse.urlsplit(raw_referrer).hostname or '')[:253]
         except ValueError:
             referrer = ''
         SiteVisit.objects.create(
             site=site,
-            path=str(request.data.get('path') or '')[:180],
+            path=event.validated_data['path'],
             referrer=referrer,
             device=device,
         )
