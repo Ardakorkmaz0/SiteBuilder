@@ -86,7 +86,9 @@ export default function AuthShell({ title, description, onSubmit, children, foot
               {t('Build and publish your first site in minutes.')}
             </p>
             <p className="mt-4 max-w-md text-base leading-7 text-[var(--studio-text-muted)]">
-              {t('Sign in to keep building your sites.')}
+              {/* Under every account screen — sign-up and password reset too —
+                  so it says what the place is, not "sign in". */}
+              {t('Templates, a visual editor and publishing, in one place.')}
             </p>
             <MadeWithSitebuilder />
           </aside>
