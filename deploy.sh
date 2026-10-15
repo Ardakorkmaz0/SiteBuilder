@@ -25,7 +25,7 @@ say() { printf '\n\033[1;35m==> %s\033[0m\n' "$1"; }
 say "Depo durumu"
 cd "$ROOT"
 if [ -n "$(git status --porcelain)" ]; then
-  echo "UYARI: kaydedilmemiş değişiklikler var, bunlar dağıtılmayacak:"
+  echo "UYARI: commit'lenmemiş değişiklikler var; bunlar dağıtılmayacak (arayüz de HEAD'den derlenir):"
   git status --short
 fi
 AHEAD="$(git rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
@@ -37,11 +37,26 @@ echo "yerel HEAD: $(git rev-parse --short HEAD)"
 
 # --- 1. Arayüzü derle -------------------------------------------------------
 # VITE_API_URL derleme anında gömülür; frontend/.env.production'dan gelir.
+#
+# Arayüz, çalışma klasöründen DEĞİL, commit'lenmiş HEAD'in temiz bir kopyasından
+# derlenir. Backend sunucuda `git pull` ile commit'lenmiş koddan gelir; arayüz de
+# öyle olmalı. Eskiden çalışma klasörü derleniyordu: yukarıdaki "dağıtılmayacak"
+# uyarısına rağmen commit'lenmemiş yarım işler canlı arayüze giriyordu.
 say "Arayüz derleniyor"
-cd "$ROOT/frontend"
+if [ ! -f "$ROOT/frontend/.env.production" ]; then
+  echo "HATA: frontend/.env.production yok; API adresi olmadan derlenemez."
+  exit 1
+fi
+BUILD_DIR="$(mktemp -d)"
+trap 'rm -rf "$BUILD_DIR"' EXIT
+git -C "$ROOT" archive HEAD frontend | tar -x -C "$BUILD_DIR"
+cp "$ROOT/frontend/.env.production" "$BUILD_DIR/frontend/"
+ln -s "$ROOT/frontend/node_modules" "$BUILD_DIR/frontend/node_modules"
+cd "$BUILD_DIR/frontend"
 npm run build
-BUNDLE="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' dist/index.html | head -1)"
-echo "derlenen paket: $BUNDLE"
+DIST="$BUILD_DIR/frontend/dist"
+BUNDLE="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' "$DIST/index.html" | head -1)"
+echo "derlenen paket: $BUNDLE (HEAD $(git -C "$ROOT" rev-parse --short HEAD))"
 
 # --- 2. Backend: kodu çek, yeniden derle, migration'ları uygula -------------
 say "Backend güncelleniyor"
@@ -57,8 +72,7 @@ ssh "$HOST" "cd $REMOTE_APP && git pull --ff-only && sudo docker compose up -d -
 # index.html söyler (aşağıdaki doğrulama ona bakar).
 KEEP_DAYS="${SITEBUILDER_KEEP_ASSET_DAYS:-14}"
 say "Arayüz yükleniyor"
-cd "$ROOT/frontend"
-tar czf /tmp/sb-dist.tgz -C dist .
+tar czf /tmp/sb-dist.tgz -C "$DIST" .
 scp -q /tmp/sb-dist.tgz "$HOST:/tmp/"
 ssh "$HOST" "sudo tar xzf /tmp/sb-dist.tgz -C $REMOTE_WEB && sudo find $REMOTE_WEB/assets -type f -mtime +$KEEP_DAYS -delete && rm /tmp/sb-dist.tgz"
 rm -f /tmp/sb-dist.tgz
