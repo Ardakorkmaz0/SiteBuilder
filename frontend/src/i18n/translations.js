@@ -3184,6 +3184,11 @@ export const TURKISH_TRANSLATIONS = {
   'Open the saved version': 'Kaydedilmiş sürümü aç',
   'Save mine anyway': 'Yine de benimkini kaydet',
   'This site was saved somewhere else after it was opened here.': 'Bu site, burada açıldıktan sonra başka bir yerde kaydedildi.',
+  'HTML is too large (max ~2MB).': 'HTML çok büyük (en fazla ~2 MB).',
+  'Page HTML is too large (max ~2MB).': 'Sayfanın HTML’i çok büyük (en fazla ~2 MB).',
+  'A published page is too large (max ~1.5MB).': 'Yayınlanan bir sayfa çok büyük (en fazla ~1,5 MB).',
+  'The published site is too large (max ~10MB).': 'Yayınlanan site çok büyük (en fazla ~10 MB).',
+  'Upload too large. Each image may be at most 5 MB; the request may be at most 6 MB.': 'Yükleme çok büyük. Her görsel en fazla 5 MB, istek en fazla 6 MB olabilir.',
 }
 
 // Content libraries (templates, section blocks and component variants) carry

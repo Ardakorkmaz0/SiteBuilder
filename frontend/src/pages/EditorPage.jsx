@@ -983,9 +983,14 @@ function SiteEditor() {
   // failed" in the header and the work only in this tab. Every 5, 10, 20… up
   // to 60 seconds, and at once when the browser says it is online again.
   const autoSaveRetryRef = useRef(0)
+  // An automatic save the server refused for good (the page is over the size
+  // limit, a value it will not take): asking again gets the same answer. Its
+  // reason is shown instead, as a manual Save's would be — before, it said
+  // only "Save failed", and that it was trying again.
+  const [autoSaveRefused, setAutoSaveRefused] = useState(false)
   useEffect(() => {
     if (autoSaveState === 'saved') autoSaveRetryRef.current = 0
-    if (autoSaveState !== 'error' || !autoSaveEnabled) return undefined
+    if (autoSaveState !== 'error' || !autoSaveEnabled || autoSaveRefused) return undefined
     const attempt = autoSaveRetryRef.current
     const retry = () => {
       // A session that has ended will not come back by itself: asking again
@@ -1002,7 +1007,7 @@ function SiteEditor() {
       window.clearTimeout(timer)
       window.removeEventListener('online', retry)
     }
-  }, [autoSaveState, autoSaveEnabled])
+  }, [autoSaveState, autoSaveEnabled, autoSaveRefused])
   useEffect(() => {
     if (!autoSaveEnabled) return undefined
     const flush = () => {
@@ -1757,6 +1762,7 @@ function SiteEditor() {
       )
       if (Number.isInteger(data.revision)) baseRevisionRef.current = data.revision
       setSiteConflict(false)
+      setAutoSaveRefused(false)
       publishedRef.current = !!data.published
       setPublished(data.published)
       setModerationBlocked(!!data.moderation_blocked)
@@ -1808,6 +1814,12 @@ function SiteEditor() {
       if (e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
         // Nothing was written; the dialog says why and lets the person choose.
         setSiteConflict(true)
+        return null
+      }
+      const status = e?.response?.status
+      if (auto && !recoveryMessageRef.current && status >= 400 && status < 500 && ![401, 408, 429].includes(status)) {
+        setAutoSaveRefused(true)
+        setError(apiError(e))
         return null
       }
       if (!auto) setError(recoveryMessageRef.current || apiError(e))
@@ -2344,7 +2356,7 @@ function SiteEditor() {
           <div
             role="status"
             aria-live="polite"
-            title={autoSaveState === 'error' ? t('Your latest changes are not saved yet. Trying again — or press Save.') : undefined}
+            title={autoSaveState === 'error' && !autoSaveRefused ? t('Your latest changes are not saved yet. Trying again — or press Save.') : undefined}
             className="flex items-center gap-1.5 text-[10px] text-[var(--studio-text-muted)]"
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: saveStatus.tone }} />
