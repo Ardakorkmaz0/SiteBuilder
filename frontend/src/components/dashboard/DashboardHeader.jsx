@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore, useIsGuest } from '../../store/authStore.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { accountName } from '../../utils/accountName.js'
 import LanguageSwitcher from '../LanguageSwitcher.jsx'
 import DashboardGlobalSearch from './DashboardGlobalSearch.jsx'
 import AppInfo from './AppInfo.jsx'
@@ -18,7 +19,8 @@ import {
 } from '../icons.jsx'
 
 export function DashboardAvatar({ user, size = 32 }) {
-  const letter = (user?.display_name || user?.username || '?').trim().charAt(0).toUpperCase()
+  const { t } = useLanguage()
+  const letter = (accountName(user, t) || '?').trim().charAt(0).toLocaleUpperCase()
   if (user?.avatar_url) {
     return <img src={user.avatar_url} alt="" className="rounded-full object-cover" style={{ width: size, height: size }} />
   }
@@ -54,7 +56,7 @@ export default function DashboardHeader({ current = '', showSearch = true }) {
   const accountTriggerRef = useRef(null)
   const mobileMenuRef = useRef(null)
   const mobileTriggerRef = useRef(null)
-  const displayName = user?.display_name || user?.username || t('Account')
+  const displayName = accountName(user, t, t('Account'))
 
   useEffect(() => {
     const closeOutside = (event) => {
@@ -158,7 +160,7 @@ export default function DashboardHeader({ current = '', showSearch = true }) {
                   <DashboardAvatar user={user} size={40} />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-[var(--studio-text)]">{displayName}</p>
-                    <p className="truncate text-xs text-[var(--studio-text-muted)]">@{user?.username}</p>
+                    {!isGuest && <p className="truncate text-xs text-[var(--studio-text-muted)]">@{user?.username}</p>}
                   </div>
                 </div>
                 <div className="my-1 border-t studio-divider" />

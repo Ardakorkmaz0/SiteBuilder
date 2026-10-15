@@ -3163,6 +3163,7 @@ export const TURKISH_TRANSLATIONS = {
   'Not over a place it can go.': 'Bırakılabilecek bir yerin üzerinde değil.',
   'Dropped.': 'Bırakıldı.',
   'Dragging cancelled.': 'Sürükleme iptal edildi.',
+  'Welcome': 'Hoş geldin',
 }
 
 // Editor-only libraries (the section blocks and component variants) carry

@@ -24,6 +24,7 @@ import {
 } from '../components/icons.jsx'
 import { profileLinks } from '../utils/profileLinks.js'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { accountName } from '../utils/accountName.js'
 
 const LINK_ICONS = { website: LinkIcon, github: GithubIcon, twitter: XSocialIcon, instagram: InstagramIcon }
 const PINNED_PROJECTS_KEY = 'pwb_pinned_projects'
@@ -225,7 +226,7 @@ export default function ProfilePage() {
     display_name: profile?.display_name || user?.display_name,
     username: profile?.username || user?.username,
   }
-  const profileName = profileUser.display_name || profileUser.username || t('Creator')
+  const profileName = accountName(profileUser, t, t('Creator'))
   const launchSteps = [
     { done: Boolean(profile?.display_name && profile?.bio), label: t('Complete your public profile') },
     { done: sites.length > 0, label: t('Create your first project') },
@@ -289,10 +290,12 @@ export default function ProfilePage() {
                 </div>
                 <div className="min-w-0">
                   <h2 id="profile-name" className="truncate text-2xl font-semibold text-[var(--studio-text)]">{profileName}</h2>
-                  <p className="mt-0.5 text-sm font-medium text-[var(--studio-text-muted)]">
-                    @{profileUser.username}
-                    {profile?.headline && <span className="text-[var(--studio-text)]"> · {profile.headline}</span>}
-                  </p>
+                  {(!user?.is_guest || profile?.headline) && (
+                    <p className="mt-0.5 text-sm font-medium text-[var(--studio-text-muted)]">
+                      {!user?.is_guest && <>@{profileUser.username}</>}
+                      {profile?.headline && <span className="text-[var(--studio-text)]">{user?.is_guest ? '' : ' · '}{profile.headline}</span>}
+                    </p>
+                  )}
                   <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--studio-text-muted)]">
                     {profile?.bio || t('Add a short bio so visitors know who is behind your sites.')}
                   </p>
@@ -352,7 +355,7 @@ export default function ProfilePage() {
                   <input
                     className="studio-input w-full px-3 py-2 text-sm"
                     id="profile-display-name"
-                    placeholder={profile?.username}
+                    placeholder={user?.is_guest ? t('Your name') : profile?.username}
                     value={displayName}
                     maxLength={80}
                     onChange={(event) => setDisplayName(event.target.value)}

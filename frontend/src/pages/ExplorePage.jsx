@@ -21,6 +21,7 @@ import {
   PlusIcon,
 } from '../components/icons.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { accountName, chosenName } from '../utils/accountName.js'
 
 // Keep the feed across navigation within one account, including its favorite state.
 let feedCache = null
@@ -85,7 +86,7 @@ export default function ExplorePage() {
     views: ownSites.reduce((sum, site) => sum + (site.view_count || 0), 0),
     favorites: ownSites.reduce((sum, site) => sum + (site.favorite_count || 0), 0),
   }), [ownSites])
-  const displayName = user?.display_name || user?.username || t('Creator')
+  const displayName = accountName(user, t, t('Creator'))
   const lastEdited = latestSite ? formattedDate(latestSite.updated_at, language) : ''
 
   // A guest at the site limit is told what an account changes, with the way to
@@ -270,7 +271,8 @@ export default function ExplorePage() {
           <div className="dashboard-workspace-primary">
             <div className="max-w-2xl">
               <h1 id="workspace-heading" className="text-3xl font-semibold text-[var(--studio-text)] [overflow-wrap:anywhere] sm:text-4xl">
-                {t('Welcome back, {name}', { name: displayName })}
+                {/* A new guest has no name and has not been here before. */}
+                {user?.is_guest && !chosenName(user) ? t('Welcome') : t('Welcome back, {name}', { name: displayName })}
               </h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--studio-text-muted)]">
                 {t('Continue your latest project or start with a fresh idea.')}

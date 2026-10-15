@@ -112,6 +112,7 @@ import {
 } from '../utils/localFile.js'
 import { localizeTemplateHtml } from '../utils/templateLocalization.js'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { accountName } from '../utils/accountName.js'
 import { useUiTheme } from '../ui/useUiTheme.js'
 import { useEscapeToClose } from '../ui/useEscapeToClose.js'
 import MobileEditorPreview from '../components/editor/MobileEditorPreview.jsx'
@@ -2243,14 +2244,14 @@ function SiteEditor() {
               title={t('Your profile')}
               className="ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--studio-accent-soft)] text-xs font-bold text-[var(--studio-accent-hover)]"
             >
-              {(authUser?.username || '?').trim().charAt(0).toUpperCase()}
+              {(accountName(authUser, t) || '?').trim().charAt(0).toLocaleUpperCase()}
             </button>
             {accountOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setAccountOpen(false)} />
                 <div style={{ position: 'fixed', top: menuPos.account?.top, right: menuPos.account?.right }} className="studio-menu z-50 w-64 p-2">
                   <div className="px-2 py-1.5">
-                    <div className="truncate text-sm font-semibold">{authUser?.username || t('Your profile')}</div>
+                    <div className="truncate text-sm font-semibold">{accountName(authUser, t, t('Your profile'))}</div>
                     <div className="text-[11px] text-[var(--studio-text-muted)]">{t('Appearance')}</div>
                   </div>
                   <div className="grid grid-cols-3 gap-1 rounded-lg bg-[var(--studio-control)] p-1">
