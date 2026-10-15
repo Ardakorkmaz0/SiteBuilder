@@ -159,6 +159,12 @@ class Site(models.Model):
     hot_score = models.FloatField(default=0.0, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Counts writes to the site through the editor's save (and the server-side
+    # edits to its content: a restored version, a community block added, a
+    # takedown purge). The editor sends the revision it is working from; a save
+    # made from an older one is refused (409) instead of silently writing over
+    # what another tab or device saved in between.
+    revision = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ['-updated_at']

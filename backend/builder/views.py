@@ -664,6 +664,7 @@ class SiteViewSet(viewsets.ModelViewSet):
             SiteVersion.snapshot(site, source='save', label='before restore', force=True)
             site.schema = version.schema
             site.html = version.html
+            site.revision += 1
             site.save()
             SiteVersion.snapshot(site, source='restore', label=f'restored from v{version.pk}')
         return Response(SiteSerializer(site).data)
@@ -2074,7 +2075,8 @@ class UseSharedComponentView(APIView):
                 target.get('html') or '', wrap_marked(style + component.html, component.pk),
             )
             site.schema = validate_and_clean_schema(schema)
-            update = ['schema', 'updated_at']
+            site.revision += 1
+            update = ['schema', 'revision', 'updated_at']
             # The home page's document is mirrored to site.html.
             if target is pages[0]:
                 site.html = target['html']
@@ -2101,7 +2103,8 @@ class UseSharedComponentView(APIView):
         # Straight through the normal save gate — a shared block is subject to
         # exactly the same allowlist as anything the user drew themselves.
         site.schema = validate_and_clean_schema(schema)
-        site.save(update_fields=['schema', 'updated_at'])
+        site.revision += 1
+        site.save(update_fields=['schema', 'revision', 'updated_at'])
 
         SharedComponent.objects.filter(pk=component.pk).update(use_count=F('use_count') + 1)
         component.refresh_from_db(fields=['use_count'])
@@ -2263,7 +2266,7 @@ def _purge_shared_copies(component_id):
     """
     marked = 0
     sites_touched = 0
-    for site in Site.objects.only('id', 'schema', 'html').iterator():
+    for site in Site.objects.only('id', 'schema', 'html', 'revision').iterator():
         schema = site.schema if isinstance(site.schema, dict) else {}
         pages = schema.get('pages') if isinstance(schema.get('pages'), list) else []
         removed_here = 0
@@ -2294,7 +2297,8 @@ def _purge_shared_copies(component_id):
             # else on the page should shift because of a takedown.
             site.schema = schema
             site.html = site_html
-            site.save(update_fields=['schema', 'html', 'updated_at'])
+            site.revision += 1
+            site.save(update_fields=['schema', 'html', 'revision', 'updated_at'])
             # Draft schema, legacy HTML and published documents can hold the
             # same copies; count the fullest representation once.
             marked += max(removed_here, live_removed, html_removed)

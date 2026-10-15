@@ -103,6 +103,7 @@ import { createSaveQueue } from '../utils/saveQueue.js'
 import { projectSnapshot } from '../utils/projectSnapshot.js'
 import { clearEditorRecovery, readEditorRecovery, SESSION_EXPIRED_EVENT, writeEditorRecovery } from '../utils/editorRecovery.js'
 import RecoveryDialog from '../components/editor/RecoveryDialog.jsx'
+import SiteConflictDialog from '../components/editor/SiteConflictDialog.jsx'
 import {
   clearLocalFileHandle,
   downloadHtmlFile,
@@ -510,6 +511,13 @@ function SiteEditor() {
   const [leavePromptOpen, setLeavePromptOpen] = useState(false)
   const leaveActionRef = useRef(null)
   const leaveConfirmedRef = useRef(false)
+  // The site revision this editor works from (Site.revision on the server).
+  // Every save sends it. When another tab or device has saved in between, the
+  // server refuses (409) and the conflict dialog asks which version wins:
+  // before, the later save silently replaced the other one's work.
+  const baseRevisionRef = useRef(null)
+  const [siteConflict, setSiteConflict] = useState(false)
+  const reloadingRef = useRef(false)
   const discardLeaveRef = useRef(false)
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPanelLayout, setAiPanelLayout] = useState(readAiPanelLayout)
@@ -877,6 +885,7 @@ function SiteEditor() {
   useEffect(() => {
     if (!dirty && !htmlDirty && !metaDirty && !workspaceDirty) return undefined
     const handler = (e) => {
+      if (reloadingRef.current) return
       if (!shouldBlockEditorUnload(
         { dirty, htmlDirty, metaDirty, workspaceDirty },
         leaveConfirmedRef.current,
@@ -900,7 +909,7 @@ function SiteEditor() {
   // and dirty flags instead of the previous render's closure.
   saveLifecycleRef.current = {
     save, performSave, dirty, htmlDirty, metaDirty, workspaceDirty, published,
-    loading: loading || !!recoveryDraft, autoSaveEnabled, previewing,
+    loading: loading || !!recoveryDraft || siteConflict, autoSaveEnabled, previewing,
   }
   const recoveryCaptureRef = useRef(null)
   recoveryCaptureRef.current = (event) => {
@@ -942,7 +951,7 @@ function SiteEditor() {
   }, [])
   useEffect(() => {
     if (!shouldRunEditorAutoSave(
-      { autoSaveEnabled, loading: loading || !!recoveryDraft, dirty, htmlDirty, metaDirty, workspaceDirty, previewing },
+      { autoSaveEnabled, loading: loading || !!recoveryDraft || siteConflict, dirty, htmlDirty, metaDirty, workspaceDirty, previewing },
       discardLeaveRef.current,
     )) return undefined
     const timer = window.setTimeout(() => {
@@ -956,6 +965,7 @@ function SiteEditor() {
     autoSaveEnabled,
     loading,
     recoveryDraft,
+    siteConflict,
     previewing,
     dirty,
     htmlDirty,
@@ -1026,6 +1036,7 @@ function SiteEditor() {
       .then((data) => {
         if (!active) return
         loadedSiteRef.current = true
+        baseRevisionRef.current = Number.isInteger(data.revision) ? data.revision : null
         setTitle(data.title)
         setSlug(data.slug)
         setPublished(data.published)
@@ -1630,6 +1641,7 @@ function SiteEditor() {
   }
 
   function applySitePatch(data) {
+    if (Number.isInteger(data?.revision)) baseRevisionRef.current = data.revision
     if (data?.site_options !== undefined) setSiteOptions(data.site_options || {})
     if (data?.review_token !== undefined) setReviewToken(data.review_token || '')
     if (data?.custom_domain !== undefined) setCustomDomain(data.custom_domain || '')
@@ -1687,7 +1699,7 @@ function SiteEditor() {
   // that queued behind a publish request still held "not published" and took
   // the site down again the moment the publish finished (and put a site that
   // was just unpublished back up).
-  async function performSave(wantPublished, { auto = false, versionSource } = {}) {
+  async function performSave(wantPublished, { auto = false, versionSource, force = false } = {}) {
       const nextPublished = typeof wantPublished === 'boolean' ? wantPublished : publishedRef.current
       setAutoSaveState('saving')
       // While an AI proposal is drawn on the canvas, the design is the one it
@@ -1738,9 +1750,13 @@ function SiteEditor() {
         {
           title: safeTitle, schema, html, published: nextPublished, category, tags,
           ...(publishedPages ? { published_pages: publishedPages } : {}),
+          // "Save mine anyway" leaves it out, and the server takes the save.
+          ...(!force && baseRevisionRef.current != null ? { base_revision: baseRevisionRef.current } : {}),
         },
         { saveSource: versionSource || (auto ? 'auto' : 'manual') },
       )
+      if (Number.isInteger(data.revision)) baseRevisionRef.current = data.revision
+      setSiteConflict(false)
       publishedRef.current = !!data.published
       setPublished(data.published)
       setModerationBlocked(!!data.moderation_blocked)
@@ -1768,7 +1784,7 @@ function SiteEditor() {
       return data
   }
 
-  async function save(nextPublished, { auto = false, versionSource } = {}) {
+  async function save(nextPublished, { auto = false, versionSource, force = false } = {}) {
     // Every server write goes through one queue. Automatic saves wait behind an
     // active write instead of being dropped; each queued task invokes the latest
     // render's performSave so slow requests cannot lose newer work.
@@ -1784,11 +1800,16 @@ function SiteEditor() {
           // A later "leave without saving" also cancels queued writes.
           if (auto && discardLeaveRef.current) return null
           const latestSave = saveLifecycleRef.current?.performSave || performSave
-          return latestSave(nextPublished, { auto, versionSource })
+          return latestSave(nextPublished, { auto, versionSource, force })
         },
       )
     } catch (e) {
       setAutoSaveState('error')
+      if (e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
+        // Nothing was written; the dialog says why and lets the person choose.
+        setSiteConflict(true)
+        return null
+      }
       if (!auto) setError(recoveryMessageRef.current || apiError(e))
       return null
     } finally {
@@ -2110,6 +2131,17 @@ function SiteEditor() {
   const leaveDialog = (
     <>
       <RecoveryDialog open={!!recoveryDraft} onRestore={restoreRecovery} onDiscard={discardRecovery} />
+      <SiteConflictDialog
+        open={siteConflict}
+        onReload={() => {
+          reloadingRef.current = true
+          window.location.reload()
+        }}
+        onOverwrite={() => {
+          setSiteConflict(false)
+          save(undefined, { force: true })
+        }}
+      />
       <UnsavedLeaveDialog
       open={leavePromptOpen}
       saving={saving}
@@ -3255,6 +3287,7 @@ function SiteEditor() {
                 // back over the version the user just loaded.
                 setWorkspaceSession((session) => session + 1)
               }
+              if (Number.isInteger(fresh?.revision)) baseRevisionRef.current = fresh.revision
               if (fresh?.title !== undefined) setTitle(fresh.title)
               if (fresh?.slug !== undefined) setSlug(fresh.slug)
               if (fresh?.category !== undefined) setCategory(fresh.category || 'other')
