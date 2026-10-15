@@ -70,7 +70,7 @@ function LibraryCard({ entry, onUse }) {
   return (
     <button
       type="button"
-      onClick={() => onUse(entry)}
+      onClick={(event) => onUse(entry, { atEnd: event.detail === 0 })}
       title={`${label} — ${t(entry.desc || entry.label)}`}
       className="group flex flex-col rounded-xl border border-[var(--studio-border,#e5e7eb)] bg-[var(--studio-panel-raised,#ffffff)] p-2 text-left transition hover:border-[var(--studio-accent,#4f46e5)] hover:shadow-md"
     >
@@ -214,12 +214,14 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
     setLimit(PAGE_SIZE)
   }
 
-  const use = (entry) => {
+  // A card pressed with Enter or Space (a click with no pointer: detail 0)
+  // goes straight to the end of the page; the keyboard has no spot to click.
+  const use = (entry, { atEnd = false } = {}) => {
     const html = localizedHtml(entry, language)
     if (onPickComponent) {
-      onPickComponent(entry.use.type, html)
+      onPickComponent(entry.use.type, html, { atEnd })
     } else {
-      onArmPlacement?.(entry.native ? entry.use : { ...entry.use, html })
+      onArmPlacement?.(entry.native ? entry.use : { ...entry.use, html }, { atEnd })
     }
     onClose()
   }

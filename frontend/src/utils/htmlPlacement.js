@@ -52,6 +52,19 @@ export function pageWrapper(bodyEl) {
   return null
 }
 
+// Where "the end of the page" is, for a block added without a spot to point
+// at (picked with the keyboard): above the page's footer, else at the end of
+// the element wrapping the whole page, else at the end of <body>.
+export function endOfPage(doc) {
+  const body = doc?.body
+  if (!body) return { target: null, position: 'beforeend' }
+  const footers = [...body.querySelectorAll('footer')].filter((el) => !el.closest('[data-pwb-chrome]') && !el.parentElement?.closest('footer'))
+  const footer = footers[footers.length - 1]
+  if (footer) return { target: footer, position: 'beforebegin' }
+  const wrapper = pageWrapper(body)
+  return wrapper ? { target: wrapper, position: 'beforeend' } : { target: body, position: 'beforeend' }
+}
+
 // Resolve a click to the block the user actually pointed at: the NEAREST
 // block-level ancestor of `el` (climbing only out of inline wrappers like
 // span/a/strong). This is what makes nested editing work — clicking a card

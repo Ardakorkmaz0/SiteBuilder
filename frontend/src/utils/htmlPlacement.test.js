@@ -8,6 +8,7 @@ import {
   normalizeDocument,
   disarmDrag,
   closestPlaceableBlock,
+  endOfPage,
   pageWrapper,
   placeableBlocks,
   diffAppendedBodyChildren,
@@ -498,3 +499,28 @@ describe('a page that redirects itself', () => {
     expect(disarmMetaRefresh('<meta http-equiv="X-UA-Compatible" content="IE=edge">')).toContain(' http-equiv="X-UA-Compatible"')
   })
 })
+
+// A block picked with the keyboard has no spot: it goes where a page ends.
+describe('endOfPage', () => {
+  const place = (html) => {
+    const doc = parseHtmlDocument(`<!doctype html><html><body>${html}</body></html>`)
+    const { target, position } = endOfPage(doc)
+    insertSnippet(doc, '<section id="new">New</section>', target, position)
+    return [...doc.body.querySelectorAll('[id]')].map((el) => el.id)
+  }
+
+  it('goes above the footer', () => {
+    expect(place('<header id="h"></header><main id="m"></main><footer id="f"><footer id="inner"></footer></footer>'))
+      .toEqual(['h', 'm', 'new', 'f', 'inner'])
+  })
+
+  it('goes inside the element that wraps the whole page', () => {
+    expect(place('<div id="page"><section id="a"></section><section id="b"></section></div>'))
+      .toEqual(['page', 'a', 'b', 'new'])
+  })
+
+  it('goes at the end of the body otherwise', () => {
+    expect(place('<section id="a"></section><section id="b"></section>')).toEqual(['a', 'b', 'new'])
+  })
+})
+

@@ -142,3 +142,21 @@ describe('BlockLibrary', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
+
+// A card pressed with the keyboard goes to the end of the page; a click still
+// arms a placement to aim with the pointer.
+describe('BlockLibrary from the keyboard', () => {
+  it('asks for the end of the page on Enter, and arms on a click', { timeout: 20000 }, async () => {
+    localStorage.setItem('pwb_language', 'en')
+    const user = userEvent.setup()
+    const armed = []
+    renderLibrary({ onArmPlacement: (data, options) => armed.push(options) })
+    const card = document.querySelector('[data-block-library] .grid > button')
+
+    card.focus()
+    await user.keyboard('{Enter}')
+    await user.click(document.querySelector('[data-block-library] .grid > button'))
+
+    expect(armed).toEqual([{ atEnd: true }, { atEnd: false }])
+  })
+})
