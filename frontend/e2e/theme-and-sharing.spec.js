@@ -11,8 +11,7 @@ test('a theme edit says it is not on the page until it is applied', async ({ pag
   const { data: site } = await api(request, 'POST', '/sites/', { title: 'E2E theme' })
   await openEditor(page, site.id)
   await page.getByRole('tab', { name: 'Theme' }).click()
-  const background = properties(page).locator('label')
-    .filter({ has: page.locator('span', { hasText: /^Site background$/ }) }).locator('input[type=text]')
+  const background = properties(page).getByRole('textbox', { name: 'Site background', exact: true })
   await background.fill('#123456')
   await expect(properties(page).getByRole('status')).toContainText('Not on the page yet')
 

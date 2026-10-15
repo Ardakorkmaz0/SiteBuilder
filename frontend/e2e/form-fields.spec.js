@@ -40,7 +40,8 @@ test('a password field on the canvas, edited part by part', async ({ page, reque
   await preview.locator('[data-field-part="label"]').click()
   const labelPart = dialog.getByRole('region', { name: 'Label' })
   await expect(labelPart).toHaveCount(1)
-  await labelPart.locator('label').filter({ has: page.locator('span', { hasText: /^Color$/ }) }).locator('input[type="text"]').fill('#c00000')
+  // A colour's code field is named by its label (the swatch is "Pick a colour: …").
+  await labelPart.getByRole('textbox', { name: 'Color', exact: true }).fill('#c00000')
   await expect.poll(() => block.locator('label').evaluate((el) => getComputedStyle(el).color)).toBe('rgb(192, 0, 0)')
   await page.keyboard.press('Escape')
 
