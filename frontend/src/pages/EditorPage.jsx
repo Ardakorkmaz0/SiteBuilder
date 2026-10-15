@@ -1027,10 +1027,15 @@ function SiteEditor() {
   // and takes the pending automatic save with it. Send it on the way out. The
   // rules are the same as for any automatic save: not when it is switched off,
   // and not after "leave without saving".
-  useEffect(() => () => {
-    const s = saveLifecycleRef.current
-    if (!sessionEndedRef.current && shouldRunEditorAutoSave(s, discardLeaveRef.current)) {
-      s.save(undefined, { auto: true })
+  const leftEditorRef = useRef(false)
+  useEffect(() => {
+    leftEditorRef.current = false
+    return () => {
+      leftEditorRef.current = true
+      const s = saveLifecycleRef.current
+      if (!sessionEndedRef.current && shouldRunEditorAutoSave(s, discardLeaveRef.current)) {
+        s.save(undefined, { auto: true })
+      }
     }
   }, [])
 
@@ -1750,16 +1755,31 @@ function SiteEditor() {
       const publishedPages = nextPublished
         ? publishedPagesFor(schema, map, safeTitle, slug)
         : undefined
-      const data = await updateSite(
-        id,
-        {
-          title: safeTitle, schema, html, published: nextPublished, category, tags,
-          ...(publishedPages ? { published_pages: publishedPages } : {}),
-          // "Save mine anyway" leaves it out, and the server takes the save.
-          ...(!force && baseRevisionRef.current != null ? { base_revision: baseRevisionRef.current } : {}),
-        },
-        { saveSource: versionSource || (auto ? 'auto' : 'manual') },
-      )
+      let data
+      try {
+        data = await updateSite(
+          id,
+          {
+            title: safeTitle, schema, html, published: nextPublished, category, tags,
+            ...(publishedPages ? { published_pages: publishedPages } : {}),
+            // "Save mine anyway" leaves it out, and the server takes the save.
+            ...(!force && baseRevisionRef.current != null ? { base_revision: baseRevisionRef.current } : {}),
+          },
+          { saveSource: versionSource || (auto ? 'auto' : 'manual') },
+        )
+      } catch (e) {
+        // The save sent on the way out of the editor, from a tab that another
+        // one has saved over since. There is no dialog left to ask in, so the
+        // changes are kept as a local draft that this site offers to restore
+        // when it is opened again — before, they were gone without a word.
+        if (leftEditorRef.current && e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
+          writeEditorRecovery(editorOwnerId, id, {
+            schema, title: safeTitle, category, tagsText, currentPageId: storeNow.currentPageId,
+            codeDrafts: {}, reason: 'site_changed',
+          })
+        }
+        throw e
+      }
       if (Number.isInteger(data.revision)) baseRevisionRef.current = data.revision
       setSiteConflict(false)
       setAutoSaveRefused(false)
@@ -2142,7 +2162,7 @@ function SiteEditor() {
   const currentPage = storePages[currentPageIndex] || storePages[0]
   const leaveDialog = (
     <>
-      <RecoveryDialog open={!!recoveryDraft} onRestore={restoreRecovery} onDiscard={discardRecovery} />
+      <RecoveryDialog open={!!recoveryDraft} reason={recoveryDraft?.reason} onRestore={restoreRecovery} onDiscard={discardRecovery} />
       <SiteConflictDialog
         open={siteConflict}
         onReload={() => {
