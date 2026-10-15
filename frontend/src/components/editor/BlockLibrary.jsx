@@ -291,7 +291,7 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
                       cat.nested ? 'pl-5' : 'pl-2.5'
                     } ${
                       category === cat.id && !q
-                        ? 'bg-[var(--studio-control,#eef2ff)] font-semibold text-[var(--studio-accent,#4f46e5)]'
+                        ? 'bg-[var(--studio-control,#eef2ff)] font-semibold text-[var(--studio-accent-hover,#4338ca)]'
                         : 'text-[var(--studio-text-muted,#6b7280)] hover:bg-[var(--studio-control-hover,#f3f4f6)] hover:text-[var(--studio-text,#374151)]'
                     }`}
                   >
