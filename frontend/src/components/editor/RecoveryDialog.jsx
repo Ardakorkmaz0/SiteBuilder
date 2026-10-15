@@ -6,7 +6,7 @@ export default function RecoveryDialog({ open, onRestore, onDiscard }) {
   const ref = useInitialDialogFocus(open)
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-[170] grid place-items-center bg-black/40 p-4">
+    <div className="studio-theme-surface studio-overlay fixed inset-0 z-[170] grid place-items-center p-4">
       <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="recovery-title"
         aria-describedby="recovery-description"
         onKeyDown={(event) => {
@@ -21,9 +21,9 @@ export default function RecoveryDialog({ open, onRestore, onDiscard }) {
             event.preventDefault(); first.focus()
           }
         }}
-        className="w-full max-w-md rounded-2xl border border-[#e5e7eb] bg-white p-5 shadow-2xl">
-        <h2 id="recovery-title" className="text-base font-bold text-[#111827]">{t('Recover your unsaved work?')}</h2>
-        <p id="recovery-description" className="mt-2 text-sm leading-relaxed text-[#6b7280]">
+        className="w-full max-w-md rounded-2xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-5 shadow-2xl outline-none">
+        <h2 id="recovery-title" className="text-base font-bold text-[var(--studio-text)]">{t('Recover your unsaved work?')}</h2>
+        <p id="recovery-description" className="mt-2 text-sm leading-relaxed text-[var(--studio-text-muted)]">
           {t('Your session ended while this site had unsaved changes. Restore the local draft, or keep the version from the server.')}
         </p>
         <div className="mt-5 flex flex-wrap justify-end gap-2">
