@@ -3,11 +3,12 @@
 // form read as a row of unnamed text boxes.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import LanguageProvider from '../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../ui/UiThemeProvider.jsx'
 import ProfilePage from './ProfilePage.jsx'
 import { useAuthStore } from '../store/authStore.js'
+import { updateProfile } from '../api/profile.js'
 
 vi.mock('../api/profile.js', () => ({
   getProfile: vi.fn(() => Promise.resolve({ display_name: 'Ada', bio: '', headline: '', location: '', website: '', github: '', twitter: '', instagram: '' })),
@@ -45,3 +46,34 @@ describe('the profile form', () => {
     expect(await screen.findByRole('textbox', { name: 'Search your sites…' })).toBeInTheDocument()
   })
 })
+
+// A website the server refused was reported at the top of the page, out of
+// sight of the Save button, and nothing pointed at the field.
+describe('a refused link', () => {
+  it('is said under its field, which is marked and focused', async () => {
+    updateProfile.mockRejectedValueOnce({
+      response: { status: 400, data: { code: 'validation_error', website: ['Enter a web address, like yoursite.com.'], error_codes: { website: ['invalid'] } } },
+    })
+    render(
+      <MemoryRouter>
+        <UiThemeProvider>
+          <LanguageProvider>
+            <ProfilePage />
+          </LanguageProvider>
+        </UiThemeProvider>
+      </MemoryRouter>,
+    )
+    const website = await screen.findByRole('textbox', { name: 'Website' })
+    fireEvent.change(website, { target: { value: 'not an address' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }))
+
+    expect(await screen.findByText('Enter a web address, like yoursite.com.')).toBeInTheDocument()
+    expect(website).toHaveAttribute('aria-invalid', 'true')
+    expect(website).toHaveAccessibleDescription('Enter a web address, like yoursite.com.')
+    expect(website).toHaveFocus()
+
+    fireEvent.change(website, { target: { value: 'ada.dev' } })
+    expect(website).not.toHaveAttribute('aria-invalid')
+  })
+})
+

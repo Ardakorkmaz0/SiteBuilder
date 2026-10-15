@@ -3170,6 +3170,9 @@ export const TURKISH_TRANSLATIONS = {
   'Page not found': 'Sayfa bulunamadı',
   'Your latest changes are not saved yet. Trying again — or press Save.': 'Son değişiklikleriniz henüz kaydedilmedi. Yeniden deneniyor; dilerseniz Kaydet’e basın.',
   'Templates, a visual editor and publishing, in one place.': 'Şablonlar, görsel editör ve yayınlama tek yerde.',
+  'Enter a web address, like yoursite.com.': 'Bir web adresi girin, örneğin siteniz.com.',
+  'Enter a username like @ada, or a full link.': '@ada gibi bir kullanıcı adı ya da tam bir bağlantı girin.',
+  'yoursite.com': 'siteniz.com',
 }
 
 // Editor-only libraries (the section blocks and component variants) carry

@@ -50,7 +50,22 @@ export default function ProfilePage() {
   const [bio, setBio] = useState('')
   // Modern-profile meta — a single object keeps the six optional fields tidy.
   const [meta, setMeta] = useState({ headline: '', location: '', website: '', github: '', twitter: '', instagram: '' })
-  const setMetaField = (key) => (event) => setMeta((m) => ({ ...m, [key]: event.target.value }))
+  const setMetaField = (key) => (event) => {
+    setMeta((m) => ({ ...m, [key]: event.target.value }))
+    setLinkError((current) => (current?.field === key ? null : current))
+  }
+  // A link the server refused ("Enter a web address…") is said under that
+  // field and the cursor goes there. In the banner at the top of the page it
+  // was out of sight of the Save button that caused it.
+  const [linkError, setLinkError] = useState(null)
+  const linkFieldProps = (key) => ({
+    id: `profile-${key}`,
+    'aria-invalid': linkError?.field === key || undefined,
+    'aria-describedby': linkError?.field === key ? `profile-${key}-error` : undefined,
+  })
+  const linkErrorText = (key) => (linkError?.field === key
+    ? <p id={`profile-${key}-error`} className="mt-1 text-xs text-[var(--studio-danger)]">{linkError.message}</p>
+    : null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -118,6 +133,7 @@ export default function ProfilePage() {
     event.preventDefault()
     setSaving(true)
     setError('')
+    setLinkError(null)
     setSaved(false)
     try {
       const result = await updateProfile({ display_name: displayName, bio, ...meta })
@@ -126,7 +142,13 @@ export default function ProfilePage() {
       setSaved(true)
       setTimeout(() => setSaved(false), 1800)
     } catch (requestError) {
-      setError(apiError(requestError))
+      const field = ['website', 'github', 'twitter', 'instagram'].find((key) => requestError?.response?.data?.[key])
+      if (field) {
+        setLinkError({ field, message: apiError(requestError) })
+        document.getElementById(`profile-${field}`)?.focus()
+      } else {
+        setError(apiError(requestError))
+      }
     } finally {
       setSaving(false)
     }
@@ -407,12 +429,13 @@ export default function ProfilePage() {
                     <label htmlFor="profile-website" className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Website')}</label>
                     <input
                       className="studio-input w-full px-3 py-2 text-sm"
-                      id="profile-website"
-                      placeholder="yoursite.com"
+                      {...linkFieldProps('website')}
+                      placeholder={t('yoursite.com')}
                       value={meta.website}
                       maxLength={200}
                       onChange={setMetaField('website')}
                     />
+                    {linkErrorText('website')}
                   </div>
                 </div>
                 <div>
@@ -424,16 +447,20 @@ export default function ProfilePage() {
                       ['twitter', XSocialIcon, 'X (Twitter)'],
                       ['instagram', InstagramIcon, 'Instagram'],
                     ].map(([key, SocialIcon, label]) => (
-                      <div key={key} className="relative">
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--studio-text-faint)]"><SocialIcon size={14} /></span>
-                        <input
-                          className="studio-input w-full py-2 pl-9 pr-3 text-sm"
-                          placeholder={label}
-                          aria-label={label}
-                          value={meta[key]}
-                          maxLength={100}
-                          onChange={setMetaField(key)}
-                        />
+                      <div key={key}>
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--studio-text-faint)]"><SocialIcon size={14} /></span>
+                          <input
+                            className="studio-input w-full py-2 pl-9 pr-3 text-sm"
+                            {...linkFieldProps(key)}
+                            placeholder={label}
+                            aria-label={label}
+                            value={meta[key]}
+                            maxLength={100}
+                            onChange={setMetaField(key)}
+                          />
+                        </div>
+                        {linkErrorText(key)}
                       </div>
                     ))}
                   </div>

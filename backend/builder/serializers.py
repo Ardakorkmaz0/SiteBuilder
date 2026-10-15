@@ -1,7 +1,9 @@
+import re
+
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password as dj_validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.validators import validate_image_file_extension
+from django.core.validators import URLValidator, validate_image_file_extension
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import ErrorDetail
@@ -372,6 +374,11 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
+# A social account's handle ("ada", "@ada", "ada.studio"), or else a link.
+_PROFILE_HANDLE = re.compile(r'^@?[A-Za-z0-9._-]{1,100}$')
+_PROFILE_URL = URLValidator(schemes=['http', 'https'])
+
+
 class ProfileSerializer(serializers.ModelSerializer):
     """Read/update the current user's profile. `avatar` is the multipart write
     field; `avatar_url` is the absolute read URL — same split as
@@ -394,29 +401,42 @@ class ProfileSerializer(serializers.ModelSerializer):
         return _absolute_image_url(obj.avatar, self.context)
 
     @staticmethod
-    def _clean_link(value):
+    def _clean_link(value, handle_ok=False):
         """Links/handles render as clickable hrefs on public pages — reject
         any embedded scheme other than http(s) so a stored value can never
-        smuggle javascript: into an anchor."""
+        smuggle javascript: into an anchor. And it has to be an address (or,
+        for a social account, a handle): any text was kept, and the profile
+        showed it as a link to nowhere ("https://xn--bu%20bir%20adres…")."""
         cleaned = (value or '').strip()
         lowered = cleaned.lower()
         if '://' in cleaned and not lowered.startswith(('http://', 'https://')):
             raise serializers.ValidationError('Links must use http:// or https://.')
         if lowered.startswith(('javascript:', 'data:', 'vbscript:')):
             raise serializers.ValidationError('Links must use http:// or https://.')
+        if not cleaned:
+            return cleaned
+        if handle_ok and '://' not in cleaned and _PROFILE_HANDLE.match(cleaned):
+            return cleaned
+        try:
+            _PROFILE_URL(cleaned if '://' in cleaned else f'https://{cleaned}')
+        except DjangoValidationError:
+            raise serializers.ValidationError(
+                'Enter a username like @ada, or a full link.' if handle_ok
+                else 'Enter a web address, like yoursite.com.',
+            )
         return cleaned
 
     def validate_website(self, value):
         return self._clean_link(value)
 
     def validate_github(self, value):
-        return self._clean_link(value)
+        return self._clean_link(value, handle_ok=True)
 
     def validate_twitter(self, value):
-        return self._clean_link(value)
+        return self._clean_link(value, handle_ok=True)
 
     def validate_instagram(self, value):
-        return self._clean_link(value)
+        return self._clean_link(value, handle_ok=True)
 
     def validate_avatar(self, file):
         if file.size > MAX_IMAGE_BYTES:
