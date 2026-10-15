@@ -188,5 +188,6 @@ describe('a Turkish template', () => {
       }
     }
     expect([...untranslated]).toEqual([])
-  }, 30000)
+  // 500 templates, each parsed twice: slow beside the parallel suite.
+  }, 120000)
 })
