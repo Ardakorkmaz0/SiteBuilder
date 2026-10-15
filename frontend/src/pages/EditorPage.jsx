@@ -426,6 +426,9 @@ function SiteEditor() {
   const restoredRecoveryRef = useRef(null)
   const sessionEndedRef = useRef(false)
   const recoveryMessageRef = useRef('')
+  // The session is gone but the editor stayed open (a guest, or a draft that
+  // could not be stored): the error bar offers the download it asks for.
+  const [sessionLost, setSessionLost] = useState(false)
   const loadedSiteRef = useRef(false)
   // Back LEAVES the editor. One history step back is usually another editor
   // (open a site, return, open the next), and moving between pages of a design
@@ -919,12 +922,14 @@ function SiteEditor() {
       event.preventDefault()
       recoveryMessageRef.current = t('Your session expired and the local draft could not be saved. Download your project before signing in again.')
       setError(recoveryMessageRef.current)
+      setSessionLost(true)
     } else if (authUser?.is_guest) {
       // A guest has no credentials to re-enter a revoked identity. Leave its
       // live work available for export instead of redirecting to a dead end.
       event.preventDefault()
       recoveryMessageRef.current = t('Your guest session expired. Download your project before starting a new session.')
       setError(recoveryMessageRef.current)
+      setSessionLost(true)
     }
   }
   useEffect(() => {
@@ -973,6 +978,9 @@ function SiteEditor() {
     if (autoSaveState !== 'error' || !autoSaveEnabled) return undefined
     const attempt = autoSaveRetryRef.current
     const retry = () => {
+      // A session that has ended will not come back by itself: asking again
+      // only collects the same 401.
+      if (recoveryMessageRef.current) return
       const s = saveLifecycleRef.current
       if (!shouldRunEditorAutoSave(s, discardLeaveRef.current)) return
       autoSaveRetryRef.current = attempt + 1
@@ -2525,7 +2533,18 @@ function SiteEditor() {
       )}
 
       {error && (
-        <div className="bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>
+        <div role="alert" className="flex flex-wrap items-center gap-3 bg-red-50 px-4 py-2 text-sm text-red-600">
+          <span className="min-w-0 flex-1">{error}</span>
+          {sessionLost && (
+            <button
+              type="button"
+              onClick={exportProject}
+              className="shrink-0 rounded-md border border-red-300 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
+            >
+              {t('Export project (.json)')}
+            </button>
+          )}
+        </div>
       )}
 
       <DndContext
