@@ -1,4 +1,6 @@
 export const TURKISH_TRANSLATIONS = {
+  'Runs in preview and in the published-site sandbox': 'Önizlemede ve yayınlanan sitenin korumalı alanında çalışır',
+  'Could not copy the code. Select and copy it manually.': 'Kod kopyalanamadı. Kodu seçip elle kopyalayın.',
   'Recover your unsaved work?': 'Kaydedilmemiş çalışman geri yüklensin mi?',
   'Your guest session expired. Download your project before starting a new session.': 'Misafir oturumun sona erdi. Yeni bir oturum başlatmadan önce projeni indir.',
   'Your session ended while this site had unsaved changes. Restore the local draft, or keep the version from the server.': 'Bu sitede kaydedilmemiş değişiklikler varken oturumun sona erdi. Yerel taslağı geri yükleyebilir veya sunucudaki sürümü kullanabilirsin.',

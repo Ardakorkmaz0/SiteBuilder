@@ -65,6 +65,8 @@ export default function SiteControlCenter({
   const { isGuest, gate: guestGate, dialog: guestDialog } = useGuestGate()
   const [tab, setTab] = useState(initialTab)
   const [busy, setBusy] = useState(false)
+  const [actionBusy, setActionBusy] = useState(false)
+  const actionPendingRef = useRef(false)
   const [error, setError] = useState('')
   const [submissions, setSubmissions] = useState([])
   const [analytics, setAnalytics] = useState(null)
@@ -136,25 +138,52 @@ export default function SiteControlCenter({
     } catch { setError(t('Could not copy the link.')) }
   }
 
-  async function markSubmission(row, isRead = true) {
-    const next = await updateSiteSubmission(site.id, row.id, isRead)
-    setSubmissions((items) => items.map((item) => item.id === next.id ? next : item))
+  // Failed mutations must stay in the panel where they can be retried. Without
+  // a shared guard they reject from the click handler and leave no explanation;
+  // racing a read/delete or two link replacements can also apply stale results.
+  async function runAction(action) {
+    if (actionPendingRef.current) return
+    actionPendingRef.current = true
+    setActionBusy(true)
+    setError('')
+    try {
+      await action()
+    } catch (err) {
+      setError(apiError(err))
+    } finally {
+      actionPendingRef.current = false
+      setActionBusy(false)
+    }
   }
 
-  async function removeSubmission(row) {
-    await deleteSiteSubmission(site.id, row.id)
-    setSubmissions((items) => items.filter((item) => item.id !== row.id))
+  function markSubmission(row, isRead = true) {
+    return runAction(async () => {
+      const next = await updateSiteSubmission(site.id, row.id, isRead)
+      setSubmissions((items) => items.map((item) => item.id === next.id ? next : item))
+    })
   }
 
-  async function toggleComment(row) {
-    const next = await resolveSiteComment(site.id, row.id, !row.resolved)
-    setComments((items) => items.map((item) => item.id === next.id ? next : item))
+  function removeSubmission(row) {
+    return runAction(async () => {
+      await deleteSiteSubmission(site.id, row.id)
+      setSubmissions((items) => items.filter((item) => item.id !== row.id))
+    })
   }
 
-  async function resetReviewLink() {
+  function toggleComment(row) {
+    return runAction(async () => {
+      const next = await resolveSiteComment(site.id, row.id, !row.resolved)
+      setComments((items) => items.map((item) => item.id === next.id ? next : item))
+    })
+  }
+
+  function resetReviewLink() {
+    if (actionPendingRef.current) return
     if (!window.confirm(t('Create a new review link? The previous link will stop working.'))) return
-    const data = await regenerateReviewLink(site.id)
-    onSitePatch({ ...site, review_token: data.review_token })
+    return runAction(async () => {
+      const data = await regenerateReviewLink(site.id)
+      onSitePatch({ ...site, review_token: data.review_token })
+    })
   }
 
   function editContent(entry, value) {
@@ -179,7 +208,7 @@ export default function SiteControlCenter({
         </header>
         <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-[#e5e7eb] bg-white px-3 py-2 md:px-6" aria-label={t('Site tools')}>
           {TABS.map(([id, label]) => (
-            <button key={id} type="button" onClick={() => { if (GUEST_TABS[id] && guestGate(GUEST_TABS[id])) return; setBusy(['inbox', 'analytics', 'feedback'].includes(id)); setError(''); setTab(id) }} aria-pressed={tab === id} className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold ${tab === id ? 'bg-[var(--studio-accent)] text-white' : 'text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]'}`}>{t(label)}{isGuest && GUEST_TABS[id] ? <span aria-label={t('Needs an account')} title={t('Needs an account')} className="ml-1 opacity-70">⚿</span> : null}</button>
+            <button key={id} type="button" onClick={() => { if (GUEST_TABS[id] && guestGate(GUEST_TABS[id])) return; if (tab === id) return; setBusy(['inbox', 'analytics', 'feedback'].includes(id)); setError(''); setTab(id) }} aria-pressed={tab === id} className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold ${tab === id ? 'bg-[var(--studio-accent)] text-white' : 'text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]'}`}>{t(label)}{isGuest && GUEST_TABS[id] ? <span aria-label={t('Needs an account')} title={t('Needs an account')} className="ml-1 opacity-70">⚿</span> : null}</button>
           ))}
         </nav>
         {guestDialog}
@@ -242,7 +271,7 @@ export default function SiteControlCenter({
             <div className="space-y-3">
               {!submissions.length ? <EmptyState>{t('No form submissions yet.')}</EmptyState> : submissions.map((row) => (
                 <article key={row.id} className={`rounded-2xl border p-4 ${row.is_read ? 'border-[#e5e7eb] bg-white' : 'border-[#a5b4fc] bg-[#eef2ff]'}`}>
-                  <div className="flex items-center justify-between gap-3"><div className="text-xs font-semibold text-[var(--studio-text-muted)]">{row.page || t('Site form')} · {new Date(row.created_at).toLocaleString()}</div><div className="flex gap-2"><button type="button" onClick={() => markSubmission(row, !row.is_read)} className="text-xs font-semibold text-[#4f46e5]">{t(row.is_read ? 'Mark unread' : 'Mark read')}</button><button type="button" onClick={() => removeSubmission(row)} className="text-xs font-semibold text-[var(--studio-danger)]">{t('Delete')}</button></div></div>
+                  <div className="flex items-center justify-between gap-3"><div className="text-xs font-semibold text-[var(--studio-text-muted)]">{row.page || t('Site form')} · {new Date(row.created_at).toLocaleString()}</div><div className="flex gap-2"><button type="button" disabled={actionBusy} onClick={() => markSubmission(row, !row.is_read)} className="text-xs font-semibold text-[#4f46e5] disabled:opacity-50">{t(row.is_read ? 'Mark unread' : 'Mark read')}</button><button type="button" disabled={actionBusy} onClick={() => removeSubmission(row)} className="text-xs font-semibold text-[var(--studio-danger)] disabled:opacity-50">{t('Delete')}</button></div></div>
                   <dl className="mt-3 grid gap-2 sm:grid-cols-2">{Object.entries(row.data || {}).map(([key, value]) => <div key={key} className="rounded-xl bg-white/80 p-3"><dt className="text-[11px] font-bold uppercase tracking-wide text-[var(--studio-text-faint)]">{key}</dt><dd className="mt-1 whitespace-pre-wrap text-sm text-[#374151]">{String(value)}</dd></div>)}</dl>
                 </article>
               ))}
@@ -272,8 +301,8 @@ export default function SiteControlCenter({
                   one decision. Replacing the address stays here as the last
                   resort for a link that leaked. */}
               <SharePanel siteId={site.id} reviewUrl={reviewUrl} onCopy={copy} copied={copied} />
-              <button type="button" onClick={resetReviewLink} className="text-xs font-semibold text-[var(--studio-danger)]">{t('Replace the link (the old one stops working)')}</button>
-              {!comments.length ? <EmptyState>{t('No client comments yet.')}</EmptyState> : comments.map((row) => <article key={row.id} className={`rounded-2xl border bg-white p-4 ${row.resolved ? 'opacity-60' : ''}`}><div className="flex justify-between gap-3"><div><strong className="text-sm">{row.author_name}</strong><div className="text-xs text-[var(--studio-text-faint)]">{[row.author_email, commentPageLabel(schema.pages, row.page_id, t)].filter(Boolean).join(' · ')}</div></div><button type="button" onClick={() => toggleComment(row)} className="text-xs font-semibold text-[#4f46e5]">{t(row.resolved ? 'Reopen' : 'Resolve')}</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#374151]">{row.body}</p></article>)}
+              <button type="button" disabled={actionBusy} onClick={resetReviewLink} className="text-xs font-semibold text-[var(--studio-danger)] disabled:opacity-50">{t('Replace the link (the old one stops working)')}</button>
+              {!comments.length ? <EmptyState>{t('No client comments yet.')}</EmptyState> : comments.map((row) => <article key={row.id} className={`rounded-2xl border bg-white p-4 ${row.resolved ? 'opacity-60' : ''}`}><div className="flex justify-between gap-3"><div><strong className="text-sm">{row.author_name}</strong><div className="text-xs text-[var(--studio-text-faint)]">{[row.author_email, commentPageLabel(schema.pages, row.page_id, t)].filter(Boolean).join(' · ')}</div></div><button type="button" disabled={actionBusy} onClick={() => toggleComment(row)} className="text-xs font-semibold text-[#4f46e5] disabled:opacity-50">{t(row.resolved ? 'Reopen' : 'Resolve')}</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#374151]">{row.body}</p></article>)}
             </div>
           )}
 

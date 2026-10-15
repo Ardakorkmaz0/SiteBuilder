@@ -2,6 +2,7 @@ import { readElementMultilineText, writeElementMultilineText } from './domMultil
 import { readElementMotion } from './htmlMotion.js'
 import { slugifyAnchor } from './anchors.js'
 import { landingTarget } from './htmlPlacement.js'
+import { PHONE_BREAKPOINT } from './htmlDevices.js'
 
 const MOBILE_STYLE_TAG_ATTR = 'data-pwb-responsive-overrides'
 const MOBILE_VAR_PREFIX = '--pwb-mobile-'
@@ -434,12 +435,16 @@ export function setElementLinks(el, links) {
       const cloneWrapper = holder && holder !== el && holder.childElementCount === 1
       const source = cloneWrapper ? holder : template
       const clone = source.cloneNode(true)
+      giveCloneOwnIds(el.ownerDocument, clone)
       source.insertAdjacentElement('afterend', clone)
       anchor = cloneWrapper ? clone.querySelector('a') : clone
       if (!anchor) return
       // A cloned item must not inherit the "current page" marker.
-      anchor.removeAttribute('aria-current')
-      anchor.classList.remove('on', 'active', 'current')
+      for (const node of new Set([clone, anchor])) {
+        node.removeAttribute('aria-current')
+        node.classList.remove('on', 'active', 'current')
+      }
+      anchors.push(anchor)
     }
     writeElementMultilineText(anchor, link.text)
     if (link.href) anchor.setAttribute('href', link.href)
@@ -507,6 +512,15 @@ export function describeElement(el, win = el?.ownerDocument?.defaultView) {
   }
   const canEditText = isTextEditable(el)
   const px = (v) => Math.round(parseFloat(v) || 0)
+  // Select presets should round-trip their authored values, but on a phone
+  // that means its override. Reading the stored PC value first made effects
+  // and stacking controls jump back to PC values after every mobile edit.
+  const activeStyleValue = (name) => {
+    if (win?.innerWidth > 0 && win.innerWidth < PHONE_BREAKPOINT && el.hasAttribute(mobileAttr(name))) {
+      return el.style.getPropertyValue(`${MOBILE_VAR_PREFIX}${name}`).trim()
+    }
+    return pcStyleValue(el, name)
+  }
   // The parent we'd jump to with "Select parent" (skips inline wrappers,
   // stops at <body>) and a readable ancestor trail for context.
   const parent = selectableParent(el)
@@ -567,7 +581,7 @@ export function describeElement(el, win = el?.ownerDocument?.defaultView) {
     flexWrap: cs ? String(cs.flexWrap || '') : '',
     // Stacking: a sticky header is the case that keeps coming up.
     position: cs ? String(cs.position || '') : '',
-    zIndex: Number(pcStyleValue(el, 'z-index')) || 0,
+    zIndex: Number(activeStyleValue('z-index') || cs?.zIndex) || 0,
     padding: cs ? px(cs.paddingTop) : 0,
     radius: cs ? px(cs.borderTopLeftRadius) : 0,
     width: cs ? px(cs.width) : 0,
@@ -578,13 +592,13 @@ export function describeElement(el, win = el?.ownerDocument?.defaultView) {
     // Border (single width/colour/style for the whole box — covers the common case).
     borderWidth: cs ? px(cs.borderTopWidth) : 0,
     borderColor: cs ? cssColorToHex(cs.borderTopColor) : '',
-    borderStyle: pcStyleValue(el, 'border-style') || (cs ? cs.borderTopStyle : '') || '',
+    borderStyle: activeStyleValue('border-style') || (cs ? cs.borderTopStyle : '') || '',
     // Effects — mirror the component-mode html panel. Read the INLINE value
     // first so a preset applied here round-trips in the select; fall back to the
     // computed value (which won't match a preset, but shows the right default).
-    boxShadow: pcStyleValue(el, 'box-shadow') || (cs ? cs.boxShadow : '') || '',
-    opacity: pcStyleValue(el, 'opacity') !== '' ? Number(pcStyleValue(el, 'opacity')) : (cs ? Number(cs.opacity) : 1),
-    overflow: pcStyleValue(el, 'overflow') || (cs ? cs.overflow : '') || '',
+    boxShadow: activeStyleValue('box-shadow') || (cs ? cs.boxShadow : '') || '',
+    opacity: activeStyleValue('opacity') !== '' ? Number(activeStyleValue('opacity')) : (cs ? Number(cs.opacity) : 1),
+    overflow: activeStyleValue('overflow') || (cs ? cs.overflow : '') || '',
     // Flex layout — lets a nav/row container space and align its children
     // (the navbar case: it's a flex box, not a plain block).
     justifyContent: cs ? String(cs.justifyContent || '') : '',
@@ -641,6 +655,13 @@ function ancestorTrail(el) {
 // Apply a partial update from the panel. Only keys present in `patch` are
 // touched; empty-string style values clear the inline override so the
 // stylesheet value shows through again.
+function numericStyle(value, { zero = '0px', min = 0 } = {}) {
+  if (value === '' || value == null) return ''
+  const n = Number(value)
+  if (!Number.isFinite(n) || n < min) return ''
+  return n === 0 ? zero : `${n}px`
+}
+
 export function applyElementPatch(el, patch = {}) {
   if (!el || el.nodeType !== 1) return
   if (patch.text !== undefined && isTextEditable(el)) {
@@ -650,64 +671,51 @@ export function applyElementPatch(el, patch = {}) {
   if (patch.links !== undefined) setElementLinks(el, patch.links)
   if (patch.src !== undefined && el.tagName === 'IMG') setImageSource(el, patch.src)
   if (patch.alt !== undefined && el.tagName === 'IMG') el.setAttribute('alt', patch.alt)
-  // Both go through setPcStyle, which knows where a PC value lives while a
-  // phone value exists for the same property. setImp is for the controls that
-  // have to beat a template's own !important; an empty value clears either.
-  const setStyle = (name, value) => setPcStyle(el, name, value, { important: false })
+  // Every explicit panel choice must beat imported template rules, including
+  // their !important declarations. The shared setter also moves a PC value
+  // out of line when a phone override needs to win at its breakpoint.
   const setImp = (name, value) => setPcStyle(el, name, value)
   if (patch.fontSize !== undefined) {
     const n = Number(patch.fontSize)
-    setStyle('font-size', n > 0 ? `${n}px` : '')
+    setImp('font-size', n > 0 ? `${n}px` : '')
   }
-  if (patch.fontWeight !== undefined) setStyle('font-weight', patch.fontWeight)
-  if (patch.textAlign !== undefined) setStyle('text-align', patch.textAlign)
-  if (patch.color !== undefined) setStyle('color', patch.color)
-  if (patch.background !== undefined) setStyle('background-color', patch.background)
-  if (patch.padding !== undefined) {
-    const n = Number(patch.padding)
-    setImp('padding', n > 0 ? `${n}px` : '')
-  }
-  if (patch.radius !== undefined) {
-    const n = Number(patch.radius)
-    setImp('border-radius', n >= 0 && String(patch.radius) !== '' ? `${n}px` : '')
-  }
-  // 0 width/height clears the override (auto), so the element isn't collapsed.
-  if (patch.width !== undefined) {
-    const n = Number(patch.width)
-    setImp('width', n > 0 ? `${n}px` : '')
-  }
-  if (patch.height !== undefined) {
-    const n = Number(patch.height)
-    setImp('height', n > 0 ? `${n}px` : '')
-  }
+  if (patch.fontWeight !== undefined) setImp('font-weight', patch.fontWeight)
+  if (patch.textAlign !== undefined) setImp('text-align', patch.textAlign)
+  if (patch.color !== undefined) setImp('color', patch.color)
+  if (patch.background !== undefined) setImp('background-color', patch.background)
+  if (patch.padding !== undefined) setImp('padding', numericStyle(patch.padding))
+  if (patch.radius !== undefined) setImp('border-radius', numericStyle(patch.radius))
+  // 0 means auto, while empty means the imported template's original value.
+  if (patch.width !== undefined) setImp('width', numericStyle(patch.width, { zero: 'auto' }))
+  if (patch.height !== undefined) setImp('height', numericStyle(patch.height, { zero: 'auto' }))
   // Margins: 0 is a real value (collapse the gap), so always write it.
   if (patch.marginTop !== undefined) {
-    const n = Number(patch.marginTop)
-    setImp('margin-top', `${n}px`)
+    setImp('margin-top', numericStyle(patch.marginTop, { min: -Infinity }))
   }
   if (patch.marginBottom !== undefined) {
-    const n = Number(patch.marginBottom)
-    setImp('margin-bottom', `${n}px`)
+    setImp('margin-bottom', numericStyle(patch.marginBottom, { min: -Infinity }))
   }
-  if (patch.display !== undefined) setStyle('display', patch.display)
+  if (patch.display !== undefined) setImp('display', patch.display)
   // Border: width drives a solid border; 0 removes it. Colour is independent.
   if (patch.borderWidth !== undefined) {
-    const n = Number(patch.borderWidth)
-    if (n > 0) {
+    const width = numericStyle(patch.borderWidth)
+    if (width) {
       setImp('border-style', 'solid')
-      setImp('border-width', `${n}px`)
+      setImp('border-width', width)
     } else {
       setImp('border-width', '')
       setImp('border-style', '')
     }
   }
   if (patch.borderColor !== undefined) setImp('border-color', patch.borderColor)
-  // Border style on its own (None clears the border entirely). Written
+  // Border style on its own (None hides the border entirely). Written
   // !important like the rest of the box overrides so template CSS can't pin it.
   if (patch.borderStyle !== undefined) {
     if (patch.borderStyle && patch.borderStyle !== 'none') {
       setImp('border-style', patch.borderStyle)
       if (!pcStyleValue(el, 'border-width')) setImp('border-width', '1px')
+    } else if (patch.borderStyle === 'none') {
+      setImp('border-style', 'none')
     } else {
       setImp('border-style', '')
       setImp('border-width', '')
@@ -716,17 +724,15 @@ export function applyElementPatch(el, patch = {}) {
   // Effects — parity with the component-mode html panel. Empty string clears the
   // override so the stylesheet value (if any) shows through again.
   if (patch.boxShadow !== undefined) {
-    if (patch.boxShadow && patch.boxShadow !== 'none') setImp('box-shadow', patch.boxShadow)
-    else setImp('box-shadow', '')
+    setImp('box-shadow', patch.boxShadow || '')
   }
   if (patch.opacity !== undefined) {
     const n = Number(patch.opacity)
-    if (patch.opacity === '' || !Number.isFinite(n) || n >= 1) setImp('opacity', '')
-    else setImp('opacity', String(Math.max(0, n)))
+    if (patch.opacity === '' || !Number.isFinite(n)) setImp('opacity', '')
+    else setImp('opacity', String(Math.max(0, Math.min(1, n))))
   }
   if (patch.overflow !== undefined) {
-    if (patch.overflow && patch.overflow !== 'visible') setImp('overflow', patch.overflow)
-    else setImp('overflow', '')
+    setImp('overflow', patch.overflow || '')
   }
   // One-click horizontal placement inside the parent. Auto side margins work
   // for BOTH block elements and flex children (auto margins absorb the free
@@ -760,12 +766,9 @@ export function applyElementPatch(el, patch = {}) {
   }
   // Flex layout controls (only take effect on flex/inline-flex containers, but
   // harmless otherwise) — the practical way to space/align a navbar's items.
-  if (patch.justifyContent !== undefined) setStyle('justify-content', patch.justifyContent)
-  if (patch.alignItems !== undefined) setStyle('align-items', patch.alignItems)
-  if (patch.gap !== undefined) {
-    const n = Number(patch.gap)
-    setImp('gap', n > 0 ? `${n}px` : '')
-  }
+  if (patch.justifyContent !== undefined) setImp('justify-content', patch.justifyContent)
+  if (patch.alignItems !== undefined) setImp('align-items', patch.alignItems)
+  if (patch.gap !== undefined) setImp('gap', numericStyle(patch.gap))
   if (patch.flexDirection !== undefined) setImp('flex-direction', patch.flexDirection)
   if (patch.flexWrap !== undefined) setImp('flex-wrap', patch.flexWrap)
 
@@ -787,7 +790,7 @@ export function applyElementPatch(el, patch = {}) {
     setImp('letter-spacing', patch.letterSpacing === '' || !Number.isFinite(n) ? '' : `${n}em`)
   }
   if (patch.textTransform !== undefined) setImp('text-transform', patch.textTransform)
-  if (patch.italic !== undefined) setImp('font-style', patch.italic ? 'italic' : '')
+  if (patch.italic !== undefined) setImp('font-style', patch.italic ? 'italic' : 'normal')
   if (patch.underline !== undefined) {
     // 'none' is meaningful: links are underlined by the browser, so removing it
     // needs a real declaration rather than an empty one.
@@ -802,14 +805,10 @@ export function applyElementPatch(el, patch = {}) {
     ['paddingLeft', 'padding-left'],
   ]) {
     if (patch[key] === undefined) continue
-    const n = Number(patch[key])
     // 0 is a real value here — it removes the space the stylesheet asked for.
-    setImp(prop, Number.isFinite(n) ? `${n}px` : '')
+    setImp(prop, numericStyle(patch[key]))
   }
-  if (patch.maxWidth !== undefined) {
-    const n = Number(patch.maxWidth)
-    setImp('max-width', n > 0 ? `${n}px` : '')
-  }
+  if (patch.maxWidth !== undefined) setImp('max-width', numericStyle(patch.maxWidth, { zero: 'none' }))
 
   // ---- Background -------------------------------------------------------
   // Gradient and image share `background-image`, so the last one set wins and
@@ -845,7 +844,7 @@ export function applyElementPatch(el, patch = {}) {
   }
   if (patch.zIndex !== undefined) {
     const n = Number(patch.zIndex)
-    setImp('z-index', patch.zIndex === '' || !Number.isFinite(n) || n === 0 ? '' : String(Math.round(n)))
+    setImp('z-index', patch.zIndex === '' || !Number.isFinite(n) ? '' : String(Math.round(n)))
   }
 }
 
@@ -883,16 +882,16 @@ export function applyMobileElementPatch(el, patch = {}) {
   direct('textAlign', 'text-align')
   direct('color', 'color')
   direct('background', 'background-color')
-  if (patch.padding !== undefined) setMobileStyle(el, 'padding', pxAboveZero(patch.padding))
+  if (patch.padding !== undefined) setMobileStyle(el, 'padding', numericStyle(patch.padding))
   if (patch.radius !== undefined) setMobileStyle(el, 'border-radius', pxIncludingZero(patch.radius))
-  if (patch.width !== undefined) setMobileStyle(el, 'width', pxAboveZero(patch.width))
-  if (patch.height !== undefined) setMobileStyle(el, 'height', pxAboveZero(patch.height))
+  if (patch.width !== undefined) setMobileStyle(el, 'width', numericStyle(patch.width, { zero: 'auto' }))
+  if (patch.height !== undefined) setMobileStyle(el, 'height', numericStyle(patch.height, { zero: 'auto' }))
   if (patch.marginTop !== undefined) setMobileStyle(el, 'margin-top', pxIncludingZero(patch.marginTop))
   if (patch.marginBottom !== undefined) setMobileStyle(el, 'margin-bottom', pxIncludingZero(patch.marginBottom))
   direct('display', 'display')
 
   if (patch.borderWidth !== undefined) {
-    const width = pxAboveZero(patch.borderWidth)
+    const width = numericStyle(patch.borderWidth)
     setMobileStyle(el, 'border-width', width)
     if (width && !el.hasAttribute('data-pwb-mobile-border-style')) {
       setMobileStyle(el, 'border-style', 'solid')
@@ -935,7 +934,7 @@ export function applyMobileElementPatch(el, patch = {}) {
   }
   direct('justifyContent', 'justify-content')
   direct('alignItems', 'align-items')
-  if (patch.gap !== undefined) setMobileStyle(el, 'gap', pxAboveZero(patch.gap))
+  if (patch.gap !== undefined) setMobileStyle(el, 'gap', numericStyle(patch.gap))
 
   // Typography and spacing that a phone genuinely needs to state differently —
   // a 1.1 heading ratio that has to open up, padding that has to come in.
@@ -965,7 +964,7 @@ export function applyMobileElementPatch(el, patch = {}) {
   ]) {
     if (patch[key] !== undefined) setMobileStyle(el, name, pxIncludingZero(patch[key]))
   }
-  if (patch.maxWidth !== undefined) setMobileStyle(el, 'max-width', pxAboveZero(patch.maxWidth))
+  if (patch.maxWidth !== undefined) setMobileStyle(el, 'max-width', numericStyle(patch.maxWidth, { zero: 'none' }))
   // The row that has to become a column. This is the override the whole
   // per-breakpoint layer exists for.
   direct('flexDirection', 'flex-direction')
@@ -1004,7 +1003,7 @@ export function applyMobileElementPatch(el, patch = {}) {
   }
   if (patch.zIndex !== undefined) {
     const n = Number(patch.zIndex)
-    setMobileStyle(el, 'z-index', patch.zIndex === '' || !Number.isFinite(n) || n === 0 ? '' : String(Math.round(n)))
+    setMobileStyle(el, 'z-index', patch.zIndex === '' || !Number.isFinite(n) ? '' : String(Math.round(n)))
   }
 
   removeUnusedMobileOverrideStyle(el.ownerDocument)

@@ -3,11 +3,11 @@ function fileMap(files) {
 }
 
 function safeStyleContent(value) {
-  return String(value || '').replace(/<\/\s*style/gi, '<\\/style')
+  return String(value || '').replace(/<\/\s*style/gi, (match) => match.replace('/', '\\/'))
 }
 
 function safeScriptContent(value) {
-  return String(value || '').replace(/<\/\s*script/gi, '<\\/script')
+  return String(value || '').replace(/<\/\s*script/gi, (match) => match.replace('/', '\\/'))
 }
 
 // Source workspace HTML belongs to a readable, multi-file project. The visual
@@ -19,30 +19,37 @@ export function inlineProjectHtml(html, files) {
 
   output = output.replace(
     /<link\b(?=[^>]*\brel=["']stylesheet["'])(?=[^>]*\bhref=["']styles\.css["'])[^>]*\/?\s*>/i,
-    `<style data-pwb-project-styles>\n${safeStyleContent(assets.get('styles.css'))}\n</style>`,
+    () => `<style data-pwb-project-styles>\n${safeStyleContent(assets.get('styles.css'))}\n</style>`,
   )
   output = output.replace(
     /<link\b(?=[^>]*\brel=["']stylesheet["'])(?=[^>]*\bhref=["']custom\.css["'])[^>]*\/?\s*>/i,
-    `<style data-pwb-custom-styles>\n${safeStyleContent(assets.get('custom.css'))}\n</style>`,
+    () => `<style data-pwb-custom-styles>\n${safeStyleContent(assets.get('custom.css'))}\n</style>`,
   )
   output = output.replace(
     /<script\b(?=[^>]*\bsrc=["']runtime\.js["'])[^>]*>\s*<\/script\s*>/i,
-    `<script data-pwb-project-runtime>\n${safeScriptContent(assets.get('runtime.js'))}\n</script>`,
+    () => `<script data-pwb-project-runtime>\n${safeScriptContent(assets.get('runtime.js'))}\n</script>`,
   )
   output = output.replace(
     /<script\b(?=[^>]*\bsrc=["']custom\.js["'])[^>]*>\s*<\/script\s*>/i,
-    `<script data-pwb-custom-script>\n${safeScriptContent(assets.get('custom.js'))}\n</script>`,
+    () => `<script data-pwb-custom-script>\n${safeScriptContent(assets.get('custom.js'))}\n</script>`,
   )
 
   return output
 }
 
+function unusedTokenPrefix(source, prefix) {
+  while (source.includes(prefix)) prefix += '_'
+  return prefix
+}
+
 function minifyCss(css) {
+  const source = String(css || '')
+  const prefix = unusedTokenPrefix(source, '___PWB_CSS_STRING_')
   const strings = []
-  const protectedCss = String(css || '').replace(
+  const protectedCss = source.replace(
     /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g,
     (value) => {
-      const token = `___PWB_CSS_STRING_${strings.length}___`
+      const token = `${prefix}${strings.length}___`
       strings.push(value)
       return token
     },
@@ -56,7 +63,7 @@ function minifyCss(css) {
     .trim()
 
   strings.forEach((value, index) => {
-    output = output.replace(`___PWB_CSS_STRING_${index}___`, value)
+    output = output.replace(`${prefix}${index}___`, () => value)
   })
   return output
 }
@@ -64,28 +71,34 @@ function minifyCss(css) {
 // Conservative production export: CSS and document whitespace are compacted,
 // while scripts, preformatted text and textareas stay byte-for-byte intact.
 export function minifyGeneratedHtml(html) {
+  const source = String(html || '')
+  const prefix = unusedTokenPrefix(source, '___PWB_HTML_BLOCK_')
   const protectedBlocks = []
-  let output = String(html || '').replace(
-    /<(script|pre|textarea)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
-    (value) => {
-      const token = `___PWB_HTML_BLOCK_${protectedBlocks.length}___`
-      protectedBlocks.push(value)
-      return token
-    },
+  const protect = (value) => {
+    const token = `${prefix}${protectedBlocks.length}___`
+    protectedBlocks.push(value)
+    return token
+  }
+  let output = source.replace(
+    /<(script|pre|textarea|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
+    (value, tag) => protect(tag.toLowerCase() === 'style'
+      ? value.replace(/^(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)$/i, (_, open, css, close) => `${open}${minifyCss(css)}${close}`)
+      : value),
   )
 
-  output = output.replace(/<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi, (_, attrs, css) => (
-    `<style${attrs}>${minifyCss(css)}</style>`
+  // Protect complete tags before compacting text. Attribute values can contain
+  // meaningful spaces, newlines, > characters and comment-looking strings.
+  output = output.replace(/<!--[\s\S]*?-->|<(?:"[^"]*"|'[^']*'|[^'">])*>/g, (tag) => (
+    tag.startsWith('<!--') && !/^<!--\[if/i.test(tag) ? '' : protect(tag)
   ))
   output = output
-    .replace(/<!--(?!\[if)[\s\S]*?-->/gi, '')
     .replace(/[\t\r\n]+/g, ' ')
     .replace(/ {2,}/g, ' ')
     .replace(/>\s+</g, '> <')
     .trim()
 
   protectedBlocks.forEach((value, index) => {
-    output = output.replace(`___PWB_HTML_BLOCK_${index}___`, value)
+    output = output.replace(`${prefix}${index}___`, () => value)
   })
   return output
 }

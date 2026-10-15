@@ -101,7 +101,7 @@ function TreeNode({ node, depth, activePath, dirty, onOpen, collapsed, toggle })
   )
 }
 
-export default function ProjectFilesPanel() {
+export default function ProjectFilesPanel({ onOpen }) {
   const { t } = useLanguage()
   const tree = useProjectStore((s) => s.tree)
   const activePath = useProjectStore((s) => s.activePath)
@@ -109,6 +109,7 @@ export default function ProjectFilesPanel() {
   const rootName = useProjectStore((s) => s.rootName)
   const files = useProjectStore((s) => s.files)
   const setActive = useProjectStore((s) => s.setActive)
+  const openFile = onOpen || setActive
   const [collapsed, setCollapsed] = useState(() => new Set())
 
   // The CSS/JS the OPEN html page links — surfaced at the top so the user never
@@ -152,7 +153,7 @@ export default function ProjectFilesPanel() {
               <button
                 key={path}
                 type="button"
-                onClick={() => setActive(path)}
+                onClick={() => openFile(path)}
                 title={path}
                 className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left font-mono text-[12.5px] transition ${
                   active ? 'bg-[#eef2ff]' : 'hover:bg-[#f3f4f6]'
@@ -181,7 +182,7 @@ export default function ProjectFilesPanel() {
           depth={0}
           activePath={activePath}
           dirty={dirty}
-          onOpen={setActive}
+          onOpen={openFile}
           collapsed={collapsed}
           toggle={toggle}
         />

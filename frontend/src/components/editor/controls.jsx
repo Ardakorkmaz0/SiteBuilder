@@ -431,8 +431,9 @@ export function LabeledPx({ label, value, onChange }) {
 // Whole numbers unless `step` is a fraction. A line height of 1.2 and letter
 // spacing of 0.05em used to be rounded on the way in and out: they read as 1
 // and 0, and typing 1.5 turned into 2 under the cursor.
-export function LabeledNumber({ label, value, onChange, step = 1 }) {
+export function LabeledNumber({ label, value, onChange, step = 1, allowEmpty = false }) {
   const fractional = step < 1
+  const keepDraft = fractional || allowEmpty
   // What the person is typing ("1.", "0.0") until they leave the field; the
   // value that comes back from the page would otherwise overwrite it.
   const [draft, setDraft] = useState(null)
@@ -447,10 +448,11 @@ export function LabeledNumber({ label, value, onChange, step = 1 }) {
         value={draft ?? shown}
         onChange={(e) => {
           const raw = e.target.value
-          if (fractional) setDraft(raw)
-          // An emptied fraction field clears the style (on a phone: back to the
-          // desktop value); 0 would be a value of its own for letter spacing.
-          onChange(raw === '' ? (fractional ? '' : 0) : Number(raw))
+          if (keepDraft) setDraft(raw)
+          // HTML fields opt into the distinction: empty restores the inherited
+          // style while 0 is an explicit value. Other integer consumers keep
+          // their existing clear-to-zero behavior.
+          onChange(raw === '' ? (keepDraft ? '' : 0) : Number(raw))
         }}
         onBlur={() => setDraft(null)}
       />

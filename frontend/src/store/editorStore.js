@@ -237,6 +237,17 @@ export function selectComponentParent(state, id) {
   return findParentInTree(selectCurrentPage(state)?.components || [], id)
 }
 
+function selectedTreeRoots(components, ids) {
+  const selected = new Set(ids)
+  return [...selected].map((id) => findInTree(components, id)).filter((component) => {
+    if (!component) return false
+    for (let parent = findParentInTree(components, component.id); parent; parent = findParentInTree(components, parent.id)) {
+      if (selected.has(parent.id)) return false
+    }
+    return true
+  })
+}
+
 function siblingPositionInTree(components, id) {
   const index = components.findIndex((component) => component.id === id)
   if (index >= 0) return { index, length: components.length }
@@ -430,6 +441,22 @@ function cloneTree(c, { keepAnchors = false } = {}) {
   }
   if (hasKids(c)) copy.children = c.children.map((child) => cloneTree(child, { keepAnchors }))
   return copy
+}
+
+// Copies need a visible offset on BOTH designs. A manually arranged phone
+// keeps its own boxes, and reload clamps boxes to the artboard: do the same
+// before showing a copy so it neither overlaps exactly nor jumps on reload.
+function offsetPageCopy(component, page) {
+  const offset = (layout, maxX) => {
+    const shifted = { ...layout, x: (layout.x || 0) + 24, y: (layout.y || 0) + 24 }
+    return page.flowMode ? shifted : clampLayout(shifted, { maxX })
+  }
+  return {
+    layout: offset(component.layout || { x: 0, y: 0, w: 200, h: 80 }, page.canvasWidth || CANVAS_WIDTH),
+    ...(component.mobileLayout ? {
+      mobileLayout: offset(component.mobileLayout, page.mobileWidth || MOBILE_CANVAS_WIDTH),
+    } : {}),
+  }
 }
 
 // Could every section name in this subtree be used on a page with these
@@ -1364,7 +1391,9 @@ export const useEditorStore = create((set, get) => ({
     const next = mode === 'html' ? 'html' : 'empty'
     const page = get().schema.pages.find((p) => p.id === id)
     if (!page || page.mode === next) return
-    get().record('page-mode-' + id)
+    // Applying and removing a document are distinct actions, even immediately
+    // after each other. Coalescing them skips the HTML snapshot on Undo.
+    get().record()
     set((state) => ({
       schema: mapPage(state.schema, id, (p) => ({ ...p, mode: next })),
       dirty: true,
@@ -1816,19 +1845,13 @@ export const useEditorStore = create((set, get) => ({
     get().record('paste')
     set((state) => {
       const page = selectCurrentPage(state)
-      const offset = (layout) => layout && {
-        ...layout,
-        x: (layout.x || 0) + 24,
-        y: (layout.y || 0) + 24,
-      }
       // The clipboard moves along with every paste, so pasting again cascades
       // (+24, +48, …). It used to paste from the same origin each time, and a
       // second Ctrl+V dropped its copy exactly on top of the first — two
       // components that looked like one.
       const shifted = state.clipboard.map((c) => ({
         ...c,
-        layout: offset(c.layout || { x: 0, y: 0, w: 200, h: 80 }),
-        ...(c.mobileLayout ? { mobileLayout: offset(c.mobileLayout) } : {}),
+        ...offsetPageCopy(c, page),
       }))
       // Cut + paste is a move: the block keeps its section name, and the links
       // that lead to it keep working. A copy of something still on the page
@@ -1850,7 +1873,11 @@ export const useEditorStore = create((set, get) => ({
   },
 
   cutSelection: () => {
-    if (get().copySelection()) get().removeSelection()
+    if (!get().copySelection()) return
+    // Copy supports page-level blocks. A mixed selection may also contain a
+    // nested child: cutting that uncopied child would lose it permanently.
+    get().selectMany(get().clipboard.map((component) => component.id))
+    get().removeSelection()
   },
 
   // Duplicate every selected component (Ctrl+D). One → the existing single path.
@@ -1865,11 +1892,13 @@ export const useEditorStore = create((set, get) => ({
       const page = selectCurrentPage(state)
       let components = page.components
       const newIds = []
-      for (const src of ids.map((id) => findInTree(page.components, id)).filter(Boolean)) {
+      // A selected parent already carries every descendant in its copy.
+      // Duplicating a selected child again would also change the ORIGINAL tree.
+      for (const src of selectedTreeRoots(page.components, ids)) {
         const copy = cloneTree(src)
         newIds.push(copy.id)
         if (isTopLevel(page.components, src.id)) {
-          copy.layout = { ...src.layout, x: (src.layout?.x || 0) + 24, y: (src.layout?.y || 0) + 24 }
+          Object.assign(copy, offsetPageCopy(src, page))
           components = [...components, copy]
         } else {
           // A block inside a container is placed by that container's own
@@ -2739,11 +2768,7 @@ export const useEditorStore = create((set, get) => ({
       const copy = cloneTree(src)
       // Nudge a top-level free-canvas copy so it doesn't sit exactly on the original.
       if (isTopLevel(page.components, id)) {
-        copy.layout = {
-          ...src.layout,
-          x: (src.layout?.x || 0) + 24,
-          y: (src.layout?.y || 0) + 24,
-        }
+        Object.assign(copy, offsetPageCopy(src, page))
       }
       const components = insertAfterInTree(page.components, id, copy)
       return {

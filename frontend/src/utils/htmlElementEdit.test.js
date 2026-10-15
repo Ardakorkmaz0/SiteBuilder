@@ -111,6 +111,17 @@ describe('describeElement', () => {
     expect(hero.hasParent).toBe(false)
     expect(hero.ancestors).toEqual([])
   })
+
+  it('reports the active phone values for effects and stacking without changing PC inspector values', () => {
+    const p = document.getElementById('para')
+    applyElementPatch(p, { opacity: 0.8, boxShadow: '0 1px 3px rgba(0,0,0,0.15)', overflow: 'hidden', borderStyle: 'solid', zIndex: 3 })
+    applyMobileElementPatch(p, { opacity: 0.4, boxShadow: 'none', overflow: 'visible', borderStyle: 'none', zIndex: 9 })
+    const winAtWidth = (width) => ({ innerWidth: width, getComputedStyle: (el) => window.getComputedStyle(el) })
+    const phone = describeElement(p, winAtWidth(390))
+    expect([phone.opacity, phone.boxShadow, phone.overflow, phone.borderStyle, phone.zIndex]).toEqual([0.4, 'none', 'visible', 'none', 9])
+    const pc = describeElement(p, winAtWidth(1024))
+    expect([pc.opacity, pc.boxShadow, pc.overflow, pc.borderStyle, pc.zIndex]).toEqual([0.8, '0 1px 3px rgba(0,0,0,0.15)', 'hidden', 'solid', 3])
+  })
 })
 
 describe('applyElementPatch', () => {
@@ -190,6 +201,19 @@ describe('applyElementPatch', () => {
     applyElementPatch(p, { color: '#00ff00' })
     expect(p.textContent).toBe('Some text')
     expect(p.style.color).toBeTruthy()
+  })
+
+  it('lets the basic panel controls override an imported important rule', () => {
+    const p = document.getElementById('para')
+    applyElementPatch(p, {
+      fontSize: 32, fontWeight: '700', textAlign: 'center', color: '#ff0000',
+      background: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    })
+    // Template styles commonly use !important. A normal inline declaration
+    // loses to them, so the input immediately jumps back to its previous value.
+    for (const name of ['font-size', 'font-weight', 'text-align', 'color', 'background-color', 'display', 'justify-content', 'align-items']) {
+      expect(p.style.getPropertyPriority(name), name).toBe('important')
+    }
   })
 })
 
@@ -300,17 +324,21 @@ describe('applyElementPatch — box styles', () => {
     expect(p.style.padding).toBe('24px')
     expect(p.style.borderRadius).toBe('12px')
     applyElementPatch(p, { padding: 0, radius: '' })
+    expect(p.style.padding).toBe('0px')
+    applyElementPatch(p, { padding: '' })
     expect(p.style.padding).toBe('')
     expect(p.style.borderRadius).toBe('')
   })
 })
 
 describe('applyElementPatch — size & spacing', () => {
-  it('sets width and clears it at 0 (auto)', () => {
+  it('sets automatic width at 0 and restores the template only when empty', () => {
     const p = document.getElementById('para')
     applyElementPatch(p, { width: 320 })
     expect(p.style.width).toBe('320px')
     applyElementPatch(p, { width: 0 })
+    expect(p.style.width).toBe('auto')
+    applyElementPatch(p, { width: '' })
     expect(p.style.width).toBe('')
   })
 
@@ -331,11 +359,13 @@ describe('applyElementPatch — size & spacing', () => {
     expect(p.style.display).toBe('')
   })
 
-  it('sets height and clears it at 0', () => {
+  it('sets automatic height at 0 and restores the template only when empty', () => {
     const p = document.getElementById('para')
     applyElementPatch(p, { height: 120 })
     expect(p.style.height).toBe('120px')
     applyElementPatch(p, { height: 0 })
+    expect(p.style.height).toBe('auto')
+    applyElementPatch(p, { height: '' })
     expect(p.style.height).toBe('')
   })
 
@@ -347,6 +377,8 @@ describe('applyElementPatch — size & spacing', () => {
     // jsdom normalises hex to rgb(); just confirm a red border colour landed.
     expect(p.style.getPropertyValue('border-color')).toMatch(/#ff0000|rgb\(255, 0, 0\)/)
     applyElementPatch(p, { borderWidth: 0 })
+    expect(p.style.getPropertyValue('border-width')).toBe('0px')
+    applyElementPatch(p, { borderWidth: '' })
     expect(p.style.getPropertyValue('border-width')).toBe('')
     expect(p.style.getPropertyValue('border-style')).toBe('')
   })
@@ -361,12 +393,15 @@ describe('applyElementPatch — size & spacing', () => {
 })
 
 describe('applyElementPatch — effects (parity with component mode)', () => {
-  it('sets a border style and clears the border on None', () => {
+  it('distinguishes hiding a border from restoring the template default', () => {
     const p = document.getElementById('para')
     applyElementPatch(p, { borderStyle: 'dashed' })
     expect(p.style.getPropertyValue('border-style')).toBe('dashed')
     expect(p.style.getPropertyValue('border-width')).toBe('1px') // seeds a width so it shows
     applyElementPatch(p, { borderStyle: 'none' })
+    expect(p.style.getPropertyValue('border-style')).toBe('none')
+    expect(p.style.getPropertyValue('border-width')).toBe('1px')
+    applyElementPatch(p, { borderStyle: '' })
     expect(p.style.getPropertyValue('border-style')).toBe('')
     expect(p.style.getPropertyValue('border-width')).toBe('')
   })
@@ -376,14 +411,18 @@ describe('applyElementPatch — effects (parity with component mode)', () => {
     applyElementPatch(p, { boxShadow: '0 4px 12px rgba(0,0,0,0.15)' })
     expect(p.style.getPropertyValue('box-shadow')).toContain('4px')
     applyElementPatch(p, { boxShadow: 'none' })
+    expect(p.style.getPropertyValue('box-shadow')).toBe('none')
+    applyElementPatch(p, { boxShadow: '' })
     expect(p.style.getPropertyValue('box-shadow')).toBe('')
   })
 
-  it('sets opacity below 1 and clears it at 1', () => {
+  it('sets full opacity explicitly and clears only an empty value', () => {
     const p = document.getElementById('para')
     applyElementPatch(p, { opacity: 0.5 })
     expect(p.style.getPropertyValue('opacity')).toBe('0.5')
     applyElementPatch(p, { opacity: 1 })
+    expect(p.style.getPropertyValue('opacity')).toBe('1')
+    applyElementPatch(p, { opacity: '' })
     expect(p.style.getPropertyValue('opacity')).toBe('')
   })
 
@@ -392,6 +431,8 @@ describe('applyElementPatch — effects (parity with component mode)', () => {
     applyElementPatch(p, { overflow: 'hidden' })
     expect(p.style.getPropertyValue('overflow')).toBe('hidden')
     applyElementPatch(p, { overflow: 'visible' })
+    expect(p.style.getPropertyValue('overflow')).toBe('visible')
+    applyElementPatch(p, { overflow: '' })
     expect(p.style.getPropertyValue('overflow')).toBe('')
   })
 })
@@ -674,7 +715,7 @@ describe('typography controls', () => {
     expect(el.style.textDecoration).toBe('none')
 
     applyElementPatch(el, { italic: false, underline: true })
-    expect(el.style.fontStyle).toBe('')
+    expect(el.style.fontStyle).toBe('normal')
     expect(el.style.textDecoration).toBe('underline')
   })
 })
@@ -702,6 +743,8 @@ describe('per-side padding and max width', () => {
     applyElementPatch(el, { maxWidth: 720 })
     expect(el.style.getPropertyValue('max-width')).toBe('720px')
     applyElementPatch(el, { maxWidth: 0 })
+    expect(el.style.getPropertyValue('max-width')).toBe('none')
+    applyElementPatch(el, { maxWidth: '' })
     expect(el.style.getPropertyValue('max-width')).toBe('')
   })
 })
@@ -776,11 +819,13 @@ describe('position and stacking', () => {
     expect(el.style.getPropertyValue('top')).toBe('')
   })
 
-  it('treats stack order 0 as unset', () => {
+  it('writes stack order 0 and restores the template only when empty', () => {
     const el = document.getElementById('hero')
     applyElementPatch(el, { zIndex: 5 })
     expect(el.style.getPropertyValue('z-index')).toBe('5')
     applyElementPatch(el, { zIndex: 0 })
+    expect(el.style.getPropertyValue('z-index')).toBe('0')
+    applyElementPatch(el, { zIndex: '' })
     expect(el.style.getPropertyValue('z-index')).toBe('')
   })
 })
@@ -908,7 +953,7 @@ describe('a phone value is never outranked by the PC value', () => {
     const p = para()
     applyElementPatch(p, { width: 640 })
     applyMobileElementPatch(p, { width: 280 })
-    applyElementPatch(p, { width: 0 })
+    applyElementPatch(p, { width: '' })
 
     expect(p).not.toHaveAttribute('data-pwb-pc-width')
     expect(p.style.getPropertyValue('--pwb-pc-width')).toBe('')
@@ -930,7 +975,7 @@ describe('a phone value is never outranked by the PC value', () => {
 
   it('leaves a PC value that is not !important inline: the phone rule already wins over it', () => {
     const p = para()
-    applyElementPatch(p, { fontSize: 26 })
+    p.style.fontSize = '26px' // an authored value, rather than a panel override
     applyMobileElementPatch(p, { fontSize: 18 })
 
     expect(p.style.getPropertyValue('font-size')).toBe('26px')
@@ -955,7 +1000,7 @@ describe('phone edits the panel offers and used to drop', () => {
     expect(p.style.getPropertyValue('--pwb-mobile-z-index')).toBe('5')
     expect(p.style.getPropertyValue('position')).toBe('')
 
-    applyMobileElementPatch(p, { backgroundImage: '', position: '', zIndex: 0 })
+    applyMobileElementPatch(p, { backgroundImage: '', position: '', zIndex: '' })
     expect(describeElement(p).mobileOverrideCount).toBe(0)
   })
 })
@@ -1066,6 +1111,29 @@ describe('menu links', () => {
     expect(items).toHaveLength(3)
     expect(items[2].className).toBe('item')
     expect(items[2].querySelector('a').textContent).toBe('Three')
+  })
+
+  it('keeps the requested order when several links are added at once', () => {
+    const nav = mount(navHtml)
+    applyElementPatch(nav, { links: [
+      { text: 'Home', href: '#home' }, { text: 'Work', href: '#work' },
+      { text: 'Third', href: '#third' }, { text: 'Fourth', href: '#fourth' },
+    ] })
+    expect([...nav.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['Home', 'Work', 'Third', 'Fourth'])
+  })
+
+  it('gives a cloned menu item its own ids and clears the wrapper current marker', () => {
+    const list = mount('<ul><li id="item" class="nav-item active" aria-current="page"><a id="nav-link" class="nav-link current" href="#home" aria-labelledby="nav-link">Home</a></li></ul>')
+    applyElementPatch(list, { links: [{ text: 'Home', href: '#home' }, { text: 'Contact', href: '#contact' }] })
+    const copy = list.lastElementChild
+    expect(copy.id).toBe('item-2')
+    expect(copy.querySelector('a').id).toBe('nav-link-2')
+    expect(copy.querySelector('a').getAttribute('aria-labelledby')).toBe('nav-link-2')
+    expect(copy.classList.contains('active')).toBe(false)
+    expect(copy.querySelector('a').classList.contains('current')).toBe(false)
+    expect(copy.hasAttribute('aria-current')).toBe(false)
+    expect(list.firstElementChild.classList.contains('active')).toBe(true)
+    expect(copy.classList.contains('nav-item')).toBe(true)
   })
 
   it('does not carry the current-page marker onto the new item', () => {

@@ -783,6 +783,36 @@ class PublicSiteSerializer(serializers.ModelSerializer):
         return _absolute_image_url(prof.avatar if prof else None, self.context)
 
 
+class _StrictBooleanField(serializers.BooleanField):
+    # HTML checkboxes normally treat an absent value as False. These explicit
+    # state-changing API fields must remain required for every request encoding.
+    default_empty_html = serializers.empty
+
+    def to_internal_value(self, data):
+        if not isinstance(data, bool):
+            self.fail('invalid')
+        return data
+
+
+class SubmissionStateSerializer(serializers.Serializer):
+    is_read = _StrictBooleanField()
+
+
+class ReviewCommentStateSerializer(serializers.Serializer):
+    resolved = _StrictBooleanField()
+
+
+class SiteViewEventSerializer(serializers.Serializer):
+    path = serializers.CharField(required=False, default='', allow_blank=True, allow_null=True, trim_whitespace=False)
+    referrer = serializers.CharField(required=False, default='', allow_blank=True, allow_null=True, trim_whitespace=False)
+
+    def validate_path(self, value):
+        return (value or '')[:180]
+
+    def validate_referrer(self, value):
+        return (value or '')[:500]
+
+
 class FormSubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = FormSubmission

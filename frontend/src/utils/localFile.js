@@ -4,6 +4,8 @@
 // don't ship the API — callers must check supportsLocalFiles() and fall back
 // to downloadHtmlFile().
 
+import { writeFileContents } from './fileWritable.js'
+
 const HTML_TYPES = [
   { description: 'HTML file', accept: { 'text/html': ['.html', '.htm'] } },
 ]
@@ -47,9 +49,7 @@ export async function writeHtmlToHandle(handle, html) {
     if (perm !== 'granted') perm = await handle.requestPermission({ mode: 'readwrite' })
     if (perm !== 'granted') throw new Error('Write permission for the linked file was declined.')
   }
-  const writable = await handle.createWritable()
-  await writable.write(String(html ?? ''))
-  await writable.close()
+  await writeFileContents(handle, String(html ?? ''))
 }
 
 // Plain-download fallback for browsers without the File System Access API.

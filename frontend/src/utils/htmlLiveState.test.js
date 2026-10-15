@@ -183,7 +183,9 @@ describe('an edit to an element that is showing borrowed state', () => {
     expect(saved.getElementById('panel').style.height).toBe('0px')
     expect(saved.getElementById('panel').style.opacity).toBe('')
     expect(saved.getElementById('panel').style.color).toBe('rgb(255, 0, 0)')
-    expect(saved.getElementById('plain').getAttribute('style')).toMatch(/^color: ?(rgb\(255, 0, 0\)|#ff0000);?$/)
+    expect(saved.getElementById('plain').style.color).toBe('rgb(255, 0, 0)')
+    expect(saved.getElementById('plain').style.getPropertyPriority('color')).toBe('important')
+    expect(saved.getElementById('plain').style.length).toBe(1)
   })
 
   it('keeps the author\'s value for the very thing the script had changed', () => {

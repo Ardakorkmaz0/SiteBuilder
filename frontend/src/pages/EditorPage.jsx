@@ -615,7 +615,19 @@ function SiteEditor() {
   // backward compatibility.
   const currentPageId = useEditorStore((s) => s.currentPageId)
   const storePages = useEditorStore((s) => s.schema.pages)
-  const [pageHtmlMap, setPageHtmlMap] = useState({})
+  const [pageHtmlMap, updatePageHtmlMap] = useState({})
+  const latestHtmlMapRef = useRef(pageHtmlMap)
+  const htmlForSchemaRef = useRef(new WeakMap())
+  const setPageHtmlMap = useCallback((value) => {
+    const next = typeof value === 'function' ? value(latestHtmlMapRef.current) : value
+    latestHtmlMapRef.current = next
+    // A schema bound by import/mode Undo remains the same object while its
+    // HTML is edited. Keep that binding current before a later schema action
+    // records it, or Undo of a rename would restore an older document.
+    const schema = useEditorStore.getState().schema
+    if (htmlForSchemaRef.current.has(schema)) htmlForSchemaRef.current.set(schema, next)
+    updatePageHtmlMap(next)
+  }, [])
   const siteHtml = pageHtmlMap[currentPageId] || ''
   const setSiteHtml = (html) =>
     setPageHtmlMap((m) => ({ ...m, [currentPageId]: html }))
@@ -662,7 +674,6 @@ function SiteEditor() {
   // HTML belongs to the schema object before and after it; store undo/redo
   // restore those exact objects, so when one of them becomes current again its
   // documents come back with it.
-  const htmlForSchemaRef = useRef(new WeakMap())
   function rememberHtmlForSchema(schema, htmlMap) {
     if (schema) htmlForSchemaRef.current.set(schema, htmlMap)
   }
@@ -674,7 +685,7 @@ function SiteEditor() {
     htmlRevisionRef.current += 1
     setHtmlDirty(true)
     setWorkspaceSession((session) => session + 1)
-  }), [])
+  }), [setPageHtmlMap])
   // Element selected inside the HTML edit iframe — drives the right-rail
   // element properties panel (null → site settings).
   const [htmlSelection, setHtmlSelection] = useState(null)
@@ -1066,7 +1077,7 @@ function SiteEditor() {
       active = false
       clearTimeout(loadingTimer)
     }
-  }, [id, loadSchema, savedPageOnMount, editorOwnerId])
+  }, [id, loadSchema, savedPageOnMount, editorOwnerId, setPageHtmlMap])
 
   // Mouse drags start after 5px of travel (so plain clicks stay clicks).
   // Touch drags start after a 250ms hold — the standard long-press pattern
@@ -1415,10 +1426,12 @@ function SiteEditor() {
   // undo/redo), or its stale copy would clobber the change on the next
   // mode switch.
   function commitHtml(next, { reseedWorkspace = false } = {}) {
-    if (next === siteHtml) return
+    const previous = latestHtmlMapRef.current[currentPageId] || ''
+    if (next === previous) return
+    const at = nextHistoryStamp()
     setHtmlPast((p) => [
       ...p.slice(-(HTML_HISTORY_CAP - 1)),
-      { pageId: currentPageId, html: siteHtml, at: nextHistoryStamp() },
+      { pageId: currentPageId, html: previous, at },
     ])
     setHtmlFuture([])
     // A new edit ends what could be redone in the OTHER undo list too: after
@@ -1458,6 +1471,16 @@ function SiteEditor() {
   // step undone last, which is the one with the lowest stamp.
   const stampOf = (entry) => (entry && Number.isFinite(entry.at) ? entry.at : 0)
   function undoOnHtmlPage() {
+    const live = workspaceRef.current?.getHtml?.()
+    if ((workspaceDirty || htmlTyping) && live != null && live !== siteHtml) {
+      // Source can run ahead of the committed map. Undo that edit first and
+      // keep its exact text for Redo instead of skipping it (and losing it).
+      setHtmlFuture([{ pageId: currentPageId, html: live, at: nextHistoryStamp() }])
+      if (useEditorStore.getState().future.length) useEditorStore.setState({ future: [], futureAt: [] })
+      workspaceRef.current?.setDocument?.(siteHtml)
+      markHtmlDirty()
+      return
+    }
     const store = useEditorStore.getState()
     const htmlAt = htmlPast.length ? stampOf(htmlPast[htmlPast.length - 1]) : -1
     const siteAt = store.past.length ? (store.pastAt[store.pastAt.length - 1] ?? 0) : -1
@@ -1466,6 +1489,11 @@ function SiteEditor() {
     else undoHtml()
   }
   function redoOnHtmlPage() {
+    const live = workspaceRef.current?.getHtml?.()
+    if ((workspaceDirty || htmlTyping) && live != null && live !== siteHtml) {
+      commitHtml(live)
+      return
+    }
     const store = useEditorStore.getState()
     const htmlAt = htmlFuture.length ? stampOf(htmlFuture[htmlFuture.length - 1]) : Infinity
     const siteAt = store.future.length ? (store.futureAt[0] ?? 0) : Infinity
@@ -1490,10 +1518,14 @@ function SiteEditor() {
   // Switch the active page: commit whatever the open workspace surface holds
   // into the page we are LEAVING first, so edits can't be lost or leak into
   // the next page. The workspace remounts per page (key={currentPageId}).
+  function flushWorkspaceDrafts() {
+    codePanelRef.current?.applyPendingHtml?.('source')
+    liveHtmlMap({ commit: true })
+  }
+
   function switchToPage(pageId) {
     if (pageId === currentPageId) return
-    const live = workspaceRef.current?.getHtml?.()
-    if (live != null && live !== siteHtml) commitHtml(live)
+    flushWorkspaceDrafts()
     setHtmlSelection(null)
     useEditorStore.getState().selectPage(pageId)
   }
@@ -1510,7 +1542,16 @@ function SiteEditor() {
   }
 
   function editBrowserFavicon() {
-    setControlCenterFocus('favicon')
+    openSiteControlCenter('readiness', 'favicon')
+  }
+
+  function openSiteControlCenter(nextTab = 'readiness', focusField = '') {
+    // Source edits live in the workspace until Apply/Save. Content tools
+    // must start from that document or their first edit replaces the draft
+    // with the last saved HTML. Record the handoff separately for Undo.
+    flushWorkspaceDrafts()
+    setControlCenterFocus(focusField)
+    setControlCenterTab(nextTab)
     setControlCenterOpen(true)
   }
 
@@ -1528,11 +1569,14 @@ function SiteEditor() {
       commitHtml(htmlText, { reseedWorkspace: true })
       return
     }
+    const at = nextHistoryStamp()
+    const previous = latestHtmlMapRef.current[pageId] || ''
     setHtmlPast((p) => [
       ...p.slice(-(HTML_HISTORY_CAP - 1)),
-      { pageId, html: pageHtmlMap[pageId] || '', at: nextHistoryStamp() },
+      { pageId, html: previous, at },
     ])
     setHtmlFuture([])
+    if (useEditorStore.getState().future.length) useEditorStore.setState({ future: [], futureAt: [] })
     setPageHtmlMap((m) => ({ ...m, [pageId]: htmlText }))
     markHtmlDirty()
   }
@@ -1618,8 +1662,8 @@ function SiteEditor() {
   // brings the map up to date (save does; an export only reads).
   function liveHtmlMap({ commit = false } = {}) {
     const live = workspaceRef.current?.getHtml?.()
-    const map = { ...pageHtmlMap }
-    if (live != null && live !== siteHtml) {
+    const map = { ...latestHtmlMapRef.current }
+    if (live != null && live !== (map[currentPageId] || '')) {
       map[currentPageId] = live
       // As an undo step: the typing becomes one only when the pointer next
       // goes down, and once the save has taken it as the page's own document
@@ -1728,6 +1772,9 @@ function SiteEditor() {
     try {
       return await saveQueueRef.current.run(
         () => {
+          // This automatic task may have waited behind an in-flight request.
+          // A later "leave without saving" also cancels queued writes.
+          if (auto && discardLeaveRef.current) return null
           const latestSave = saveLifecycleRef.current?.performSave || performSave
           return latestSave(nextPublished, { auto, versionSource })
         },
@@ -2096,7 +2143,7 @@ function SiteEditor() {
   // must render View through the export iframe — otherwise the plain React
   // preview would show it static, disagreeing with the published page.
   const componentViewNeedsIframe =
-    hasFixedComponent(currentPage?.components) || pageHasMotion(currentPage)
+    hasFixedComponent(currentPage?.components) || pageHasMotion(currentPage) || Boolean(customCss?.trim() || customJs?.trim())
   // A site with a light/dark switch: View draws both palettes, as published.
   const componentColorMode = currentPage
     ? viewColorMode({ theme, colorMode: colorModeSetting, pages: storePages }, currentPage, colorModePreview)
@@ -2269,10 +2316,10 @@ function SiteEditor() {
         <div className="ml-auto flex min-w-0 items-center gap-1">
           {aiOn && <AiBar open={aiOpen} onOpenChange={setAiOpen} />}
           <span className="mx-1 hidden h-5 w-px bg-[var(--studio-border)] lg:block" aria-hidden />
-          <button type="button" onClick={() => (currentPageIsHtml ? undoOnHtmlPage() : undo())} disabled={currentPageIsHtml ? !htmlPast.length && !canUndo && !htmlTyping : !canUndo} title={t('Undo (Ctrl+Z)')} className="studio-icon-btn hidden md:inline-flex">
+          <button type="button" onClick={() => (currentPageIsHtml ? undoOnHtmlPage() : undo())} disabled={currentPageIsHtml ? !htmlPast.length && !canUndo && !htmlTyping && !workspaceDirty : !canUndo} title={t('Undo (Ctrl+Z)')} className="studio-icon-btn hidden md:inline-flex">
             <UndoIcon size={16} />
           </button>
-          <button type="button" onClick={() => (currentPageIsHtml ? redoOnHtmlPage() : redo())} disabled={currentPageIsHtml ? !htmlFuture.length && !canRedo : !canRedo} title={t('Redo (Ctrl+Shift+Z)')} className="studio-icon-btn hidden md:inline-flex">
+          <button type="button" onClick={() => (currentPageIsHtml ? redoOnHtmlPage() : redo())} disabled={currentPageIsHtml ? workspaceDirty || (!htmlFuture.length && !canRedo) : !canRedo} title={t('Redo (Ctrl+Shift+Z)')} className="studio-icon-btn hidden md:inline-flex">
             <RedoIcon size={16} />
           </button>
           <button type="button" onClick={previewCurrentSite} disabled={saving} className="studio-btn hidden lg:inline-flex">
@@ -2282,13 +2329,13 @@ function SiteEditor() {
               to live inside a tab of the control centre, which is nowhere. */}
           <button
             type="button"
-            onClick={() => { if (guestGate('share_link')) return; setControlCenterFocus(''); setControlCenterTab('feedback'); setControlCenterOpen(true) }}
+            onClick={() => { if (guestGate('share_link')) return; openSiteControlCenter('feedback') }}
             title={t('Share this project')}
             className="studio-btn studio-btn-secondary"
           >
             <LinkIcon size={14} /> <span className="hidden xl:inline">{t('Share')}</span>
           </button>
-          <button type="button" onClick={() => save()} disabled={saving} className="studio-btn studio-btn-secondary">
+          <button type="button" onClick={() => save()} disabled={saving} aria-label={t('Save')} className="studio-btn studio-btn-secondary">
             <SaveIcon size={14} /> <span className="hidden xl:inline">{t('Save')}</span>
           </button>
           {/* Beside Save because it decides whether Save is needed at all. The
@@ -2342,8 +2389,8 @@ function SiteEditor() {
                 <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
                 <div style={{ position: 'fixed', top: menuPos.more?.top, right: menuPos.more?.right }} className="studio-menu z-50 max-h-[calc(100vh-70px)] w-72 overflow-y-auto p-1.5">
                   {aiOn && <button type="button" onClick={() => { setMoreOpen(false); setWizardOpen(true) }} className="studio-menu-item font-semibold text-[var(--studio-accent-hover)]"><SparklesIcon size={15} /> {t('AI Site Wizard')}</button>}
-                  <button type="button" onClick={() => { setMoreOpen(false); if (guestGate('share_link')) return; setControlCenterTab('feedback'); setControlCenterOpen(true) }} className="studio-menu-item"><LinkIcon size={15} /> {t('Share this project')}</button>
-                  <button type="button" onClick={() => { setMoreOpen(false); setControlCenterTab('readiness'); setControlCenterOpen(true) }} className="studio-menu-item"><CogIcon size={15} /> {t('Site control center')}</button>
+                  <button type="button" onClick={() => { setMoreOpen(false); if (guestGate('share_link')) return; openSiteControlCenter('feedback') }} className="studio-menu-item"><LinkIcon size={15} /> {t('Share this project')}</button>
+                  <button type="button" onClick={() => { setMoreOpen(false); openSiteControlCenter() }} className="studio-menu-item"><CogIcon size={15} /> {t('Site control center')}</button>
                   <div className="studio-divider my-1 border-t" />
                   <button type="button" onClick={() => { setMoreOpen(false); setTemplateOpen(true) }} className="studio-menu-item">{t('Choose a template...')}</button>
                   <button type="button" onClick={() => { setMoreOpen(false); startBlankHtml() }} className="studio-menu-item">{t('Start blank HTML')}</button>
@@ -2359,8 +2406,18 @@ function SiteEditor() {
                       onClick={() => {
                         setMoreOpen(false)
                         if (!window.confirm(t('Remove this page HTML and switch it back to the component canvas? (Undo brings the HTML back.)'))) return
-                        commitHtml('')
+                        flushWorkspaceDrafts()
+                        // Removing HTML changes the schema mode and its external
+                        // document together. Bind both maps to that one store
+                        // history entry so one Undo restores the whole page.
+                        const before = useEditorStore.getState().schema
+                        const currentMap = liveHtmlMap()
+                        rememberHtmlForSchema(before, currentMap)
                         setPageMode(currentPageId, 'empty')
+                        const nextMap = { ...currentMap, [currentPageId]: '' }
+                        rememberHtmlForSchema(useEditorStore.getState().schema, nextMap)
+                        setPageHtmlMap(nextMap)
+                        markHtmlDirty()
                         if (localFile?.pageId === currentPageId) unlinkLocalFile()
                         setHtmlSelection(null)
                       }}
@@ -2369,10 +2426,10 @@ function SiteEditor() {
                   )}
                   <div className="studio-divider my-1 border-t" />
                   <div className="space-y-2 px-2 py-1.5">
-                    <select value={category} onChange={(event) => changeCategory(event.target.value)} className="studio-input w-full px-2 py-1.5 text-xs capitalize">
+                    <select value={category} onChange={(event) => changeCategory(event.target.value)} aria-label={t('Category')} className="studio-input w-full px-2 py-1.5 text-xs capitalize">
                       {DISCOVERY_CATEGORIES.map((item) => <option key={item} value={item}>{t(item.charAt(0).toUpperCase() + item.slice(1))}</option>)}
                     </select>
-                    <input value={tagsText} onChange={(event) => changeTagsText(event.target.value)} placeholder={t('Comma-separated tags for discovery')} className="studio-input w-full px-2 py-1.5 text-xs" />
+                    <input value={tagsText} onChange={(event) => changeTagsText(event.target.value)} aria-label={t('Tags')} placeholder={t('Comma-separated tags for discovery')} className="studio-input w-full px-2 py-1.5 text-xs" />
                   </div>
                   <div className="studio-divider my-1 border-t" />
                   <button type="button" onClick={() => { setMoreOpen(false); setHistoryOpen(true) }} disabled={saving} className="studio-menu-item disabled:opacity-40"><ClockIcon size={15} /> {t('History')}</button>
@@ -2523,6 +2580,7 @@ function SiteEditor() {
                       linkArmed={linkArmed}
                       onLinkToPage={(pid) => workspaceRef.current?.bindSourceToPage?.(pid)}
                       onSelect={switchToPage}
+                      onBeforePageChange={flushWorkspaceDrafts}
                       onActiveClick={() => workspaceRef.current?.toggleSource?.()}
                       onImportInto={importHtmlIntoPage}
                     />
@@ -2728,6 +2786,7 @@ function SiteEditor() {
                       linkArmed={linkMode && !!linkSourceId}
                       onLinkToPage={(pid) => bindLinkSourceToPage(pid)}
                       onSelect={switchToPage}
+                      onBeforePageChange={flushWorkspaceDrafts}
                       onActiveClick={() => switchCanvasMode((m) => (m === 'source' ? 'edit' : 'source'))}
                     />
                   }

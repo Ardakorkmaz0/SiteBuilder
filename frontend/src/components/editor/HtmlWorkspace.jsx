@@ -101,6 +101,12 @@ function setDocumentDesignMode(doc, value) {
   }
 }
 
+function elementInDocument(el, doc) {
+  // A node in the previous srcdoc Document can still be isConnected after
+  // navigation. Only the current document is an editable selection.
+  return !!el && el.ownerDocument === doc && !!doc?.body?.contains(el)
+}
+
 function activateBuilderTab(root, tabId) {
   if (!root || !tabId) return
   root.querySelectorAll('[role="tab"][data-builder-tab]').forEach((tab) => {
@@ -794,7 +800,7 @@ function HtmlWorkspace({
     const doc = iframeRef.current?.contentDocument
     const win = doc?.defaultView
     const el = selectedRef.current
-    if (!doc?.body || !win || !el?.isConnected) return
+    if (!doc?.body || !win || !elementInDocument(el, doc)) return
     const rect = el.getBoundingClientRect()
     const cs = win.getComputedStyle(el)
     const px = (value) => Number.parseFloat(value) || 0
@@ -898,7 +904,7 @@ function HtmlWorkspace({
   const handleSelectionChromeAction = useCallback((action) => {
     const doc = iframeRef.current?.contentDocument
     const el = selectedRef.current
-    if (!doc?.body || !el?.isConnected) return
+    if (!doc?.body || !elementInDocument(el, doc)) return
     let next = el
     let changed = false
 
@@ -1212,7 +1218,7 @@ function HtmlWorkspace({
     const doc = iframeRef.current?.contentDocument
     const el = selectedRef.current
     if (!doc?.body || !el) return
-    if (!el.isConnected) {
+    if (!elementInDocument(el, doc)) {
       // The node died (deleted while typing, page reseeded, …). Close the
       // panel instead of silently swallowing edits — "Properties sometimes
       // doesn't work" was exactly this dead-end.
@@ -1324,6 +1330,7 @@ function HtmlWorkspace({
       const doc = iframeRef.current?.contentDocument
       const el = selectedRef.current
       if (!doc || !el) return
+      if (!elementInDocument(el, doc)) { clearSelection(); return }
       const parent = selectableParent(el)
       if (!parent) return
       selectedRef.current = parent
@@ -1714,6 +1721,17 @@ function HtmlWorkspace({
   function onIframeLoad() {
     const doc = iframeRef.current?.contentDocument
     if (!doc) return
+    // A script-style reading can replace srcdoc while a typing heartbeat is
+    // queued. It belongs to the old Document and must not dirty the new one.
+    if (selectRefreshTimer.current) window.clearTimeout(selectRefreshTimer.current)
+    if (docPulseTimer.current) window.clearTimeout(docPulseTimer.current)
+    selectRefreshTimer.current = null
+    docPulseTimer.current = null
+    if (selectedRef.current && !elementInDocument(selectedRef.current, doc)) clearSelection()
+    if (linkSourceRef.current && !elementInDocument(linkSourceRef.current, doc)) {
+      linkSourceRef.current = null
+      onLinkArmedChange?.(false)
+    }
     loadedDocRef.current = doc
     // Tell the tool manager the document is now ready, so a restored edit/link
     // surface binds its listeners (the first effect pass ran before this load).
@@ -1751,7 +1769,9 @@ function HtmlWorkspace({
   // A fresh document has nothing typed into it yet.
   function attachTypingSteps(doc) {
     setTypingPending(false)
-    doc.addEventListener('input', () => setTypingPending(true))
+    doc.addEventListener('input', () => {
+      if (doc === iframeRef.current?.contentDocument) setTypingPending(true)
+    })
     doc.addEventListener('pointerdown', flushTyping, true)
     doc.defaultView?.addEventListener('blur', flushTyping)
   }
@@ -1780,6 +1800,7 @@ function HtmlWorkspace({
   // listeners) are discarded wholesale on reload, so no cleanup is needed.
   function attachSelectionListeners(doc) {
     doc.addEventListener('click', (e) => {
+      if (doc !== iframeRef.current?.contentDocument) return
       if (e.target?.closest?.(`[${HTML_RESIZE_OVERLAY_ATTR}]`)) return
       if (pendingRef.current || editToolRef.current !== 'text') return // owned by another tool
       const tab = e.target?.closest?.('[data-builder-tabs] [role="tab"][data-builder-tab]')
@@ -1803,6 +1824,7 @@ function HtmlWorkspace({
       onElementSelect?.(el ? describeElement(el) : null)
     })
     doc.addEventListener('mousemove', (e) => {
+      if (doc !== iframeRef.current?.contentDocument) return
       if (pendingRef.current || editToolRef.current !== 'text') {
         setThinElementHover(doc, null)
         return
@@ -1810,22 +1832,28 @@ function HtmlWorkspace({
       setThinElementHover(doc, thinSelectableAtPoint(doc, e.clientX, e.clientY))
     }, true)
     doc.addEventListener('input', () => {
+      if (doc !== iframeRef.current?.contentDocument) return
       const el = selectedRef.current
       if (!el) return
       updateSelectionResizeChrome(doc, el)
       if (selectRefreshTimer.current) window.clearTimeout(selectRefreshTimer.current)
       selectRefreshTimer.current = window.setTimeout(() => {
         const cur = selectedRef.current
-        if (cur && cur.isConnected) {
+        if (doc === iframeRef.current?.contentDocument && elementInDocument(cur, doc)) {
           updateSelectionResizeChrome(doc, cur)
           onElementSelect?.(describeElement(cur))
         }
       }, 250)
     })
     doc.addEventListener('input', () => {
+      if (doc !== iframeRef.current?.contentDocument) return
       if (docPulseTimer.current) window.clearTimeout(docPulseTimer.current)
       docPulseTimer.current = window.setTimeout(
-        () => setDocPulse({ base: htmlRef.current, doc: serializeDocument(doc) }),
+        () => {
+          if (doc === iframeRef.current?.contentDocument) {
+            setDocPulse({ base: htmlRef.current, doc: serializeDocument(doc) })
+          }
+        },
         300,
       )
     })
@@ -1880,6 +1908,7 @@ function HtmlWorkspace({
   // Don't fire a stale panel refresh after unmount.
   useEffect(() => () => {
     if (selectRefreshTimer.current) window.clearTimeout(selectRefreshTimer.current)
+    if (docPulseTimer.current) window.clearTimeout(docPulseTimer.current)
   }, [])
 
   // Edit renders the document in the state View left it in. Computed here

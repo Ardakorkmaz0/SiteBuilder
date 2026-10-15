@@ -53,6 +53,21 @@ function stripHashAndQuery(ref) {
   return String(ref || '').split('#')[0].split('?')[0]
 }
 
+// Keep parent segments until the reference has been joined to its directory.
+// Browser URLs encode spaces and Unicode; local File names are decoded text.
+function referencePaths(ref, baseDir, rootDir = '') {
+  let path = stripHashAndQuery(unwrapStaticRef(ref)).trim().replace(/\\/g, '/')
+  try { path = decodeURIComponent(path) } catch { /* A literal % is a valid filename. */ }
+  if (!path) return []
+  const rootPath = normalizePath(path)
+  const fromRoot = normalizePath(`${rootDir}/${rootPath}`)
+  return path.startsWith('/') ? [fromRoot] : [normalizePath(`${baseDir}/${path}`), fromRoot]
+}
+
+function safeRawText(value, tag) {
+  return String(value || '').replace(new RegExp(`</\\s*${tag}`, 'gi'), (match) => match.replace('/', '\\/'))
+}
+
 function isLocalRef(ref) {
   const value = String(ref || '').trim()
   return (
@@ -75,18 +90,20 @@ function buildFileIndex(files) {
     const name = basename(path)
     byName.set(name, byName.has(name) ? null : file)
   }
-  return { byPath, byName }
+  // Directory pickers include the chosen folder in webkitRelativePath. It is
+  // the upload's site root, not part of browser root-relative URLs.
+  const roots = files.map((file) => {
+    const path = String(file.webkitRelativePath || '').replace(/\\/g, '/')
+    return path.includes('/') ? path.split('/')[0] : ''
+  })
+  const rootDir = roots.length && roots.every((root) => root && root === roots[0]) ? roots[0] : ''
+  return { byPath, byName, rootDir }
 }
 
 function resolveFile(ref, baseDir, index) {
-  const clean = normalizePath(stripHashAndQuery(ref))
-  if (!clean) return null
-  return (
-    index.byPath.get(clean) ||
-    index.byPath.get(normalizePath(`${baseDir}/${clean}`)) ||
-    index.byName.get(basename(clean)) ||
-    null
-  )
+  const candidates = referencePaths(ref, baseDir, index.rootDir)
+  for (const path of candidates) if (index.byPath.has(path)) return index.byPath.get(path)
+  return candidates.length ? index.byName.get(basename(candidates.at(-1))) || null : null
 }
 
 function mimeFor(file) {
@@ -130,16 +147,33 @@ function copyAttributes(from, to, omit = new Set()) {
 }
 
 async function inlineSrcset(value, baseDir, index) {
-  const items = String(value || '').split(',').map((item) => item.trim()).filter(Boolean)
+  return transformSrcset(value, async (ref) => {
+    const file = resolveFile(ref, baseDir, index)
+    return file ? fileToDataUrl(file) : ''
+  })
+}
+
+// Commas belong to data URLs too. Read the URL token first, then its optional
+// descriptor, instead of splitting the complete attribute on every comma.
+async function transformSrcset(value, resolveUrl) {
+  const text = String(value || '')
   const converted = []
-  for (const item of items) {
-    const [url, ...descriptor] = item.split(/\s+/)
-    if (!isLocalRef(url)) {
-      converted.push(item)
-      continue
+  let i = 0
+  while (i < text.length) {
+    while (i < text.length && /[\s,]/.test(text[i])) i++
+    const start = i
+    while (i < text.length && !/\s/.test(text[i])) i++
+    let url = text.slice(start, i)
+    if (!url) break
+    let descriptor = ''
+    if (url.endsWith(',')) url = url.replace(/,+$/, '')
+    else {
+      const descriptorStart = i
+      while (i < text.length && text[i] !== ',') i++
+      descriptor = text.slice(descriptorStart, i).trim()
     }
-    const file = resolveFile(url, baseDir, index)
-    converted.push(file ? [await fileToDataUrl(file), ...descriptor].join(' ') : item)
+    const convertedUrl = isLocalRef(url) ? await resolveUrl(url) : ''
+    converted.push([convertedUrl || url, descriptor].filter(Boolean).join(' '))
   }
   return converted.join(', ')
 }
@@ -166,13 +200,14 @@ export async function htmlFilesToDocument(fileList) {
     const file = resolveFile(href, htmlDir, index)
     if (!file) continue
     const style = doc.createElement('style')
+    copyAttributes(link, style, new Set(['href', 'rel', 'integrity', 'crossorigin']))
     style.setAttribute('data-inlined-from', href)
-    style.textContent = await inlineCssUrls(await file.text(), dirname(filePath(file)), index)
+    style.textContent = safeRawText(await inlineCssUrls(await file.text(), dirname(filePath(file)), index), 'style')
     link.replaceWith(style)
   }
 
-  for (const style of [...doc.querySelectorAll('style')]) {
-    style.textContent = await inlineCssUrls(style.textContent, htmlDir, index)
+  for (const style of [...doc.querySelectorAll('style:not([data-inlined-from])')]) {
+    style.textContent = safeRawText(await inlineCssUrls(style.textContent, htmlDir, index), 'style')
   }
 
   for (const script of [...doc.querySelectorAll('script[src]')]) {
@@ -183,7 +218,7 @@ export async function htmlFilesToDocument(fileList) {
     const inline = doc.createElement('script')
     copyAttributes(script, inline, new Set(['src', 'integrity', 'crossorigin']))
     inline.setAttribute('data-inlined-from', src)
-    inline.textContent = await file.text()
+    inline.textContent = safeRawText(await file.text(), 'script')
     script.replaceWith(inline)
   }
 
@@ -238,13 +273,17 @@ function unwrapStaticRef(ref) {
 // Resolve a href/src ref (relative to baseDir) to a map entry: try the
 // directory-relative path, then the root-relative path, then a bare basename.
 function resolveInMap(ref, baseDir, filesMap) {
-  const clean = normalizePath(stripHashAndQuery(unwrapStaticRef(ref)))
-  if (!clean) return null
-  const candidates = [normalizePath(`${baseDir}/${clean}`), clean]
+  const candidates = referencePaths(ref, baseDir)
   for (const c of candidates) if (filesMap.has(c)) return filesMap.get(c)
-  const base = basename(clean)
-  for (const [p, f] of filesMap) if (basename(p) === base) return f
-  return null
+  if (!candidates.length) return null
+  const base = basename(candidates.at(-1))
+  let match = null
+  for (const [p, f] of filesMap) {
+    if (basename(p) !== base) continue
+    if (match) return null
+    match = f
+  }
+  return match
 }
 
 // url(...) inlining against the in-memory map (CSS files reference assets
@@ -289,14 +328,15 @@ export async function assemblePreviewHtml(htmlText, htmlPath, filesMap, opts = {
     const cssDir = dirname(entry.path)
     const css = await inlineCssUrlsMap(entry.content || '', cssDir, filesMap)
     const style = doc.createElement('style')
+    copyAttributes(link, style, new Set(['href', 'rel', 'integrity', 'crossorigin']))
     style.setAttribute('data-pwb-injected', href)
-    style.textContent = css
+    style.textContent = safeRawText(css, 'style')
     if (forEdit) link.after(style) // keep the <link>, add styling next to it
     else link.replaceWith(style)
   }
 
   for (const style of [...doc.querySelectorAll('style:not([data-pwb-injected])')]) {
-    style.textContent = await inlineCssUrlsMap(style.textContent, htmlDir, filesMap)
+    style.textContent = safeRawText(await inlineCssUrlsMap(style.textContent, htmlDir, filesMap), 'style')
   }
 
   if (!forEdit) {
@@ -308,7 +348,7 @@ export async function assemblePreviewHtml(htmlText, htmlPath, filesMap, opts = {
       const inline = doc.createElement('script')
       copyAttributes(script, inline, new Set(['src', 'integrity', 'crossorigin']))
       inline.setAttribute('data-pwb-injected', src)
-      inline.textContent = entry.content || ''
+      inline.textContent = safeRawText(entry.content, 'script')
       script.replaceWith(inline)
     }
   }
@@ -333,6 +373,12 @@ export async function assemblePreviewHtml(htmlText, htmlPath, filesMap, opts = {
           if (url) el.setAttribute(attr, url)
         }
       }
+    }
+    for (const el of doc.querySelectorAll('[srcset]')) {
+      el.setAttribute('srcset', await transformSrcset(el.getAttribute('srcset'), async (ref) => {
+        const entry = resolveInMap(ref, htmlDir, filesMap)
+        return entry?.kind === 'asset' ? handleToDataUrl(entry) : ''
+      }))
     }
     // Server-side template languages (Django/Jinja `{% … %}` / `{{ … }}`) can't
     // run in the browser, so they'd otherwise show as raw text. Strip them from

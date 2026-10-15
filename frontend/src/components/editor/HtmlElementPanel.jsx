@@ -3,7 +3,7 @@ import {
   LabeledCheckbox,
   LabeledColor,
   LabeledImage,
-  LabeledNumber,
+  LabeledNumber as NumberControl,
   LabeledRange,
   LabeledSelect,
   LabeledText,
@@ -131,6 +131,12 @@ const PANEL_TABS = [
   ['design', 'Design'],
   ['layout', 'Layout'],
 ]
+
+// Empty restores the template (or PC value on a phone), while entering 0 is
+// a separate design choice such as no padding or automatic width.
+function LabeledNumber(props) {
+  return <NumberControl {...props} allowEmpty />
+}
 
 function TextAlignGlyph({ side }) {
   const x = side === 'center' ? [2, 4, 3] : side === 'right' ? [2, 6, 4] : [2, 2, 2]
