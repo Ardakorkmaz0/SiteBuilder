@@ -21,6 +21,7 @@ import {
   PlusIcon,
 } from '../components/icons.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 import { accountName, chosenName } from '../utils/accountName.js'
 
 // Keep the feed across navigation within one account, including its favorite state.
@@ -52,6 +53,7 @@ function formattedDate(value, language) {
 
 export default function ExplorePage() {
   const { language, t } = useLanguage()
+  useDocumentTitle(t('Explore'))
   const user = useAuthStore((state) => state.user)
   // Set by the sign-in pages when a guest session's work was taken over.
   const location = useLocation()

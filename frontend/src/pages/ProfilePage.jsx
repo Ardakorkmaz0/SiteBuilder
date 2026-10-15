@@ -24,6 +24,7 @@ import {
 } from '../components/icons.jsx'
 import { profileLinks } from '../utils/profileLinks.js'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 import { accountName } from '../utils/accountName.js'
 
 const LINK_ICONS = { website: LinkIcon, github: GithubIcon, twitter: XSocialIcon, instagram: InstagramIcon }
@@ -40,6 +41,7 @@ function initialPinnedProjects() {
 
 export default function ProfilePage() {
   const { language, t } = useLanguage()
+  useDocumentTitle(t('Profile and projects'))
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const navigate = useNavigate()

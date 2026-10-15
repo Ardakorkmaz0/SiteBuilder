@@ -23,6 +23,7 @@ import HtmlElementPanel from '../components/editor/HtmlElementPanel.jsx'
 import CodeFileEditor from '../components/editor/CodeFileEditor.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 import { useEscapeToClose } from '../ui/useEscapeToClose.js'
 
 // Slim strip shown when a side rail is collapsed (mirrors the editor's).
@@ -88,6 +89,7 @@ function LivePane({ url, reloadKey, onReload, onOpenWindow }) {
 // — but operates on an in-memory file map (projectStore), not a server Site.
 export default function CodeProjectPage() {
   const { t } = useLanguage()
+  useDocumentTitle(t('Open a local project'))
   // Leaves the workspace, like the editor's — one step back from here is
   // usually the project you just closed.
   const navigate = useNavigate()

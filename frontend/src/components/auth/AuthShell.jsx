@@ -3,6 +3,7 @@ import LanguageSwitcher from '../LanguageSwitcher.jsx'
 import SitePreview from '../dashboard/SitePreview.jsx'
 import { listExplore } from '../../api/explore.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useDocumentTitle } from '../../utils/useDocumentTitle.js'
 
 export function AuthWidgetFrame({ children }) {
   return (
@@ -62,6 +63,7 @@ function MadeWithSitebuilder() {
 
 export default function AuthShell({ title, description, onSubmit, children, footer }) {
   const { t } = useLanguage()
+  useDocumentTitle(typeof title === 'string' ? title : null)
   const Surface = onSubmit ? 'form' : 'section'
   const surfaceProps = onSubmit ? { onSubmit } : {}
 

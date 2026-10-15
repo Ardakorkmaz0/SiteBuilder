@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { getReviewSite, submitReviewComment } from '../api/sites.js'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 import { apiError } from '../utils/errors.js'
 import { HTML_ALLOW, PUBLIC_HTML_SANDBOX, withBuilderInteractiveHtml, withViewportMeta } from '../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
@@ -20,6 +21,7 @@ export default function ReviewPage() {
   const previewFrameRef = useRef(null)
 
   const [refusal, setRefusal] = useState(null)
+  useDocumentTitle(payload?.site?.title || null)
 
   useEffect(() => {
     getReviewSite(token).then((data) => {

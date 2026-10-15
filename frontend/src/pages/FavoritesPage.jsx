@@ -10,9 +10,11 @@ import DashboardSearch from '../components/dashboard/DashboardSearch.jsx'
 import ExploreCard from '../components/dashboard/ExploreCard.jsx'
 import { StarIcon } from '../components/icons.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 
 export default function FavoritesPage() {
   const { t } = useLanguage()
+  useDocumentTitle(t('Favorites'))
   const [items, setItems] = useState(null) // null = loading
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')

@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/authStore.js'
 import { CogIcon } from '../components/icons.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 import AdminOverview from '../components/admin/AdminOverview.jsx'
 import { AccountDetail, AccountList } from '../components/admin/AdminAccounts.jsx'
 import { SiteDetail, SiteList } from '../components/admin/AdminSites.jsx'
@@ -30,6 +31,7 @@ const RANGES = [7, 30, 90]
 
 export default function AdminPage() {
   const { t } = useLanguage()
+  useDocumentTitle(t('Admin'))
   const isSuperuser = useAuthStore((s) => s.user?.is_superuser)
   const goBack = useGoBack('/')
   const [params, setParams] = useSearchParams()
