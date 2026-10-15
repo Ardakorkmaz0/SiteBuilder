@@ -237,9 +237,12 @@ export default function ProfilePage() {
 
   return (
     <div className="dashboard-page">
+      <a href="#profile-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-[var(--studio-panel-raised)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--studio-accent-hover)] focus:shadow-lg">
+        {t('Skip to content')}
+      </a>
       <DashboardHeader current="projects" />
 
-      <main className="dashboard-container">
+      <main id="profile-main" className="dashboard-container">
         <div className="dashboard-page-heading">
           <div>
             <div>
