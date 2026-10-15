@@ -18,6 +18,8 @@ import { useGuestGate } from '../utils/useGuestGate.jsx'
 import { lastPageOutside } from '../utils/lastVisited.js'
 import {
   registry,
+  CANVAS_WIDTH,
+  MOBILE_CANVAS_WIDTH,
   PC_CANVAS_PRESETS,
   MOBILE_CANVAS_PRESETS,
 } from '../components/registry.jsx'
@@ -572,6 +574,8 @@ function SiteEditor() {
   // into the HTML document (null when not placing).
   const [pendingType, setPendingType] = useState(null)
   const [pendingHtml, setPendingHtml] = useState(null)
+  // Picked with the keyboard: straight to the end of the page, no spot to click.
+  const [pendingAtEnd, setPendingAtEnd] = useState(false)
   // Component-canvas tap-to-place: the armed palette item (touch fallback for
   // drag-and-drop) — {type, preset, html, w, h, label} or null. Esc cancels.
   const [pendingPlace, setPendingPlace] = useState(null)
@@ -1215,6 +1219,25 @@ function SiteEditor() {
     const d = pendingPlace
     if (!d) return
     setPendingPlace(null)
+    placeData(d, x, y, inside)
+  }
+
+  // A palette item picked with the keyboard has no spot to land on: it goes
+  // centred below everything on the page (in the canvas being edited), and is
+  // selected, so the arrow keys move it on from there.
+  function placeAtEnd(d) {
+    const state = useEditorStore.getState()
+    const page = selectCurrentPage(state)
+    const mobile = state.viewport === 'mobile'
+    const width = mobile ? (page.mobileWidth || MOBILE_CANVAS_WIDTH) : (page.canvasWidth || CANVAS_WIDTH)
+    const bottom = (page.components || []).reduce((lowest, c) => {
+      const box = (mobile ? c.mobileLayout || c.layout : c.layout) || {}
+      return Math.max(lowest, (box.y || 0) + (box.h || 0))
+    }, 0)
+    placeData(d, width / 2, bottom + 24 + (d.h || 120) / 2)
+  }
+
+  function placeData(d, x, y, inside = null) {
     const w = d.w || 360
     const h = d.h || 120
     if (inside?.parentId && d.type !== 'region') {
@@ -2355,7 +2378,7 @@ function SiteEditor() {
               >
                 <Sidebar
                   key="html-rail"
-                  onPickComponent={(type, html) => { setPendingType(type); setPendingHtml(html || null) }}
+                  onPickComponent={(type, html, options) => { setPendingType(type); setPendingHtml(html || null); setPendingAtEnd(!!options?.atEnd) }}
                   onCollapse={() => setRail('left', false)}
                   // In HTML mode the Animation tab acts on the element selected in
                   // the document, not on a schema component — without this it had
@@ -2459,8 +2482,9 @@ function SiteEditor() {
                   onImportFile={() => htmlInputRef.current?.click()}
                   pendingType={pendingType}
                   pendingHtml={pendingHtml}
-                  onPlaced={() => { setPendingType(null); setPendingHtml(null) }}
-                  onCancelPlacement={() => { setPendingType(null); setPendingHtml(null) }}
+                  pendingAtEnd={pendingAtEnd}
+                  onPlaced={() => { setPendingType(null); setPendingHtml(null); setPendingAtEnd(false) }}
+                  onCancelPlacement={() => { setPendingType(null); setPendingHtml(null); setPendingAtEnd(false) }}
                   brushColor={brushColor}
                   brushTarget={brushTarget}
                   brushRecentColors={recentBrushColors}
@@ -2556,7 +2580,12 @@ function SiteEditor() {
               >
                 <Sidebar
                   key="components-rail"
-                  onArmPlacement={(data) => {
+                  onArmPlacement={(data, options) => {
+                    if (options?.atEnd) {
+                      switchCanvasMode('edit')
+                      placeAtEnd(data)
+                      return
+                    }
                     setPendingPlace(data)
                     switchCanvasMode('edit')
                     // On a phone the palette is a drawer covering the canvas —

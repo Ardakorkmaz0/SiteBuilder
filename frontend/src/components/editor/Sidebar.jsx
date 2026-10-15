@@ -107,6 +107,17 @@ function PalettePreviewPanel({ preview, onClose }) {
   )
 }
 
+// The keyboard has no spot on the canvas to click: Enter or Space on a swatch
+// adds it at the end of the page instead (`{ atEnd: true }`), selected, where
+// the arrow keys can move it on.
+function onEnterOrSpace(run) {
+  return (event) => {
+    if ((event.key !== 'Enter' && event.key !== ' ') || event.repeat) return
+    event.preventDefault()
+    run()
+  }
+}
+
 // One variant swatch, dual-mode:
 //  - HTML-upload mode (`onPick` set): native drag + click → onPick(type, html)
 //    (click arms placement, drag drops the raw HTML into the page iframe).
@@ -163,6 +174,10 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
           inspect()
           onPick(type, html)
         }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={onEnterOrSpace(() => onPick(type, html, { atEnd: true }))}
+        aria-label={t('{name}: Enter adds it at the end of the page', { name: variantLabel })}
         title={t('Click to place, or drag onto the page — {name}', { name: variantLabel })}
         className={`cursor-pointer rounded-lg border p-1.5 transition select-none hover:border-[var(--studio-accent)] hover:bg-[var(--studio-control-hover)] active:cursor-grabbing ${variant.recommended ? 'border-[var(--studio-accent)] bg-[var(--studio-control)]' : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)]'}`}
       >
@@ -186,6 +201,13 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
             : { type, preset, html, w, h, label: variantLabel },
         )
       }}
+      onKeyDown={onEnterOrSpace(() => onArm?.(
+        nativeCanvas
+          ? { type, preset, w, h, label: variantLabel }
+          : { type, preset, html, w, h, label: variantLabel },
+        { atEnd: true },
+      ))}
+      aria-label={t('{name}: Enter adds it at the end of the page', { name: variantLabel })}
       title={t('Click to place, or drag onto the canvas — {name}', { name: variantLabel })}
       style={{ touchAction: 'manipulation' }}
       className={`cursor-grab rounded-lg border p-1.5 transition hover:border-[var(--studio-accent)] hover:bg-[var(--studio-control-hover)] active:cursor-grabbing ${variant.recommended ? 'border-[var(--studio-accent)] bg-[var(--studio-control)]' : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)]'} ${isDragging ? 'opacity-40' : ''}`}
@@ -279,6 +301,10 @@ function BlockCard({ block, onPick, onArm, onInspect, theme }) {
           inspect()
           onPick('section', block.html)
         }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={onEnterOrSpace(() => onPick('section', block.html, { atEnd: true }))}
+        aria-label={t('{name}: Enter adds it at the end of the page', { name: block.label })}
         title={t('Click to place, or drag onto the page — {name} section', { name: block.label })}
         className="cursor-pointer rounded-lg border border-[#e5e7eb] bg-white p-2.5 transition select-none hover:border-[#4f46e5] hover:bg-[#fafaff] active:cursor-grabbing"
       >
@@ -296,6 +322,8 @@ function BlockCard({ block, onPick, onArm, onInspect, theme }) {
         inspect()
         onArm?.({ type: 'section', preset: block.id, html: block.html, w, h, label: block.label })
       }}
+      onKeyDown={onEnterOrSpace(() => onArm?.({ type: 'section', preset: block.id, html: block.html, w, h, label: block.label }, { atEnd: true }))}
+      aria-label={t('{name}: Enter adds it at the end of the page', { name: block.label })}
       title={t('Click to place, or drag onto the canvas — {name} section', { name: block.label })}
       style={{ touchAction: 'manipulation' }}
       className={`cursor-grab rounded-lg border border-[#e5e7eb] bg-white p-2.5 transition hover:border-[#4f46e5] hover:bg-[#fafaff] active:cursor-grabbing ${isDragging ? 'opacity-40' : ''}`}
@@ -647,6 +675,7 @@ export default function Sidebar({ onPickComponent, onArmPlacement, onCollapse, f
               {onPickComponent
                 ? t('Click in the page or drag to place.')
                 : t('Click (or tap) to place, or drag onto the canvas.')}
+              {' '}{t('With the keyboard, Enter adds it at the end of the page.')}
             </p>
           </>
         )}

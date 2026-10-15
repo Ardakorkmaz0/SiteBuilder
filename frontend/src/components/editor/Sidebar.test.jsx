@@ -151,3 +151,42 @@ describe('Sidebar variants in Turkish', () => {
   })
 })
 
+
+// The keyboard has no spot to click on the canvas: Enter or Space on a swatch
+// asks for the end of the page instead of arming a placement.
+describe('Sidebar from the keyboard', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    localStorage.setItem('pwb_language', 'en')
+  })
+
+  it('adds a component at the end of the page on Enter or Space', async () => {
+    const user = userEvent.setup()
+    const calls = []
+    renderSidebar({ onArmPlacement: (data, options) => calls.push([data, options]) })
+    await user.click(screen.getByRole('button', { name: /^■Button\d+▸$/ }))
+    const swatch = screen.getAllByRole('button', { name: /: Enter adds it at the end of the page$/ })[0]
+
+    fireEvent.keyDown(swatch, { key: 'Enter' })
+    fireEvent.keyDown(swatch, { key: ' ' })
+    fireEvent.keyDown(swatch, { key: 'Enter', repeat: true })
+    fireEvent.keyDown(swatch, { key: 'a' })
+
+    expect(calls).toHaveLength(2)
+    expect(calls[0][0]).toMatchObject({ type: 'button' })
+    expect(calls.every(([, options]) => options?.atEnd === true)).toBe(true)
+  })
+
+  it('reaches an HTML page\'s swatches by keyboard and asks for the end there too', async () => {
+    const user = userEvent.setup()
+    const picks = []
+    renderSidebar({ onPickComponent: (type, html, options) => picks.push([type, options]) })
+    await user.click(screen.getByRole('button', { name: /^■Button\d+▸$/ }))
+    const swatch = screen.getAllByRole('button', { name: /: Enter adds it at the end of the page$/ })[0]
+
+    expect(swatch).toHaveAttribute('tabindex', '0')
+    fireEvent.keyDown(swatch, { key: 'Enter' })
+
+    expect(picks).toEqual([['button', { atEnd: true }]])
+  })
+})

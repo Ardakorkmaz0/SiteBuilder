@@ -21,6 +21,7 @@ import {
   disarmDrag,
   DRAG_MIME,
   closestPlaceableBlock,
+  endOfPage,
   placeableBlocks,
   diffAppendedBodyChildren,
   ensureEditHintChrome,
@@ -571,6 +572,9 @@ function HtmlWorkspace({
   onImportFile,
   pendingType,
   pendingHtml,
+  // Picked with the keyboard: placed at the end of the page as soon as the
+  // edit document is ready, instead of waiting for a click in it.
+  pendingAtEnd = false,
   onPlaced,
   onCancelPlacement,
   // Brush tool (shared with the component canvas): when the 'brush' edit tool is
@@ -682,6 +686,12 @@ function HtmlWorkspace({
   // unset we fall back to the type's default snippet.
   const pendingHtmlRef = useRef(pendingHtml)
   useEffect(() => { pendingHtmlRef.current = pendingHtml }, [pendingHtml])
+  const pendingAtEndRef = useRef(pendingAtEnd)
+  useEffect(() => { pendingAtEndRef.current = pendingAtEnd }, [pendingAtEnd])
+  // The document the iframe last finished loading. Switching from View to
+  // Edit, the frame briefly holds an empty about:blank: a block placed there
+  // went nowhere, and the empty page was handed on as the edit.
+  const loadedDocRef = useRef(null)
   // Latest edit tool for the load-time selection listener (bound once).
   const editToolRef = useRef(editTool)
   useEffect(() => { editToolRef.current = editTool }, [editTool])
@@ -1413,6 +1423,21 @@ function HtmlWorkspace({
     onPlaced?.()
   }, [onCommit, onPlaced])
 
+  const placeAtPageEnd = useCallback(() => {
+    const type = pendingRef.current
+    const doc = iframeRef.current?.contentDocument
+    if (!type || !doc?.body || doc !== loadedDocRef.current) return
+    const { target, position } = endOfPage(doc)
+    const node = insertSnippet(doc, pendingHtmlRef.current || componentToHtml(type), target, position)
+    removePlacementChrome(doc)
+    onCommit?.(serializeDocument(doc))
+    if (node) {
+      node.scrollIntoView?.({ block: 'center' })
+      flashNode(doc, node)
+    }
+    onPlaced?.()
+  }, [onCommit, onPlaced])
+
   // Binds click/drop placement + hover highlight + Esc-cancel onto the edit
   // iframe's document. Returns a cleanup that removes them all. Every handler
   // re-checks pendingRef because a load-time binding has no cleanup path.
@@ -1689,6 +1714,7 @@ function HtmlWorkspace({
   function onIframeLoad() {
     const doc = iframeRef.current?.contentDocument
     if (!doc) return
+    loadedDocRef.current = doc
     // Tell the tool manager the document is now ready, so a restored edit/link
     // surface binds its listeners (the first effect pass ran before this load).
     setLoadTick((tick) => tick + 1)
@@ -1815,6 +1841,10 @@ function HtmlWorkspace({
   useEffect(() => {
     const doc = iframeRef.current?.contentDocument
     if (!doc || mode !== 'edit') return undefined
+    if (placing && pendingAtEndRef.current) {
+      placeAtPageEnd()
+      return undefined
+    }
     if (placing) {
       setDocumentDesignMode(doc, 'off')
       clearSelection() // placement clicks shouldn't fight the element panel

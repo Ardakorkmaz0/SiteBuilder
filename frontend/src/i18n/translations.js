@@ -3164,6 +3164,8 @@ export const TURKISH_TRANSLATIONS = {
   'Dropped.': 'Bırakıldı.',
   'Dragging cancelled.': 'Sürükleme iptal edildi.',
   'Welcome': 'Hoş geldin',
+  '{name}: Enter adds it at the end of the page': '{name}: Enter ile sayfanın sonuna eklenir',
+  'With the keyboard, Enter adds it at the end of the page.': 'Klavyeyle Enter, sayfanın sonuna ekler.',
 }
 
 // Editor-only libraries (the section blocks and component variants) carry
