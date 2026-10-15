@@ -903,6 +903,28 @@ function SiteEditor() {
     tagsText,
     published,
   ])
+  // A failed automatic save is tried again: the server or the connection is
+  // usually back in a moment. It used to wait for the next edit, with "Save
+  // failed" in the header and the work only in this tab. Every 5, 10, 20… up
+  // to 60 seconds, and at once when the browser says it is online again.
+  const autoSaveRetryRef = useRef(0)
+  useEffect(() => {
+    if (autoSaveState === 'saved') autoSaveRetryRef.current = 0
+    if (autoSaveState !== 'error' || !autoSaveEnabled) return undefined
+    const attempt = autoSaveRetryRef.current
+    const retry = () => {
+      const s = saveLifecycleRef.current
+      if (!shouldRunEditorAutoSave(s, discardLeaveRef.current)) return
+      autoSaveRetryRef.current = attempt + 1
+      s.save(undefined, { auto: true })
+    }
+    const timer = window.setTimeout(retry, Math.min(60000, 5000 * 2 ** attempt))
+    window.addEventListener('online', retry)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('online', retry)
+    }
+  }, [autoSaveState, autoSaveEnabled])
   useEffect(() => {
     if (!autoSaveEnabled) return undefined
     const flush = () => {
@@ -2141,7 +2163,12 @@ function SiteEditor() {
             onChange={(event) => changeTitle(event.target.value)}
             aria-label={t('Site title')}
           />
-          <div role="status" aria-live="polite" className="flex items-center gap-1.5 text-[10px] text-[var(--studio-text-muted)]">
+          <div
+            role="status"
+            aria-live="polite"
+            title={autoSaveState === 'error' ? t('Your latest changes are not saved yet. Trying again — or press Save.') : undefined}
+            className="flex items-center gap-1.5 text-[10px] text-[var(--studio-text-muted)]"
+          >
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: saveStatus.tone }} />
             {saveStatus.label}
             {currentPageIsHtml && localFile ? <span className="hidden xl:inline">· {localFile.name}</span> : null}
