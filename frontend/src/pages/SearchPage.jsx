@@ -7,6 +7,7 @@ import DashboardGlobalSearch from '../components/dashboard/DashboardGlobalSearch
 import ExploreCard from '../components/dashboard/ExploreCard.jsx'
 import SearchPeople from '../components/dashboard/SearchPeople.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 
 function SearchResults({ query, type, onFilter }) {
   const { t } = useLanguage()
@@ -121,6 +122,7 @@ function SearchResults({ query, type, onFilter }) {
 
 export default function SearchPage() {
   const { t } = useLanguage()
+  useDocumentTitle(t('Search results'))
   const [params, setParams] = useSearchParams()
   const query = (params.get('q') || '').trim().slice(0, 80)
   const requestedType = params.get('type')

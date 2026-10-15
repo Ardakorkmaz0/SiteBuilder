@@ -11,6 +11,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import { ArrowLeftIcon, GithubIcon, GlobeIcon, InstagramIcon, LinkIcon, MapPinIcon, XSocialIcon } from '../components/icons.jsx'
 import { profileLinks } from '../utils/profileLinks.js'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 
 const LINK_ICONS = { website: LinkIcon, github: GithubIcon, twitter: XSocialIcon, instagram: InstagramIcon }
 
@@ -49,6 +50,7 @@ export default function PublicProfilePage() {
 
   const ready = state.id === id
   const data = ready ? state.data : null
+  useDocumentTitle(data?.display_name || null)
   const error = ready ? state.error : ''
   const goBack = useGoBack('/')
   useScrollRestore(!!data) // restore scroll once the profile + sites have loaded

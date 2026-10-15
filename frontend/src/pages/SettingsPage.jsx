@@ -6,6 +6,7 @@ import { useGoBack } from '../utils/useGoBack.js'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import AdminAiSettings from '../components/admin/AdminAiSettings.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 
 // Superuser-only runtime settings: Google sign-in, reCAPTCHA, SMTP email, and the
 // frontend URL — edited here instead of redeploying env vars. Secrets are
@@ -30,6 +31,7 @@ function Field({ label, hint, children }) {
 
 export default function SettingsPage() {
   const { t } = useLanguage()
+  useDocumentTitle(t('Settings'))
   const goBack = useGoBack('/admin')
   const [data, setData] = useState(null) // null = loading; the masked GET payload
   const [form, setForm] = useState({})   // editable text fields

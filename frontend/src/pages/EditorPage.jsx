@@ -114,6 +114,7 @@ import {
 } from '../utils/localFile.js'
 import { localizeTemplateHtml } from '../utils/templateLocalization.js'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 import { accountName } from '../utils/accountName.js'
 import { useUiTheme } from '../ui/useUiTheme.js'
 import { useEscapeToClose } from '../ui/useEscapeToClose.js'
@@ -447,6 +448,8 @@ function SiteEditor() {
     try { return localStorage.getItem('pwb_page_' + id) || '' } catch { return '' }
   })
   const [title, setTitle] = useState('')
+  // The tab says which site is open: two editor tabs used to read the same.
+  useDocumentTitle(title.trim() || null)
   const [slug, setSlug] = useState('')
   const [published, setPublished] = useState(false)
   // Whether the site is published as far as the server has told us, readable

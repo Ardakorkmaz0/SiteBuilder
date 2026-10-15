@@ -27,6 +27,7 @@ import { sharedBlockHtml } from '../utils/componentExport.js'
 import { STATIC_HTML_SANDBOX } from '../utils/htmlRuntime.js'
 import { useAuthStore } from '../store/authStore.js'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 import { apiError } from '../utils/errors.js'
 
 const CATEGORIES = [
@@ -143,6 +144,7 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
 
 export default function CommunityPage() {
   const { t } = useLanguage()
+  useDocumentTitle(t('Community blocks'))
   const user = useAuthStore((state) => state.user)
   const [category, setCategory] = useState('')
   const [query, setQuery] = useState('')

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 
 // A wrong address used to bounce straight to the home page. That is tidy and
 // it is also a small lie: the person is told nothing, and somebody who mistyped
@@ -15,6 +16,7 @@ const SECONDS = 6
 
 export default function NotFoundPage() {
   const { t } = useLanguage()
+  useDocumentTitle(t('Page not found'))
   const navigate = useNavigate()
   const location = useLocation()
   const [left, setLeft] = useState(SECONDS)
