@@ -49,7 +49,7 @@ function Field({ label, children, hint }) {
     <label className="block">
       <span className="mb-1 block text-xs font-semibold text-[#374151]">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-[11px] text-[#9ca3af]">{hint}</span>}
+      {hint && <span className="mt-1 block text-[11px] text-[var(--studio-text-faint)]">{hint}</span>}
     </label>
   )
 }
@@ -194,7 +194,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
           </span>
           <div className="min-w-0">
             <h2 id="ai-wizard-title" className="text-sm font-bold text-[#111827]">{t('AI Site Wizard')}</h2>
-            <p className="truncate text-xs text-[#6b7280]">
+            <p className="truncate text-xs text-[var(--studio-text-muted)]">
               {t('Answer a few questions — get a complete, responsive site.')}
             </p>
           </div>
@@ -216,7 +216,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
             onClick={close}
             title={t('Close')}
             aria-label={t('Close')}
-            className={`${phase === 'form' ? '' : 'ml-auto '}rounded-lg px-2 py-1 text-sm text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#374151]`}
+            className={`${phase === 'form' ? '' : 'ml-auto '}rounded-lg px-2 py-1 text-sm text-[var(--studio-text-faint)] hover:bg-[#f3f4f6] hover:text-[#374151]`}
           >
             ✕
           </button>
@@ -347,7 +347,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
                   {WIZARD_FONTS.map((f) => (
                     <Chip key={f.id} active={answers.font === f.id} onClick={() => patch({ font: f.id })}>
                       {t(f.label)}
-                      <span className="block text-[11px] text-[#9ca3af]">{f.family}</span>
+                      <span className="block text-[11px] text-[var(--studio-text-faint)]">{f.family}</span>
                     </Chip>
                   ))}
                 </div>
@@ -359,7 +359,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
             <div className="space-y-4">
               <div>
                 <h3 className="mb-1 text-sm font-semibold text-[#111827]">{t('Which sections?')}</h3>
-                <p className="mb-3 text-xs text-[#6b7280]">
+                <p className="mb-3 text-xs text-[var(--studio-text-muted)]">
                   {t('Pre-picked for a {type} — toggle freely; order follows this list.', {
                     type: t(WIZARD_SITE_TYPES.find((siteType) => siteType.id === answers.type)?.label || '').toLocaleLowerCase(),
                   })}
@@ -387,7 +387,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
             <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 text-center">
               <span className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--studio-border)] border-t-[var(--studio-accent)]" aria-hidden />
               <p className="text-sm font-semibold text-[#111827]">{t(statusLine)}</p>
-              <p className="max-w-sm text-xs text-[#6b7280]">
+              <p className="max-w-sm text-xs text-[var(--studio-text-muted)]">
                 {t('Building a complete responsive site from your answers — usually 15-40 seconds.')}
               </p>
             </div>
@@ -397,11 +397,11 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
             <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-center">
               <p className="max-w-md text-sm font-medium text-[#b91c1c]">{errorText}</p>
               {noProvider ? (
-                <p className="max-w-md text-xs text-[#6b7280]">
+                <p className="max-w-md text-xs text-[var(--studio-text-muted)]">
                   {t('Open the AI chat (AI button in the header) → Settings, and paste any free key — or start from a ready-made template instead.')}
                 </p>
               ) : (
-                <p className="max-w-md text-xs text-[#6b7280]">
+                <p className="max-w-md text-xs text-[var(--studio-text-muted)]">
                   {t('This is usually a temporary quota hiccup — trying again often works.')}
                 </p>
               )}
@@ -463,7 +463,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
             <button
               type="button"
               onClick={() => (step === 0 ? close() : setStep(step - 1))}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-[#6b7280] hover:bg-[#f3f4f6]"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--studio-text-muted)] hover:bg-[#f3f4f6]"
             >
               {step === 0 ? t('Cancel') : t('← Back')}
             </button>
@@ -496,7 +496,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
               <button
                 type="button"
                 onClick={() => setPhase('form')}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-[#6b7280] hover:bg-[#f3f4f6]"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--studio-text-muted)] hover:bg-[#f3f4f6]"
               >
                 {t('← Edit answers')}
               </button>
@@ -509,7 +509,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
                 {t('↻ Regenerate')}
               </button>
               {providerUsed && (
-                <span className="text-[11px] text-[#9ca3af]">{t('via')} {providerUsed}</span>
+                <span className="text-[11px] text-[var(--studio-text-faint)]">{t('via')} {providerUsed}</span>
               )}
             </div>
             <div className="flex items-center gap-2">

@@ -104,7 +104,7 @@ function PageThumbnail({ boxW = 208, boxH = 132 }) {
   if (!components.length) {
     return (
       <div
-        className="flex items-center justify-center text-[10px] text-[#9ca3af]"
+        className="flex items-center justify-center text-[10px] text-[var(--studio-text-faint)]"
         style={{ width: boxW, height: boxH }}
       >
         {t('This page is empty')}
@@ -141,7 +141,7 @@ function findComponent(components, id) {
 function PreviewTile({ label, reveal, children }) {
   return (
     <div className="min-w-0 flex-1">
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[#9ca3af]">{label}</div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--studio-text-faint)]">{label}</div>
       <div className="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white" style={{ height: 140 }}>
         <MotionLoop reveal={reveal} durationMs={650} style={{ height: '100%' }}>
           {children}
@@ -231,7 +231,7 @@ export default function AnimationPanel({ html = null }) {
       <style ref={styleRef}>{DEMO_CSS}{MOTION_CSS}</style>
 
       <div>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--studio-text-muted)]">
           {t('Entrance (on scroll)')}
         </h2>
         <div className="grid grid-cols-2 gap-1.5">
@@ -285,7 +285,7 @@ export default function AnimationPanel({ html = null }) {
           >
             {motion.animIn === picked ? t('In use') : t('Use this animation')}
           </button>
-          <p className="mt-1.5 text-[11px] leading-snug text-[#9ca3af]">
+          <p className="mt-1.5 text-[11px] leading-snug text-[var(--studio-text-faint)]">
             {pinned
               ? t('A pinned bar cannot animate.')
               : !selectedId
@@ -294,13 +294,13 @@ export default function AnimationPanel({ html = null }) {
           </p>
         </div>
       ) : (
-        <p className="rounded-lg border border-dashed border-[#e5e7eb] px-3 py-4 text-center text-[11px] text-[#9ca3af]">
+        <p className="rounded-lg border border-dashed border-[#e5e7eb] px-3 py-4 text-center text-[11px] text-[var(--studio-text-faint)]">
           {t('Pick an animation to preview it.')}
         </p>
       )}
 
       <div>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--studio-text-muted)]">
           {t('Hover effect')}
         </h2>
         <div className="grid grid-cols-3 gap-2">
@@ -327,7 +327,7 @@ export default function AnimationPanel({ html = null }) {
             </button>
           ))}
         </div>
-        <p className="mt-1.5 text-[11px] leading-snug text-[#9ca3af]">
+        <p className="mt-1.5 text-[11px] leading-snug text-[var(--studio-text-faint)]">
           {t('Hover a swatch to preview; click to apply or remove.')}
         </p>
       </div>
@@ -344,7 +344,7 @@ export default function AnimationPanel({ html = null }) {
           >
             {t('Remove animation')}
           </button>
-          <p className="mt-1.5 text-[11px] leading-snug text-[#9ca3af]">
+          <p className="mt-1.5 text-[11px] leading-snug text-[var(--studio-text-faint)]">
             {motion.animIn !== 'none' && motion.animHover !== 'none'
               ? t('Clears both the entrance and the hover effect on this element.')
               : motion.animIn !== 'none'

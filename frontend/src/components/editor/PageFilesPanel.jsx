@@ -87,7 +87,7 @@ export default function PageFilesPanel({
         } ${active ? 'bg-[#eef2ff]' : 'hover:bg-[#f3f4f6]'}`}
       >
         {active && <span className="absolute bottom-1 left-0 top-1 w-0.5 rounded-full bg-[#4f46e5]" />}
-        <span className="shrink-0 text-[#6b7280]">
+        <span className="shrink-0 text-[var(--studio-text-muted)]">
           {hasHtml ? <FileCodeIcon size={14} /> : <FileIcon size={14} />}
         </span>
         {editingId === page.id ? (
@@ -131,7 +131,7 @@ export default function PageFilesPanel({
           </button>
         )}
         {mode === 'html' && !(htmlMap[page.id] || '').trim() && (
-          <span className="shrink-0 rounded bg-[#f3f4f6] px-1 text-[9px] font-bold uppercase text-[#9ca3af]">
+          <span className="shrink-0 rounded bg-[#f3f4f6] px-1 text-[9px] font-bold uppercase text-[var(--studio-text-faint)]">
             {t('empty')}
           </span>
         )}
@@ -146,7 +146,7 @@ export default function PageFilesPanel({
               setEditingId(page.id)
               setDraft(page.name || '')
             }}
-            className="rounded px-1 text-xs text-[#9ca3af] hover:bg-white hover:text-[#374151]"
+            className="rounded px-1 text-xs text-[var(--studio-text-faint)] hover:bg-white hover:text-[#374151]"
           >
             ✎
           </button>
@@ -159,7 +159,7 @@ export default function PageFilesPanel({
                 importTarget.current = page.id
                 importRef.current?.click()
               }}
-              className="rounded px-1 text-xs text-[#9ca3af] hover:bg-white hover:text-[#374151]"
+              className="rounded px-1 text-xs text-[var(--studio-text-faint)] hover:bg-white hover:text-[#374151]"
             >
               ⬆
             </button>
@@ -177,7 +177,7 @@ export default function PageFilesPanel({
                   : t('Delete "{name}" ({file})?', { name: page.name, file: fname })
                 if (window.confirm(question)) deletePage(page.id)
               }}
-              className="rounded px-1 text-xs text-[#9ca3af] hover:bg-white hover:text-red-600"
+              className="rounded px-1 text-xs text-[var(--studio-text-faint)] hover:bg-white hover:text-red-600"
             >
               ✕
             </button>
@@ -195,7 +195,7 @@ export default function PageFilesPanel({
         </div>
       )}
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[#6b7280]">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--studio-text-muted)]">
           {t('Explorer')}
         </h2>
         <span className="flex gap-0.5">
@@ -244,10 +244,10 @@ export default function PageFilesPanel({
                 aria-expanded={!isCollapsed}
                 className="flex w-full items-center gap-1.5 rounded-md py-1 pl-1 pr-2 text-left text-[12.5px] font-semibold text-[#374151] hover:bg-[#f3f4f6]"
               >
-                <span className="w-3 text-[10px] text-[#9ca3af]">{isCollapsed ? '▸' : '▾'}</span>
-                <FolderIcon size={14} className="text-[#6b7280]" />
+                <span className="w-3 text-[10px] text-[var(--studio-text-faint)]">{isCollapsed ? '▸' : '▾'}</span>
+                <FolderIcon size={14} className="text-[var(--studio-text-muted)]" />
                 <span className="min-w-0 truncate">{folder}</span>
-                <span className="ml-auto text-[10px] font-normal text-[#9ca3af]">{items.length}</span>
+                <span className="ml-auto text-[10px] font-normal text-[var(--studio-text-faint)]">{items.length}</span>
               </button>
               {!isCollapsed && items.map((p) => renderFile(p, true))}
             </div>
@@ -255,7 +255,7 @@ export default function PageFilesPanel({
         })}
       </div>
 
-      <p className="mt-4 text-xs leading-relaxed text-[#9ca3af]">
+      <p className="mt-4 text-xs leading-relaxed text-[var(--studio-text-faint)]">
         {mode === 'html'
           ? t('Each page is its own HTML file — the first one publishes as the home page. Click the open file again to view its source code.')
           : t('Pages of your design. Click the open page again to toggle the code panel.')}
@@ -271,7 +271,7 @@ export default function PageFilesPanel({
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-bold text-[#111827]">{t('How should this page start?')}</h3>
-            <p className="mt-1 text-sm text-[#6b7280]">
+            <p className="mt-1 text-sm text-[var(--studio-text-muted)]">
               {t('Each page can use a different mode. You can switch a page later from its toolbar.')}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-3">
@@ -282,7 +282,7 @@ export default function PageFilesPanel({
               >
                 <LayersIcon size={20} className="text-[#4f46e5]" />
                 <span className="text-sm font-semibold text-[#111827]">{t('Empty canvas')}</span>
-                <span className="text-[11px] leading-snug text-[#6b7280]">
+                <span className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
                   {t('Drag-and-drop components on a blank canvas.')}
                 </span>
               </button>
@@ -293,7 +293,7 @@ export default function PageFilesPanel({
               >
                 <FileCodeIcon size={20} className="text-[#4f46e5]" />
                 <span className="text-sm font-semibold text-[#111827]">{t('HTML page')}</span>
-                <span className="text-[11px] leading-snug text-[#6b7280]">
+                <span className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
                   {t('Upload, paste, or author a full HTML document.')}
                 </span>
               </button>

@@ -33,7 +33,7 @@ function TreeNode({ node, depth, activePath, dirty, onOpen, collapsed, toggle })
           active ? 'bg-[#eef2ff]' : 'hover:bg-[#f3f4f6]'
         }`}
       >
-        <span className="shrink-0 text-[#6b7280]">
+        <span className="shrink-0 text-[var(--studio-text-muted)]">
           <KindIcon kind={node.kind} />
         </span>
         <span
@@ -80,8 +80,8 @@ function TreeNode({ node, depth, activePath, dirty, onOpen, collapsed, toggle })
         style={{ paddingLeft: 8 + depth * 14 }}
         className="flex w-full items-center gap-1 rounded-md py-1 pr-2 text-left text-[12.5px] font-semibold text-[#374151] hover:bg-[#f3f4f6]"
       >
-        <span className="w-3 text-[10px] text-[#9ca3af]">{isCollapsed ? '▸' : '▾'}</span>
-        <FolderIcon size={14} className="text-[#6b7280]" />
+        <span className="w-3 text-[10px] text-[var(--studio-text-faint)]">{isCollapsed ? '▸' : '▾'}</span>
+        <FolderIcon size={14} className="text-[var(--studio-text-muted)]" />
         <span className={`min-w-0 truncate ${folderDirty ? 'text-[#15803d]' : ''}`}>{node.name}</span>
       </button>
       {!isCollapsed &&
@@ -141,7 +141,7 @@ export default function ProjectFilesPanel() {
 
       {linked.length > 0 && (
         <div className="mb-3 rounded-lg border border-[#e5e7eb] bg-white p-1.5">
-          <div className="flex items-center gap-1 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[#9ca3af]">
+          <div className="flex items-center gap-1 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--studio-text-faint)]">
             <LinkIcon size={11} /> {t('Linked by this page')}
           </div>
           {linked.map((path) => {
@@ -158,7 +158,7 @@ export default function ProjectFilesPanel() {
                   active ? 'bg-[#eef2ff]' : 'hover:bg-[#f3f4f6]'
                 }`}
               >
-                <span className="shrink-0 text-[#6b7280]">
+                <span className="shrink-0 text-[var(--studio-text-muted)]">
                   <KindIcon kind={f?.kind} />
                 </span>
                 <span
@@ -186,7 +186,7 @@ export default function ProjectFilesPanel() {
           toggle={toggle}
         />
       </div>
-      <p className="mt-4 text-xs leading-relaxed text-[#9ca3af]">
+      <p className="mt-4 text-xs leading-relaxed text-[var(--studio-text-faint)]">
         {t('Only web files (HTML / CSS / JS + images) are shown. Edited files turn')}
         <span className="font-semibold text-[#15803d]"> {t('green')}</span> {t('until you save them to disk.')}
       </p>

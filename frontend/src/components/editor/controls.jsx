@@ -113,7 +113,7 @@ export function LabeledImage({ label, value, onChange }) {
           <button
             type="button"
             onClick={() => onChange('')}
-            className="rounded-lg px-2 py-1 text-xs text-[#6b7280] hover:bg-[#f3f4f6]"
+            className="rounded-lg px-2 py-1 text-xs text-[var(--studio-text-muted)] hover:bg-[#f3f4f6]"
           >
             {t('Clear')}
           </button>
@@ -143,7 +143,7 @@ export function LabeledImage({ label, value, onChange }) {
         className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-3 py-4 text-center text-xs transition ${
           dragOver
             ? 'border-[#4f46e5] bg-[#eef2ff] text-[#4f46e5]'
-            : 'border-[#d1d5db] bg-[#f9fafb] text-[#6b7280] hover:border-[#d1d5db]'
+            : 'border-[#d1d5db] bg-[#f9fafb] text-[var(--studio-text-muted)] hover:border-[#d1d5db]'
         }`}
       >
         {busy
@@ -165,7 +165,7 @@ export function LabeledImage({ label, value, onChange }) {
         <button
           type="button"
           onClick={() => setShowUrl((s) => !s)}
-          className="rounded-lg px-2 py-1 text-xs font-medium text-[#6b7280] hover:bg-[#f3f4f6]"
+          className="rounded-lg px-2 py-1 text-xs font-medium text-[var(--studio-text-muted)] hover:bg-[#f3f4f6]"
         >
           {showUrl ? t('Hide URL') : t('Paste URL')}
         </button>
@@ -187,7 +187,7 @@ export function LabeledImage({ label, value, onChange }) {
 
       {/* Built-in presets */}
       <div className="mt-2">
-        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#6b7280]">
+        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--studio-text-muted)]">
           {t('Quick presets')}
         </span>
         <div className="grid grid-cols-4 gap-1.5">
@@ -246,11 +246,11 @@ function ImageLibrary({ value, onPick }) {
   }
 
   if (images === null) {
-    return <p className="mt-1.5 text-xs text-[#6b7280]">{t('Loading library…')}</p>
+    return <p className="mt-1.5 text-xs text-[var(--studio-text-muted)]">{t('Loading library…')}</p>
   }
   if (images.length === 0) {
     return (
-      <p className="mt-1.5 text-xs text-[#6b7280]">
+      <p className="mt-1.5 text-xs text-[var(--studio-text-muted)]">
         {err || t('No uploads yet — drop an image above to start your library.')}
       </p>
     )
@@ -422,7 +422,7 @@ export function LabeledPx({ label, value, onChange }) {
             onChange(e.target.value === '' ? '' : `${e.target.value}${unit}`)
           }
         />
-        <span className="text-xs text-[#6b7280]">{unit}</span>
+        <span className="text-xs text-[var(--studio-text-muted)]">{unit}</span>
       </div>
     </label>
   )
@@ -474,7 +474,7 @@ export function LabeledRange({ label, value, onChange, min = 0, max = 1, step = 
           onChange={(e) => onChange(e.target.value)}
           className="flex-1 accent-[#4f46e5]"
         />
-        <span className="w-8 text-right text-xs text-[#6b7280]">{v}</span>
+        <span className="w-8 text-right text-xs text-[var(--studio-text-muted)]">{v}</span>
       </div>
     </label>
   )
@@ -490,7 +490,7 @@ export function LabeledCheckbox({ label, checked, onChange, hint }) {
         onChange={(e) => onChange(e.target.checked)}
       />
       <span className="text-sm text-[#374151]">{label}</span>
-      {hint && <span className="text-xs text-[#6b7280]">{hint}</span>}
+      {hint && <span className="text-xs text-[var(--studio-text-muted)]">{hint}</span>}
     </label>
   )
 }
@@ -563,7 +563,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
                   type="button"
                   onClick={() => onActiveChange && onActiveChange(tab.id)}
                   className={`text-xs font-semibold ${
-                    sel ? 'text-[#4f46e5]' : 'text-[#6b7280] hover:text-[#4f46e5]'
+                    sel ? 'text-[#4f46e5]' : 'text-[var(--studio-text-muted)] hover:text-[#4f46e5]'
                   }`}
                   title={t('Show this tab on the canvas')}
                 >
@@ -574,7 +574,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
                     type="button"
                     onClick={() => move(tab.id, -1)}
                     disabled={i === 0}
-                    className="rounded-lg px-1 text-xs text-[#6b7280] hover:bg-[#f3f4f6] disabled:opacity-30"
+                    className="rounded-lg px-1 text-xs text-[var(--studio-text-muted)] hover:bg-[#f3f4f6] disabled:opacity-30"
                     title={t('Move up')}
                     aria-label={t('Move up')}
                   >
@@ -584,7 +584,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
                     type="button"
                     onClick={() => move(tab.id, 1)}
                     disabled={i === tabs.length - 1}
-                    className="rounded-lg px-1 text-xs text-[#6b7280] hover:bg-[#f3f4f6] disabled:opacity-30"
+                    className="rounded-lg px-1 text-xs text-[var(--studio-text-muted)] hover:bg-[#f3f4f6] disabled:opacity-30"
                     title={t('Move down')}
                     aria-label={t('Move down')}
                   >
@@ -613,7 +613,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
         <button
           type="button"
           onClick={add}
-          className="w-full rounded-lg border border-dashed border-[#d1d5db] py-1 text-xs text-[#6b7280] hover:border-[#4f46e5] hover:text-[#4f46e5]"
+          className="w-full rounded-lg border border-dashed border-[#d1d5db] py-1 text-xs text-[var(--studio-text-muted)] hover:border-[#4f46e5] hover:text-[#4f46e5]"
         >
           {t('+ Add tab')}
         </button>
@@ -760,7 +760,7 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
         />
       )}
       {kind === 'top' && (
-        <p className="text-xs text-[#9ca3af]">{t('Clicking scrolls to the top of the page.')}</p>
+        <p className="text-xs text-[var(--studio-text-faint)]">{t('Clicking scrolls to the top of the page.')}</p>
       )}
     </label>
   )
@@ -782,7 +782,7 @@ export function LinksEditor({ label, value, onChange, pages = [], sections = nul
         {links.map((link, i) => (
           <div key={i} className="rounded-lg border border-[#e5e7eb] p-2">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs text-[#6b7280]">{t('Link')} {i + 1}</span>
+              <span className="text-xs text-[var(--studio-text-muted)]">{t('Link')} {i + 1}</span>
               <button
                 type="button"
                 onClick={() => remove(i)}
@@ -810,7 +810,7 @@ export function LinksEditor({ label, value, onChange, pages = [], sections = nul
         <button
           type="button"
           onClick={add}
-          className="w-full rounded-lg border border-dashed border-[#d1d5db] py-1 text-xs text-[#6b7280] hover:border-[#4f46e5] hover:text-[#4f46e5]"
+          className="w-full rounded-lg border border-dashed border-[#d1d5db] py-1 text-xs text-[var(--studio-text-muted)] hover:border-[#4f46e5] hover:text-[#4f46e5]"
         >
           {t('+ Add link')}
         </button>
@@ -829,14 +829,14 @@ export function HtmlContentControl({ label, value, onChange, pages = [] }) {
     <div>
       <span className={labelCls}>{label}</span>
       {!hasFields ? (
-        <p className="rounded-lg border border-dashed border-[#d1d5db] bg-white p-2 text-xs leading-relaxed text-[#6b7280]">
+        <p className="rounded-lg border border-dashed border-[#d1d5db] bg-white p-2 text-xs leading-relaxed text-[var(--studio-text-muted)]">
           {t('No simple text or links found. Use the HTML / CSS / JS editor below.')}
         </p>
       ) : (
         <div className="space-y-3">
           {fields.texts.length > 0 && (
             <div className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af]">{t('Text')}</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--studio-text-faint)]">{t('Text')}</div>
               {fields.texts.map((field) => (
                 <LabeledTextarea
                   key={`text-${field.path}`}
@@ -847,7 +847,7 @@ export function HtmlContentControl({ label, value, onChange, pages = [] }) {
                 />
               ))}
               {fields.textOverflow > 0 && (
-                <p className="text-[11px] text-[#9ca3af]">
+                <p className="text-[11px] text-[var(--studio-text-faint)]">
                   {t('{count} more text fields are available in the code editor.', { count: fields.textOverflow })}
                 </p>
               )}
@@ -855,7 +855,7 @@ export function HtmlContentControl({ label, value, onChange, pages = [] }) {
           )}
           {fields.links.length > 0 && (
             <div className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af]">{t('Links')}</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--studio-text-faint)]">{t('Links')}</div>
               {fields.links.map((field) => (
                 <LinkTargetControl
                   key={`link-${field.path}`}
@@ -866,7 +866,7 @@ export function HtmlContentControl({ label, value, onChange, pages = [] }) {
                 />
               ))}
               {fields.linkOverflow > 0 && (
-                <p className="text-[11px] text-[#9ca3af]">
+                <p className="text-[11px] text-[var(--studio-text-faint)]">
                   {t('{count} more links are available in the code editor.', { count: fields.linkOverflow })}
                 </p>
               )}
