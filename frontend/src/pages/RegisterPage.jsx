@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { register, googleLogin, upgradeGuest } from '../api/auth.js'
 import { useAuthStore, useIsGuest } from '../store/authStore.js'
@@ -21,6 +21,10 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [captcha, setCaptcha] = useState('')
   const [error, setError] = useState('')
+  // Which field the server refused ("this username is taken"): marked, said
+  // with the field, and where the cursor goes, so the fix is one step away.
+  const [errorField, setErrorField] = useState('')
+  const fieldRefs = { username: useRef(null), email: useRef(null), password: useRef(null) }
   const [loading, setLoading] = useState(false)
   // Matches the sign-in form: unchecked keeps the session in
   // sessionStorage so it ends with the tab.
@@ -49,6 +53,7 @@ export default function RegisterPage() {
       return
     }
     setError('')
+    setErrorField('')
     setLoading(true)
     try {
       const { token, user } = upgrading
@@ -61,6 +66,9 @@ export default function RegisterPage() {
       navigate('/', moved ? { state: { guestWorkMoved: moved } } : undefined)
     } catch (err) {
       setError(apiError(err, t('Registration failed.')))
+      const field = ['username', 'email', 'password'].find((key) => err?.response?.data?.[key])
+      setErrorField(field || '')
+      if (field) fieldRefs[field].current?.focus()
     } finally {
       setLoading(false)
     }
@@ -95,7 +103,7 @@ export default function RegisterPage() {
       )}
     >
       {error && (
-        <div role="alert" className="studio-status-danger rounded-lg border px-3 py-2 text-sm">
+        <div id="register-error" role="alert" className="studio-status-danger rounded-lg border px-3 py-2 text-sm">
           {error}
         </div>
       )}
@@ -105,8 +113,11 @@ export default function RegisterPage() {
         {/* Folded as it is typed, not silently on the server: the name in the
             field is the name the account will have. */}
         <input
+          ref={fieldRefs.username}
           className="ms-input"
           value={username}
+          aria-invalid={errorField === 'username' || undefined}
+          aria-describedby={errorField === 'username' ? 'register-error' : undefined}
           onChange={(e) => setUsername(e.target.value.toLowerCase())}
           autoComplete="username"
           spellCheck="false"
@@ -118,9 +129,12 @@ export default function RegisterPage() {
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium text-[var(--studio-text-muted)]">{t('Email')}</span>
         <input
+          ref={fieldRefs.email}
           type="email"
           className="ms-input"
           value={email}
+          aria-invalid={errorField === 'email' || undefined}
+          aria-describedby={errorField === 'email' ? 'register-error' : undefined}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
           required
@@ -130,8 +144,10 @@ export default function RegisterPage() {
       <div className="block">
         <label htmlFor="register-password" className="mb-1.5 block text-sm font-medium text-[var(--studio-text-muted)]">{t('Password')}</label>
         <input
+          ref={fieldRefs.password}
           id="register-password"
-          aria-describedby="register-password-hint"
+          aria-describedby={errorField === 'password' ? 'register-error register-password-hint' : 'register-password-hint'}
+          aria-invalid={errorField === 'password' || undefined}
           type="password"
           className="ms-input"
           value={password}

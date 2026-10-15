@@ -76,3 +76,23 @@ describe('registering', () => {
     expect(useAuthStore.getState().token).toBe('real-token')
   })
 })
+
+// "This username is already taken" used to sit above the form with nothing
+// pointing at the field it was about.
+describe('a refused sign-up', () => {
+  it('marks the field the server refused and puts the cursor there', async () => {
+    register.mockRejectedValue({
+      response: { status: 400, data: { code: 'validation_error', username: ['This username is already taken.'], error_codes: { username: ['unique'] } } },
+    })
+    renderPage()
+    fill()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('This username is already taken.')
+    const field = screen.getByLabelText(/Username/i)
+    expect(field).toHaveAttribute('aria-invalid', 'true')
+    expect(field).toHaveAccessibleDescription('This username is already taken.')
+    expect(field).toHaveFocus()
+    expect(screen.getByLabelText(/Email/i)).not.toHaveAttribute('aria-invalid')
+  })
+})
