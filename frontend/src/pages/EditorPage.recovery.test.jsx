@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 
 const { getSite, updateSite } = vi.hoisted(() => ({ getSite: vi.fn(), updateSite: vi.fn() }))
@@ -63,7 +63,10 @@ describe('session expiry recovery', () => {
       } }).catch(() => {})
     })
     expect(useAuthStore.getState().token).toBe('guest-token')
-    expect(screen.getByText(/guest session expired/)).toBeInTheDocument()
+    // Said as an alert, with the download it asks for right beside it.
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent(/guest session expired/)
+    expect(within(alert).getByRole('button', { name: 'Export project (.json)' })).toBeInTheDocument()
     expect(JSON.stringify(readEditorRecovery(7, 1).schema)).toContain('Guest work')
   }, 30000)
 
