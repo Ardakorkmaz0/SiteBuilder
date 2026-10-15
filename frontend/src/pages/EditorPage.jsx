@@ -2126,6 +2126,8 @@ function SiteEditor() {
           to="/"
           onClick={(event) => { event.preventDefault(); requestLeave(() => navigate('/')) }}
           title={t('Sitebuilder home')}
+          // Its face is the letter S; that is all a screen reader would say.
+          aria-label={t('Sitebuilder home')}
           className="brand-mark shrink-0"
           style={{ width: '1.75rem', height: '1.75rem', fontSize: '0.78rem', borderRadius: '8px', boxShadow: 'none' }}
         >S</Link>
