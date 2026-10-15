@@ -164,7 +164,10 @@ describe('Sidebar from the keyboard', () => {
     const user = userEvent.setup()
     const calls = []
     renderSidebar({ onArmPlacement: (data, options) => calls.push([data, options]) })
-    await user.click(screen.getByRole('button', { name: /^■Button\d+▸$/ }))
+    const category = screen.getByRole('button', { name: /^■Button\d+▸$/ })
+    expect(category).toHaveAttribute('aria-expanded', 'false')
+    await user.click(category)
+    expect(screen.getByRole('button', { name: /^■Button\d+▾$/ })).toHaveAttribute('aria-expanded', 'true')
     const swatch = screen.getAllByRole('button', { name: /: Enter adds it at the end of the page$/ })[0]
 
     fireEvent.keyDown(swatch, { key: 'Enter' })
