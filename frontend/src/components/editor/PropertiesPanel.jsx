@@ -63,7 +63,7 @@ function SnippetPicker({ groups, list, onPick }) {
   const { t } = useLanguage()
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-semibold text-[#6b7280]">
+      <span className="mb-1 block text-xs font-semibold text-[var(--studio-text-muted)]">
         {t('Insert snippet (optional)')}
       </span>
       <select
@@ -383,7 +383,7 @@ function asOneStep(run) {
 
 function SectionTitle({ children }) {
   return (
-    <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6b7280]">
+    <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--studio-text-muted)]">
       {children}
     </h3>
   )
@@ -790,7 +790,7 @@ export default function PropertiesPanel({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="truncate text-sm font-semibold text-[#111827]">{t('Selection')}</h2>
-              <p className="truncate text-xs text-[#6b7280]">{t('{count} items selected', { count: selectedLayoutItems.length })}</p>
+              <p className="truncate text-xs text-[var(--studio-text-muted)]">{t('{count} items selected', { count: selectedLayoutItems.length })}</p>
             </div>
           </div>
         </div>
@@ -805,7 +805,7 @@ export default function PropertiesPanel({
           <section className="space-y-3">
             <SectionTitle>
               {t('Size')}
-              <span className="ml-1 font-normal normal-case text-[#9ca3af]">
+              <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">
                 ({t(isFlow ? 'all screens' : isMobile ? 'mobile' : 'PC')})
               </span>
             </SectionTitle>
@@ -833,12 +833,12 @@ export default function PropertiesPanel({
             <section className="space-y-2">
               <SectionTitle>
                 {t('Align & Distribute')}
-                <span className="ml-1 font-normal normal-case text-[#9ca3af]">
+                <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">
                   ({t('{count} selected', { count: selectedLayoutItems.length })})
                 </span>
               </SectionTitle>
               {extendedMode && (
-                <p className="text-[11px] leading-snug text-[#9ca3af]">
+                <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
                   {t('Aligns the selected items to each other.')}
                 </p>
               )}
@@ -893,7 +893,7 @@ export default function PropertiesPanel({
       <div className="studio-properties-panel flex h-full min-w-0 flex-col overflow-hidden">
         <div className="border-b border-[#e5e7eb] px-4 py-3">
           <h2 className="text-sm font-semibold text-[#111827]">{t('Page')}</h2>
-          <p className="text-xs text-[#6b7280]">
+          <p className="text-xs text-[var(--studio-text-muted)]">
             {isFlow
               ? t('HTML flow layout - nothing selected')
               : t(isMobile ? 'Mobile layout - nothing selected' : 'PC layout - nothing selected')}
@@ -1012,7 +1012,7 @@ export default function PropertiesPanel({
             onChange={(v) => writePageMeta({ seoTitle: v })}
             placeholder={page.name}
           />
-          <p className="text-[11px] leading-snug text-[#9ca3af]">
+          <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
             {t('{count}/60 characters', { count: (pageSetting('seoTitle') || page.name || '').length })}
           </p>
           <LabeledTextarea
@@ -1022,7 +1022,7 @@ export default function PropertiesPanel({
             rows={3}
             placeholder={t('One or two sentences describing this page.')}
           />
-          <p className="text-[11px] leading-snug text-[#9ca3af]">
+          <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
             {t('{count}/160 characters — search engines cut off longer descriptions.', {
               count: (pageSetting('seoDescription') || '').length,
             })}
@@ -1032,7 +1032,7 @@ export default function PropertiesPanel({
             value={page.seoImage || ''}
             onChange={(v) => setPageMeta(page.id, { seoImage: v })}
           />
-          <p className="text-[11px] leading-snug text-[#9ca3af]">
+          <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
             {t('Shown when the page is shared on social apps. 1200x630 works best.')}
           </p>
           <div
@@ -1050,7 +1050,7 @@ export default function PropertiesPanel({
             </p>
           </div>
         </PanelGroup>
-          <p className="text-xs leading-relaxed text-[#6b7280]">
+          <p className="text-xs leading-relaxed text-[var(--studio-text-muted)]">
             {isFlow
               ? t('Flow mode uses one document order that adapts across PC and mobile.')
               : isMobile
@@ -1067,7 +1067,7 @@ export default function PropertiesPanel({
           title={
             <>
               {t('Theme')}
-              <span className="ml-1 font-normal normal-case text-[#9ca3af]">({ownTheme ? t('this page') : t('whole site')})</span>
+              <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">({ownTheme ? t('this page') : t('whole site')})</span>
             </>
           }
           defaultOpen
@@ -1776,7 +1776,7 @@ export default function PropertiesPanel({
           title={
             <>
               {t(showPositionControls ? 'Position & Size' : 'Layout Size')}
-              <span className="ml-1 font-normal normal-case text-[#9ca3af]">
+              <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">
                 ({t(isFlow ? 'all screens' : isMobile ? 'mobile' : 'PC')})
               </span>
             </>
@@ -1891,7 +1891,7 @@ export default function PropertiesPanel({
                 ↓ {t('Move section down')}
               </button>
             </div>
-            <p className="text-[11px] leading-snug text-[#9ca3af]">
+            <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
               {t('Sections stay stacked; changing the height pushes the content below.')}
             </p>
           </PanelGroup>
@@ -1910,7 +1910,7 @@ export default function PropertiesPanel({
                 ['stretch', t('Stretch')],
               ]}
             />
-            <p className="text-[11px] leading-snug text-[#9ca3af]">
+            <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
               {t('Docking keeps this element attached to the chosen grid edge as the screen width changes.')}
             </p>
           </PanelGroup>
@@ -1926,13 +1926,13 @@ export default function PropertiesPanel({
               <>
                 {t('Align & Distribute')}
                 {selectedIds.length > 1 && (
-                  <span className="ml-1 font-normal normal-case text-[#9ca3af]">({t('{count} selected', { count: selectedIds.length })})</span>
+                  <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">({t('{count} selected', { count: selectedIds.length })})</span>
                 )}
               </>
             }
           >
             {extendedMode && (
-              <p className="text-[11px] leading-snug text-[#9ca3af]">
+              <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
                 {selectedIds.length > 1
                   ? t('Aligns the selected items to each other.')
                   : t('Aligns this item to the artboard. Shift-click on the canvas to select more.')}
@@ -2052,7 +2052,7 @@ export default function PropertiesPanel({
                 ['tilt', t('Tilt')],
               ]}
             />
-            <p className="text-[11px] leading-snug text-[#9ca3af]">
+            <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
               {t('Preview motion by switching to View.')}
             </p>
           </PanelGroup>
@@ -2104,7 +2104,7 @@ export default function PropertiesPanel({
                 />
               </div>
               {extendedMode && (
-                <p className="text-[11px] leading-snug text-[#9ca3af]">
+                <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
                   {t('Sticky keeps the item in the page flow until it reaches the edge. Fixed pins it to the browser viewport.')}
                 </p>
               )}
@@ -2234,7 +2234,7 @@ function MixedNumber({ label, value, mixed, onChange }) {
 
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-semibold text-[#6b7280]">{label}</span>
+      <span className="mb-1 block text-xs font-semibold text-[var(--studio-text-muted)]">{label}</span>
       <input
         key={`${label}-${mixed ? 'mixed' : displayValue}`}
         type="number"

@@ -89,13 +89,13 @@ function PalettePreviewPanel({ preview, onClose }) {
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[#4f46e5]">{t('Preview')}</div>
           <div className="truncate text-sm font-semibold text-[#111827]">{t(preview.label)}</div>
-          {preview.desc && <div className="truncate text-[11px] text-[#6b7280]">{t(preview.desc)}</div>}
+          {preview.desc && <div className="truncate text-[11px] text-[var(--studio-text-muted)]">{t(preview.desc)}</div>}
         </div>
         <button
           type="button"
           onClick={onClose}
           title={t('Close preview')}
-          className="rounded-md px-1.5 py-0.5 text-xs font-semibold text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#374151]"
+          className="rounded-md px-1.5 py-0.5 text-xs font-semibold text-[var(--studio-text-faint)] hover:bg-[#f3f4f6] hover:text-[#374151]"
         >
           x
         </button>
@@ -147,7 +147,7 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
   const preview = (
     <>
       <HtmlPreview html={html} wide={wide} />
-      <div className="mt-1 min-h-6 break-words text-center text-[10px] leading-3 text-[#6b7280]">{variantLabel}</div>
+      <div className="mt-1 min-h-6 break-words text-center text-[10px] leading-3 text-[var(--studio-text-muted)]">{variantLabel}</div>
       {variant.recommended && (
         <div
           title={t('Recommended component')}
@@ -248,8 +248,8 @@ function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle }) {
           {item.icon}
         </span>
         <span className="min-w-0 flex-1 truncate text-left font-medium text-[#374151]">{t(item.label)}</span>
-        {variants.length > 0 && <span className="text-[11px] text-[#9ca3af]">{variants.length}</span>}
-        {variants.length > 0 && <span className="w-3 text-[10px] text-[#9ca3af]">{open ? '▾' : '▸'}</span>}
+        {variants.length > 0 && <span className="text-[11px] text-[var(--studio-text-faint)]">{variants.length}</span>}
+        {variants.length > 0 && <span className="w-3 text-[10px] text-[var(--studio-text-faint)]">{open ? '▾' : '▸'}</span>}
       </button>
       {open && variants.length > 0 && (
         <div className="grid grid-cols-2 gap-2 border-t border-[#f1f1f4] bg-[#fafafa] p-2">
@@ -283,7 +283,7 @@ function BlockCard({ block, onPick, onArm, onInspect, theme }) {
     <>
       <BlockThumb block={block} theme={theme} />
       <div className="mt-1.5 text-sm font-medium text-[#374151]">{block.label}</div>
-      <div className="truncate text-[11px] text-[#9ca3af]">{block.desc}</div>
+      <div className="truncate text-[11px] text-[var(--studio-text-faint)]">{block.desc}</div>
     </>
   )
   if (onPick) {
@@ -401,8 +401,8 @@ function CustomBlockPanel({ onPick, onArm, onInspect, theme }) {
           <CodeIcon size={15} />
         </span>
         <span className="flex-1 text-left font-medium text-[#374151]">{t('Custom HTML')}</span>
-        {saved.length > 0 && <span className="text-[11px] text-[#9ca3af]">{saved.length}</span>}
-        <span className="w-3 text-[10px] text-[#9ca3af]">{open ? '-' : '+'}</span>
+        {saved.length > 0 && <span className="text-[11px] text-[var(--studio-text-faint)]">{saved.length}</span>}
+        <span className="w-3 text-[10px] text-[var(--studio-text-faint)]">{open ? '-' : '+'}</span>
       </button>
       {open && (
         <div className="space-y-2 border-t border-[#f1f1f4] bg-[#fafafa] p-2">
@@ -440,7 +440,7 @@ function CustomBlockPanel({ onPick, onArm, onInspect, theme }) {
           </div>
           {saved.length > 0 && (
             <div className="pt-1">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af]">{t('Saved snippets')}</div>
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--studio-text-faint)]">{t('Saved snippets')}</div>
               <div className="grid grid-cols-2 gap-2">
                 {saved.map((block) => (
                   <div key={block.id} className="group relative">
@@ -610,7 +610,7 @@ export default function Sidebar({ onPickComponent, onArmPlacement, onCollapse, f
         {filesPanel ? (
           <RailTabs tab={tab} setTab={setTab} />
         ) : (
-          <span className="flex-1 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">
+          <span className="flex-1 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--studio-text-muted)]">
             {t('Components')}
           </span>
         )}
@@ -656,7 +656,7 @@ export default function Sidebar({ onPickComponent, onArmPlacement, onCollapse, f
               <LayersIcon size={15} /> {t('Browse all blocks')}
             </button>
             <CustomBlockPanel onPick={onPickComponent} onArm={onArmPlacement} onInspect={setPreview} theme={theme} />
-            <h2 className="mb-3 mt-5 text-xs font-semibold uppercase tracking-wide text-[#6b7280]">
+            <h2 className="mb-3 mt-5 text-xs font-semibold uppercase tracking-wide text-[var(--studio-text-muted)]">
               {t('Components')}
             </h2>
             <div className="space-y-2">
@@ -672,7 +672,7 @@ export default function Sidebar({ onPickComponent, onArmPlacement, onCollapse, f
                 />
               ))}
             </div>
-            <p className="mt-4 text-xs leading-relaxed text-[#6b7280]">
+            <p className="mt-4 text-xs leading-relaxed text-[var(--studio-text-muted)]">
               {onPickComponent
                 ? t('Click in the page or drag to place.')
                 : t('Click (or tap) to place, or drag onto the canvas.')}

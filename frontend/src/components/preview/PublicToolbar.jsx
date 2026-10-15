@@ -375,7 +375,7 @@ export default function PublicToolbar({
                 type="button"
                 onClick={() => setShowReport(false)}
                 aria-label={t('Close')}
-                className="rounded-md px-2 py-1 text-sm text-[#6b7280] hover:bg-[#f3f4f6]"
+                className="rounded-md px-2 py-1 text-sm text-[var(--studio-text-muted)] hover:bg-[#f3f4f6]"
               >
                 ×
               </button>
@@ -408,7 +408,7 @@ export default function PublicToolbar({
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-sm font-medium text-[#374151]">
-                    {t('Details')} <span className="font-normal text-[#9ca3af]">{t('(optional)')}</span>
+                    {t('Details')} <span className="font-normal text-[var(--studio-text-faint)]">{t('(optional)')}</span>
                   </span>
                   <textarea
                     className="ms-input min-h-[80px] resize-y"

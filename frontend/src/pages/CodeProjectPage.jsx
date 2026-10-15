@@ -34,7 +34,7 @@ function CollapsedRail({ side, label, onOpen }) {
       type="button"
       onClick={onOpen}
       title={t('Show {label}', { label: t(label) })}
-      className={`flex w-7 shrink-0 flex-col items-center gap-2 bg-white py-3 text-[#9ca3af] transition hover:bg-[#f3f4f6] hover:text-[#374151] ${
+      className={`flex w-7 shrink-0 flex-col items-center gap-2 bg-white py-3 text-[var(--studio-text-faint)] transition hover:bg-[#f3f4f6] hover:text-[#374151] ${
         side === 'left' ? 'border-r border-[#e5e7eb]' : 'border-l border-[#e5e7eb]'
       }`}
     >
@@ -55,7 +55,7 @@ function LivePane({ url, reloadKey, onReload, onOpenWindow }) {
     <div className="flex min-w-0 flex-1 flex-col border-l border-[#e5e7eb] bg-[#0b0b0b]">
       <div className="flex items-center gap-2 border-b border-[#e5e7eb] bg-white px-3 py-1.5">
         <span className="shrink-0 text-xs font-semibold text-[#374151]">● {t('Live')}</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-[#9ca3af]">{url}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-[var(--studio-text-faint)]">{url}</span>
         <button
           type="button"
           onClick={onReload}
@@ -358,10 +358,10 @@ export default function CodeProjectPage() {
         <div className="ms-card w-full max-w-md p-8 text-center">
           <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[#eef2ff] text-[#4f46e5]"><FolderOpenIcon size={24} /></div>
           <h1 className="text-lg font-bold text-[#111827]">{t('Open a local project')}</h1>
-          <p className="mt-1 text-sm text-[#6b7280]">
+          <p className="mt-1 text-sm text-[var(--studio-text-muted)]">
             {t('Pick a folder on your computer. Only its web files (HTML, CSS, JS, images) are shown — edit them and save the changes straight back to disk.')}
           </p>
-          <p className="mt-2 rounded-lg bg-[#f3f4f6] px-3 py-2 text-xs leading-relaxed text-[#6b7280]">
+          <p className="mt-2 rounded-lg bg-[#f3f4f6] px-3 py-2 text-xs leading-relaxed text-[var(--studio-text-muted)]">
             <strong className="text-[#374151]">{t('Best for static sites')}</strong>{' '}
             {t('(plain HTML/CSS/JS) — full visual View & Edit. For')}{' '}
             <strong className="text-[#374151]">React / Django</strong>{' '}
@@ -386,7 +386,7 @@ export default function CodeProjectPage() {
           )}
           {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
         </div>
-        <button type="button" onClick={guardedGoBack} className="text-sm text-[#6b7280] hover:text-[#111827]">
+        <button type="button" onClick={guardedGoBack} className="text-sm text-[var(--studio-text-muted)] hover:text-[#111827]">
           &larr; {t('Back')}
         </button>
       </div>
@@ -408,9 +408,9 @@ export default function CodeProjectPage() {
             className="brand-mark"
             style={{ width: '1.6rem', height: '1.6rem', fontSize: '0.8rem' }}
           >S</Link>
-          <button type="button" onClick={guardedGoBack} title={t('Go back')} className="px-1 text-sm font-medium text-[#6b7280] hover:text-[#111827]">&larr;</button>
+          <button type="button" onClick={guardedGoBack} title={t('Go back')} className="px-1 text-sm font-medium text-[var(--studio-text-muted)] hover:text-[#111827]">&larr;</button>
         </div>
-        <span className="flex shrink-0 items-center gap-1.5 truncate text-sm font-semibold text-[#111827]"><FolderOpenIcon size={15} className="text-[#6b7280]" /> {rootName}</span>
+        <span className="flex shrink-0 items-center gap-1.5 truncate text-sm font-semibold text-[#111827]"><FolderOpenIcon size={15} className="text-[var(--studio-text-muted)]" /> {rootName}</span>
         <span className="shrink-0 rounded-full bg-[var(--studio-control)] px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-[var(--studio-text-muted)]">
           {t('Code Project')}
         </span>
@@ -507,11 +507,11 @@ export default function CodeProjectPage() {
                       </div>
                     ))
                   ) : (
-                    <p className="p-1 text-xs text-[#6b7280]">
+                    <p className="p-1 text-xs text-[var(--studio-text-muted)]">
                       {t('No dev server detected — looks like a static site. Just open an HTML file in View.')}
                     </p>
                   )}
-                  <p className="mt-1 px-1 text-[10px] leading-snug text-[#9ca3af]">
+                  <p className="mt-1 px-1 text-[10px] leading-snug text-[var(--studio-text-faint)]">
                     {t('A browser can’t start it for you — run the command in your terminal. The ● dot turns green once it’s up, then the ● Live tab works.')}
                   </p>
                 </div>
@@ -628,7 +628,7 @@ export default function CodeProjectPage() {
 
         <div className="flex min-w-0 flex-1 flex-col">
           {!activeFile ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-[#9ca3af]">
+            <div className="flex flex-1 items-center justify-center text-sm text-[var(--studio-text-faint)]">
               {t('Select a file from the explorer to open it.')}
             </div>
           ) : isHtml ? (
@@ -669,7 +669,7 @@ export default function CodeProjectPage() {
           (rightOpen ? (
             <div className="flex w-72 shrink-0 flex-col border-l border-gray-200 bg-white">
               <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[#6b7280]">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--studio-text-muted)]">
                   {htmlSelection ? t('Element') : t('Properties')}
                 </span>
                 <button
@@ -677,7 +677,7 @@ export default function CodeProjectPage() {
                   onClick={() => setRightOpen(false)}
                   title={t('Hide panel')}
                   aria-label={t('Hide panel')}
-                  className="rounded-md px-1.5 py-0.5 text-xs text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#374151]"
+                  className="rounded-md px-1.5 py-0.5 text-xs text-[var(--studio-text-faint)] hover:bg-[#f3f4f6] hover:text-[#374151]"
                 >
                   »
                 </button>
@@ -690,7 +690,7 @@ export default function CodeProjectPage() {
                         edit the real CSS instead of inline-styling the template. */}
                     {matchedCss.length > 0 && (
                       <div className="max-h-40 shrink-0 overflow-y-auto border-b border-[#e5e7eb] bg-[#f9fafb] p-3">
-                        <div className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[#9ca3af]">
+                        <div className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--studio-text-faint)]">
                           <PaletteIcon size={11} /> {t('Styled by — open the CSS rule')}
                         </div>
                         <div className="space-y-1">
@@ -703,7 +703,7 @@ export default function CodeProjectPage() {
                               className="flex w-full items-center justify-between gap-2 rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-left hover:border-[#4f46e5] hover:bg-[#eef2ff]"
                             >
                               <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-[#4f46e5]">{r.selector}</span>
-                              <span className="shrink-0 truncate font-mono text-[10px] text-[#9ca3af]">{r.path.split('/').pop()}</span>
+                              <span className="shrink-0 truncate font-mono text-[10px] text-[var(--studio-text-faint)]">{r.path.split('/').pop()}</span>
                             </button>
                           ))}
                         </div>
@@ -724,8 +724,8 @@ export default function CodeProjectPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="p-4 text-sm leading-relaxed text-[#9ca3af]">
-                    {t('Switch to')} <span className="font-semibold text-[#6b7280]">{t('Edit')}</span>{' '}
+                  <p className="p-4 text-sm leading-relaxed text-[var(--studio-text-faint)]">
+                    {t('Switch to')} <span className="font-semibold text-[var(--studio-text-muted)]">{t('Edit')}</span>{' '}
                     {t('and click any element in the page to change its text, link, colors, border, spacing and layout here. Or drag a component from the left onto the page.')}
                   </p>
                 )}
