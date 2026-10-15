@@ -50,7 +50,10 @@ describe('a save made from an older revision', () => {
       <UiThemeProvider>
         <LanguageProvider>
           <MemoryRouter initialEntries={['/editor/1']}>
-            <Routes><Route path="/editor/:id" element={<EditorPage />} /></Routes>
+            <Routes>
+              <Route path="/editor/:id" element={<EditorPage />} />
+              <Route path="/profile" element={<p>profile page</p>} />
+            </Routes>
           </MemoryRouter>
         </LanguageProvider>
       </UiThemeProvider>,
@@ -76,5 +79,35 @@ describe('a save made from an older revision', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Save' })[0])
     await waitFor(() => expect(updateSite).toHaveBeenCalledTimes(3), SLOW)
     expect(updateSite.mock.calls[2][1].base_revision).toBe(6)
+  }, 30000)
+
+  it('after "Save and leave", "Save mine anyway" saves and leaves instead of asking again', async () => {
+    updateSite
+      .mockRejectedValueOnce({ response: { status: 409, data: { code: 'site_changed', detail: 'This site was saved somewhere else after it was opened here.' } } })
+      .mockImplementation(async (id, payload) => ({ ...payload, slug: 'two-tabs', revision: 6 }))
+    render(
+      <UiThemeProvider>
+        <LanguageProvider>
+          <MemoryRouter initialEntries={['/editor/1']}>
+            <Routes>
+              <Route path="/editor/:id" element={<EditorPage />} />
+              <Route path="/profile" element={<p>profile page</p>} />
+            </Routes>
+          </MemoryRouter>
+        </LanguageProvider>
+      </UiThemeProvider>,
+    )
+    await waitFor(() => expect(document.querySelector('[data-cid="h1"]')).toBeTruthy(), SLOW)
+    await act(async () => useEditorStore.getState().updateProps('h1', { text: 'Mine' }))
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Back to previous page' })[0])
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and leave' }, SLOW))
+    await screen.findByRole('alertdialog', { name: 'This site changed somewhere else' }, SLOW)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save mine anyway' }))
+
+    expect(await screen.findByText('profile page', {}, SLOW)).toBeInTheDocument()
+    expect(updateSite).toHaveBeenCalledTimes(2)
+    expect(updateSite.mock.calls[1][1]).not.toHaveProperty('base_revision')
   }, 30000)
 })
