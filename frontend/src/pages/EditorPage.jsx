@@ -517,6 +517,10 @@ function SiteEditor() {
   // before, the later save silently replaced the other one's work.
   const baseRevisionRef = useRef(null)
   const [siteConflict, setSiteConflict] = useState(false)
+  // Counts refused saves, so "Save and leave" can tell a conflict from other
+  // failures; when it was one, "Save mine anyway" finishes the leave too.
+  const siteConflictCountRef = useRef(0)
+  const leaveAfterOverwriteRef = useRef(false)
   const reloadingRef = useRef(false)
   const discardLeaveRef = useRef(false)
   const [aiOpen, setAiOpen] = useState(false)
@@ -1833,6 +1837,7 @@ function SiteEditor() {
       setAutoSaveState('error')
       if (e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
         // Nothing was written; the dialog says why and lets the person choose.
+        siteConflictCountRef.current += 1
         setSiteConflict(true)
         return null
       }
@@ -1906,8 +1911,10 @@ function SiteEditor() {
   }
 
   async function saveAndLeave() {
+    const conflictsBefore = siteConflictCountRef.current
     const saved = await save()
     if (saved) finishLeave()
+    else leaveAfterOverwriteRef.current = siteConflictCountRef.current !== conflictsBefore
   }
 
   function stayInEditor() {
@@ -2169,9 +2176,14 @@ function SiteEditor() {
           reloadingRef.current = true
           window.location.reload()
         }}
-        onOverwrite={() => {
+        onOverwrite={async () => {
           setSiteConflict(false)
-          save(undefined, { force: true })
+          // Chosen after "Save and leave": once it is saved, leave as asked
+          // instead of asking again whether to save.
+          const leave = leaveAfterOverwriteRef.current
+          leaveAfterOverwriteRef.current = false
+          const saved = await save(undefined, { force: true })
+          if (saved && leave) finishLeave()
         }}
       />
       <UnsavedLeaveDialog
