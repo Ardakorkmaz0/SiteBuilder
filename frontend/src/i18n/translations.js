@@ -3179,6 +3179,11 @@ export const TURKISH_TRANSLATIONS = {
   'Enter a web address, like yoursite.com.': 'Bir web adresi girin, örneğin siteniz.com.',
   'Enter a username like @ada, or a full link.': '@ada gibi bir kullanıcı adı ya da tam bir bağlantı girin.',
   'yoursite.com': 'siteniz.com',
+  'This site changed somewhere else': 'Bu site başka bir yerde değişti',
+  'It was saved in another tab or on another device after you opened it here. Saving yours replaces that version; opening the saved one discards the changes made here.': 'Siz burada açtıktan sonra site başka bir sekmede ya da cihazda kaydedildi. Kendi sürümünüzü kaydederseniz o sürümün yerine geçer; kaydedilmiş sürümü açarsanız burada yaptığınız değişiklikler silinir.',
+  'Open the saved version': 'Kaydedilmiş sürümü aç',
+  'Save mine anyway': 'Yine de benimkini kaydet',
+  'This site was saved somewhere else after it was opened here.': 'Bu site, burada açıldıktan sonra başka bir yerde kaydedildi.',
 }
 
 // Content libraries (templates, section blocks and component variants) carry

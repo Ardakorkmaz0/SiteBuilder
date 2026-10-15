@@ -6,8 +6,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import URLValidator, validate_image_file_extension
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from rest_framework import serializers
-from rest_framework.exceptions import ErrorDetail
+from rest_framework import serializers, status
+from rest_framework.exceptions import APIException, ErrorDetail
 
 from .access import DAILY_PUBLISH_LIMIT, publish_blocked
 from .ai_policy import AI_PROVIDER_IDS, MAX_HIDDEN_MODELS, MODEL_ID_RE, local_ai_available
@@ -631,6 +631,14 @@ class SiteListSerializer(serializers.ModelSerializer):
         }
 
 
+class SiteChanged(APIException):
+    """A save made from a revision someone else has since replaced."""
+
+    status_code = status.HTTP_409_CONFLICT
+    default_code = 'site_changed'
+    default_detail = 'This site was saved somewhere else after it was opened here.'
+
+
 class SiteSerializer(serializers.ModelSerializer):
     # The rendered documents to serve at /site/<slug>/… . Write-only: the
     # editor sends them with a publish, and nothing reads them back through
@@ -638,11 +646,15 @@ class SiteSerializer(serializers.ModelSerializer):
     published_pages = serializers.ListField(
         child=serializers.DictField(), write_only=True, required=False,
     )
+    # The revision the sender loaded or last saved. Omitted, the save goes
+    # through as before (older clients, scripts, "save mine anyway").
+    base_revision = serializers.IntegerField(write_only=True, required=False, allow_null=True, min_value=0)
+    _CONTENT_FIELDS = {'title', 'schema', 'html', 'published', 'published_pages', 'category', 'tags'}
 
     class Meta:
         model = Site
         fields = ('id', 'title', 'slug', 'schema', 'html', 'published',
-                  'published_pages',
+                  'published_pages', 'revision', 'base_revision',
                   'category', 'tags', 'site_options', 'review_token',
                   'custom_domain', 'domain_status', 'domain_verification_token',
                   'moderation_blocked', 'view_count', 'created_at', 'updated_at')
@@ -653,7 +665,7 @@ class SiteSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'id', 'slug', 'review_token', 'custom_domain', 'domain_status',
             'domain_verification_token', 'moderation_blocked', 'view_count',
-            'created_at', 'updated_at',
+            'created_at', 'updated_at', 'revision',
         )
 
     # `published` stays the owner's own switch and is saved as sent, even
@@ -710,6 +722,18 @@ class SiteSerializer(serializers.ModelSerializer):
         # locking: two requests may both have passed is_valid with one slot left.
         owner = User.objects.select_for_update().get(pk=instance.owner_id)
         instance = Site.objects.select_for_update().get(pk=instance.pk, owner=owner)
+        base_revision = validated_data.pop('base_revision', None)
+        if base_revision is not None and base_revision != instance.revision:
+            raise SiteChanged({
+                'detail': 'This site was saved somewhere else after it was opened here.',
+                'code': 'site_changed',
+                'revision': instance.revision,
+            })
+        # Only what the editor's save writes moves the revision on: a settings
+        # PATCH (SEO, from the control centre) sends none of it, and must not
+        # make every other open tab look out of date.
+        if self._CONTENT_FIELDS & validated_data.keys():
+            instance.revision += 1
         try:
             self._validate_publish_state(validated_data.get('published', instance.published), owner, instance)
         except serializers.ValidationError as exc:
@@ -732,6 +756,7 @@ class SiteSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         owner = User.objects.select_for_update().get(pk=validated_data['owner'].pk)
+        validated_data.pop('base_revision', None)
         try:
             self._validate_publish_state(validated_data.get('published', False), owner, None)
         except serializers.ValidationError as exc:
