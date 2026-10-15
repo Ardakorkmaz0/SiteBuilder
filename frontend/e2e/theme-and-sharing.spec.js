@@ -91,7 +91,7 @@ test('a shared draft opens for exactly the people it is shared with', async ({ p
   await panel.getByRole('radio', { name: /^Only people you name/ }).click()
   await expect(panel.getByRole('radio', { name: /^Only people you name/ })).toBeChecked()
   expect(await sees(friend.token), 'not named yet').toBe(false)
-  await panel.getByLabel('Username').fill(name)
+  await panel.getByLabel('Add someone by username').fill(name)
   await panel.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(panel.getByText(name)).toBeVisible()
   expect(await sees(friend.token), 'named').toBe(true)

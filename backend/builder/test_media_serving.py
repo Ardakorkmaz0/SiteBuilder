@@ -61,6 +61,24 @@ def test_opened_directly_nothing_in_it_can_run(uploader, tmp_path):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize('name,content_type,body', [
+    ('legacy.svg', 'image/svg+xml', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),
+    ('legacy.html', 'text/html', '<!doctype html><script>alert(1)</script>'),
+])
+def test_active_legacy_files_also_receive_the_media_sandbox(tmp_path, name, content_type, body):
+    # Upload validation rejects these today. Old files and a storage migration
+    # must still be safe if opened as documents on the application origin.
+    (tmp_path / name).write_text(body)
+    with override_settings(SERVE_MEDIA=True, MEDIA_ROOT=tmp_path):
+        response = APIClient().get(f'/media/{name}')
+        assert response.status_code == 200
+        assert response['Content-Type'].split(';')[0] == content_type
+        assert response['Content-Security-Policy'] == MEDIA_CSP
+        assert response['X-Content-Type-Options'] == 'nosniff'
+        response.close()
+
+
+@pytest.mark.django_db
 def test_can_be_switched_off_for_a_proxy_or_bucket(uploader, tmp_path):
     with override_settings(SERVE_MEDIA=True, MEDIA_ROOT=tmp_path):
         path = _upload(uploader)

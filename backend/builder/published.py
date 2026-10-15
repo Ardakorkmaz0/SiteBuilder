@@ -86,7 +86,10 @@ def serve_published_page(request, slug, path=''):
     record_served_view(site, request, wanted)
     html = with_site_meta(page.html, site, request.build_absolute_uri('/'))
     html = _with_form_endpoint(html, published_form_path(site.slug))
-    return _harden(HttpResponse(html, content_type='text/html; charset=utf-8'))
+    response = _harden(HttpResponse(html, content_type='text/html; charset=utf-8'))
+    if page.no_index:
+        response['X-Robots-Tag'] = 'noindex'
+    return response
 
 
 def published_form_path(slug):

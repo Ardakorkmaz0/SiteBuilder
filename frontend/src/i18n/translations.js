@@ -1,6 +1,10 @@
-import { VERTICAL_TEMPLATE_TRANSLATIONS } from '../utils/templateCatalogData.js'
-
 export const TURKISH_TRANSLATIONS = {
+  'Recover your unsaved work?': 'Kaydedilmemiş çalışman geri yüklensin mi?',
+  'Your guest session expired. Download your project before starting a new session.': 'Misafir oturumun sona erdi. Yeni bir oturum başlatmadan önce projeni indir.',
+  'Your session ended while this site had unsaved changes. Restore the local draft, or keep the version from the server.': 'Bu sitede kaydedilmemiş değişiklikler varken oturumun sona erdi. Yerel taslağı geri yükleyebilir veya sunucudaki sürümü kullanabilirsin.',
+  'Keep server version': 'Sunucudaki sürümü kullan',
+  'Restore local draft': 'Yerel taslağı geri yükle',
+  'Your session expired and the local draft could not be saved. Download your project before signing in again.': 'Oturumun sona erdi ve yerel taslak kaydedilemedi. Tekrar giriş yapmadan önce projeni indir.',
   // Custom-domain ownership, routing and publication status.
   'The domain resolves somewhere else. Check the record values above. An old A or CNAME record may still be there.': 'Alan adı başka bir yere yönleniyor. Yukarıdaki kayıt değerlerini kontrol et. Eski bir A veya CNAME kaydı duruyor olabilir.',
   'Enter the hostname without http:// or a path. For example: www.your-domain.com': 'Alan adını http:// veya yol olmadan gir. Örneğin: www.alanadin.com',
@@ -56,9 +60,9 @@ export const TURKISH_TRANSLATIONS = {
   "Save changes directly to your project files": "Değişiklikleri doğrudan proje dosyalarına kaydet",
   "Early version. Use Chrome or Edge and keep a backup of important projects.": "Deneme aşamasında. Chrome veya Edge kullan; önemli projelerinin yedeğini al.",
   "Use New site or Open local project on the home page to get started.": "Başlamak için ana sayfadaki “Yeni site oluştur” veya “Yerel proje aç” düğmesini kullan.",
-  ...VERTICAL_TEMPLATE_TRANSLATIONS,
   // Common
   'Language': 'Dil',
+  'Tickets': 'Biletler',
   'Skip to content': 'İçeriğe geç',
   'Open menu': 'Menüyü aç',
   'Close menu': 'Menüyü kapat',
@@ -3175,7 +3179,7 @@ export const TURKISH_TRANSLATIONS = {
   'yoursite.com': 'siteniz.com',
 }
 
-// Editor-only libraries (the section blocks and component variants) carry
+// Content libraries (templates, section blocks and component variants) carry
 // their own bilingual labels. They add them here when they load, so their
 // markup stays out of the bundle every page needs. Existing entries win.
 export function extendTranslations(dictionary) {

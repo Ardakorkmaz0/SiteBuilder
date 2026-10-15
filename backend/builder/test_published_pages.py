@@ -135,6 +135,16 @@ class TestServing:
         assert 'allow-scripts' in csp
         assert response['X-Content-Type-Options'] == 'nosniff'
 
+    def test_noindex_applies_even_when_the_authored_html_has_no_robots_tag(self, client, site):
+        publish(client, site, payload=[
+            {'path': '', 'title': 'Ada', 'html': HOME},
+            {'path': 'draft', 'title': 'Draft', 'html': ABOUT, 'noIndex': True},
+        ])
+        public = APIClient()
+        assert public.get(f'/s/{site.slug}/draft/')['X-Robots-Tag'] == 'noindex'
+        assert public.head(f'/s/{site.slug}/draft/')['X-Robots-Tag'] == 'noindex'
+        assert public.get(f'/s/{site.slug}/').get('X-Robots-Tag') is None
+
     @pytest.mark.parametrize('close', [
         lambda site: Site.objects.filter(pk=site.pk).update(published=False),
         lambda site: Site.objects.filter(pk=site.pk).update(moderation_blocked=True),

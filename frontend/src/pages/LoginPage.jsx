@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { login, googleLogin } from '../api/auth.js'
 import { useAuthStore } from '../store/authStore.js'
 import { keepGuestWork } from '../utils/keepGuestWork.js'
@@ -8,6 +8,7 @@ import AuthShell, { AuthWidgetFrame } from '../components/auth/AuthShell.jsx'
 import GoogleSignInButton from '../components/auth/GoogleSignInButton.jsx'
 import GuestEntry from '../components/auth/GuestEntry.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { editorReturnPath } from '../utils/authReturn.js'
 
 export default function LoginPage() {
   const { t } = useLanguage()
@@ -17,6 +18,8 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const { state } = useLocation()
+  const from = editorReturnPath(state?.from)
   const setAuth = useAuthStore((s) => s.setAuth)
   // Whoever was here a second ago. If it was a guest, their sites follow them
   // into the account they are signing into. Selected field by field: a
@@ -33,7 +36,7 @@ export default function LoginPage() {
       const { token, user } = await login(username, password)
       setAuth(token, user, remember)
       const moved = await keepGuestWork({ token: previousToken, user: previousUser, nextUserId: user.id })
-      navigate('/', moved ? { state: { guestWorkMoved: moved } } : undefined)
+      navigate(from, moved ? { state: { guestWorkMoved: moved } } : undefined)
     } catch (err) {
       setError(apiError(err, t('Invalid username or password.')))
     } finally {
@@ -47,7 +50,7 @@ export default function LoginPage() {
       const { token, user } = await googleLogin(credential)
       setAuth(token, user, remember)
       const moved = await keepGuestWork({ token: previousToken, user: previousUser, nextUserId: user.id })
-      navigate('/', moved ? { state: { guestWorkMoved: moved } } : undefined)
+      navigate(from, moved ? { state: { guestWorkMoved: moved } } : undefined)
     } catch (err) {
       setError(apiError(err, t('Google sign-in failed.')))
     }
@@ -61,7 +64,7 @@ export default function LoginPage() {
       footer={(
         <>
           {t('No account?')}{' '}
-          <Link className="font-semibold text-[var(--studio-accent-hover)] hover:underline" to="/register">
+          <Link className="font-semibold text-[var(--studio-accent-hover)] hover:underline" to="/register" state={{ from }}>
             {t('Create one free')}
           </Link>
         </>

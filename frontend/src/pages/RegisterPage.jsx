@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { register, googleLogin, upgradeGuest } from '../api/auth.js'
 import { useAuthStore, useIsGuest } from '../store/authStore.js'
 import { keepGuestWork } from '../utils/keepGuestWork.js'
@@ -11,6 +11,7 @@ import Recaptcha from '../components/auth/Recaptcha.jsx'
 import GuestEntry from '../components/auth/GuestEntry.jsx'
 import { usePublicConfig } from '../utils/usePublicConfig.js'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { editorReturnPath } from '../utils/authReturn.js'
 
 const ENV_RECAPTCHA = !!import.meta.env.VITE_RECAPTCHA_SITE_KEY
 
@@ -30,6 +31,8 @@ export default function RegisterPage() {
   // sessionStorage so it ends with the tab.
   const [remember, setRemember] = useState(true)
   const navigate = useNavigate()
+  const { state } = useLocation()
+  const from = editorReturnPath(state?.from)
   const setAuth = useAuthStore((s) => s.setAuth)
   // Someone who came in through "continue without signing in" is not
   // registering a second time — they are putting a password on the identity
@@ -46,9 +49,7 @@ export default function RegisterPage() {
 
   async function onSubmit(e) {
     e.preventDefault()
-    // The upgrade endpoint is behind the guest's own token, so the captcha
-    // (which guards anonymous signup spam) has nothing to add there.
-    if (recaptchaOn && !upgrading && !captcha) {
+    if (recaptchaOn && !captcha) {
       setError(t('Please confirm you are not a robot.'))
       return
     }
@@ -57,13 +58,13 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const { token, user } = upgrading
-        ? await upgradeGuest(username, email, password)
+        ? await upgradeGuest(username, email, password, captcha)
         : await register(username, email, password, captcha)
       setAuth(token, user, remember)
       // Upgrading keeps the same row; this only has something to do when the
       // form went the ordinary register route with a guest session open.
       const moved = await keepGuestWork({ token: previousToken, user: previousUser, nextUserId: user.id })
-      navigate('/', moved ? { state: { guestWorkMoved: moved } } : undefined)
+      navigate(from, moved ? { state: { guestWorkMoved: moved } } : undefined)
     } catch (err) {
       setError(apiError(err, t('Registration failed.')))
       const field = ['username', 'email', 'password'].find((key) => err?.response?.data?.[key])
@@ -80,7 +81,7 @@ export default function RegisterPage() {
       const { token, user } = await googleLogin(credential)
       setAuth(token, user, remember)
       const moved = await keepGuestWork({ token: previousToken, user: previousUser, nextUserId: user.id })
-      navigate('/', moved ? { state: { guestWorkMoved: moved } } : undefined)
+      navigate(from, moved ? { state: { guestWorkMoved: moved } } : undefined)
     } catch (err) {
       setError(apiError(err, t('Google sign-in failed.')))
     }
@@ -96,7 +97,7 @@ export default function RegisterPage() {
       footer={(
         <>
           {t('Already have an account?')}{' '}
-          <Link className="font-semibold text-[var(--studio-accent-hover)] hover:underline" to="/login">
+          <Link className="font-semibold text-[var(--studio-accent-hover)] hover:underline" to="/login" state={{ from }}>
             {t('Sign in')}
           </Link>
         </>
@@ -182,11 +183,9 @@ export default function RegisterPage() {
       </label>
 
       {/* reCAPTCHA renders only when a runtime or build-time site key exists. */}
-      {!upgrading && (
-        <AuthWidgetFrame>
-          <Recaptcha onChange={setCaptcha} />
-        </AuthWidgetFrame>
-      )}
+      <AuthWidgetFrame>
+        <Recaptcha onChange={setCaptcha} />
+      </AuthWidgetFrame>
 
       <button type="submit" disabled={loading} className="ms-btn ms-btn-primary w-full py-2.5">
         {loading

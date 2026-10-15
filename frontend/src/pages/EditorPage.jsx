@@ -101,6 +101,8 @@ import {
 } from '../utils/editorLeave.js'
 import { createSaveQueue } from '../utils/saveQueue.js'
 import { projectSnapshot } from '../utils/projectSnapshot.js'
+import { clearEditorRecovery, readEditorRecovery, SESSION_EXPIRED_EVENT, writeEditorRecovery } from '../utils/editorRecovery.js'
+import RecoveryDialog from '../components/editor/RecoveryDialog.jsx'
 import {
   clearLocalFileHandle,
   downloadHtmlFile,
@@ -416,6 +418,15 @@ function SiteEditor() {
   // store's previewBase): nothing of it may be saved.
   const previewing = useEditorStore((s) => !!s.previewBase)
   const authUser = useAuthStore((s) => s.user)
+  const editorOwnerId = useRef(authUser?.id).current
+  const [recoveryDraft, setRecoveryDraft] = useState(null)
+  const [recoveredCodeKey, setRecoveredCodeKey] = useState('original')
+  const recoveredCodeDraftsRef = useRef(null)
+  const consumeRecoveredCode = useCallback(() => { recoveredCodeDraftsRef.current = null }, [])
+  const restoredRecoveryRef = useRef(null)
+  const sessionEndedRef = useRef(false)
+  const recoveryMessageRef = useRef('')
+  const loadedSiteRef = useRef(false)
   // Back LEAVES the editor. One history step back is usually another editor
   // (open a site, return, open the next), and moving between pages of a design
   // is what the page list is for — this button is the way out.
@@ -874,11 +885,48 @@ function SiteEditor() {
   // immediately by Ctrl+S/click Save must observe this render's title, HTML map
   // and dirty flags instead of the previous render's closure.
   saveLifecycleRef.current = {
-    save, performSave, dirty, htmlDirty, metaDirty, workspaceDirty, published, loading, autoSaveEnabled, previewing,
+    save, performSave, dirty, htmlDirty, metaDirty, workspaceDirty, published,
+    loading: loading || !!recoveryDraft, autoSaveEnabled, previewing,
+  }
+  const recoveryCaptureRef = useRef(null)
+  recoveryCaptureRef.current = (event) => {
+    if (loading || !loadedSiteRef.current || recoveryDraft) return
+    const store = useEditorStore.getState()
+    // The iframe reports dirty state after a debounce. A 401 can arrive while
+    // typing is still in that window, so inspect its live document as well.
+    const liveMap = liveHtmlMap()
+    const liveChanged = Object.keys(liveMap).some((pageId) => liveMap[pageId] !== pageHtmlMap[pageId])
+    const codeDrafts = codePanelRef.current?.getPendingHtml?.() || {}
+    if (!(store.dirty || htmlDirty || metaDirty || workspaceDirty || liveChanged || Object.keys(codeDrafts).length)) return
+    const { schema } = projectSnapshot(store.previewBase || store.schema, liveMap)
+    const draft = writeEditorRecovery(editorOwnerId, id, {
+      schema, title, category, tagsText, currentPageId: store.currentPageId,
+      codeDrafts,
+    })
+    if (!draft) {
+      // Quota/private browsing must not turn a failed backup into data loss.
+      event.preventDefault()
+      recoveryMessageRef.current = t('Your session expired and the local draft could not be saved. Download your project before signing in again.')
+      setError(recoveryMessageRef.current)
+    } else if (authUser?.is_guest) {
+      // A guest has no credentials to re-enter a revoked identity. Leave its
+      // live work available for export instead of redirecting to a dead end.
+      event.preventDefault()
+      recoveryMessageRef.current = t('Your guest session expired. Download your project before starting a new session.')
+      setError(recoveryMessageRef.current)
+    }
   }
   useEffect(() => {
+    const capture = (event) => {
+      recoveryCaptureRef.current?.(event)
+      if (!event.defaultPrevented) sessionEndedRef.current = true
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, capture)
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, capture)
+  }, [])
+  useEffect(() => {
     if (!shouldRunEditorAutoSave(
-      { autoSaveEnabled, loading, dirty, htmlDirty, metaDirty, workspaceDirty, previewing },
+      { autoSaveEnabled, loading: loading || !!recoveryDraft, dirty, htmlDirty, metaDirty, workspaceDirty, previewing },
       discardLeaveRef.current,
     )) return undefined
     const timer = window.setTimeout(() => {
@@ -891,6 +939,7 @@ function SiteEditor() {
   }, [
     autoSaveEnabled,
     loading,
+    recoveryDraft,
     previewing,
     dirty,
     htmlDirty,
@@ -946,7 +995,7 @@ function SiteEditor() {
   // and not after "leave without saving".
   useEffect(() => () => {
     const s = saveLifecycleRef.current
-    if (shouldRunEditorAutoSave(s, discardLeaveRef.current)) {
+    if (!sessionEndedRef.current && shouldRunEditorAutoSave(s, discardLeaveRef.current)) {
       s.save(undefined, { auto: true })
     }
   }, [])
@@ -957,6 +1006,7 @@ function SiteEditor() {
     getSite(id)
       .then((data) => {
         if (!active) return
+        loadedSiteRef.current = true
         setTitle(data.title)
         setSlug(data.slug)
         setPublished(data.published)
@@ -987,6 +1037,9 @@ function SiteEditor() {
         if (savedPageOnMount && pages.some((p) => p.id === savedPageOnMount)) {
           useEditorStore.getState().selectPage(savedPageOnMount)
         }
+        // Read only after the API has verified this account can access the site.
+        const recovery = readEditorRecovery(editorOwnerId, id)
+        setRecoveryDraft(recovery)
         // First-visit onboarding: a completely EMPTY site auto-opens the AI
         // wizard once — "describe it → get a full site" converts far better
         // than a blank canvas. The flag is set the moment it opens, so
@@ -998,7 +1051,7 @@ function SiteEditor() {
             !pages.some((p) => (p.components || []).length > 0) &&
             !pages.some((p) => (p.html || '').trim()) &&
             !(data.html || '').trim()
-          if (empty && aiProviderReady() && !localStorage.getItem(key)) {
+          if (!recovery && empty && aiProviderReady() && !localStorage.getItem(key)) {
             localStorage.setItem(key, '1')
             setWizardOpen(true)
           }
@@ -1013,7 +1066,7 @@ function SiteEditor() {
       active = false
       clearTimeout(loadingTimer)
     }
-  }, [id, loadSchema, savedPageOnMount])
+  }, [id, loadSchema, savedPageOnMount, editorOwnerId])
 
   // Mouse drags start after 5px of travel (so plain clicks stay clicks).
   // Touch drags start after a 250ms hold — the standard long-press pattern
@@ -1650,6 +1703,12 @@ function SiteEditor() {
       // Every canvas mutation replaces the Zustand schema object. If it has
       // changed during this request, its newer revision must remain dirty.
       if (useEditorStore.getState().schema === schemaBase) markSaved()
+      if (useEditorStore.getState().schema === schemaBase &&
+          htmlRevisionRef.current === htmlRevisionAtSave && metaRevisionRef.current === metaRevisionAtSave &&
+          !codePanelRef.current?.hasPendingHtml?.()) {
+        clearEditorRecovery(editorOwnerId, id, restoredRecoveryRef.current)
+        restoredRecoveryRef.current = null
+      }
       setAutoSaveState('saved')
       if (!auto && fileError) {
         setError(t('Saved to the server, but writing {name} failed: {error}', { name: localFile.name, error: fileError }))
@@ -1675,7 +1734,7 @@ function SiteEditor() {
       )
     } catch (e) {
       setAutoSaveState('error')
-      if (!auto) setError(apiError(e))
+      if (!auto) setError(recoveryMessageRef.current || apiError(e))
       return null
     } finally {
       if (!auto) {
@@ -1706,7 +1765,36 @@ function SiteEditor() {
   }
 
   function discardAndLeave() {
+    clearEditorRecovery(editorOwnerId, id, restoredRecoveryRef.current)
     finishLeave({ discard: true })
+  }
+
+  function restoreRecovery() {
+    if (!recoveryDraft) return
+    setPageHtmlMap(loadSchema(recoveryDraft.schema))
+    useEditorStore.setState({ dirty: true })
+    if (recoveryDraft.schema.pages.some((page) => page.id === recoveryDraft.currentPageId)) {
+      useEditorStore.getState().selectPage(recoveryDraft.currentPageId)
+    }
+    useEditorStore.getState().setViewport(readLastViewport())
+    setTitle(typeof recoveryDraft.title === 'string' ? recoveryDraft.title : title)
+    setCategory(typeof recoveryDraft.category === 'string' ? recoveryDraft.category : category)
+    setTagsText(typeof recoveryDraft.tagsText === 'string' ? recoveryDraft.tagsText : tagsText)
+    markMetaDirty()
+    markHtmlDirty()
+    restoredRecoveryRef.current = recoveryDraft.id
+    if (recoveryDraft.codeDrafts && Object.keys(recoveryDraft.codeDrafts).length) {
+      recoveredCodeDraftsRef.current = recoveryDraft.codeDrafts
+      setRecoveredCodeKey(recoveryDraft.id)
+      setCanvasMode('source')
+    }
+    setRecoveryDraft(null)
+    setWorkspaceSession((session) => session + 1)
+  }
+
+  function discardRecovery() {
+    clearEditorRecovery(editorOwnerId, id, recoveryDraft?.id)
+    setRecoveryDraft(null)
   }
 
   async function saveAndLeave() {
@@ -1965,13 +2053,16 @@ function SiteEditor() {
   const currentPageIndex = Math.max(0, storePages.findIndex((p) => p.id === currentPageId))
   const currentPage = storePages[currentPageIndex] || storePages[0]
   const leaveDialog = (
-    <UnsavedLeaveDialog
+    <>
+      <RecoveryDialog open={!!recoveryDraft} onRestore={restoreRecovery} onDiscard={discardRecovery} />
+      <UnsavedLeaveDialog
       open={leavePromptOpen}
       saving={saving}
       onSave={saveAndLeave}
       onDiscard={discardAndLeave}
       onStay={stayInEditor}
-    />
+      />
+    </>
   )
 
   // Phones are intentionally preview-only. Rendering this branch before the
@@ -2898,7 +2989,10 @@ function SiteEditor() {
                   <div className="studio-panel min-h-0 flex-1">
                     <Suspense fallback={<PanelFallback />}>
                       <CodePanel
+                        key={recoveredCodeKey}
                         ref={codePanelRef}
+                        initialHtmlDrafts={recoveredCodeDraftsRef.current || undefined}
+                        onInitialDraftsConsumed={consumeRecoveredCode}
                         currentPageId={currentPageId}
                         htmlMap={pageHtmlMap}
                         onApplyHtml={applyComponentSourceHtml}

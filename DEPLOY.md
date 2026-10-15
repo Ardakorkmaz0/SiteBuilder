@@ -421,6 +421,13 @@ Pick one:
 - **Several instances:** a local folder is not shared between them — use object
   storage (§11) and set `DJANGO_SERVE_MEDIA=False`.
 
+Django rejects multipart requests above 6 MB and stops receiving a file once
+it exceeds 5 MB, before image decoding or permanent storage. This also covers
+avatar uploads and applies in development and production. Rejected API uploads
+return `413` with code `upload_too_large`; the extra 1 MB accommodates multipart
+headers and normal form fields. A buffering proxy should enforce the same
+6 MB request limit so it does not spool larger requests before Django sees them.
+
 ---
 
 ## 8b. Customer domains (`www.their-company.com`)

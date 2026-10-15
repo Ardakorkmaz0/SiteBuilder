@@ -3,7 +3,7 @@
 // two takedowns have to stay clearly different things.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../ui/UiThemeProvider.jsx'
@@ -12,6 +12,9 @@ import {
   listComponentReports,
   resolveComponentReport,
   moderateComponent,
+  listReports,
+  moderateSite,
+  resolveReport,
 } from '../api/admin.js'
 
 vi.mock('../api/admin.js', () => ({
@@ -54,12 +57,12 @@ const REPORT = {
   component_css: '.card { padding: 24px; }',
 }
 
-async function openBlocksTab() {
+async function openBlocksTab(queue = 'blocks') {
   localStorage.setItem('pwb_language', 'en')
   render(
     <UiThemeProvider>
       <LanguageProvider>
-        <MemoryRouter initialEntries={['/admin?section=moderation&queue=blocks']}>
+        <MemoryRouter initialEntries={[`/admin?section=moderation&queue=${queue}`]}>
           <AdminPage />
         </MemoryRouter>
       </LanguageProvider>
@@ -75,6 +78,9 @@ beforeEach(() => {
   listComponentReports.mockResolvedValue({ results: [REPORT], count: 1 })
   resolveComponentReport.mockResolvedValue({})
   moderateComponent.mockResolvedValue({ sites_touched: 3, copies_removed: 4 })
+  listReports.mockResolvedValue({ results: [], count: 0 })
+  moderateSite.mockResolvedValue({})
+  resolveReport.mockResolvedValue({ status: 'dismissed' })
   vi.spyOn(window, 'confirm').mockReturnValue(true)
 })
 
@@ -82,7 +88,7 @@ describe('the flagged-blocks queue', () => {
   it('opens on the blocks that are still open, not the whole history', async () => {
     await openBlocksTab()
     await screen.findByText('Pricing card')
-    expect(listComponentReports).toHaveBeenCalledWith('open')
+    expect(listComponentReports).toHaveBeenCalledWith('open', 1)
   })
 
   it('shows the block itself, rendered without the power to run anything', async () => {
@@ -101,6 +107,73 @@ describe('the flagged-blocks queue', () => {
     expect(screen.getByText(/fake login form/)).toBeInTheDocument()
     // The number that decides whether a purge is proportionate.
     expect(screen.getByText(/7 uses/)).toBeInTheDocument()
+  })
+})
+
+const SITE_REPORT = {
+  ...REPORT,
+  site: 8,
+  site_title: 'Reported site',
+  site_slug: 'reported-site',
+  site_owner: 'ada',
+  site_published: true,
+}
+
+describe('moderation queue pagination and refresh', () => {
+  it.each([
+    ['blocks', listComponentReports, REPORT, 'component_title'],
+    ['sites', listReports, SITE_REPORT, 'site_title'],
+  ])('can reach older %s reports and resets the page when filtering', async (queue, loader, report, titleKey) => {
+    loader.mockImplementation((_status, page) => Promise.resolve({
+      results: [{ ...report, [titleKey]: page === 1 ? 'Newest report' : 'Oldest report' }], count: 51,
+    }))
+    const user = await openBlocksTab(queue)
+    await screen.findByText('Newest report')
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await screen.findByText('Oldest report')
+    expect(loader).toHaveBeenLastCalledWith('open', 2)
+
+    await user.click(screen.getByRole('button', { name: 'Resolved' }))
+    await screen.findByText('Newest report')
+    expect(loader).toHaveBeenLastCalledWith('resolved', 1)
+  })
+
+  it('refreshes every report after a site takedown resolves them together', async () => {
+    listReports
+      .mockResolvedValueOnce({ results: [SITE_REPORT, { ...SITE_REPORT, id: 6 }], count: 2 })
+      .mockResolvedValue({ results: [], count: 0 })
+    const user = await openBlocksTab('sites')
+    await screen.findAllByText('Reported site')
+    await user.click(screen.getAllByRole('button', { name: 'Unpublish site' })[0])
+    await screen.findByText('The moderation queue is clear.')
+    expect(screen.queryByText('Reported site')).toBeNull()
+    expect(listReports).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps resolved reports in the all-history filter with their new status', async () => {
+    listReports.mockImplementation((status) => Promise.resolve({
+      results: [{ ...SITE_REPORT, status: status === 'all' && resolveReport.mock.calls.length ? 'dismissed' : 'open' }],
+      count: 1,
+    }))
+    const user = await openBlocksTab('sites')
+    await screen.findByText('Reported site')
+    await user.click(screen.getByRole('button', { name: 'All' }))
+    await waitFor(() => expect(listReports).toHaveBeenLastCalledWith('all', 1))
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull())
+    expect(screen.getByText('Reported site')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['blocks', listComponentReports], ['sites', listReports],
+  ])('does not describe failed %s requests as a clear queue and allows retrying', async (queue, loader) => {
+    loader.mockRejectedValueOnce(new Error('Unavailable')).mockResolvedValue({ results: [], count: 0 })
+    const user = await openBlocksTab(queue)
+    await screen.findByText('Unavailable')
+    expect(screen.queryByText('The moderation queue is clear.')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await screen.findByText('The moderation queue is clear.')
+    expect(loader).toHaveBeenCalledTimes(2)
   })
 })
 

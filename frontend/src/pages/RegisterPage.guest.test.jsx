@@ -17,7 +17,11 @@ vi.mock('../api/auth.js', () => ({
   upgradeGuest: vi.fn(),
   googleLogin: vi.fn(),
 }))
-vi.mock('../utils/usePublicConfig.js', () => ({ usePublicConfig: () => ({}) }))
+const publicConfig = vi.hoisted(() => ({ current: {} }))
+vi.mock('../utils/usePublicConfig.js', () => ({ usePublicConfig: () => publicConfig.current }))
+vi.mock('../components/auth/Recaptcha.jsx', () => ({ default: ({ onChange }) => (
+  <button type="button" onClick={() => onChange('captcha-proof')}>Complete captcha</button>
+) }))
 
 const navigate = vi.fn()
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -46,6 +50,7 @@ beforeEach(() => {
   sessionStorage.clear()
   localStorage.setItem('pwb_language', 'en')
   useAuthStore.setState({ token: null, user: null })
+  publicConfig.current = {}
 })
 
 describe('registering', () => {
@@ -68,12 +73,25 @@ describe('registering', () => {
     expect(screen.getByText(/sites you made as a guest stay yours/i)).toBeInTheDocument()
     fill()
 
-    await waitFor(() => expect(upgradeGuest).toHaveBeenCalledWith('ada', 'ada@example.com', 'a-strong-pass-42'))
+    await waitFor(() => expect(upgradeGuest).toHaveBeenCalledWith('ada', 'ada@example.com', 'a-strong-pass-42', ''))
     expect(register).not.toHaveBeenCalled()
     // Same person, now with a password — and the session keeps working.
     expect(useAuthStore.getState().user.id).toBe(9)
     expect(useAuthStore.getState().user.is_guest).toBe(false)
     expect(useAuthStore.getState().token).toBe('real-token')
+  })
+
+  it('requires the configured CAPTCHA for a guest upgrade and sends its proof', async () => {
+    publicConfig.current = { recaptcha_site_key: 'configured' }
+    useAuthStore.setState({ token: 'guest-token', user: { id: 9, is_guest: true } })
+    upgradeGuest.mockResolvedValue({ token: 'real-token', user: { id: 9, is_guest: false } })
+    renderPage()
+    fill()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please confirm you are not a robot.')
+    expect(upgradeGuest).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Complete captcha' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create my account' }))
+    await waitFor(() => expect(upgradeGuest).toHaveBeenCalledWith('ada', 'ada@example.com', 'a-strong-pass-42', 'captcha-proof'))
   })
 })
 

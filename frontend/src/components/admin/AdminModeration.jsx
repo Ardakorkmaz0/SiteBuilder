@@ -1,7 +1,5 @@
 // The two moderation queues: reported sites and reported community blocks.
-// Moved here unchanged from the old admin page; the console hosts them under
-// "Moderation".
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   listReports,
@@ -16,13 +14,24 @@ import { STATIC_HTML_SANDBOX } from '../../utils/htmlRuntime.js'
 import { apiError } from '../../utils/errors.js'
 import { CheckIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
-import { SectionHeading } from './adminUi.jsx'
+import { ErrorBox, Pager, SectionHeading } from './adminUi.jsx'
+import { useAdminData } from './adminData.js'
 
 // DRF may return a paginated envelope ({count, results, next}) or, if pagination
 // is ever turned off, a bare array — tolerate both.
 function readPage(d) {
-  if (Array.isArray(d)) return { rows: d, count: d.length, hasMore: false }
-  return { rows: d.results || [], count: d.count ?? (d.results || []).length, hasMore: !!d.next }
+  if (Array.isArray(d)) return { rows: d, count: d.length }
+  return { rows: d.results || [], count: d.count ?? (d.results || []).length }
+}
+
+function useReportQueue(loader, statusFilter) {
+  const [page, setPage] = useState(1)
+  const key = JSON.stringify([statusFilter, page])
+  const { data, error, loading, reload } = useAdminData(() => loader(statusFilter, page).then(readPage), key)
+  // A takedown resolves every open report for the same artefact. Reload from
+  // the first page so even a now-empty final page stays within the new count.
+  const refresh = () => { setPage(1); reload() }
+  return { rows: data?.rows || [], count: data?.count || 0, error, loading, page, setPage, refresh }
 }
 
 // ---------------------------------------------------------------------------
@@ -33,29 +42,16 @@ const REPORT_FILTERS = [['open', 'Open'], ['resolved', 'Resolved'], ['dismissed'
 export function ReportsTab() {
   const { t, language } = useLanguage()
   const [statusFilter, setStatusFilter] = useState('open')
-  // Tag the loaded list with its filter so "loading" is derived (no synchronous
-  // setState in the fetch effect).
-  const [data, setData] = useState({ status: null, rows: [] })
+  const { rows, count, error: loadError, loading, page, setPage, refresh } = useReportQueue(listReports, statusFilter)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(0)
-
-  const rows = data.status === statusFilter ? data.rows : []
-  const loading = data.status !== statusFilter && !error
-
-  useEffect(() => {
-    let alive = true
-    listReports(statusFilter)
-      .then((d) => alive && setData({ status: statusFilter, rows: readPage(d).rows }))
-      .catch((e) => alive && setError(apiError(e, t('Admin access required.'))))
-    return () => { alive = false }
-  }, [statusFilter, t])
 
   async function onResolve(report, action) {
     setBusy(report.id)
     setError('')
     try {
       await resolveReport(report.id, action)
-      setData((prev) => ({ ...prev, rows: prev.rows.filter((r) => r.id !== report.id) }))
+      refresh()
     } catch (e) {
       setError(apiError(e))
     } finally {
@@ -69,7 +65,7 @@ export function ReportsTab() {
     setError('')
     try {
       await moderateSite(report.site, 'unpublish')
-      setData((prev) => ({ ...prev, rows: prev.rows.filter((r) => r.id !== report.id) }))
+      refresh()
     } catch (e) {
       setError(apiError(e))
     } finally {
@@ -84,7 +80,7 @@ export function ReportsTab() {
           <button
             key={id}
             type="button"
-            onClick={() => { setError(''); setStatusFilter(id) }}
+            onClick={() => { setError(''); setStatusFilter(id); setPage(1) }}
             className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
               statusFilter === id ? 'bg-[var(--studio-text)] text-[var(--studio-panel-raised)]' : 'bg-[var(--studio-panel-raised)] text-[var(--studio-text)] ring-1 ring-[var(--studio-border)] hover:bg-[var(--studio-control-hover)]'
             }`}
@@ -100,7 +96,7 @@ export function ReportsTab() {
 
       {loading ? (
         <p className="text-sm text-[var(--studio-text-muted)]">{t('Loading…')}</p>
-      ) : rows.length === 0 ? (
+      ) : loadError ? <ErrorBox message={loadError} onRetry={refresh} /> : rows.length === 0 ? (
         <div className="ms-card border-dashed py-16 text-center">
           <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[var(--studio-success-soft)] text-[var(--studio-success)]"><CheckIcon size={24} /></div>
           <p className="font-medium text-[var(--studio-text)]">{statusFilter === 'all' ? t('No reports') : t('No {status} reports', { status: t(statusFilter) })}</p>
@@ -165,6 +161,7 @@ export function ReportsTab() {
           ))}
         </div>
       )}
+      {!loading && !loadError && count > 0 && <Pager page={page} count={count} pageSize={50} onPage={setPage} />}
     </>
   )
 }
@@ -195,29 +192,16 @@ function FlaggedBlock({ report }) {
 export function ComponentReportsTab() {
   const { t, language } = useLanguage()
   const [statusFilter, setStatusFilter] = useState('open')
-  const [data, setData] = useState({ status: null, rows: [] })
+  const { rows, count, error: loadError, loading, page, setPage, refresh } = useReportQueue(listComponentReports, statusFilter)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(0)
-
-  const rows = data.status === statusFilter ? data.rows : []
-  const loading = data.status !== statusFilter && !error
-
-  useEffect(() => {
-    let alive = true
-    listComponentReports(statusFilter)
-      .then((d) => alive && setData({ status: statusFilter, rows: readPage(d).rows }))
-      .catch((e) => alive && setError(apiError(e, t('Admin access required.'))))
-    return () => { alive = false }
-  }, [statusFilter, t])
-
-  const drop = (id) => setData((prev) => ({ ...prev, rows: prev.rows.filter((r) => r.id !== id) }))
 
   async function onResolve(report, action) {
     setBusy(report.id)
     setError('')
     try {
       await resolveComponentReport(report.id, action)
-      drop(report.id)
+      refresh()
     } catch (e) {
       setError(apiError(e))
     } finally {
@@ -240,7 +224,7 @@ export function ComponentReportsTab() {
     setError('')
     try {
       await moderateComponent(report.component, action)
-      drop(report.id)
+      refresh()
     } catch (e) {
       setError(apiError(e))
     } finally {
@@ -255,7 +239,7 @@ export function ComponentReportsTab() {
           <button
             key={id}
             type="button"
-            onClick={() => { setError(''); setStatusFilter(id) }}
+            onClick={() => { setError(''); setStatusFilter(id); setPage(1) }}
             className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
               statusFilter === id ? 'bg-[var(--studio-text)] text-[var(--studio-panel-raised)]' : 'bg-[var(--studio-panel-raised)] text-[var(--studio-text)] ring-1 ring-[var(--studio-border)] hover:bg-[var(--studio-control-hover)]'
             }`}
@@ -271,7 +255,7 @@ export function ComponentReportsTab() {
 
       {loading ? (
         <p className="text-sm text-[var(--studio-text-muted)]">{t('Loading…')}</p>
-      ) : rows.length === 0 ? (
+      ) : loadError ? <ErrorBox message={loadError} onRetry={refresh} /> : rows.length === 0 ? (
         <div className="ms-card border-dashed py-16 text-center">
           <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[var(--studio-success-soft)] text-[var(--studio-success)]"><CheckIcon size={24} /></div>
           <p className="font-medium text-[var(--studio-text)]">{t('No flagged blocks')}</p>
@@ -337,6 +321,7 @@ export function ComponentReportsTab() {
           ))}
         </div>
       )}
+      {!loading && !loadError && count > 0 && <Pager page={page} count={count} pageSize={50} onPage={setPage} />}
     </>
   )
 }

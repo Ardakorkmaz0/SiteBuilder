@@ -1,7 +1,8 @@
-// What the specs share: the account from session.setup.js, the backend API,
-// and the moves every editor test makes (open a site, click inside the page
-// frame, publish).
+// Each editor test owns an account, so publishing in one test cannot consume
+// another test's daily allowance. The setup account remains a known identity
+// for authentication tests that deliberately start signed out.
 import fs from 'node:fs'
+import { randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { test as base, expect } from '@playwright/test'
 
@@ -13,10 +14,59 @@ export const SESSION_FILE = `${AUTH_DIR}session.json`
 export const STATE_FILE = `${AUTH_DIR}state.json`
 
 export const session = () => JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'))
+const requestTokens = new WeakMap()
+
+const accountState = ({ token, user }) => ({
+  cookies: [],
+  origins: [{
+    origin: APP_ORIGIN,
+    localStorage: [
+      { name: 'pwb_token', value: token },
+      { name: 'pwb_user', value: JSON.stringify(user) },
+      { name: 'pwb_language', value: 'en' },
+      { name: 'pwb_editor_tour_v1', value: '1' },
+    ],
+  }],
+})
 
 // Every page accepts the editor's confirmations (a delete, a load) and fails
 // its test on an uncaught error, which a passing assertion could hide.
 export const test = base.extend({
+  isolatedAccount: [true, { option: true }],
+  account: [async ({ playwright, isolatedAccount }, provide) => {
+    if (!isolatedAccount) {
+      await provide(null)
+      return
+    }
+    // A separate context avoids a fixture cycle: the normal request context
+    // inherits storageState, and storageState needs this account first.
+    const registration = await playwright.request.newContext()
+    try {
+      const username = `e2e_test_${randomBytes(6).toString('hex')}`
+      const response = await registration.post(`${API}/auth/register/`, {
+        data: {
+          username,
+          email: `${username}@example.test`,
+          password: `E2e-${randomBytes(12).toString('base64url')}`,
+        },
+      })
+      expect(response.status(), await response.text()).toBe(201)
+      await provide(await response.json())
+    } finally {
+      await registration.dispose()
+    }
+  }, { auto: true }],
+  storageState: async ({ account }, provide) => {
+    await provide(account ? accountState(account) : { cookies: [], origins: [] })
+  },
+  request: async ({ request, account }, provide) => {
+    if (account) requestTokens.set(request, account.token)
+    try {
+      await provide(request)
+    } finally {
+      requestTokens.delete(request)
+    }
+  },
   // `provide` is Playwright's fixture callback, named so the React hooks lint
   // does not read it as a hook.
   page: async ({ page }, provide) => {
@@ -29,7 +79,7 @@ export const test = base.extend({
 })
 export { expect }
 
-export async function api(request, method, path, body, token = session().token) {
+export async function api(request, method, path, body, token = requestTokens.get(request) ?? session().token) {
   const response = await request.fetch(`${API}${path}`, {
     method,
     headers: { Authorization: `Token ${token}` },

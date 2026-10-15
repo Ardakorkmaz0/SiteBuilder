@@ -7,6 +7,7 @@
 // one file per theme, and is appended below.
 import { collectTranslations, copy, item, profile, variant } from './templateCopy.js'
 import { MORE_VERTICAL_SEEDS } from './templateSeeds/index.js'
+import { extendTranslations } from '../i18n/translations.js'
 
 export { templateText } from './templateCopy.js'
 
@@ -584,3 +585,7 @@ export const VERTICAL_TEMPLATE_TRANSLATIONS = collectTranslations([
   FAMILY_NAMES,
   TEMPLATE_GROUPS,
 ])
+
+// Register before a template picker or localization helper can use the copy.
+// The base dictionary stays available without fetching the whole catalogue.
+extendTranslations(VERTICAL_TEMPLATE_TRANSLATIONS)

@@ -43,6 +43,7 @@ from .ai_policy import local_ai_available, provider_refusal, public_ai_policy
 from .shared_marks import insert_before_body_end, strip_marked, wrap_marked
 from .access import SHARE_OPEN, SHARE_PRIVATE, is_public, is_reachable, public_sites, share_access
 from .accounts import normalise_username
+from .throttles import ScopedIPRateThrottle
 from .models import (
     _domain_verification_token,
     Favorite,
@@ -73,7 +74,7 @@ from .guests import (
     create_guest_user,
     guest_blocked,
     is_guest,
-    refuse_past_site_limit,
+    site_creation,
     upgrade_guest,
 )
 from .serializers import (
@@ -177,7 +178,7 @@ class RegisterView(APIView):
     permission_classes = [AllowAny]
     # Tight per-IP cap on the credential endpoints (~10/min) to stop signup spam
     # and brute-force. See REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']['auth'].
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedIPRateThrottle]
     throttle_scope = 'auth'
 
     def post(self, request):
@@ -203,7 +204,7 @@ class GoogleLoginView(APIView):
     token. Unset client id → 503 (the frontend hides the button anyway)."""
 
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedIPRateThrottle]
     throttle_scope = 'auth'
 
     def post(self, request):
@@ -248,15 +249,25 @@ class GoogleLoginView(APIView):
     def _get_or_create_user(self, email, info):
         user = User.objects.filter(email__iexact=email).first()
         if user is None:
-            base = normalise_username(email.split('@')[0])[:140] or 'user'
-            username = base
-            i = 2
-            while User.objects.filter(username=username).exists():
-                username = f'{base}{i}'
+            # Email local parts permit characters Django usernames do not.
+            base = re.sub(r'[^\w.@+-]', '', normalise_username(email.split('@')[0]))[:140] or 'user'
+            i = 1
+            while user is None:
+                username = base if i == 1 else f'{base}{i}'
                 i += 1
-            user = User.objects.create_user(username=username, email=email)
-            user.set_unusable_password()
-            user.save()
+                if User.objects.filter(username__iexact=username).exists():
+                    continue
+                try:
+                    with transaction.atomic():
+                        # No password supplied: Django creates an unusable one.
+                        user = User.objects.create_user(username=username, email=email)
+                except IntegrityError:
+                    # A simultaneous first Google sign-in may have created the
+                    # same address, or a different address took this username.
+                    # Roll back the failed insert before looking for the winner.
+                    user = User.objects.filter(email__iexact=email).first()
+                    if user is None and not User.objects.filter(username__iexact=username).exists():
+                        raise
         # Do not touch the profile of a suspended account.
         if not user.is_active:
             return user
@@ -275,16 +286,18 @@ BAD_CREDENTIALS = 'Unable to log in with provided credentials.'
 
 class LoginView(ObtainAuthToken):
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedIPRateThrottle]
     throttle_scope = 'auth'
 
     def post(self, request, *args, **kwargs):
         # Names are stored folded, and Django compares them byte for byte. Fold
         # what is typed as well, or somebody who has always written their name
         # with a capital is locked out of their own account.
-        data = request.data
-        if data.get('username'):
-            data = {**data, 'username': normalise_username(data['username'])}
+        # Validate field types before the suspended-account password check.
+        # This also converts form QueryDicts without expanding their values
+        # into lists (which made a correct multipart login fail validation).
+        data = self.serializer_class(context={'request': request}).to_internal_value(request.data)
+        data['username'] = normalise_username(data['username'])
         # A suspended account was told "wrong username or password" even with
         # the right password, and a reset email never comes for it, so the
         # person could not find out why. With the right password they are
@@ -314,7 +327,7 @@ class PasswordResetRequestView(APIView):
     be an account-enumeration oracle). Throttled under the `auth` scope."""
 
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedIPRateThrottle]
     throttle_scope = 'auth'
 
     # Shown verbatim whether or not the email exists (no enumeration).
@@ -366,7 +379,7 @@ class PasswordResetConfirmView(APIView):
     against AUTH_PASSWORD_VALIDATORS, then sets it. Throttled under `auth`."""
 
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedIPRateThrottle]
     throttle_scope = 'auth'
 
     def post(self, request):
@@ -411,7 +424,7 @@ class GuestSessionView(APIView):
     """
 
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedIPRateThrottle]
     throttle_scope = 'guest'
 
     def post(self, request):
@@ -433,13 +446,18 @@ class GuestUpgradeView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedIPRateThrottle]
     throttle_scope = 'auth'
 
     def post(self, request):
         if not is_guest(request.user):
             return Response(
                 {'detail': 'This account is already registered.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not _verify_recaptcha(request.data.get('recaptcha')):
+            return Response(
+                {'detail': 'Captcha verification failed. Please try again.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         serializer = GuestUpgradeSerializer(data=request.data, context={'user': request.user})
@@ -483,6 +501,8 @@ class GuestAdoptView(APIView):
     throttle_scope = 'guest'
 
     def post(self, request):
+        if is_guest(request.user):
+            return guest_blocked('adopt')
         key = str(request.data.get('guest_token') or '').strip()
         if not key:
             return error_response('guest_token_required', 'No guest session to take over.')
@@ -593,8 +613,8 @@ class SiteViewSet(viewsets.ModelViewSet):
         return SiteSerializer
 
     def perform_create(self, serializer):
-        refuse_past_site_limit(self.request.user)
-        serializer.save(owner=self.request.user)
+        with site_creation(self.request.user) as owner:
+            serializer.save(owner=owner)
 
     def perform_update(self, serializer):
         site = serializer.save()
@@ -1543,21 +1563,21 @@ class CloneSiteView(APIView):
         # site would be a way to publish it again.
         if src.moderation_blocked:
             return error_response('site_moderated', 'This site was taken down by a moderator.', status.HTTP_403_FORBIDDEN)
-        refuse_past_site_limit(request.user)
         # The copy is named in the language of the editor that asked for it
         # ("Kafe (kopya)"); it always said "(copy)".
         language = request.data.get('language') if isinstance(request.data, dict) else None
         suffix = 'kopya' if language == 'tr' else 'copy'
-        copy = Site.objects.create(
-            owner=request.user,
-            title=f'{src.title} ({suffix})'[:100],
-            schema=src.schema,
-            html=src.html,
-            category=src.category,
-            tags=src.tags,
-            site_options=src.site_options,
-            published=False,
-        )
+        with site_creation(request.user) as owner:
+            copy = Site.objects.create(
+                owner=owner,
+                title=f'{src.title} ({suffix})'[:100],
+                schema=src.schema,
+                html=src.html,
+                category=src.category,
+                tags=src.tags,
+                site_options=src.site_options,
+                published=False,
+            )
         data = SiteSerializer(copy).data
         # The dashboard shows the copy straight away, with the readiness its
         # list row will have.
@@ -1747,7 +1767,9 @@ class AdminUserSuspendView(APIView):
             return error_response('self_suspend_forbidden', "You can't suspend your own account.")
         if target.is_staff or target.is_superuser:
             return error_response('admin_suspend_forbidden', "You can't suspend another admin.")
-        suspend = bool(request.data.get('suspend', True))
+        suspend = request.data.get('suspend')
+        if not isinstance(suspend, bool):
+            return error_response('invalid_suspend', 'suspend must be true or false.')
         target.is_active = not suspend
         target.save(update_fields=['is_active'])
         if suspend:
@@ -1781,9 +1803,14 @@ class AdminSiteModerateView(APIView):
             site.delete()
             return Response({'detail': 'Site deleted.', 'deleted': True})
         if action == 'reinstate':
+            # The owner may have saved a still-open editor's publish switch
+            # while blocked. Lifting the block hands back a draft, rather
+            # than publishing that saved state on the moderator's behalf.
+            if site.moderation_blocked:
+                site.published = False
             site.moderation_blocked = False
             site.moderated_at = None
-            site.save(update_fields=['moderation_blocked', 'moderated_at'])
+            site.save(update_fields=['published', 'moderation_blocked', 'moderated_at'])
             _log_admin(request, site, 'site.reinstate')
             return Response({'detail': 'Site reinstated.', 'published': site.published, 'moderation_blocked': False})
         site.published = False
@@ -2225,12 +2252,12 @@ def _purge_shared_copies(component_id):
     marked = 0
     sites_touched = 0
     for site in Site.objects.only('id', 'schema', 'html').iterator():
-        schema = site.schema if isinstance(site.schema, dict) else None
-        if not schema:
-            continue
+        schema = site.schema if isinstance(site.schema, dict) else {}
         pages = schema.get('pages') if isinstance(schema.get('pages'), list) else []
         removed_here = 0
         for page in pages:
+            if not isinstance(page, dict):
+                continue
             components = page.get('components')
             if isinstance(components, list):
                 page['components'], removed = _without_copies(components, component_id)
@@ -2239,7 +2266,7 @@ def _purge_shared_copies(component_id):
             if isinstance(page.get('html'), str):
                 page['html'], removed = strip_marked(page['html'], component_id)
                 removed_here += removed
-        site_html, _ = strip_marked(site.html, component_id)
+        site_html, html_removed = strip_marked(site.html, component_id)
         # What visitors receive is the published copy of each page: a copy
         # deleted only from the draft stayed live until the owner republished.
         live_removed = 0
@@ -2256,7 +2283,9 @@ def _purge_shared_copies(component_id):
             site.schema = schema
             site.html = site_html
             site.save(update_fields=['schema', 'html', 'updated_at'])
-            marked += removed_here or live_removed
+            # Draft schema, legacy HTML and published documents can hold the
+            # same copies; count the fullest representation once.
+            marked += max(removed_here, live_removed, html_removed)
             sites_touched += 1
     return sites_touched, marked
 

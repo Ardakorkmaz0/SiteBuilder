@@ -93,13 +93,14 @@ function documentOf(page, htmlMap) {
 
 // `htmlMap`: each HTML page's document, by page id (the editor keeps them
 // beside the schema).
-function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = null }, ref) {
+function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = null, initialHtmlDrafts = {}, onInitialDraftsConsumed }, ref) {
   const { t } = useLanguage()
   const schema = useEditorStore((state) => state.schema)
   const setCustomCss = useEditorStore((state) => state.setCustomCss)
   const setCustomJs = useEditorStore((state) => state.setCustomJs)
   const rawGeneratedFiles = useMemo(() => schemaToFiles(schema), [schema])
-  const [htmlDrafts, setHtmlDrafts] = useState({})
+  const [htmlDrafts, setHtmlDrafts] = useState(initialHtmlDrafts)
+  useEffect(() => { onInitialDraftsConsumed?.() }, [onInitialDraftsConsumed])
   const generatedFiles = useMemo(() => {
     let pageIndex = 0
     return rawGeneratedFiles.map((item) => {
@@ -227,6 +228,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
   useImperativeHandle(ref, () => ({
     applyPendingHtml,
     hasPendingHtml: () => dirtyHtmlFiles.length > 0,
+    getPendingHtml: () => Object.fromEntries(dirtyHtmlFiles.map((item) => [item.name, item.content])),
     // The live code ticker sends the change it just showed; open the page's own
     // file and put that line on screen.
     revealCode: (target) => {
@@ -238,7 +240,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
       setActiveSelection({ pageId: currentPageId, name })
       setPendingReveal(target && { ...target, at: Date.now() })
     },
-  }), [applyPendingHtml, currentPageFileName, currentPageId, dirtyHtmlFiles.length, files])
+  }), [applyPendingHtml, currentPageFileName, currentPageId, dirtyHtmlFiles, files])
 
   // Runs after the file above has rendered, so the element holds its content.
   useEffect(() => {

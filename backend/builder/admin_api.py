@@ -236,7 +236,7 @@ class AdminOverviewView(APIView):
         top_by_visits = (
             sites.filter(visits__created_at__date__gte=start)
             .annotate(n=Count('visits'))
-            .select_related('owner')
+            .select_related('owner', 'owner__profile')
             .order_by('-n')[:8]
         )
         categories = [
@@ -244,7 +244,7 @@ class AdminOverviewView(APIView):
             for row in public.values('category').annotate(n=Count('id')).order_by('-n')
         ]
         recent_users = users.select_related('profile').order_by('-date_joined')[:8]
-        recent_sites = sites.select_related('owner').order_by('-created_at')[:8]
+        recent_sites = sites.select_related('owner', 'owner__profile').order_by('-created_at')[:8]
         new_in_range = users.filter(date_joined__date__gte=start)
 
         return Response({
@@ -337,7 +337,7 @@ class AdminAccountListView(APIView):
     def get(self, request):
         qs = User.objects.select_related('profile').annotate(
             n_sites=Count('sites', distinct=True),
-            n_public=Count('sites', filter=Q(sites__published=True, sites__moderation_blocked=False), distinct=True),
+            n_public=Count('sites', filter=Q(is_active=True, sites__published=True, sites__moderation_blocked=False), distinct=True),
             n_views=Sum('sites__view_count'),
         )
         q = request.query_params.get('q', '').strip()
@@ -649,7 +649,7 @@ class AdminComponentListView(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        qs = SharedComponent.objects.select_related('author').annotate(
+        qs = SharedComponent.objects.select_related('author', 'author__profile').annotate(
             n_open_reports=Count('reports', filter=Q(reports__status='open'), distinct=True),
         )
         q = request.query_params.get('q', '').strip()

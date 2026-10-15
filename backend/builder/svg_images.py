@@ -12,12 +12,22 @@ without the script.
 """
 import re
 import xml.etree.ElementTree as ET
+from math import isfinite
 
 from rest_framework import serializers
 
 SVG_TAG = '{http://www.w3.org/2000/svg}svg'
 RUNNABLE_TAGS = {'script', 'foreignobject'}
 NUMBER = re.compile(r'^\s*([0-9]*\.?[0-9]+)\s*(px)?\s*$')
+# PositiveIntegerField's portable upper bound (also the PostgreSQL limit).
+MAX_DIMENSION = 2_147_483_647
+
+
+class _SvgTreeBuilder(ET.TreeBuilder):
+    def doctype(self, name, pubid, system):
+        # Inspect the parsed declaration too: a byte search misses UTF-16 XML.
+        # Reject it before ElementTree can expand an entity in the document.
+        raise serializers.ValidationError('This SVG declares a DOCTYPE. Export it again without one.')
 
 
 def is_svg_upload(upload):
@@ -32,15 +42,22 @@ def _local(name):
 
 def _size(root):
     """Width and height in px, from the attributes or else the viewBox."""
+    def dimension(raw):
+        try:
+            value = float(raw)
+        except (ValueError, OverflowError):
+            raise serializers.ValidationError('This SVG has invalid image dimensions.') from None
+        if not isfinite(value) or not 0 < value <= MAX_DIMENSION:
+            raise serializers.ValidationError('This SVG has invalid image dimensions.')
+        # A positive subpixel drawing still needs a nonzero stored dimension.
+        return max(1, round(value))
+
     width, height = (NUMBER.match(root.get(key, '')) for key in ('width', 'height'))
     if width and height:
-        return round(float(width.group(1))), round(float(height.group(1)))
+        return dimension(width.group(1)), dimension(height.group(1))
     box = re.split(r'[\s,]+', (root.get('viewBox') or '').strip())
     if len(box) == 4:
-        try:
-            return round(float(box[2])), round(float(box[3]))
-        except ValueError:
-            pass
+        return dimension(box[2]), dimension(box[3])
     return None, None
 
 
@@ -58,7 +75,7 @@ def check_svg(upload, max_bytes):
     if b'<!doctype' in lowered or b'<!entity' in lowered:
         raise serializers.ValidationError('This SVG declares a DOCTYPE. Export it again without one.')
     try:
-        root = ET.fromstring(data)
+        root = ET.fromstring(data, parser=ET.XMLParser(target=_SvgTreeBuilder()))
     except ET.ParseError:
         raise serializers.ValidationError('This is not a valid SVG file.') from None
     if root.tag != SVG_TAG:
