@@ -76,6 +76,7 @@ function TreeNode({ node, depth, activePath, dirty, onOpen, collapsed, toggle })
       <button
         type="button"
         onClick={() => toggle(node.path)}
+        aria-expanded={!isCollapsed}
         style={{ paddingLeft: 8 + depth * 14 }}
         className="flex w-full items-center gap-1 rounded-md py-1 pr-2 text-left text-[12.5px] font-semibold text-[#374151] hover:bg-[#f3f4f6]"
       >

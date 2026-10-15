@@ -241,6 +241,7 @@ export default function PageFilesPanel({
               <button
                 type="button"
                 onClick={() => toggleFolder(folder)}
+                aria-expanded={!isCollapsed}
                 className="flex w-full items-center gap-1.5 rounded-md py-1 pl-1 pr-2 text-left text-[12.5px] font-semibold text-[#374151] hover:bg-[#f3f4f6]"
               >
                 <span className="w-3 text-[10px] text-[#9ca3af]">{isCollapsed ? '▸' : '▾'}</span>

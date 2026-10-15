@@ -2205,6 +2205,8 @@ function SiteEditor() {
               ref={moreBtnRef}
               type="button"
               onClick={() => { anchorMenu('more', moreBtnRef); setAccountOpen(false); setMoreOpen((open) => !open) }}
+              aria-haspopup="menu"
+              aria-expanded={moreOpen}
               data-tour="more"
               title={t('More actions')}
               aria-label={t('More actions')}
@@ -2265,6 +2267,10 @@ function SiteEditor() {
               type="button"
               onClick={() => { anchorMenu('account', accountBtnRef); setMoreOpen(false); setAccountOpen((open) => !open) }}
               title={t('Your profile')}
+              // Its face is one letter; a screen reader would say just that.
+              aria-label={t('Your profile')}
+              aria-haspopup="menu"
+              aria-expanded={accountOpen}
               className="ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--studio-accent-soft)] text-xs font-bold text-[var(--studio-accent-hover)]"
             >
               {(accountName(authUser, t) || '?').trim().charAt(0).toLocaleUpperCase()}
@@ -2701,6 +2707,7 @@ function SiteEditor() {
                     <button
                       type="button"
                       onClick={() => setCanvasToolsOpen((open) => !open)}
+                      aria-expanded={canvasToolsOpen}
                       data-tour="canvas-tools"
                       title={t('Canvas tools')}
                       aria-label={t('Canvas tools')}

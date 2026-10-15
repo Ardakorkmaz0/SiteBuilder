@@ -241,6 +241,7 @@ function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle }) {
             })
           }
         }}
+        aria-expanded={variants.length > 0 ? open : undefined}
         className={`flex w-full items-center gap-3 px-3 py-2 text-sm select-none hover:bg-[#eef2ff] ${open ? 'bg-[#f5f5ff]' : ''}`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f3f4f6] text-base text-[#374151]">
