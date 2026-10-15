@@ -10,8 +10,10 @@
 // a decision about whether to take something. What is shared is what should
 // be: the widths and the stacking order.
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 import { sharedBlockHtml } from '../../utils/componentExport.js'
 import { STATIC_HTML_SANDBOX } from '../../utils/htmlRuntime.js'
 import { SPOTLIGHT_WIDTHS, SPOTLIGHT_Z } from '../editor/spotlight.js'
@@ -26,16 +28,10 @@ export default function ComponentPreviewDialog({ component, onClose, onUse, onRe
   const { t } = useLanguage()
   const [width, setWidth] = useState('desktop')
 
-  useEffect(() => {
-    const onKey = (event) => {
-      if (event.key === 'Escape') {
-        event.stopPropagation()
-        onClose?.()
-      }
-    }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [onClose])
+  // On the shared Esc stack: with "Use" or "Report" open on top, one Esc
+  // used to close both, since this listener ran first.
+  useEscapeToClose(!!component, () => onClose?.())
+  const dialogRef = useInitialDialogFocus(!!component)
 
   if (!component) return null
 
@@ -43,7 +39,9 @@ export default function ComponentPreviewDialog({ component, onClose, onUse, onRe
 
   return (
     <div
-      className="studio-theme-surface fixed inset-0 flex"
+      ref={dialogRef}
+      tabIndex={-1}
+      className="studio-theme-surface fixed inset-0 flex outline-none"
       style={{ zIndex: SPOTLIGHT_Z }}
       role="dialog"
       aria-modal="true"

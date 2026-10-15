@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 
 // A small cheat-sheet modal for the canvas keyboard shortcuts. Opened from the
 // header button or with Ctrl+/ (handled in EditorPage). Esc closes it here —
@@ -34,17 +35,10 @@ const GROUPS = [
 
 export default function ShortcutsHelp({ onClose }) {
   const { t } = useLanguage()
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'Escape') {
-        e.stopImmediatePropagation()
-        e.preventDefault()
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [onClose])
+  // The shared Esc stack: it also keeps Esc from deselecting on the canvas
+  // underneath, and gives the keyboard back to what opened the panel.
+  useEscapeToClose(true, onClose)
+  const dialogRef = useInitialDialogFocus(true)
 
   return (
     <div
@@ -52,11 +46,16 @@ export default function ShortcutsHelp({ onClose }) {
       onClick={onClose}
     >
       <div
-        className="ms-card max-h-[80vh] w-full max-w-md overflow-y-auto p-5"
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="shortcuts-help-title"
+        className="ms-card max-h-[80vh] w-full max-w-md overflow-y-auto p-5 outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-bold text-[var(--studio-text)]">⌨ {t('Keyboard shortcuts')}</h2>
+          <h2 id="shortcuts-help-title" className="text-base font-bold text-[var(--studio-text)]"><span aria-hidden="true">⌨ </span>{t('Keyboard shortcuts')}</h2>
           <button
             type="button"
             onClick={onClose}
