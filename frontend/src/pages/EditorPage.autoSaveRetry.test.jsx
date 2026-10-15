@@ -68,4 +68,29 @@ describe('an automatic save that failed', () => {
     expect(JSON.stringify(updateSite.mock.calls[1][1].schema)).toContain('Edited offline')
     await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument(), SLOW)
   }, 30000)
+
+  it('says why when the server refuses it for good, and does not keep asking', async () => {
+    updateSite.mockRejectedValue({
+      response: { status: 400, data: { code: 'validation_error', html: ['HTML is too large (max ~2MB).'], error_codes: { html: ['invalid'] } } },
+    })
+    render(
+      <UiThemeProvider>
+        <LanguageProvider>
+          <MemoryRouter initialEntries={['/editor/1']}>
+            <Routes><Route path="/editor/:id" element={<EditorPage />} /></Routes>
+          </MemoryRouter>
+        </LanguageProvider>
+      </UiThemeProvider>,
+    )
+    await waitFor(() => expect(document.querySelector('[data-cid="h1"]')).toBeTruthy(), SLOW)
+
+    await act(async () => useEditorStore.getState().updateProps('h1', { text: 'Too big' }))
+
+    expect(await screen.findByRole('alert', {}, SLOW)).toHaveTextContent('HTML is too large (max ~2MB).')
+    expect(updateSite).toHaveBeenCalledTimes(1)
+    // Past the first retry's 5 seconds: nothing was sent again.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 6000)) })
+    expect(updateSite).toHaveBeenCalledTimes(1)
+  }, 30000)
 })
+
