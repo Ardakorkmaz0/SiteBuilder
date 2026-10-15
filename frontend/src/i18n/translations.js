@@ -3168,6 +3168,7 @@ export const TURKISH_TRANSLATIONS = {
   'With the keyboard, Enter adds it at the end of the page.': 'Klavyeyle Enter, sayfanın sonuna ekler.',
   'Sitebuilder: build and publish websites': 'Sitebuilder: web siteleri oluşturun ve yayınlayın',
   'Page not found': 'Sayfa bulunamadı',
+  'Your latest changes are not saved yet. Trying again — or press Save.': 'Son değişiklikleriniz henüz kaydedilmedi. Yeniden deneniyor; dilerseniz Kaydet’e basın.',
 }
 
 // Editor-only libraries (the section blocks and component variants) carry
