@@ -3,6 +3,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
+from .upload_limits import UploadLimitExceeded
+
 
 STATUS_CODES = {
     status.HTTP_400_BAD_REQUEST: 'bad_request',
@@ -54,6 +56,8 @@ def _database_behind_code(exc):
 
 def structured_exception_handler(exc, context):
     """Add stable codes to every DRF error without breaking existing field payloads."""
+    if isinstance(exc, UploadLimitExceeded):
+        return error_response('upload_too_large', str(exc), status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
     response = exception_handler(exc, context)
     if response is None:
         return _database_behind_code(exc)

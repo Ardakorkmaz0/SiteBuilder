@@ -5,7 +5,6 @@ import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
-import ExplorePage from './pages/ExplorePage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import ProtectedRoute from './routes/ProtectedRoute.jsx'
 import LanguageProvider from './i18n/LanguageProvider.jsx'
@@ -15,7 +14,8 @@ import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 import { rememberVisit } from './utils/lastVisited.js'
 import { markSurface } from './ui/surface.js'
 
-// The editor and the public preview are the heaviest screens — together they
+// Discovery also loads the template builders, so defer it on sign-in and
+// direct editor/preview visits. The editor and public preview are the heaviest screens — together they
 // pull in the entire renderer, all eight AI templates, the schema validators,
 // the responsive HTML emitter, and the iframe runtime. Visitors who only land
 // on /login, /register, or /  (the dashboard) shouldn't pay for any of that
@@ -23,6 +23,7 @@ import { markSurface } from './ui/surface.js'
 // when the matching route mounts; the Suspense fallback keeps the UI from
 // flashing blank between chunks.
 const EditorPage = lazyChunk(() => import('./pages/EditorPage.jsx'))
+const ExplorePage = lazyChunk(() => import('./pages/ExplorePage.jsx'))
 const PreviewPage = lazyChunk(() => import('./pages/PreviewPage.jsx'))
 const CodeProjectPage = lazyChunk(() => import('./pages/CodeProjectPage.jsx'))
 const ProfilePage = lazyChunk(() => import('./pages/ProfilePage.jsx'))

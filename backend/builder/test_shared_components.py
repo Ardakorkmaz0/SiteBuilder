@@ -378,6 +378,30 @@ class TestTakedown:
         site.refresh_from_db()
         assert site.schema['pages'][0]['components'] == []
 
+    @pytest.mark.parametrize('empty_schema', [True, False])
+    @pytest.mark.parametrize('with_published_copy', [True, False])
+    def test_purging_reaches_raw_html_without_schema_copies(self, author, taker, moderator, empty_schema, with_published_copy):
+        from .models import PublishedPage
+
+        component = SharedComponent.objects.create(author=author, **GOOD)
+        html = f'<h1>Keep me</h1><div data-pwb-shared-from="{component.pk}">Remove me</div>'
+        site = Site.objects.create(
+            owner=taker, title='HTML copy', html=html,
+            **({'schema': {}} if empty_schema else {}),
+        )
+        published = PublishedPage.objects.create(site=site, path='', html=html) if with_published_copy else None
+        response = client_for(moderator).post(
+            reverse('admin-component-moderate', args=[component.pk]), {'action': 'purge'}, format='json',
+        )
+        assert response.status_code == 200
+        assert response.data['sites_touched'] == 1
+        assert response.data['copies_removed'] == 1
+        site.refresh_from_db()
+        assert site.html == '<h1>Keep me</h1>'
+        if published:
+            published.refresh_from_db()
+            assert published.html == '<h1>Keep me</h1>'
+
     def test_a_purge_touches_only_the_copies_of_that_block(self, author, taker, moderator):
         keep = SharedComponent.objects.create(author=author, **{**GOOD, 'title': 'Innocent'})
         drop = SharedComponent.objects.create(author=author, **GOOD)

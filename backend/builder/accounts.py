@@ -16,6 +16,8 @@ two requests arriving together both pass it, and Django's own admin never asks.
 The database enforces it now — case-insensitively, and only for addresses that
 exist, because guests deliberately have none.
 """
+from django.contrib.auth.models import User
+from rest_framework.exceptions import ErrorDetail, ValidationError
 
 
 def normalise_username(value):
@@ -27,3 +29,21 @@ def normalise_email(value):
     """Addresses are matched and stored casefolded; the local part is
     case-sensitive in the RFC and in nobody's mail server."""
     return (value or '').strip().lower()
+
+
+def refuse_identity_conflicts(username, email, *, exclude_user_id=None):
+    """Translate a database uniqueness race into the usual field errors.
+
+    Call after the failed write's atomic block has rolled back, so the same
+    connection can query the winning row safely.
+    """
+    users = User.objects.all()
+    if exclude_user_id is not None:
+        users = users.exclude(pk=exclude_user_id)
+    errors = {}
+    if users.filter(username__iexact=username).exists():
+        errors['username'] = [ErrorDetail('This username is already taken.', code='unique')]
+    if email and users.filter(email__iexact=email).exists():
+        errors['email'] = [ErrorDetail('An account with this email already exists.', code='unique')]
+    if errors:
+        raise ValidationError(errors)

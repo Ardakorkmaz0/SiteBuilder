@@ -5,11 +5,13 @@ import pytest
 from django.contrib.admin.models import CHANGE, LogEntry
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from .models import Favorite, Profile, Report, SiteSettings, Site, SiteVisit, UploadedImage
+from .models import Favorite, Profile, Report, SharedComponent, SiteSettings, Site, SiteVisit, UploadedImage
 
 
 def _user(username, **flags):
@@ -129,6 +131,14 @@ class TestAccounts:
         assert self._list(world, sort='sites')['results'][0]['username'] == 'ada'
         top = self._list(world, sort='views')['results'][0]
         assert top['username'] == 'ada' and top['views'] == 40 and top['public_sites'] == 1
+
+    def test_suspended_accounts_have_no_public_sites(self, world):
+        ada = world['ada'][0]
+        ada.is_active = False
+        ada.save(update_fields=['is_active'])
+        account = next(row for row in self._list(world)['results'] if row['id'] == ada.id)
+        assert account['sites'] == 2
+        assert account['public_sites'] == 0
 
     def test_detail_counts_everything_the_account_owns(self, world):
         ada = world['ada'][0]
@@ -277,6 +287,34 @@ class TestSystem:
     def test_storage_adds_up_uploads(self, world):
         data = _client(world['mod'][1]).get('/api/admin/system/').data
         assert data['storage']['uploads'] == UploadedImage.objects.count()
+
+
+@pytest.mark.django_db
+class TestQueryBudgets:
+    def test_block_authors_do_not_add_one_query_per_result(self, world):
+        admin = _client(world['mod'][1])
+        SharedComponent.objects.create(author=world['ada'][0], title='First', html='<p>Hi</p>')
+        with CaptureQueriesContext(connection) as first:
+            assert admin.get('/api/admin/components/').status_code == 200
+        for number in range(8):
+            SharedComponent.objects.create(author=world['bob'], title=f'Block {number}', html='<p>Hi</p>')
+        with CaptureQueriesContext(connection) as many:
+            response = admin.get('/api/admin/components/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 9
+        assert len(many) <= len(first)
+
+    def test_overview_profiles_do_not_add_queries_per_new_site(self, world):
+        admin = _client(world['mod'][1])
+        with CaptureQueriesContext(connection) as first:
+            assert admin.get('/api/admin/overview/').status_code == 200
+        for number in range(8):
+            site = Site.objects.create(owner=world['bob'], title=f'New site {number}', published=True)
+            SiteVisit.objects.create(site=site, device='desktop')
+        with CaptureQueriesContext(connection) as many:
+            response = admin.get('/api/admin/overview/')
+        assert response.status_code == 200
+        assert len(many) <= len(first)
 
 
 @pytest.mark.django_db

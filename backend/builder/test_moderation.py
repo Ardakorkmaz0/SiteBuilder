@@ -125,6 +125,26 @@ class TestReporting:
 
 @pytest.mark.django_db
 class TestAdminModeration:
+    @pytest.mark.parametrize('value', ['false', 'true', 0, 1, None, [], {}])
+    def test_suspend_rejects_non_booleans_without_changing_account(self, client, admin, bob, value):
+        target, token = bob
+        _auth(client, admin[1])
+        response = client.post(f'/api/admin/users/{target.id}/suspend/', {'suspend': value}, format='json')
+        assert response.status_code == 400
+        assert response.data['code'] == 'invalid_suspend'
+        target.refresh_from_db()
+        assert target.is_active is True
+        assert Token.objects.filter(key=token.key).exists()
+
+    def test_suspend_requires_an_explicit_decision(self, client, admin, bob):
+        target, token = bob
+        _auth(client, admin[1])
+        response = client.post(f'/api/admin/users/{target.id}/suspend/', {}, format='json')
+        assert response.status_code == 400
+        target.refresh_from_db()
+        assert target.is_active is True
+        assert Token.objects.filter(key=token.key).exists()
+
     def test_suspend_user_revokes_tokens(self, client, admin, bob):
         _, atok = admin
         target, btok = bob
@@ -167,6 +187,33 @@ class TestAdminModeration:
         resp = client.post(f'/api/admin/sites/{site.id}/moderate/', {'action': 'delete'}, format='json')
         assert resp.status_code == 200
         assert not Site.objects.filter(pk=site.id).exists()
+
+    def test_reinstatement_requires_the_owner_to_publish_again(self, client, admin, alice):
+        owner, token = alice
+        site = Site.objects.create(owner=owner, title='Blocked draft', published=True)
+        _auth(client, admin[1])
+        client.post(f'/api/admin/sites/{site.id}/moderate/', {'action': 'unpublish'}, format='json')
+        _auth(client, token)
+        saved = client.patch(f'/api/sites/{site.id}/', {'published': True}, format='json')
+        assert saved.status_code == 200
+        assert APIClient().get(f'/api/public/sites/{site.slug}/').status_code == 404
+
+        _auth(client, admin[1])
+        response = client.post(f'/api/admin/sites/{site.id}/moderate/', {'action': 'reinstate'}, format='json')
+        assert response.status_code == 200
+        assert response.data['published'] is False
+        site.refresh_from_db()
+        assert site.moderation_blocked is False
+        assert site.published is False
+        assert APIClient().get(f'/api/public/sites/{site.slug}/').status_code == 404
+
+        _auth(client, token)
+        assert client.patch(f'/api/sites/{site.id}/', {'published': True}, format='json').status_code == 200
+        _auth(client, admin[1])
+        # Retrying an already-completed reinstatement leaves that new publish
+        # alone; only the transition out of a takedown returns a draft.
+        response = client.post(f'/api/admin/sites/{site.id}/moderate/', {'action': 'reinstate'}, format='json')
+        assert response.data['published'] is True
 
     def test_reports_queue_lists_open(self, client, admin, alice, bob):
         a, _ = alice

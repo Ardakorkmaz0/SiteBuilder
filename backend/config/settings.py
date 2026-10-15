@@ -223,8 +223,15 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # serves /media/ (and do that before running several instances).
 SERVE_MEDIA = _env_bool('DJANGO_SERVE_MEDIA', DEBUG)
 
-# Cap a single upload at ~6 MB so a 5 MB image (the validator's limit) plus
-# multipart overhead still fits without 413.
+# Multipart file bytes need an explicit streaming limit: Django's memory
+# settings only select storage and cap non-file form data, respectively.
+MAX_UPLOAD_FILE_BYTES = 5 * 1024 * 1024
+MAX_MULTIPART_BODY_BYTES = 6 * 1024 * 1024
+FILE_UPLOAD_HANDLERS = [
+    'builder.upload_limits.LimitedUploadHandler',
+    'django.core.files.uploadhandler.MemoryFileUploadHandler',
+    'django.core.files.uploadhandler.TemporaryFileUploadHandler',
+]
 DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
 

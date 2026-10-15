@@ -78,9 +78,8 @@ class TestImageUpload:
         _, token = alice
         _auth(client, token)
         from django.core.files.uploadedfile import SimpleUploadedFile
-        # Build a genuinely big PNG (Pillow validates the bytes before our
-        # size check runs, so junk bytes wouldn't exercise the size guard).
-        # 2000x2000 RGB noise compresses badly enough to land well over 5 MB.
+        # A real PNG above the limit must be refused too. 2000x2000 RGB noise
+        # compresses badly enough to land well over 5 MB.
         import random
         big = PILImage.new('RGB', (2000, 2000))
         big.putdata([(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
@@ -93,7 +92,7 @@ class TestImageUpload:
             {'file': SimpleUploadedFile('huge.png', buf.getvalue(), 'image/png')},
             format='multipart',
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 413
         assert 'too large' in str(resp.data).lower()
 
     def test_upload_wrong_mime_rejected(self, client, alice, settings, tmp_path):
@@ -139,6 +138,36 @@ class TestSvgUploads:
         resp = self._post(client, alice, settings, tmp_path, 'mark.svg', body)
         assert resp.status_code == 201, resp.data
         assert (resp.data['width'], resp.data['height']) == (120, 40)
+
+    @pytest.mark.parametrize('size', ['inf', '-inf', 'NaN', '-3', '0', '1e300', '2147483648'])
+    def test_invalid_view_box_dimensions_are_a_validation_error(self, client, alice, settings, tmp_path, size):
+        body = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} 24"/>'.encode()
+        resp = self._post(client, alice, settings, tmp_path, 'invalid-size.svg', body)
+        assert resp.status_code == 400, resp.data
+        assert not UploadedImage.objects.exists()
+
+    @pytest.mark.parametrize('size', ['0', '9' * 400, '2147483648'])
+    def test_explicit_dimensions_must_fit_the_image_record(self, client, alice, settings, tmp_path, size):
+        body = f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="24"/>'.encode()
+        resp = self._post(client, alice, settings, tmp_path, 'invalid-size.svg', body)
+        assert resp.status_code == 400, resp.data
+        assert not UploadedImage.objects.exists()
+
+    def test_positive_subpixel_dimensions_remain_nonzero(self, client, alice, settings, tmp_path):
+        body = b'<svg xmlns="http://www.w3.org/2000/svg" width="0.1" height="0.2"/>'
+        resp = self._post(client, alice, settings, tmp_path, 'tiny.svg', body)
+        assert resp.status_code == 201, resp.data
+        assert (resp.data['width'], resp.data['height']) == (1, 1)
+
+    @pytest.mark.parametrize('encoding', ['utf-16', 'utf-16-le', 'utf-16-be'])
+    def test_a_doctype_cannot_hide_in_another_xml_encoding(self, client, alice, settings, tmp_path, encoding):
+        body = ('<?xml version="1.0" encoding="UTF-16"?>'
+                '<!DOCTYPE svg [<!ENTITY text "expanded entity">]>'
+                '<svg xmlns="http://www.w3.org/2000/svg"><text>&text;</text></svg>').encode(encoding)
+        resp = self._post(client, alice, settings, tmp_path, 'entity.svg', body)
+        assert resp.status_code == 400, resp.data
+        assert 'doctype' in str(resp.data).lower()
+        assert not UploadedImage.objects.exists()
 
     @pytest.mark.parametrize('body', [
         b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',

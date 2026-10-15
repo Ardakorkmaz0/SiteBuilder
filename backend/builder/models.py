@@ -100,10 +100,8 @@ class Site(models.Model):
     # iframe so their JavaScript runs isolated from the app/visitor session).
     html = models.TextField(blank=True, default='')
     published = models.BooleanField(default=False)
-    # When this site was last switched from draft to public. It exists for the
-    # daily publishing cap (see access.publish_blocked): the cap counts SITES an
-    # account made public today, not switch flips, so a stamp on the site is
-    # enough — unpublishing and republishing the same one reuses its slot.
+    # Latest transition from draft to public. SitePublication keeps daily slots
+    # after deletion; this stamp remains a legacy fallback for cap accounting.
     last_published_at = models.DateTimeField(null=True, blank=True, db_index=True)
     # Set by a superuser to lift a site to the top of the home feed; null means
     # not pinned. A timestamp rather than a flag so several pinned sites keep a
@@ -202,6 +200,26 @@ class Site(models.Model):
             slug = f'{base}-{counter}'
             counter += 1
         return slug
+
+
+class SitePublication(models.Model):
+    """One site's daily publication slot, retained when that site is deleted.
+
+    site_pk deliberately is not a foreign key: deleting the authored content
+    must not refund the account's anti-spam allowance.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='site_publications',
+    )
+    site_pk = models.PositiveBigIntegerField()
+    published_on = models.DateField(default=timezone.localdate)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(
+            fields=['owner', 'site_pk', 'published_on'], name='site_publication_daily_unique',
+        )]
+        indexes = [models.Index(fields=['owner', 'published_on'], name='site_publication_owner_day')]
 
 
 class SiteViewer(models.Model):

@@ -16,14 +16,16 @@ Signing up does not start over: upgrade_guest() writes real credentials onto
 the same row, so the work made as a guest is still there afterwards.
 """
 import secrets
+from contextlib import contextmanager
 
 from django.contrib.auth.models import User
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from rest_framework import status
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from .models import Site
+from .accounts import refuse_identity_conflicts
 
 # Enough to try the product properly; not enough to turn throwaway identities
 # into a hosting farm. Signing up lifts it.
@@ -58,6 +60,17 @@ def refuse_past_site_limit(user):
         })
 
 
+@contextmanager
+def site_creation(user):
+    """Count and create under the same owner lock for both blank and copied sites."""
+    with transaction.atomic():
+        owner = User.objects.select_for_update().filter(pk=user.pk, is_active=True).first()
+        if owner is None:
+            raise PermissionDenied('This account is no longer available.')
+        refuse_past_site_limit(owner)
+        yield owner
+
+
 @transaction.atomic
 def create_guest_user():
     """A new guest identity. The password is unusable: this account can only be
@@ -90,18 +103,26 @@ def guest_blocked(action):
     )
 
 
-@transaction.atomic
 def upgrade_guest(user, *, username, email, password):
     """Turn the guest into a full account, in place. Same row, same id, so
     every site, favourite and draft they made stays theirs."""
-    user.username = username
-    user.email = email
-    user.set_password(password)
-    user.save(update_fields=['username', 'email', 'password'])
-    profile = user.profile
-    profile.is_guest = False
-    profile.save(update_fields=['is_guest'])
-    return user
+    user_id = user.pk
+    try:
+        with transaction.atomic():
+            user = User.objects.select_for_update().filter(pk=user_id).first()
+            if user is None or not user.is_active or not is_guest(user):
+                raise ValidationError({'detail': 'This guest session is no longer available.'})
+            user.username = username
+            user.email = email
+            user.set_password(password)
+            user.save(update_fields=['username', 'email', 'password'])
+            profile = user.profile
+            profile.is_guest = False
+            profile.save(update_fields=['is_guest'])
+            return user
+    except IntegrityError:
+        refuse_identity_conflicts(username, email, exclude_user_id=user_id)
+        raise
 
 
 @transaction.atomic
@@ -118,6 +139,25 @@ def adopt_guest_work(guest, account):
     identity, and it came from this browser.
     """
     from .models import Favorite, Site, UploadedImage
+
+    # Upgrade and adoption both lock the identities before checking the guest
+    # flag. A request authenticated just before an upgrade must never transfer
+    # and delete the now-registered account. Lock in pk order to avoid two
+    # simultaneous transfers acquiring the same pair in opposite orders.
+    participants = {
+        person.pk: person
+        for person in User.objects.select_for_update()
+        .filter(pk__in=[guest.pk, account.pk]).order_by('pk')
+    }
+    guest, account = participants.get(guest.pk), participants.get(account.pk)
+    if guest is None or not guest.is_active or not is_guest(guest):
+        raise ValidationError({'guest_token': 'That is not an available guest session.'})
+    if account is None or not account.is_active or account.pk == guest.pk or is_guest(account):
+        raise PermissionDenied({
+            'detail': 'Create an account before taking over guest work.',
+            'code': 'guest_forbidden',
+            'action': 'adopt',
+        })
 
     moved = {
         'sites': Site.objects.filter(owner=guest).update(owner=account),

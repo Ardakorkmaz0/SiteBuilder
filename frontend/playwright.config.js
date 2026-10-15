@@ -31,6 +31,9 @@ export default defineConfig({
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],
+        ...(process.env.E2E_CHROMIUM_EXECUTABLE ? {
+          launchOptions: { executablePath: process.env.E2E_CHROMIUM_EXECUTABLE },
+        } : {}),
         viewport: { width: 1440, height: 900 },
         storageState: 'e2e/.auth/state.json',
       },

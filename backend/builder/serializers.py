@@ -4,13 +4,14 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password as dj_validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import URLValidator, validate_image_file_extension
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import ErrorDetail
 
 from .access import DAILY_PUBLISH_LIMIT, publish_blocked
 from .ai_policy import AI_PROVIDER_IDS, MAX_HIDDEN_MODELS, MODEL_ID_RE, local_ai_available
-from .accounts import normalise_email, normalise_username
+from .accounts import normalise_email, normalise_username, refuse_identity_conflicts
 from .guests import GUEST_SITE_LIMIT, GUEST_USERNAME_PREFIX, is_guest
 from .models import (
     FormSubmission,
@@ -21,6 +22,7 @@ from .models import (
     SharedComponent,
     SharedComponentReport,
     Site,
+    SitePublication,
     SiteSettings,
     SiteVersion,
     UploadedImage,
@@ -77,12 +79,14 @@ class RegisterSerializer(serializers.ModelSerializer):
     # No UniqueValidator: it compares exactly, which let `Ada` and `ada` both
     # exist. validate_username folds the name and checks against every
     # spelling of it.
-    username = serializers.CharField()
+    username = serializers.CharField(
+        max_length=150, validators=[User.username_validator],
+    )
     # Required so every new account is reachable for password reset / receipts
     # once email is wired (see DEPLOY.md). Uniqueness is enforced
     # case-insensitively in validate_email; Google sign-in links by email the
     # same way, so the two paths can't create two accounts for one address.
-    email = serializers.EmailField(required=True)
+    email = serializers.EmailField(required=True, max_length=254)
     password = serializers.CharField(write_only=True, min_length=8)
 
     class Meta:
@@ -115,11 +119,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        return User.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data['email'],
-            password=validated_data['password'],
-        )
+        try:
+            with transaction.atomic():
+                return User.objects.create_user(
+                    username=validated_data['username'],
+                    email=validated_data['email'],
+                    password=validated_data['password'],
+                )
+        except IntegrityError:
+            refuse_identity_conflicts(validated_data['username'], validated_data['email'])
+            raise
 
 
 class GuestUpgradeSerializer(serializers.Serializer):
@@ -130,8 +139,10 @@ class GuestUpgradeSerializer(serializers.Serializer):
     to exclude the guest itself, whose username is about to be replaced.
     """
 
-    username = serializers.CharField(max_length=150)
-    email = serializers.EmailField(required=True)
+    username = serializers.CharField(
+        max_length=150, validators=[User.username_validator],
+    )
+    email = serializers.EmailField(required=True, max_length=254)
     password = serializers.CharField(write_only=True, min_length=8)
 
     def _others(self):
@@ -658,6 +669,10 @@ class SiteSerializer(serializers.ModelSerializer):
     # switch — PATCH, PUT, create — goes through this serializer.
     def validate_published(self, value):
         user = getattr(self.context.get('request'), 'user', None)
+        return self._validate_publish_state(value, user, self.instance)
+
+    @staticmethod
+    def _validate_publish_state(value, user, site):
         if value and is_guest(user):
             raise serializers.ValidationError(
                 'Create an account to publish this site — your work is kept.',
@@ -665,8 +680,8 @@ class SiteSerializer(serializers.ModelSerializer):
         # Only a move INTO public is capped. Saving an already-public site, and
         # unpublishing, are untouched — otherwise editing a live page would
         # eat the owner's allowance.
-        going_public = value and not (self.instance and self.instance.published)
-        if going_public and publish_blocked(user, self.instance):
+        going_public = value and not (site and site.published)
+        if going_public and publish_blocked(user, site):
             raise serializers.ValidationError(
                 f'You can make {DAILY_PUBLISH_LIMIT} sites public a day. '
                 'Try again tomorrow — a site you already published today can '
@@ -689,7 +704,16 @@ class SiteSerializer(serializers.ModelSerializer):
     def validate_published_pages(self, value):
         return clean_published_pages(value)
 
+    @transaction.atomic
     def update(self, instance, validated_data):
+        # Serialise publication decisions per owner, and re-read the site after
+        # locking: two requests may both have passed is_valid with one slot left.
+        owner = User.objects.select_for_update().get(pk=instance.owner_id)
+        instance = Site.objects.select_for_update().get(pk=instance.pk, owner=owner)
+        try:
+            self._validate_publish_state(validated_data.get('published', instance.published), owner, instance)
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError({'published': exc.detail}) from exc
         pages = validated_data.pop('published_pages', None)
         # Read before the update: afterwards `instance` already carries the new
         # value, and the stamp has to mark the crossing, not the state.
@@ -705,7 +729,13 @@ class SiteSerializer(serializers.ModelSerializer):
             replace_published_pages(site, pages)
         return site
 
+    @transaction.atomic
     def create(self, validated_data):
+        owner = User.objects.select_for_update().get(pk=validated_data['owner'].pk)
+        try:
+            self._validate_publish_state(validated_data.get('published', False), owner, None)
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError({'published': exc.detail}) from exc
         pages = validated_data.pop('published_pages', None)
         site = super().create(validated_data)
         if site.published:
@@ -719,6 +749,10 @@ class SiteSerializer(serializers.ModelSerializer):
         """Record that this site went public, for the daily cap."""
         site.last_published_at = timezone.now()
         site.save(update_fields=['last_published_at'])
+        SitePublication.objects.get_or_create(
+            owner_id=site.owner_id, site_pk=site.pk,
+            published_on=timezone.localdate(site.last_published_at),
+        )
 
 
 class PublicSiteSerializer(serializers.ModelSerializer):

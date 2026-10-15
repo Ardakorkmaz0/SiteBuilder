@@ -9,7 +9,7 @@ writing its own filter.
 """
 from django.utils import timezone
 
-from .models import Site
+from .models import Site, SitePublication
 
 # --- How much of the internet one account may open in a day ----------------
 #
@@ -28,10 +28,17 @@ def sites_published_today(user, today=None):
     if user is None or not getattr(user, 'is_authenticated', False):
         return set()
     day = today or timezone.localdate()
-    return set(
+    # Include the old stamp as a compatibility fallback for pre-ledger writes;
+    # the ledger keeps the slot even after its site no longer exists.
+    used = set(
+        SitePublication.objects.filter(owner=user, published_on=day)
+        .values_list('site_pk', flat=True),
+    )
+    used.update(
         Site.objects.filter(owner=user, last_published_at__date=day)
         .values_list('pk', flat=True),
     )
+    return used
 
 
 def publish_blocked(user, site=None, today=None):

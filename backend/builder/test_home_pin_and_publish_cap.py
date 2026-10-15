@@ -18,7 +18,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .access import DAILY_PUBLISH_LIMIT, publish_blocked
-from .models import Site
+from .models import Site, SitePublication
 
 
 @pytest.fixture
@@ -227,6 +227,9 @@ class TestDailyPublishCap:
             publish(api, Site.objects.create(owner=owner, title=f'S{i}').pk)
         Site.objects.filter(owner=owner).update(
             last_published_at=timezone.now() - timedelta(days=1),
+        )
+        SitePublication.objects.filter(owner=owner).update(
+            published_on=timezone.localdate() - timedelta(days=1),
         )
         fresh = Site.objects.create(owner=owner, title='A new day')
 

@@ -2294,6 +2294,7 @@ function HtmlWorkspace({
             </div>
             <textarea
               ref={sourceRef}
+              aria-label={t('HTML source editor')}
               value={sourceDraft}
               onChange={(e) => { setGlow(null); setSourceDraft(e.target.value) }}
               spellCheck={false}

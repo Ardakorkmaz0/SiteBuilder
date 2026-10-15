@@ -2,7 +2,7 @@
 import { randomBytes } from 'node:crypto'
 import { test, expect, session, API } from './support.js'
 
-test.use({ storageState: { cookies: [], origins: [] } })
+test.use({ isolatedAccount: false, storageState: { cookies: [], origins: [] } })
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {

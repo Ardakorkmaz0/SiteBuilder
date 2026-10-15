@@ -80,6 +80,23 @@ class TestProfile:
         assert resp.data['avatar_url']
         assert resp.data['avatar_url'].startswith('http')
 
+    @pytest.mark.parametrize('name,body,ctype', [
+        ('page.html', b'<script>alert(1)</script>', 'image/png'),
+        ('picture.html', _png_bytes(), 'image/png'),
+        ('active.svg', b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', 'image/svg+xml'),
+    ])
+    def test_avatar_upload_cannot_publish_html_or_active_svg(self, client, alice, settings, tmp_path, name, body, ctype):
+        settings.MEDIA_ROOT = tmp_path
+        user, token = alice
+        _auth(client, token)
+        resp = client.patch('/api/profile/', {
+            'avatar': SimpleUploadedFile(name, body, ctype),
+        }, format='multipart')
+        assert resp.status_code == 400, resp.data
+        user.profile.refresh_from_db()
+        assert not user.profile.avatar
+        assert not any(tmp_path.rglob('*'))
+
     def test_me_endpoint_carries_display_name(self, client, alice):
         _, token = alice
         _auth(client, token)
