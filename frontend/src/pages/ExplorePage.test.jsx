@@ -138,3 +138,22 @@ describe('ExplorePage templates', () => {
     expect(await screen.findByRole('dialog', { name: 'An account is needed' })).toBeInTheDocument()
   })
 })
+
+describe('ExplorePage greeting', () => {
+  it('welcomes a new guest without reading out the random guest handle', async () => {
+    // The API fills an unset display name with the username.
+    useAuthStore.setState({ user: { id: 300, username: 'guest-x7k2m4pq', display_name: 'guest-x7k2m4pq', is_guest: true }, token: 'guest-session' })
+    render(<LanguageProvider><MemoryRouter><ExplorePage /></MemoryRouter></LanguageProvider>)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome' })).toBeInTheDocument()
+    expect(screen.queryByText(/guest-x7k2m4pq/)).toBeNull()
+  })
+
+  it('welcomes an account back by name', async () => {
+    useAuthStore.setState({ user: { id: 100, username: 'ada', display_name: 'Ada Studio' }, token: 'test-session' })
+    render(<LanguageProvider><MemoryRouter><ExplorePage /></MemoryRouter></LanguageProvider>)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome back, Ada Studio' })).toBeInTheDocument()
+  })
+})
+
