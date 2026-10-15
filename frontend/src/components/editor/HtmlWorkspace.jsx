@@ -2072,9 +2072,10 @@ function HtmlWorkspace({
                 type="button"
                 onClick={() => switchMode('view')}
                 title={t('Run the page: click through it in View, then come back — Edit shows it the way you left it.')}
+                aria-label={t('Run')}
                 className="studio-btn studio-btn-secondary inline-flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs"
               >
-                ▶ <span className="hidden @[900px]:inline">{t('Run')}</span>
+                <span aria-hidden="true">▶</span> <span className="hidden @[900px]:inline">{t('Run')}</span>
               </button>
             </div>
           )}

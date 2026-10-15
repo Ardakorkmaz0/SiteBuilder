@@ -73,7 +73,7 @@ export default function AdminPage() {
       <header className="sticky top-0 z-10 border-b border-[var(--studio-border)] bg-[color-mix(in_srgb,var(--studio-panel-raised)_92%,transparent)] backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-y-2 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <Link to="/" title={t('Sitebuilder home')} className="brand-mark">S</Link>
+            <Link to="/" title={t('Sitebuilder home')} aria-label={t('Sitebuilder home')} className="brand-mark">S</Link>
             <button type="button" onClick={goBack} className="text-sm font-medium text-[var(--studio-text-muted)] hover:text-[var(--studio-text)]">
               &larr; {t('Back')}
             </button>

@@ -208,6 +208,7 @@ export default function PublicToolbar({
               <Link
                 to="/"
                 title={t('Sitebuilder home')}
+                aria-label={t('Sitebuilder home')}
                 className="brand-mark"
                 style={{ width: '2.15rem', height: '2.15rem' }}
               >
