@@ -28,7 +28,7 @@
   --studio-border-strong: #b9c4d4;
   --studio-text: #15171d;
   --studio-text-muted: #5f6775;
-  --studio-text-faint: #667080;
+  --studio-text-faint: #616a79; /* 4.5:1 or better on every light surface, the shell included */
   --studio-danger: #b83241;
   --studio-danger-soft: #fff0f2;
   --studio-success: #1d7049;
