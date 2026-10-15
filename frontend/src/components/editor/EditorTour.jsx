@@ -19,9 +19,16 @@ const CARD = { width: 320, height: 186 }
 
 export default function EditorTour({ open, steps = EDITOR_TOUR_STEPS, onClose }) {
   const { t } = useLanguage()
-  const [index, setIndex] = useState(0)
+  // The steps and the position in them change together: a key handler that
+  // read the step count from its own render could, pressed in the moment
+  // after the steps arrived, still see none and step off the end.
+  const [tour, setTour] = useState({ available: [], index: 0 })
+  const { available, index } = tour
+  const move = (delta) => setTour((current) => ({
+    ...current,
+    index: Math.max(0, Math.min(current.index + delta, current.available.length - 1)),
+  }))
   const [spot, setSpot] = useState(null)
-  const [available, setAvailable] = useState([])
 
   // Which steps apply is read from the DOM AFTER the commit, not during the
   // render: mounted in the same commit as the editor itself, this component
@@ -30,8 +37,7 @@ export default function EditorTour({ open, steps = EDITOR_TOUR_STEPS, onClose })
   useEffect(() => {
     if (!open) return undefined
     const settle = window.setTimeout(() => {
-      setAvailable(usableSteps(steps, (selector) => document.querySelector(selector)))
-      setIndex(0)
+      setTour({ available: usableSteps(steps, (selector) => document.querySelector(selector)), index: 0 })
     }, 0)
     return () => window.clearTimeout(settle)
   }, [open, steps])
@@ -70,12 +76,12 @@ export default function EditorTour({ open, steps = EDITOR_TOUR_STEPS, onClose })
     if (!open) return undefined
     const onKey = (event) => {
       if (event.key === 'Escape') { event.preventDefault(); close() }
-      else if (event.key === 'ArrowRight') setIndex((current) => Math.min(current + 1, available.length - 1))
-      else if (event.key === 'ArrowLeft') setIndex((current) => Math.max(0, current - 1))
+      else if (event.key === 'ArrowRight') move(1)
+      else if (event.key === 'ArrowLeft') move(-1)
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [open, close, available.length])
+  }, [open, close])
 
   if (!open || !step) return null
 
@@ -104,7 +110,7 @@ export default function EditorTour({ open, steps = EDITOR_TOUR_STEPS, onClose })
         <div className="editor-tour-actions">
           <button
             type="button"
-            onClick={() => setIndex((current) => Math.max(0, current - 1))}
+            onClick={() => move(-1)}
             disabled={index === 0}
             className="studio-btn studio-btn-secondary px-2.5 py-1 text-xs"
           >
@@ -113,7 +119,7 @@ export default function EditorTour({ open, steps = EDITOR_TOUR_STEPS, onClose })
           <button type="button" onClick={close} className="editor-tour-skip">{t('Skip')}</button>
           <button
             type="button"
-            onClick={() => (last ? close() : setIndex((current) => current + 1))}
+            onClick={() => (last ? close() : move(1))}
             className="studio-btn studio-btn-primary px-2.5 py-1 text-xs"
           >
             {last ? t('Done') : <>{t('Next')} →</>}
