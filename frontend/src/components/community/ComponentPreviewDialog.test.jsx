@@ -2,10 +2,11 @@
 // It has to be the real block, at real widths, with the decision reachable
 // from where you made it.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import ComponentPreviewDialog from './ComponentPreviewDialog.jsx'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 const COMPONENT = {
   id: 3,
@@ -91,3 +92,30 @@ describe('deciding from here', () => {
     expect(onClose).toHaveBeenCalled()
   })
 })
+
+// "Use" and "Report" open on top of the preview. Esc closes the top one; the
+// preview's own listener ran first and took itself down with it.
+function OnTop({ onClose }) {
+  useEscapeToClose(true, onClose)
+  return <div role="dialog" aria-label="Use this block" />
+}
+
+describe('Esc with a dialog on top', () => {
+  it('closes only the dialog on top', () => {
+    localStorage.setItem('pwb_language', 'en')
+    const closePreview = vi.fn()
+    const closeTop = vi.fn()
+    render(
+      <LanguageProvider>
+        <ComponentPreviewDialog component={COMPONENT} onClose={closePreview} />
+        <OnTop onClose={closeTop} />
+      </LanguageProvider>,
+    )
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(closeTop).toHaveBeenCalledTimes(1)
+    expect(closePreview).not.toHaveBeenCalled()
+  })
+})
+
