@@ -127,8 +127,11 @@ export default function SearchPage() {
   const type = ['users', 'sites'].includes(requestedType) ? requestedType : 'all'
   return (
     <div className="dashboard-page">
+      <a href="#search-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-[var(--studio-panel-raised)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--studio-accent-hover)] focus:shadow-lg">
+        {t('Skip to content')}
+      </a>
       <DashboardHeader showSearch={false} />
-      <main className="dashboard-container">
+      <main id="search-main" className="dashboard-container">
         <div className="mb-6">
           <h1 className="mb-4 text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">{t('Search results')}</h1>
           <DashboardGlobalSearch key={`${query}:${type}`} initialQuery={query} resultType={type} label={t('Search query')} formLabel={t('Search results')} />

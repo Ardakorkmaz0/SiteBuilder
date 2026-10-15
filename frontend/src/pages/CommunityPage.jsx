@@ -206,8 +206,11 @@ export default function CommunityPage() {
 
   return (
     <div className="dashboard-page">
+      <a href="#community-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-[var(--studio-panel-raised)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--studio-accent-hover)] focus:shadow-lg">
+        {t('Skip to content')}
+      </a>
       <DashboardHeader current="community" />
-      <main className="dashboard-container">
+      <main id="community-main" className="dashboard-container">
         <section aria-labelledby="blocks-heading">
           <div className="dashboard-section-heading">
             <div className="min-w-0">
