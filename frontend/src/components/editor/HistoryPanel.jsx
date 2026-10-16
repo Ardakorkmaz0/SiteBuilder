@@ -23,6 +23,7 @@ export default function HistoryPanel({
   siteId,
   onClose,
   onRestored,
+  onRestore,
   onSave,
   // Work on screen that the server does not have yet.
   hasUnsavedChanges = false,
@@ -68,6 +69,13 @@ export default function HistoryPanel({
 
   const restore = (versionId) => run(async () => {
     if (!window.confirm(t('Load this save? Your current state is snapshotted first, so you can undo the load.'))) return
+    // The editor owns the queue and its live drafts. Delegating the whole load
+    // keeps an older in-flight save from overwriting the restored version.
+    if (onRestore) {
+      const fresh = await onRestore(versionId)
+      if (fresh) await refresh()
+      return
+    }
     // The snapshot the server takes before a load is of the SAVED site. Work
     // still on screen was dropped, though this dialog promises the load can
     // be undone; it is saved first, so a save holds it.

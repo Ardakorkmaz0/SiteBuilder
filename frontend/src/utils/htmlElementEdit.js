@@ -377,6 +377,23 @@ function gradientPartsOf(...values) {
   return gradientParts('')
 }
 
+function computedBackgroundImage(el) {
+  try {
+    return el.ownerDocument?.defaultView?.getComputedStyle(el).backgroundImage || ''
+  } catch {
+    return ''
+  }
+}
+
+function patchedGradient(current, patch) {
+  // A missing stop uses the same initial colour shown by the panel. An
+  // explicitly emptied stop still clears the gradient.
+  const from = patch.gradientFrom !== undefined ? patch.gradientFrom : current.gradientFrom || '#ffffff'
+  const to = patch.gradientTo !== undefined ? patch.gradientTo : current.gradientTo || '#000000'
+  const angle = Number(patch.gradientAngle !== undefined ? patch.gradientAngle : current.gradientAngle)
+  return from && to ? `linear-gradient(${Number.isFinite(angle) ? angle : 160}deg, ${from}, ${to})` : ''
+}
+
 const CONTENT_PATCH_KEYS = ['text', 'href', 'src', 'alt', 'links']
 
 const LINK_LIST_TAGS = new Set(['NAV', 'UL', 'OL', 'HEADER', 'MENU'])
@@ -814,12 +831,15 @@ export function applyElementPatch(el, patch = {}) {
   // Gradient and image share `background-image`, so the last one set wins and
   // clearing either falls back to the flat colour underneath.
   if (patch.gradientFrom !== undefined || patch.gradientTo !== undefined || patch.gradientAngle !== undefined) {
-    const current = gradientParts(pcStyleValue(el, 'background-image'))
-    const from = patch.gradientFrom !== undefined ? patch.gradientFrom : current.gradientFrom
-    const to = patch.gradientTo !== undefined ? patch.gradientTo : current.gradientTo
-    const angle = Number(patch.gradientAngle !== undefined ? patch.gradientAngle : current.gradientAngle)
-    if (from && to) setImp('background-image', `linear-gradient(${Number.isFinite(angle) ? angle : 160}deg, ${from}, ${to})`)
-    else setImp('background-image', '')
+    const current = gradientPartsOf(
+      pcStyleValue(el, 'background-image'),
+      // At PC width the page's stylesheet still supplies its PC gradient,
+      // even when a phone override exists. At phone width it must not seed
+      // the PC value from that visible phone override.
+      !phoneOverrides(el, 'background-image') || el.ownerDocument?.defaultView?.innerWidth >= PHONE_BREAKPOINT
+        ? computedBackgroundImage(el) : '',
+    )
+    setImp('background-image', patchedGradient(current, patch))
   }
   if (patch.backgroundImage !== undefined) {
     const url = String(patch.backgroundImage || '').trim()
@@ -973,15 +993,12 @@ export function applyMobileElementPatch(el, patch = {}) {
   // Background, stacking: the same rules as on the PC side, kept to the phone.
   const phoneValue = (name) => el.style.getPropertyValue(`${MOBILE_VAR_PREFIX}${name}`).trim()
   if (patch.gradientFrom !== undefined || patch.gradientTo !== undefined || patch.gradientAngle !== undefined) {
-    const current = gradientPartsOf(phoneValue('background-image'), pcStyleValue(el, 'background-image'))
-    const from = patch.gradientFrom !== undefined ? patch.gradientFrom : current.gradientFrom
-    const to = patch.gradientTo !== undefined ? patch.gradientTo : current.gradientTo
-    const angle = Number(patch.gradientAngle !== undefined ? patch.gradientAngle : current.gradientAngle)
-    setMobileStyle(
-      el,
-      'background-image',
-      from && to ? `linear-gradient(${Number.isFinite(angle) ? angle : 160}deg, ${from}, ${to})` : '',
+    const current = gradientPartsOf(
+      phoneValue('background-image'),
+      pcStyleValue(el, 'background-image'),
+      computedBackgroundImage(el),
     )
+    setMobileStyle(el, 'background-image', patchedGradient(current, patch))
   }
   if (patch.backgroundImage !== undefined) {
     const url = String(patch.backgroundImage || '').trim()

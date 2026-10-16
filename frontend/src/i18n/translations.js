@@ -1585,6 +1585,7 @@ export const TURKISH_TRANSLATIONS = {
   'Manual save': 'Manuel kayıt',
   'Pin': 'Sabitle',
   'Unpin': 'Sabitlemeyi kaldır',
+  'Your work kept changing while the save was loading. Nothing on screen was replaced. Try loading again when you finish editing.': 'Kayıt yüklenirken çalışmanız değişmeye devam etti. Ekrandaki çalışmanız korundu. Düzenlemenizi bitirdiğinizde yeniden yüklemeyi deneyin.',
   'Save failed. Nothing was loaded.': 'Kaydetme başarısız oldu. Hiçbir şey yüklenmedi.',
   'Save failed. The checkpoint was not created.': 'Kayıt başarısız oldu. Kontrol noktası oluşturulmadı.',
   'Save failed. The checkpoint was not changed.': 'Kayıt başarısız oldu. Kontrol noktası değiştirilmedi.',

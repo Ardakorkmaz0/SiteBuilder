@@ -103,3 +103,27 @@ alınmasını açıkça istedi.
 Paste tekrar aynı history key'ini kullanırsa veya force kayıt yayın tercihini
 almazsa ilgili regresyonların kırılması beklenir. İnceleyen kişi bunları
 yalnız test sonuçlarına güvenmeden mutation ile doğrulayabilir.
+
+## Commit, CI ve canlı doğrulaması
+
+Kullanıcının sonraki açık talimatıyla üç düzeltme `4adc730` commit'inde
+`master` üzerine kaydedilip push edildi. Author ve committer:
+`ArdaKorkmaz0 <korkmazarda4455@gmail.com>`.
+
+[Aynı HEAD'in tests koşusu](https://github.com/Ardakorkmaz0/SiteBuilder/actions/runs/38885129969)
+başarılı: frontend ve backend işleri yeşil, Chromium **94/94 geçti** (8,9 dakika).
+Ardından yalnız `bash deploy.sh` ile dağıtım yapıldı. Canlıdaki paket
+`assets/index-BRpjwIvE.js` olarak doğrulandı; API, SPA admin yolları ve Django
+admin yönlendirmesi beklenen durum kodlarını döndürdü. Betik başarıyla tamamlandı.
+Üretim verisi değiştirilmedi ve Caddy ayarına müdahale edilmedi.
+
+Bağımsız Codex incelemesi izole kopyada 17 testi çalıştırdı; bağlantı eşleme,
+ayrı Paste geçmişi ve force kayıt yayın tercihini geri alan mutation'lar sırasıyla
+9, 2 ve 2 testi kırdı. Engelleyici yeni bulgu bildirilmedi. Bu, Claude incelemesi
+olarak sunulmaz. Dağıtım sonrası devam eden test turu ayrı raporlanacaktır.
+
+Devam turu ve kullanıcının bildirdiği **Gradient to** problemi için
+[ikinci rapor](EDITOR-CONTINUED-2026-10-16.md) hazırlanmıştır. Gradient,
+copy-to-page Undo, çok sayfalı tema geçmişi, coalesced Redo, SEO revizyonu,
+checkpoint kayıt kuyruğu ve editörden ayrılma snapshot'ları burada açıklanır.
+Bu sonraki düzeltmeler için yeni canlıya alma yapılmamıştır.
