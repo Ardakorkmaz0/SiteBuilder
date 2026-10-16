@@ -1,4 +1,5 @@
-import { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 import { lazyChunk } from '../utils/lazyChunk.js'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -12,6 +13,7 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { getSite, updateSite } from '../api/sites.js'
+import { restoreVersion } from '../api/versions.js'
 import { useEditorStore, selectCurrentPage, nextHistoryStamp } from '../store/editorStore.js'
 import { useAuthStore } from '../store/authStore.js'
 import { useGuestGate } from '../utils/useGuestGate.jsx'
@@ -914,6 +916,7 @@ function SiteEditor() {
   // and dirty flags instead of the previous render's closure.
   saveLifecycleRef.current = {
     save, performSave, dirty, htmlDirty, metaDirty, workspaceDirty, published,
+    flushWorkspaceDrafts, historyDraftSnapshot, applyHistoryRestore, captureDetachedDraft,
     loading: loading || !!recoveryDraft || siteConflict, autoSaveEnabled, previewing,
   }
   const recoveryCaptureRef = useRef(null)
@@ -1033,10 +1036,31 @@ function SiteEditor() {
   // rules are the same as for any automatic save: not when it is switched off,
   // and not after "leave without saving".
   const leftEditorRef = useRef(false)
-  useEffect(() => {
+  const detachedDraftRef = useRef(null)
+  useLayoutEffect(() => {
     leftEditorRef.current = false
+    detachedDraftRef.current = null
     return () => {
       leftEditorRef.current = true
+      const s = saveLifecycleRef.current
+      // Layout cleanup runs before the workspace and code-panel refs vanish,
+      // and before the next editor loads its schema into the shared store.
+      detachedDraftRef.current = s.captureDetachedDraft()
+      const draft = detachedDraftRef.current
+      if (!sessionEndedRef.current && shouldRunEditorAutoSave(s, discardLeaveRef.current) &&
+          draft && Object.keys(draft.codeDrafts).length) {
+        // Unapplied component source is deliberately separate from its canvas.
+        // Keep that source locally rather than converting the page on exit.
+        writeEditorRecovery(editorOwnerId, id, {
+          schema: projectSnapshot(draft.schema, draft.map).schema,
+          title: draft.title, category: draft.category, tagsText: draft.tagsText,
+          currentPageId: draft.currentPageId, codeDrafts: draft.codeDrafts,
+        })
+      }
+    }
+  }, [editorOwnerId, id])
+  useEffect(() => {
+    return () => {
       const s = saveLifecycleRef.current
       if (!sessionEndedRef.current && shouldRunEditorAutoSave(s, discardLeaveRef.current)) {
         s.save(undefined, { auto: true })
@@ -1479,24 +1503,45 @@ function SiteEditor() {
 
   // …and the other way round: a new step recorded in the store (a page
   // renamed, a theme edit) ends what could be redone in the documents' list.
-  // A recorded step is the one store change that grows `past` and empties
-  // `future` without touching the design; undo and redo both replace it.
+  // Recording updates history before changing the design. A coalesced edit
+  // only replaces its stamp, but still ends the document redo branch.
   useEffect(() => useEditorStore.subscribe((state, before) => {
-    if (state.past !== before.past && state.schema === before.schema && !state.future.length) {
+    if ((state.past !== before.past || state.pastAt !== before.pastAt) && state.schema === before.schema && !state.future.length) {
       setHtmlFuture((list) => (list.length ? [] : list))
     }
   }), [])
 
-  // Undo entries carry the page they belong to, so undoing after a page
-  // switch restores the right document (and reseeds only when visible).
+  // A single-page edit keeps its legacy entry; an operation spanning several
+  // HTML pages carries their documents together, so one Undo is one action.
+  function htmlEntryDocuments(entry) {
+    return entry.documents || { [entry.pageId]: entry.html }
+  }
+
+  function reverseHtmlEntry(entry) {
+    const current = latestHtmlMapRef.current
+    if (!entry.documents) return { pageId: entry.pageId, html: current[entry.pageId] || '', at: entry.at }
+    return {
+      documents: Object.fromEntries(Object.keys(entry.documents).map((pageId) => [pageId, current[pageId] || ''])),
+      at: entry.at,
+    }
+  }
+
+  function restoreHtmlEntry(entry) {
+    const documents = htmlEntryDocuments(entry)
+    setPageHtmlMap((current) => ({ ...current, ...documents }))
+    markHtmlDirty()
+    if (Object.prototype.hasOwnProperty.call(documents, currentPageId)) {
+      workspaceRef.current?.setDocument?.(documents[currentPageId])
+    }
+  }
+
   function undoHtml() {
     if (!htmlPast.length) return
     const entry = htmlPast[htmlPast.length - 1]
+    const reverse = reverseHtmlEntry(entry)
     setHtmlPast(htmlPast.slice(0, -1))
-    setHtmlFuture((f) => [...f, { pageId: entry.pageId, html: pageHtmlMap[entry.pageId] || '', at: entry.at }])
-    setPageHtmlMap((m) => ({ ...m, [entry.pageId]: entry.html }))
-    markHtmlDirty()
-    if (entry.pageId === currentPageId) workspaceRef.current?.setDocument?.(entry.html)
+    setHtmlFuture((future) => [...future, reverse])
+    restoreHtmlEntry(entry)
   }
 
   // On an HTML page, Undo takes the newest step of either stack: the page's
@@ -1539,14 +1584,10 @@ function SiteEditor() {
   function redoHtml() {
     if (!htmlFuture.length) return
     const entry = htmlFuture[htmlFuture.length - 1]
+    const reverse = reverseHtmlEntry(entry)
     setHtmlFuture(htmlFuture.slice(0, -1))
-    setHtmlPast((p) => [
-      ...p.slice(-(HTML_HISTORY_CAP - 1)),
-      { pageId: entry.pageId, html: pageHtmlMap[entry.pageId] || '', at: entry.at },
-    ])
-    setPageHtmlMap((m) => ({ ...m, [entry.pageId]: entry.html }))
-    markHtmlDirty()
-    if (entry.pageId === currentPageId) workspaceRef.current?.setDocument?.(entry.html)
+    setHtmlPast((past) => [...past.slice(-(HTML_HISTORY_CAP - 1)), reverse])
+    restoreHtmlEntry(entry)
   }
 
   // Switch the active page: commit whatever the open workspace surface holds
@@ -1656,37 +1697,39 @@ function SiteEditor() {
   }
 
   function applySitePatch(data) {
-    if (Number.isInteger(data?.revision)) baseRevisionRef.current = data.revision
+    // Options can report a newer server revision without loading its content.
+    // Keep the revision belonging to this editor's document for its next save.
     if (data?.site_options !== undefined) setSiteOptions(data.site_options || {})
     if (data?.review_token !== undefined) setReviewToken(data.review_token || '')
     if (data?.custom_domain !== undefined) setCustomDomain(data.custom_domain || '')
     if (data?.domain_status !== undefined) setDomainStatus(data.domain_status || 'not_connected')
   }
 
-  // Theme presets / Apply, on an HTML site: rewrite EVERY page's document
-  // with the new palette + font. The current page rides commitHtml (undo +
-  // live reseed); the others are merged into the map in the same batch.
-  // The site theme goes to every page that follows it; a page with its own
-  // theme is skipped. `pageOnly` ("This page only") touches the open page alone.
+  // A theme is one document operation across the pages that follow it. Take
+  // pending typing as its own step first, then snapshot every changed page.
   function applyThemeToAllHtmlPages(theme, { pageOnly = false } = {}) {
-    const liveCur = workspaceRef.current?.getHtml?.() ?? pageHtmlMap[currentPageId] ?? ''
+    const before = liveHtmlMap({ commit: true })
     const pages = useEditorStore.getState().schema.pages
-    const ownTheme = new Set(pages.filter(hasOwnTheme).map((p) => p.id))
-    if (!pageOnly) {
-      setPageHtmlMap((prev) => {
-        const next = { ...prev }
-        for (const [pid, h] of Object.entries(prev)) {
-          if (pid === currentPageId || ownTheme.has(pid) || !h || !h.trim()) continue
-          const applied = applyThemeToDocument(h, theme)
-          if (applied) next[pid] = applied
-        }
-        return next
-      })
+    const next = { ...before }
+    const documents = {}
+    for (const page of pages) {
+      if (pageOnly ? page.id !== currentPageId : hasOwnTheme(page)) continue
+      const previous = before[page.id] || ''
+      if (!previous.trim()) continue
+      const applied = applyThemeToDocument(previous, theme)
+      if (applied == null || applied === previous) continue
+      documents[page.id] = previous
+      next[page.id] = applied
     }
-    if (!pageOnly && ownTheme.has(currentPageId)) return
-    if (liveCur && liveCur.trim()) {
-      const appliedCur = applyThemeToDocument(liveCur, theme)
-      if (appliedCur) commitHtml(appliedCur, { reseedWorkspace: true })
+    if (!Object.keys(documents).length) return
+    const at = nextHistoryStamp()
+    setHtmlPast((past) => [...past.slice(-(HTML_HISTORY_CAP - 1)), { documents, at }])
+    setHtmlFuture([])
+    if (useEditorStore.getState().future.length) useEditorStore.setState({ future: [], futureAt: [] })
+    setPageHtmlMap(next)
+    markHtmlDirty()
+    if (Object.prototype.hasOwnProperty.call(documents, currentPageId)) {
+      workspaceRef.current?.setDocument?.(next[currentPageId])
     }
   }
 
@@ -1708,6 +1751,18 @@ function SiteEditor() {
     return map
   }
 
+  function captureDetachedDraft() {
+    if (!loadedSiteRef.current) return null
+    const store = useEditorStore.getState()
+    return {
+      schema: store.previewBase || store.schema,
+      currentPageId: store.currentPageId,
+      map: liveHtmlMap(),
+      codeDrafts: codePanelRef.current?.getPendingHtml?.() || {},
+      title, category, tagsText,
+    }
+  }
+
   // `wantPublished` is a boolean only when the save IS the publish switch.
   // Every other save keeps the site as it is, and reads that when it runs, not
   // when it was scheduled: an automatic save fires 2.5s after an edit, and one
@@ -1720,13 +1775,15 @@ function SiteEditor() {
       // While an AI proposal is drawn on the canvas, the design is the one it
       // was drawn over: a save pressed (or already queued) at that moment
       // writes that, never the proposal.
-      const storeNow = useEditorStore.getState()
+      const detached = detachedDraftRef.current
+      const storeNow = detached || useEditorStore.getState()
       const schemaBase = storeNow.previewBase || storeNow.schema
-      const map = liveHtmlMap({ commit: true })
+      const map = detached ? detached.map : liveHtmlMap({ commit: true })
       // A save may finish after the user has already made another edit. These
       // snapshots ensure we acknowledge only the exact revision sent below.
       const htmlRevisionAtSave = htmlRevisionRef.current
       const metaRevisionAtSave = metaRevisionRef.current
+      const baseRevisionAtSave = baseRevisionRef.current
       // Per-page html rides inside the schema; the home page's document is
       // mirrored to site.html so single-page flows (and old data) keep working.
       const { schema, homeHtml: html } = projectSnapshot(schemaBase, map)
@@ -1768,7 +1825,7 @@ function SiteEditor() {
             title: safeTitle, schema, html, published: nextPublished, category, tags,
             ...(publishedPages ? { published_pages: publishedPages } : {}),
             // "Save mine anyway" leaves it out, and the server takes the save.
-            ...(!force && baseRevisionRef.current != null ? { base_revision: baseRevisionRef.current } : {}),
+            ...(!force && baseRevisionAtSave != null ? { base_revision: baseRevisionAtSave } : {}),
           },
           { saveSource: versionSource || (auto ? 'auto' : 'manual') },
         )
@@ -1777,10 +1834,16 @@ function SiteEditor() {
         // one has saved over since. There is no dialog left to ask in, so the
         // changes are kept as a local draft that this site offers to restore
         // when it is opened again — before, they were gone without a word.
-        if (leftEditorRef.current && e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
+        if (leftEditorRef.current && !discardLeaveRef.current &&
+            e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
+          const latest = detachedDraftRef.current
           writeEditorRecovery(editorOwnerId, id, {
-            schema, title: safeTitle, category, tagsText, currentPageId: storeNow.currentPageId,
-            codeDrafts: {}, reason: 'site_changed',
+            schema: latest ? projectSnapshot(latest.schema, latest.map).schema : schema,
+            title: latest?.title ?? safeTitle,
+            category: latest?.category ?? category,
+            tagsText: latest?.tagsText ?? tagsText,
+            currentPageId: latest?.currentPageId ?? storeNow.currentPageId,
+            codeDrafts: latest?.codeDrafts || {}, reason: 'site_changed',
           })
         }
         throw e
@@ -1802,10 +1865,14 @@ function SiteEditor() {
       }
       // Every canvas mutation replaces the Zustand schema object. If it has
       // changed during this request, its newer revision must remain dirty.
-      if (useEditorStore.getState().schema === schemaBase) markSaved()
-      if (useEditorStore.getState().schema === schemaBase &&
+      const leaving = detachedDraftRef.current
+      const sameSchema = leaving ? leaving.schema === schemaBase : useEditorStore.getState().schema === schemaBase
+      if (!leftEditorRef.current && sameSchema) markSaved()
+      const sameDetachedHtml = !leaving || JSON.stringify(leaving.map) === JSON.stringify(map)
+      const pendingCode = leaving ? Object.keys(leaving.codeDrafts).length > 0 : codePanelRef.current?.hasPendingHtml?.()
+      if (sameSchema && sameDetachedHtml &&
           htmlRevisionRef.current === htmlRevisionAtSave && metaRevisionRef.current === metaRevisionAtSave &&
-          !codePanelRef.current?.hasPendingHtml?.()) {
+          !pendingCode) {
         clearEditorRecovery(editorOwnerId, id, restoredRecoveryRef.current)
         restoredRecoveryRef.current = null
       }
@@ -1858,6 +1925,107 @@ function SiteEditor() {
         manualSaveCountRef.current = Math.max(0, manualSaveCountRef.current - 1)
         if (manualSaveCountRef.current === 0) setSaving(false)
       }
+    }
+  }
+
+  // These values describe content, rather than acknowledgement flags: a save
+  // may clear dirty state while an edit made during its request still differs.
+  function historyDraftSnapshot() {
+    const store = useEditorStore.getState()
+    const map = liveHtmlMap()
+    const pending = codePanelRef.current?.getPendingHtml?.() || {}
+    return {
+      schema: store.previewBase || store.schema,
+      html: JSON.stringify(map),
+      metadata: JSON.stringify([title, category, tagsText, publishedRef.current]),
+      codeDrafts: JSON.stringify(pending),
+      unsaved: store.dirty || htmlDirty || metaDirty || workspaceDirty ||
+        Object.keys(pending).length > 0 ||
+        Object.keys(map).some((pageId) => map[pageId] !== latestHtmlMapRef.current[pageId]),
+    }
+  }
+
+  function applyHistoryRestore(fresh) {
+    // The restore endpoint returns the full site after the
+    // rollback — push the schema + html back into the editor
+    // store + local state so the canvas reflects it immediately
+    // (no manual reload needed).
+    {
+      // The per-page html map comes back exactly like the initial load.
+      setPageHtmlMap(fresh?.schema ? loadSchema(fresh.schema, { legacySiteHtml: fresh.html }) : {})
+      setHtmlPast([])
+      setHtmlFuture([])
+      htmlRevisionRef.current = 0
+      setHtmlDirty(false)
+      setWorkspaceDirty(false)
+      // Remount the HTML workspace so a source textarea or editable
+      // iframe cannot retain the pre-restore document and auto-save it
+      // back over the version the user just loaded.
+      setWorkspaceSession((session) => session + 1)
+    }
+    if (Number.isInteger(fresh?.revision)) baseRevisionRef.current = fresh.revision
+    if (fresh?.title !== undefined) setTitle(fresh.title)
+    if (fresh?.slug !== undefined) setSlug(fresh.slug)
+    if (fresh?.category !== undefined) setCategory(fresh.category || 'other')
+    if (fresh?.tags !== undefined) {
+      setTagsText(Array.isArray(fresh.tags) ? fresh.tags.join(', ') : '')
+    }
+    metaRevisionRef.current = 0
+    setMetaDirty(false)
+    if (fresh?.published !== undefined) {
+      publishedRef.current = !!fresh.published
+      setPublished(fresh.published)
+    }
+    markSaved()
+  }
+
+  async function restoreHistoryVersion(versionId) {
+    const sameDraft = (before, after) => before.schema === after.schema &&
+      before.html === after.html && before.metadata === after.metadata && before.codeDrafts === after.codeDrafts
+    const flushDrafts = () => {
+      flushSync(() => saveLifecycleRef.current.flushWorkspaceDrafts())
+      return saveLifecycleRef.current.historyDraftSnapshot()
+    }
+    try {
+      return await saveQueueRef.current.run(async () => {
+        if (leftEditorRef.current) return null
+        // A save/load pair can race with typing at either request boundary.
+        // Retry only a bounded number of times; never replace a newer draft.
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const beforeSave = flushDrafts()
+          if (beforeSave.unsaved) {
+            // Already inside the queue: calling save() here would deadlock.
+            await saveLifecycleRef.current.performSave()
+            if (leftEditorRef.current) return null
+            if (!sameDraft(beforeSave, flushDrafts())) continue
+          }
+          const beforeRestore = saveLifecycleRef.current.historyDraftSnapshot()
+          const fresh = await restoreVersion(id, versionId)
+          if (leftEditorRef.current) return null
+          // The server has moved to this revision even when newer local work
+          // prevents us from applying the response. Its next save must use it.
+          if (Number.isInteger(fresh?.revision)) baseRevisionRef.current = fresh.revision
+          if (!sameDraft(beforeRestore, flushDrafts())) {
+            useEditorStore.setState({ dirty: true })
+            markHtmlDirty()
+            markMetaDirty()
+            continue
+          }
+          // Render the loaded document before the next queued save captures it.
+          flushSync(() => saveLifecycleRef.current.applyHistoryRestore(fresh))
+          return fresh
+        }
+        throw new Error(t('Your work kept changing while the save was loading. Nothing on screen was replaced. Try loading again when you finish editing.'))
+      })
+    } catch (e) {
+      if (leftEditorRef.current) return null
+      setAutoSaveState('error')
+      if (e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
+        siteConflictCountRef.current += 1
+        setSiteConflict(true)
+        return null
+      }
+      throw e
     }
   }
 
@@ -3317,39 +3485,7 @@ function SiteEditor() {
             hasUnsavedChanges={dirty || htmlDirty || metaDirty || workspaceDirty}
             autoSaveEnabled={autoSaveEnabled}
             onAutoSaveEnabled={setAutoSaveEnabled}
-            onRestored={(fresh) => {
-              // The restore endpoint returns the full site after the
-              // rollback — push the schema + html back into the editor
-              // store + local state so the canvas reflects it immediately
-              // (no manual reload needed).
-              {
-                // The per-page html map comes back exactly like the initial load.
-                setPageHtmlMap(fresh?.schema ? loadSchema(fresh.schema, { legacySiteHtml: fresh.html }) : {})
-                setHtmlPast([])
-                setHtmlFuture([])
-                htmlRevisionRef.current = 0
-                setHtmlDirty(false)
-                setWorkspaceDirty(false)
-                // Remount the HTML workspace so a source textarea or editable
-                // iframe cannot retain the pre-restore document and auto-save it
-                // back over the version the user just loaded.
-                setWorkspaceSession((session) => session + 1)
-              }
-              if (Number.isInteger(fresh?.revision)) baseRevisionRef.current = fresh.revision
-              if (fresh?.title !== undefined) setTitle(fresh.title)
-              if (fresh?.slug !== undefined) setSlug(fresh.slug)
-              if (fresh?.category !== undefined) setCategory(fresh.category || 'other')
-              if (fresh?.tags !== undefined) {
-                setTagsText(Array.isArray(fresh.tags) ? fresh.tags.join(', ') : '')
-              }
-              metaRevisionRef.current = 0
-              setMetaDirty(false)
-              if (fresh?.published !== undefined) {
-                publishedRef.current = !!fresh.published
-                setPublished(fresh.published)
-              }
-              markSaved()
-            }}
+            onRestore={restoreHistoryVersion}
           />
         </Suspense>
       )}

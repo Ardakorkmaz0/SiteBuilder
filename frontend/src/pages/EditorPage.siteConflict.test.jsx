@@ -2,7 +2,7 @@
 // since replaced, silently won and took the first tab's work with it. Now the
 // server refuses it (409) and the editor asks which version wins.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 const updateSite = vi.fn()
@@ -29,11 +29,13 @@ import LanguageProvider from '../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../ui/UiThemeProvider.jsx'
 import { useEditorStore } from '../store/editorStore.js'
 import { useAuthStore } from '../store/authStore.js'
+import { patchSite } from '../api/sites.js'
 
 const SLOW = { timeout: 15000 }
 
 beforeEach(() => {
   updateSite.mockReset()
+  patchSite.mockReset()
   initiallyPublished = false
   localStorage.clear()
   localStorage.setItem('pwb_language', 'en')
@@ -45,6 +47,40 @@ beforeEach(() => {
 })
 
 describe('a save made from an older revision', () => {
+  it('does not adopt an unseen content revision from saving SEO options', async () => {
+    patchSite.mockResolvedValue({ revision: 5, site_options: { seo: { title: 'New SEO title' } } })
+    updateSite.mockImplementation(async (id, payload) => {
+      if (payload.base_revision !== 5) throw { response: { status: 409, data: { code: 'site_changed' } } }
+      return { ...payload, slug: 'two-tabs', revision: 6 }
+    })
+    render(
+      <UiThemeProvider>
+        <LanguageProvider>
+          <MemoryRouter initialEntries={['/editor/1']}>
+            <Routes><Route path="/editor/:id" element={<EditorPage />} /></Routes>
+          </MemoryRouter>
+        </LanguageProvider>
+      </UiThemeProvider>,
+    )
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Site title', exact: true })).toHaveValue('Two tabs'), SLOW)
+    await act(async () => useEditorStore.getState().updateProps('h1', { text: 'My local draft' }))
+    fireEvent.click(screen.getByRole('button', { name: 'More actions', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'Site control center', exact: true }))
+    const center = await screen.findByRole('dialog', { name: 'Site control center', exact: true }, SLOW)
+    fireEvent.change(within(center).getByRole('textbox', { name: 'SEO title', exact: true }), { target: { value: 'New SEO title' } })
+    fireEvent.click(within(center).getByRole('button', { name: 'Save SEO settings', exact: true }))
+    await waitFor(() => expect(patchSite).toHaveBeenCalledTimes(1), SLOW)
+    await waitFor(() => expect(within(center).getByRole('button', { name: 'Save SEO settings', exact: true })).toBeEnabled(), SLOW)
+    expect(patchSite.mock.calls[0][1].site_options.seo.title).toBe('New SEO title')
+    fireEvent.click(within(center).getByRole('button', { name: 'Close', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }))
+
+    await waitFor(() => expect(updateSite).toHaveBeenCalledTimes(1), SLOW)
+    expect(updateSite.mock.calls[0][1].base_revision).toBe(4)
+    expect(updateSite.mock.calls[0][1].schema.pages[0].components[0].props.text).toBe('My local draft')
+    expect(await screen.findByRole('alertdialog', { name: 'This site changed somewhere else' }, SLOW)).toBeInTheDocument()
+  }, 30000)
+
   it.each([
     { published: false, requested: true, before: 'Publish', after: 'Published' },
     { published: true, requested: false, before: 'Published', after: 'Publish' },

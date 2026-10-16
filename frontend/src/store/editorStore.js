@@ -2804,7 +2804,9 @@ export const useEditorStore = create((set, get) => ({
   // Copy a component (with all its properties + children) onto ANOTHER page,
   // so a tuned element survives across pages without rebuilding it.
   copyComponentToPage: (id, pageId) => {
-    get().record('copy-to-page')
+    // Choosing a destination is one action; rapid copies to other pages must
+    // not disappear together when only the latest copy is undone.
+    get().record()
     set((state) => {
       const page = selectCurrentPage(state)
       if (!pageId || pageId === page.id) return {}
