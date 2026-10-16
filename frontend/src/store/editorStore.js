@@ -18,6 +18,7 @@ import { regionContentWidth } from '../utils/regionLayout.js'
 import { anchorOf, anchorProblem, elementIdFor, retargetLinks, slugifyAnchor } from '../utils/anchors.js'
 import { splitPageHtml } from '../utils/projectSnapshot.js'
 import { normalizeLanguageTag } from '../utils/languages.js'
+import { containerDesignWidth } from '../utils/containerFit.js'
 
 const HISTORY_LIMIT = 60
 // Gap between two same-key edits that still counts as one gesture.
@@ -271,6 +272,7 @@ function parentDesignWidth(parent, mobileWidth) {
   if (parent?.type === 'region') {
     return mobileWidth || regionContentWidth(parent)
   }
+  if (parent?.type === 'container') return containerDesignWidth(parent)
   return Math.round(parent?.layout?.w || 0) || undefined
 }
 
@@ -1047,11 +1049,13 @@ function clampLayout(l, bounds = {}) {
   let y = Math.max(0, Math.round(l.y))
   let w = Math.max(8, Math.round(l.w))
   let h = Math.max(4, Math.round(l.h))
+  if (bounds.maxWidth !== undefined) w = Math.min(w, bounds.maxWidth)
   if (bounds.maxX) {
     const maxX = Math.max(8, Math.round(bounds.maxX))
     w = Math.min(w, maxX)
-    if (x + w > maxX) x = Math.max(0, maxX - w)
+    if (!bounds.allowOverflowX && x + w > maxX) x = Math.max(0, maxX - w)
   }
+  if (bounds.maxLeft !== undefined) x = Math.min(x, bounds.maxLeft)
   if (bounds.maxY) {
     const maxY = Math.max(4, Math.round(bounds.maxY))
     h = Math.min(h, maxY)
@@ -1081,7 +1085,26 @@ function layoutBoundsFor(page, id, key) {
     ? page.mobileWidth || MOBILE_CANVAS_WIDTH
     : undefined)
   const parentLayout = key === 'mobileLayout' ? parent.mobileLayout || parent.layout : parent.layout
-  return { maxX, maxY: Math.round(parentLayout?.h || 0) || undefined }
+  // A copied container may already have a larger child design than its box.
+  // Its fitted canvas can grow with a move; clamping to yesterday's extent
+  // would make a left nudge impossible to reverse. Keep the server's limits
+  // independently: x can reach 5000, while the box width cannot exceed 2000.
+  const fittedContainer = parent.type === 'container' && maxX > Math.round(parent.layout?.w || 600)
+  return {
+    maxX,
+    maxY: Math.round(parentLayout?.h || 0) || undefined,
+    ...(fittedContainer ? { allowOverflowX: true, maxLeft: 5000, maxWidth: 2000 } : {}),
+  }
+}
+
+// Free containers and tabs share one child design at both breakpoints.
+// Regions keep independent phone child positions, just like page roots do.
+function componentLayoutKey(page, id, viewport) {
+  if (isTopLevel(page.components, id)) {
+    return !page.flowMode && viewport === 'mobile' ? 'mobileLayout' : 'layout'
+  }
+  const parent = findParentInTree(page.components, id)
+  return viewport === 'mobile' && parent?.type === 'region' ? 'mobileLayout' : 'layout'
 }
 
 // Clamp an artboard width / fold value to sane bounds (mirrors the backend).
@@ -1957,10 +1980,10 @@ export const useEditorStore = create((set, get) => ({
   nudgeSelection: (dx, dy) => {
     const ids = get().selectedIds
     if (!ids.length) return
-    const key = get().layoutKey()
     const page = selectCurrentPage(get())
     const updates = {}
     for (const id of ids) {
+      const key = componentLayoutKey(page, id, get().viewport)
       const c = findInTree(page.components, id)
       const l = c && (c[key] || c.layout)
       if (l) {
@@ -1980,21 +2003,24 @@ export const useEditorStore = create((set, get) => ({
     get().record('layout-many-' + key)
     set((state) => {
       const page = selectCurrentPage(state)
+      let editedMobile = false
       const apply = (arr) =>
         arr.map((c) => {
           const patch = updates[c.id]
           if (patch) {
-            const base = c[key] || c.layout || { x: 0, y: 0, w: 200, h: 80 }
+            const componentKey = componentLayoutKey(page, c.id, state.viewport)
+            if (componentKey === 'mobileLayout') editedMobile = true
+            const base = c[componentKey] || c.layout || { x: 0, y: 0, w: 200, h: 80 }
             return {
               ...c,
-              [key]: clampLayout({ ...base, ...patch }, layoutBoundsFor(page, c.id, key)),
+              [componentKey]: clampLayout({ ...base, ...patch }, layoutBoundsFor(page, c.id, componentKey)),
             }
           }
           return Array.isArray(c.children) ? { ...c, children: apply(c.children) } : c
         })
       const components = apply(page.components)
       const schema =
-        key === 'mobileLayout'
+        editedMobile
           ? mapPage(state.schema, page.id, (p) => ({ ...p, components, mobileManual: true }))
           : withComponents(state.schema, page.id, components)
       return { schema, dirty: true }
@@ -2374,16 +2400,10 @@ export const useEditorStore = create((set, get) => ({
   },
 
   // Move and resize both flow through here, editing the ACTIVE breakpoint only.
-  // Nested children always flow, so they only ever edit their single `layout`.
+  // Containers/tabs share one child design; regions keep a phone layout too.
   setLayout: (id, patch) => {
     const page0 = selectCurrentPage(get())
-    const topLevel = isTopLevel(page0.components, id)
-    const parent0 = topLevel ? null : findParentInTree(page0.components, id)
-    const key = topLevel
-      ? get().layoutKey()
-      : get().viewport === 'mobile' && parent0?.type === 'region'
-        ? 'mobileLayout'
-        : 'layout'
+    const key = componentLayoutKey(page0, id, get().viewport)
     get().record('layout-' + key + '-' + id)
     set((state) => {
       const page = selectCurrentPage(state)
@@ -2406,7 +2426,7 @@ export const useEditorStore = create((set, get) => ({
       const sized = patch.w !== undefined || patch.h !== undefined
       let components = mapTree(page.components, id, (c) => {
         const base = c[key] || c.layout || { x: 0, y: 0, w: 200, h: 80 }
-        const next = { ...c, [key]: clampLayout({ ...base, ...patch }, { maxX, maxY }) }
+        const next = { ...c, [key]: clampLayout({ ...base, ...patch }, { ...bounds, maxX, maxY }) }
         if (sized && c.type === 'html') next.props = { ...c.props, _boxManual: true }
         // A block sized by hand fits its box from then on (utils/boxFit.js):
         // its content grows and shrinks with it instead of being clipped or
@@ -2816,6 +2836,12 @@ export const useEditorStore = create((set, get) => ({
       if (!target || target.mode === 'html' || !src) return {}
       // Keep the section names only if the other page does not already use them.
       const [copy] = cloneTrees([src], { keepAnchors: subtreeAnchorsFree(src, target.components, state.schema.pages) })
+      // Use the same target bounds now that normalization applies on reload.
+      // A wide free container then fits its child design from the first paint.
+      if (!target.flowMode) {
+        copy.layout = clampLayout(copy.layout, { maxX: target.canvasWidth || CANVAS_WIDTH })
+        if (copy.mobileLayout) copy.mobileLayout = clampLayout(copy.mobileLayout, { maxX: target.mobileWidth || MOBILE_CANVAS_WIDTH })
+      }
       return {
         schema: withComponents(state.schema, pageId, [...target.components, copy]),
         dirty: true,

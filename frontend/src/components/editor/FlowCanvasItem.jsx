@@ -20,6 +20,7 @@ import {
   responsiveRegionChildLayout,
 } from '../../utils/regionLayout.js'
 import { autoLayoutChildStyle, autoLayoutContainerStyle } from '../../utils/autoLayout.js'
+import { containerDesignWidth } from '../../utils/containerFit.js'
 import { trackPointerDrag } from '../../utils/pointerDrag.js'
 import {
   CHROME_ACCENT,
@@ -462,7 +463,7 @@ export function ContainerEditor({
   const { t } = useLanguage()
   const viewport = useEditorStore((s) => s.viewport)
   const kids = Array.isArray(component.children) ? component.children : []
-  const designW = Math.max(1, Math.round(component.layout?.w || 600))
+  const designW = containerDesignWidth(component)
   const designH = absoluteChildrenHeight(kids, Math.round(component.layout?.h || 160))
   const boundsH = Math.max(1, Math.round(component.layout?.h || designH))
   const { setNodeRef, isOver } = useDroppable({ id: component.id })

@@ -27,6 +27,8 @@ import { autoLayoutChildStyle, autoLayoutContainerStyle } from '../../utils/auto
 import { elementIdFor } from '../../utils/anchors.js'
 import { fitsBox, nativeFit } from '../../utils/boxFit.js'
 import FitBox from './FitBox.jsx'
+import ContainerCanvas from './ContainerCanvas.jsx'
+import { containerDesignWidth } from '../../utils/containerFit.js'
 
 function isViewportStretch(component) {
   return component?.type === 'region' || (
@@ -277,15 +279,19 @@ export function RenderComponent({
       )
     }
     const minHeight = absoluteChildrenHeight(kids, Math.round(component.layout?.h || 160))
+    const containerStyle = {
+      ...style,
+      overflow: sanitizeStyles(stylesFor(component, viewport)).overflow || 'visible',
+      display: 'block',
+      position: 'relative',
+    }
+    if (!kids.length) return <div style={{ ...containerStyle, minHeight }} />
     return (
-      <div
-        style={{
-          ...style,
-          overflow: sanitizeStyles(stylesFor(component, viewport)).overflow || 'visible',
-          display: 'block',
-          position: 'relative',
-          minHeight,
-        }}
+      <ContainerCanvas
+        width={containerDesignWidth(component)}
+        height={minHeight}
+        initialWidth={viewport === 'mobile' ? component.mobileLayout?.w || component.layout?.w : component.layout?.w}
+        style={{ ...containerStyle, height: sanitizeStyles(stylesFor(component, viewport)).height || 'auto' }}
       >
         {kids.map((c) => {
           if (isHidden(c, viewport)) return null
@@ -306,7 +312,7 @@ export function RenderComponent({
             </div>
           )
         })}
-      </div>
+      </ContainerCanvas>
     )
   }
 

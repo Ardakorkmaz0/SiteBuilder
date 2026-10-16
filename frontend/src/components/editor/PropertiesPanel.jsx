@@ -334,6 +334,14 @@ function componentLayout(component, layoutKey) {
   return component?.[layoutKey] || component?.layout || { x: 0, y: 0, w: 200, h: 80 }
 }
 
+function entryLayoutKey(entry, isMobile, isFlow) {
+  // Containers and tabs share their child design across breakpoints. A region
+  // child has its own phone coordinates, including on a flow page.
+  if (!isMobile) return 'layout'
+  if (entry?.parent) return entry.parent.type === 'region' ? 'mobileLayout' : 'layout'
+  return isFlow ? 'layout' : 'mobileLayout'
+}
+
 function cleanSize(value, fallback) {
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
@@ -698,8 +706,8 @@ export default function PropertiesPanel({
 
   const isMobile = viewport === 'mobile'
   const isFlow = !!page.flowMode
-  const layoutKey = isFlow ? 'layout' : isMobile ? 'mobileLayout' : 'layout'
   const selectedEntry = findComponentEntry(page.components, selectedId)
+  const layoutKey = entryLayoutKey(selectedEntry, isMobile, isFlow)
   const component = selectedEntry?.component || null
   const parentComponent = selectedEntry?.parent || null
   const viewportStretchComponent = component?.type === 'region' || (
@@ -725,7 +733,7 @@ export default function PropertiesPanel({
     .filter(Boolean)
   const selectedLayoutItems = selectedEntries.map((entry) => ({
     component: entry.component,
-    layout: componentLayout(entry.component, layoutKey),
+    layout: componentLayout(entry.component, entryLayoutKey(entry, isMobile, isFlow)),
   }))
   const selectionWidthValue = sharedLayoutValue(selectedLayoutItems, 'w')
   const selectionHeightValue = sharedLayoutValue(selectedLayoutItems, 'h')
