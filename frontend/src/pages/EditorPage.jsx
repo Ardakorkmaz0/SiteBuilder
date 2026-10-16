@@ -2013,6 +2013,16 @@ function SiteEditor() {
           }
           // Render the loaded document before the next queued save captures it.
           flushSync(() => saveLifecycleRef.current.applyHistoryRestore(fresh))
+          if (fresh.published) {
+            // Versions contain the design, while public URLs serve rendered
+            // documents. Rebuild those documents through the same save queue.
+            // Keep a failed synchronization dirty so Save can safely retry it.
+            flushSync(() => {
+              useEditorStore.setState({ dirty: true })
+              markHtmlDirty()
+            })
+            return await saveLifecycleRef.current.performSave(undefined, { auto: true, versionSource: 'checkpoint' })
+          }
           return fresh
         }
         throw new Error(t('Your work kept changing while the save was loading. Nothing on screen was replaced. Try loading again when you finish editing.'))

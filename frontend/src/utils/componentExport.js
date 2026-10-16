@@ -73,6 +73,22 @@ function selectorTouches(scope, selector) {
 // Used-CSS collection
 // ---------------------------------------------------------------------------
 
+function isRuleGroup(rule) {
+  return rule.type === CSSRule.MEDIA_RULE || rule.type === CSSRule.SUPPORTS_RULE ||
+    (rule.cssRules && /^@layer\b/i.test(rule.cssText))
+}
+
+function wrapRuleGroup(rule, inner) {
+  return `${rule.cssText.slice(0, rule.cssText.indexOf('{')).trim()} {\n${inner.join('\n')}\n}`
+}
+
+function* nestedRules(rules) {
+  for (const rule of rules) {
+    yield rule
+    if (isRuleGroup(rule)) yield* nestedRules(rule.cssRules)
+  }
+}
+
 function ruleTextFor(rule, scope, seen) {
   // A plain style rule: keep it when it touches the subtree.
   if (rule.type === CSSRule.STYLE_RULE) {
@@ -82,16 +98,16 @@ function ruleTextFor(rule, scope, seen) {
   }
   // @media / @supports: keep the wrapper only if something inside it matched,
   // because the responsive behaviour is part of the component.
-  if (rule.type === CSSRule.MEDIA_RULE || rule.type === CSSRule.SUPPORTS_RULE) {
+  if (isRuleGroup(rule)) {
     const inner = [...(rule.cssRules || [])]
       .map((child) => ruleTextFor(child, scope, seen))
       .filter(Boolean)
-    if (!inner.length) return ''
-    const condition = rule.type === CSSRule.MEDIA_RULE
-      ? `@media ${rule.conditionText || rule.media?.mediaText || 'all'}`
-      : `@supports ${rule.conditionText}`
-    return `${condition} {\n${inner.join('\n')}\n}`
+    // Even an empty first mention establishes a layer's cascade position.
+    if (!inner.length && !/^@layer\b/i.test(rule.cssText)) return ''
+    return wrapRuleGroup(rule, inner)
   }
+  // Dropping a layer-order declaration can reverse important priorities.
+  if (/^@layer\b[^{}]*;/i.test(rule.cssText)) return rule.cssText
   return ''
 }
 
@@ -115,7 +131,16 @@ function noteUsage(rule, seen) {
 // The custom properties a kept rule reads have to be defined somewhere, and
 // that somewhere is usually :root — which is NOT part of the subtree, so it
 // would otherwise be dropped and every colour would fall back to nothing.
-function collectVariables(sheets, seen) {
+function inheritsFromRule(root, selector) {
+  for (let node = root; node; node = node.parentElement) {
+    try {
+      if (node.matches(selector)) return true
+    } catch { /* An unsupported selector cannot supply inherited values. */ }
+  }
+  return false
+}
+
+function collectVariables(sheets, seen, root) {
   const found = new Map()
   let pass = 0
   // A variable can be defined in terms of another; two passes covers the
@@ -123,13 +148,19 @@ function collectVariables(sheets, seen) {
   while (pass < 2 && seen.variables.size > found.size) {
     pass += 1
     for (const rules of sheets) {
-      for (const rule of rules) {
+      for (const rule of nestedRules(rules)) {
         if (rule.type !== CSSRule.STYLE_RULE || !rule.style) continue
+        if (!inheritsFromRule(root, rule.selectorText)) continue
         for (const name of seen.variables) {
           if (found.has(name)) continue
           const value = rule.style.getPropertyValue(name)
           if (!value) continue
-          found.set(name, value.trim())
+          // The live cascade handles specificity, inheritance and layer order.
+          // Detached documents and incomplete DOM implementations can fall
+          // back to definitions that actually apply to this ancestor chain.
+          let resolved = ''
+          try { resolved = root.ownerDocument.defaultView?.getComputedStyle(root).getPropertyValue(name).trim() || '' } catch { /* use authored value */ }
+          found.set(name, resolved || value.trim())
           for (const nested of value.matchAll(/var\(\s*(--[\w-]+)/g)) seen.variables.add(nested[1])
         }
       }
@@ -139,8 +170,8 @@ function collectVariables(sheets, seen) {
 }
 
 function collectAtRules(sheets, seen) {
-  const out = []
-  for (const rules of sheets) {
+  function collect(rules) {
+    const out = []
     for (const rule of rules) {
       if (rule.type === CSSRule.KEYFRAMES_RULE && seen.animations.has(rule.name)) {
         out.push(rule.cssText)
@@ -149,9 +180,14 @@ function collectAtRules(sheets, seen) {
         const family = (rule.style?.getPropertyValue('font-family') || '').replace(/['"]/g, '').trim()
         if (family && [...seen.fontValues].some((value) => value.includes(family))) out.push(rule.cssText)
       }
+      if (isRuleGroup(rule)) {
+        const inner = collect(rule.cssRules)
+        if (inner.length) out.push(wrapRuleGroup(rule, inner))
+      }
     }
+    return out
   }
-  return out
+  return sheets.flatMap(collect)
 }
 
 // Every readable rule in the document, flattened per sheet. A cross-origin
@@ -328,7 +364,7 @@ export function exportComponent(doc, el, { allowScripts = false, scope = nextSco
       if (text) matched.push(text)
     }
   }
-  const variables = collectVariables(sheets, seen)
+  const variables = collectVariables(sheets, seen, el)
   const atRules = collectAtRules(sheets, seen)
 
   const variableBlock = variables.size

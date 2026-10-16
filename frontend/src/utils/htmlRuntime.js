@@ -2,6 +2,7 @@ import { insertBeforeClosingTag } from './htmlInsert.js'
 import { FORM_FIELD_CSS } from './formField.js'
 import { THEME_TOGGLE_CSS } from './themeToggle.js'
 import { BOX_FIT_CSS, fitBoxContent } from './boxFit.js'
+import { fitContainerCanvas } from './containerFit.js'
 import { MOTION_ARM_JS, MOTION_CSS, MOTION_OBSERVER_JS } from './motion.js'
 
 const RUNTIME_STYLE = `
@@ -480,16 +481,22 @@ function boxFitScript() {
   return `
   (function () {
     var fitBoxContent = ${fitBoxContent.toString()};
+    var fitContainerCanvas = ${fitContainerCanvas.toString()};
     function fitOne(box) {
+      if (box.hasAttribute('data-pwb-container-width')) {
+        var canvas = box.querySelector(':scope > [data-pwb-container-root]');
+        if (canvas) fitContainerCanvas(box, canvas, box.getAttribute('data-pwb-container-width'), box.getAttribute('data-pwb-container-height'));
+        return;
+      }
       var root = box.querySelector(':scope > [data-pwb-fit-root]');
       if (root) fitBoxContent(box, root, box.getAttribute('data-pwb-fit'), box.hasAttribute('data-pwb-fit-fill'));
     }
     function fitAll() {
-      var boxes = document.querySelectorAll('[data-pwb-fit]');
+      var boxes = document.querySelectorAll('[data-pwb-fit],[data-pwb-container-width]');
       for (var i = 0; i < boxes.length; i++) fitOne(boxes[i]);
     }
     function start() {
-      var boxes = document.querySelectorAll('[data-pwb-fit]');
+      var boxes = document.querySelectorAll('[data-pwb-fit],[data-pwb-container-width]');
       if (!boxes.length) return;
       fitAll();
       if (window.ResizeObserver) {

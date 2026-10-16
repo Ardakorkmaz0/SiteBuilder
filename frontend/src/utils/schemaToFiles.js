@@ -41,6 +41,7 @@ import {
 } from '../components/renderer/layout.js'
 import { regionContentWidth, resolveRegionDock } from './regionLayout.js'
 import { autoLayoutChildCss, autoLayoutContainerCss } from './autoLayout.js'
+import { containerDesignWidth } from './containerFit.js'
 import { fixedRailInset } from './railInset.js'
 import {
   navLinkLabel,
@@ -418,7 +419,10 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
         return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}">${linkWrap(filled, boxedNode(filled))}</div>`
       })
       .join('')
-    return `<div style="display:block;position:relative;min-height:${h}px;${styleStr}">${inner}</div>`
+    if (!kids.length) return `<div style="display:block;position:relative;min-height:${h}px;${styleStr}"></div>`
+    const designW = containerDesignWidth(c)
+    const scale = Math.min(1, Math.max(1, Number(c.layout?.w) || designW) / designW)
+    return `<div data-pwb-container-width="${designW}" data-pwb-container-height="${h}" style="display:block;position:relative;min-height:${h * scale}px;${styleStr}"><div data-pwb-container-root style="position:absolute;left:0;top:0;width:${designW}px;height:${h}px;transform-origin:0 0${scale === 1 ? '' : `;transform:scale(${scale})`}">${inner}</div></div>`
   }
   if (c.type === 'tabs') {
     const tabs = (Array.isArray(p.tabs) ? p.tabs : []).filter((t) => t && t.id)

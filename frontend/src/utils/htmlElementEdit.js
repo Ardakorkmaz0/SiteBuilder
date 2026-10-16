@@ -78,11 +78,11 @@ const MOBILE_OVERRIDE_SELECTOR = MOBILE_STYLE_FIELDS
 // the PC rule holds everywhere else. Clearing the phone value puts the PC
 // value back inline.
 //
-// The attribute is written twice for the specificity of two, so a template
-// rule like `.hero .title { … !important }` still does not outrank a value the
-// user set.
+// Important declarations in the first layer beat important template rules,
+// including IDs. PC and phone share the layer so the media rule wins by order.
 const twice = (attr) => `[${attr}][${attr}]`
 const MOBILE_OVERRIDE_CSS = `
+@layer pwb-responsive-overrides {
 ${MOBILE_STYLE_FIELDS.map(([name, property]) => (
     `${twice(pcAttr(name))} { ${property}: var(${PC_VAR_PREFIX}${name}) !important; }`
   )).join('\n')}
@@ -90,6 +90,7 @@ ${MOBILE_STYLE_FIELDS.map(([name, property]) => (
 ${MOBILE_STYLE_FIELDS.map(([name, property]) => (
     `  ${twice(mobileAttr(name))} { ${property}: var(${MOBILE_VAR_PREFIX}${name}) !important; }`
   )).join('\n')}
+}
 }`
 
 function ensureMobileOverrideStyle(doc) {
@@ -98,12 +99,20 @@ function ensureMobileOverrideStyle(doc) {
   if (style) {
     // A page saved before a field was added carries the older rule list.
     if (style.textContent !== MOBILE_OVERRIDE_CSS) style.textContent = MOBILE_OVERRIDE_CSS
-    return style
+  } else {
+    style = doc.createElement('style')
+    style.setAttribute(MOBILE_STYLE_TAG_ATTR, '')
+    style.textContent = MOBILE_OVERRIDE_CSS
   }
-  style = doc.createElement('style')
-  style.setAttribute(MOBILE_STYLE_TAG_ATTR, '')
-  style.textContent = MOBILE_OVERRIDE_CSS
-  ;(doc.head || doc.documentElement).appendChild(style)
+  // Reserve the first cascade layer without moving an early charset declaration
+  // past the encoding sniffing limit in the serialized document.
+  const parent = doc.head || doc.documentElement
+  const firstStylesheet = [...parent.children].find((child) => (
+    child.tagName === 'STYLE' || (
+      child.tagName === 'LINK' && [...child.relList].some((rel) => rel.toLowerCase() === 'stylesheet')
+    )
+  ))
+  if (firstStylesheet !== style) parent.insertBefore(style, firstStylesheet || null)
   return style
 }
 
