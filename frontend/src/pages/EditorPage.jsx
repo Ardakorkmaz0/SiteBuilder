@@ -517,6 +517,7 @@ function SiteEditor() {
   // before, the later save silently replaced the other one's work.
   const baseRevisionRef = useRef(null)
   const [siteConflict, setSiteConflict] = useState(false)
+  const conflictedPublicationRef = useRef(undefined)
   // Counts refused saves, so "Save and leave" can tell a conflict from other
   // failures; when it was one, "Save mine anyway" finishes the leave too.
   const siteConflictCountRef = useRef(0)
@@ -1786,6 +1787,7 @@ function SiteEditor() {
       }
       if (Number.isInteger(data.revision)) baseRevisionRef.current = data.revision
       setSiteConflict(false)
+      conflictedPublicationRef.current = undefined
       setAutoSaveRefused(false)
       publishedRef.current = !!data.published
       setPublished(data.published)
@@ -1837,6 +1839,8 @@ function SiteEditor() {
       setAutoSaveState('error')
       if (e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
         // Nothing was written; the dialog says why and lets the person choose.
+        // Queued ordinary saves must not replace an explicit publish choice.
+        if (typeof nextPublished === 'boolean') conflictedPublicationRef.current = nextPublished
         siteConflictCountRef.current += 1
         setSiteConflict(true)
         return null
@@ -2182,7 +2186,7 @@ function SiteEditor() {
           // instead of asking again whether to save.
           const leave = leaveAfterOverwriteRef.current
           leaveAfterOverwriteRef.current = false
-          const saved = await save(undefined, { force: true })
+          const saved = await save(conflictedPublicationRef.current, { force: true })
           if (saved && leave) finishLeave()
         }}
       />

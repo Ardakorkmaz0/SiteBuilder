@@ -428,19 +428,38 @@ function moveInTree(components, id, dir) {
   )
 }
 
-// Deep-clone a subtree with fresh ids. A section name (props.anchor) is an
+// Deep-clone component trees with fresh ids. A section name (props.anchor) is an
 // element id on the page, so a copy that lands on the SAME page must not carry
 // it — two elements answering to #about, and the link lands on whichever comes
 // first. Copies onto another page (a duplicated page, copy-to-page) may keep it.
-function cloneTree(c, { keepAnchors = false } = {}) {
-  const copy = { ...structuredClone(c), id: genId(c.type) }
-  if (!keepAnchors && copy.props && 'anchor' in copy.props) {
-    const props = { ...copy.props }
-    delete props.anchor
-    copy.props = props
+function cloneTrees(components, { keepAnchors = false } = {}) {
+  const targets = new Map()
+  const clone = (component, keep) => {
+    const copy = { ...structuredClone(component), id: genId(component.type) }
+    if (!keep && copy.props) delete copy.props.anchor
+    targets.set(`#${elementIdFor(component)}`, `#${elementIdFor(copy)}`)
+    if (hasKids(component)) copy.children = component.children.map((child) => clone(child, keep))
+    return copy
   }
-  if (hasKids(c)) copy.children = c.children.map((child) => cloneTree(child, { keepAnchors }))
-  return copy
+  const copies = components.map((component) => clone(
+    component,
+    typeof keepAnchors === 'function' ? keepAnchors(component) : keepAnchors,
+  ))
+  // Build the map for ALL selected roots first: a button may target a block
+  // in a different copied tree. Rewrite exact local fragments once, so URLs,
+  // uncopied targets and newly mapped ids remain untouched.
+  const relink = (copy) => {
+    const props = copy.props
+    for (const key of ['href', 'buttonHref']) {
+      if (props && targets.has(props[key])) props[key] = targets.get(props[key])
+    }
+    for (const link of Array.isArray(props?.links) ? props.links : []) {
+      if (link && targets.has(link.href)) link.href = targets.get(link.href)
+    }
+    if (hasKids(copy)) copy.children.forEach(relink)
+  }
+  copies.forEach(relink)
+  return copies
 }
 
 // Copies need a visible offset on BOTH designs. A manually arranged phone
@@ -1453,7 +1472,7 @@ export const useEditorStore = create((set, get) => ({
         id: genId('page'),
         name: `${src.name} copy`,
         // Fresh component ids so classes/anchors stay unique across pages.
-        components: (src.components || []).map((c) => cloneTree(c, { keepAnchors: true })),
+        components: cloneTrees(src.components || [], { keepAnchors: true }),
       }
       const idx = state.schema.pages.findIndex((p) => p.id === id)
       const pages = [...state.schema.pages]
@@ -1842,7 +1861,9 @@ export const useEditorStore = create((set, get) => ({
   // originals, and select the new copies (Ctrl+V).
   pasteClipboard: () => {
     if (!get().clipboard.length) return
-    get().record('paste')
+    // Each paste is a separate action, even when two pages are pasted into
+    // within the typing-coalescing window.
+    get().record()
     set((state) => {
       const page = selectCurrentPage(state)
       // The clipboard moves along with every paste, so pasting again cascades
@@ -1856,11 +1877,9 @@ export const useEditorStore = create((set, get) => ({
       // Cut + paste is a move: the block keeps its section name, and the links
       // that lead to it keep working. A copy of something still on the page
       // would duplicate the name, so it pastes without one.
-      const clones = shifted.map((c) => ({
-        ...cloneTree(c, { keepAnchors: subtreeAnchorsFree(c, page.components, state.schema.pages) }),
-        layout: c.layout,
-        ...(c.mobileLayout ? { mobileLayout: c.mobileLayout } : {}),
-      }))
+      const clones = cloneTrees(shifted, {
+        keepAnchors: (component) => subtreeAnchorsFree(component, page.components, state.schema.pages),
+      })
       const newIds = clones.map((c) => c.id)
       return {
         schema: withComponents(state.schema, page.id, [...page.components, ...clones]),
@@ -1894,8 +1913,10 @@ export const useEditorStore = create((set, get) => ({
       const newIds = []
       // A selected parent already carries every descendant in its copy.
       // Duplicating a selected child again would also change the ORIGINAL tree.
-      for (const src of selectedTreeRoots(page.components, ids)) {
-        const copy = cloneTree(src)
+      const sources = selectedTreeRoots(page.components, ids)
+      const copies = cloneTrees(sources)
+      for (const [index, src] of sources.entries()) {
+        const copy = copies[index]
         newIds.push(copy.id)
         if (isTopLevel(page.components, src.id)) {
           Object.assign(copy, offsetPageCopy(src, page))
@@ -2765,7 +2786,7 @@ export const useEditorStore = create((set, get) => ({
       const page = selectCurrentPage(state)
       const src = findInTree(page.components, id)
       if (!src) return {}
-      const copy = cloneTree(src)
+      const [copy] = cloneTrees([src])
       // Nudge a top-level free-canvas copy so it doesn't sit exactly on the original.
       if (isTopLevel(page.components, id)) {
         Object.assign(copy, offsetPageCopy(src, page))
@@ -2792,7 +2813,7 @@ export const useEditorStore = create((set, get) => ({
       // An HTML page is its document: it has no canvas for a copy to land on.
       if (!target || target.mode === 'html' || !src) return {}
       // Keep the section names only if the other page does not already use them.
-      const copy = cloneTree(src, { keepAnchors: subtreeAnchorsFree(src, target.components, state.schema.pages) })
+      const [copy] = cloneTrees([src], { keepAnchors: subtreeAnchorsFree(src, target.components, state.schema.pages) })
       return {
         schema: withComponents(state.schema, pageId, [...target.components, copy]),
         dirty: true,
