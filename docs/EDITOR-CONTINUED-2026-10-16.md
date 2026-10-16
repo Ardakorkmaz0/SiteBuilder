@@ -74,6 +74,20 @@ dağıtılmıyor.
   seçildikten sonra gelen 409'un silinmiş taslağı yeniden oluşturduğunu
   kanıtladı. Recovery yazımı da `discardLeaveRef` tercihini izler. Düzeltme
   sonrası detached, restore, ayrılma ve tema komşuları yedi dosyada 31/31 geçti.
+- **Restore sırasında sunucunun eski satırı kullanması:** `get_object()` ile
+  izin kontrolü yapıldıktan sonra başka bir kayıt tamamlanırsa, transaction
+  içindeki eski `site` nesnesi recovery'ye eski dokümanı koyabiliyor, metadata
+  alanlarını geri yazabiliyor ve revision 4 → 5 → 5 yapabiliyordu. Restore,
+  transaction içinde owner filtresi korunarak `select_for_update()` ile satırı
+  yeniden okur; recovery, restore ve revision artışı aynı kilitli nesneyi
+  kullanır. Yalnız schema/html/revision/updated_at alanları yazılır.
+  Yeni altı endpoint testi, unauthenticated ve başka owner çağrılarını DB
+  satırı/history count ile doğrular; normal owner restore ve permission-read
+  sınırına yerleştirilen gerçek DB yazımından sonra üç regresyonu kapsar.
+  Eski kaynakta 3 hata/3 başarılı; düzeltme sonrası versions/revision
+  komşularıyla 29/29 başarılı. Bu deterministik stale-read kanıtıdır;
+  SQLite testi PostgreSQL'in paralel satır kilitlemesini ölçtüğü iddiasını
+  taşımaz.
 
 ## Henüz kapatılmayan bulgular
 
@@ -88,6 +102,11 @@ Yalnız geometriyi ölçeklemek `fit: off` yazının fontunu aynı bırakıp yen
 kırpılma üretebilir; yalnız x'i sınırlamak öğeleri üst üste bindirebilir. Bu
 nedenle kanıtsız bir hızlı düzeltme uygulanmadı. Güvenilir çözüm, container'ın
 tasarım alanını Edit, View ve export taraflarında tutarlı sığdırmayı gerektirir.
+Devam incelemesinde gerçek store, ContainerEditor ve Renderer/export ile beş
+izole tanı daha geçti: Paste anında küçültürken, copy-to-page başlangıçta
+800 px bırakıp normalize/reload sırasında aynı kırpılmaya dönüşür. Dolayısıyla
+yalnız Paste offset'ini değiştirmek yeterli değildir. İçerik metni silinmez;
+geometriye erişim ve görünürlük bozulur.
 
 İçeri aktarılan CSS'te `#id { background-image: ... !important }` gibi daha
 güçlü bir selector varsa, mevcut mobil override stylesheet'inin attribute
@@ -101,17 +120,25 @@ sorgusu ve CSS cascade görünürlüğünü jsdom ile kanıtlamaz.
 | Kontrol | Sonuç |
 | --- | --- |
 | Frontend tam suite | **240 dosyada 2.279/2.279 başarılı**, 93,72 saniye |
-| Backend tam suite | **811/811 başarılı**, 139,30 saniye |
+| Backend son tam suite | **817/817 başarılı**, 137,28 saniye |
 | ESLint | Başarılı |
 | Üretim derlemesi | Başarılı |
 | `git diff --check` | Temiz |
 
-Bu devam turu **48 yeni test** ekler. Frontend Node 26 üzerinde
+Bu devam turu frontend'de **48**, backend'de **6 yeni test** ekler. Frontend Node 26 üzerinde
 `NODE_OPTIONS=--no-experimental-webstorage npm run test:run -- --maxWorkers=4`,
 backend `.venv-linux/bin/python -m pytest -q` ile çalıştırıldı. Model veya
 migration değişikliği yok. Mevcut büyük bundle ve test ortamındaki staticfiles
 uyarıları sürer; yeni test hatası yok. Yerel loglar:
 `/tmp/sitebuilder-continued-{frontend,backend,lint,build}.log`.
+Sunucu restore düzeltmesi sonrasındaki tam koşu:
+`/tmp/sitebuilder-continued-backend-final.log`. Bu ikinci düzeltme frontend
+kaynaklarını değiştirmez; frontend tam suite/lint/build aynı kaynakla geçmiştir.
+
+Gradient ve editör düzeltmeleri `7ac4873` ile owner author/committer kimliğinde
+master'a push edildi. Aynı commit'in CI frontend ve backend işleri yeşil;
+sunucu restore kilidi sonraki ayrı commit'te tutulur. Yeni HEAD'in CI sonucu
+ayrıca kontrol edilir. Bu devam turundaki hiçbir commit canlıya alınmamıştır.
 
 Yeni E2E spec veya yerel tarayıcı koşusu yok; testler Vitest/jsdom ve izole
 fixture'larla çalıştırılıyor. Üretim verisine test yazımı yapılmıyor.
@@ -129,6 +156,17 @@ Yazarlar bulguları testle doğruladı; reviewer kaynakları sessizce değiştir
 Detached kayıtta beş test bağımsız olarak da geçti; global store'u kullanma,
 eski cevabın B'yi temiz işaretlemesi ve pending Source recovery'sini kaldırma
 mutation'larının üçü de ilgili regresyonları kırdı.
+Sunucudaki restore düzeltmesinin altı testi de bağımsız kopyada geçti;
+transaction içindeki fresh read kaldırılınca üç regresyon kırıldı. Yalnız
+`select_for_update` yerine normal queryset koyan mutation SQLite testlerini
+kırmaz: gerçek paralel PostgreSQL row-lock testi yapılmış sayılmaz.
+
+Ek salt okunur tanıda gerçek HtmlWorkspace üzerinden iki PC/telefon testi,
+serialize → projectSnapshot → splitPageHtml → publishedPagesFor zincirinde
+gradienti, `!important` değerini ve responsive override stilini korudu.
+Backend'in üç HTML doğrulama yolu da aynı ham HTML'yi korudu. Bu geçici tanılar
+kalıcı suite'in 48 yeni frontend test sayısına eklenmez ve gradient için
+ayrıca E2E kayıt kuyruğu testi yapıldığı iddiasını taşımaz.
 
 Claude CLI mevcut olmadığı için gerçek Claude çapraz incelemesi henüz
 yapılmadı. Bu Codex kontrolleri Claude onayı olarak sunulmaz; bu rapor

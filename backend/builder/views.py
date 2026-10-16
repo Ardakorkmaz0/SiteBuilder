@@ -16,6 +16,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -657,6 +658,9 @@ class SiteViewSet(viewsets.ModelViewSet):
         # Wrap the snapshot-of-current + restore in a transaction so a crash
         # mid-way can never leave the site in a half-restored state.
         with transaction.atomic():
+            # Ownership was checked above, but another save may have committed
+            # since that read. Snapshot and replace the current locked row.
+            site = get_object_or_404(Site.objects.select_for_update(), pk=site.pk, owner=request.user)
             # Always recorded, even when it matches the latest snapshot: it is
             # the recovery point the load promises, and it is looked for under
             # "Recovery points". De-duplicated away, the only row there was the
@@ -665,7 +669,7 @@ class SiteViewSet(viewsets.ModelViewSet):
             site.schema = version.schema
             site.html = version.html
             site.revision += 1
-            site.save()
+            site.save(update_fields=['schema', 'html', 'revision', 'updated_at'])
             SiteVersion.snapshot(site, source='restore', label=f'restored from v{version.pk}')
         return Response(SiteSerializer(site).data)
 
