@@ -4,7 +4,7 @@ import { RenderComponent } from '../renderer/Renderer.jsx'
 import { ContainerEditor, RegionEditor, TabsEditor } from './FlowCanvasItem.jsx'
 import { snapDraggedRect, snapThresholdFor } from '../../utils/snapping.js'
 import { beginDragScroll } from '../../utils/dragAutoScroll.js'
-import { trackPointerDrag } from '../../utils/pointerDrag.js'
+import { usePointerDrag } from '../../ui/usePointerDrag.js'
 import { embedAspectLock } from '../../utils/htmlSnippetSizing.js'
 import { fixedRailInset } from '../../utils/railInset.js'
 import { BRUSH_CURSOR } from './brushCursor.js'
@@ -63,6 +63,7 @@ export default function FreeCanvasItem({
       ? component.mobileLayout || component.layout
       : component.layout
   const page = useEditorStore(selectCurrentPage)
+  const trackDrag = usePointerDrag(page.id, viewport)
   const canvasWidth = viewport === 'mobile' ? page.mobileWidth || 390 : page.canvasWidth || 1000
   const viewportStretch = component.type === 'region' || (
     component.type === 'navbar' &&
@@ -275,7 +276,7 @@ export default function FreeCanvasItem({
         })
       }
       state.beginHistoryGesture()
-      trackPointerDrag(e, {
+      trackDrag(e, {
         onMove: onMovePin,
         onEnd: () => useEditorStore.getState().endHistoryGesture(),
       })
@@ -343,7 +344,7 @@ export default function FreeCanvasItem({
       setDragGuides(snap.guides)
     }
     state.beginHistoryGesture()
-    trackPointerDrag(e, {
+    trackDrag(e, {
       onMove: (ev) => {
         drag.track(ev)
         moveTo(ev.clientX, ev.clientY)
@@ -396,7 +397,7 @@ export default function FreeCanvasItem({
       setLayout(component.id, { x: nx, y: ny, w: nw, h: nh })
     }
     useEditorStore.getState().beginHistoryGesture()
-    trackPointerDrag(e, {
+    trackDrag(e, {
       onMove: (ev) => {
         drag.track(ev)
         resizeTo(ev.clientX, ev.clientY)

@@ -13,7 +13,7 @@ import { phoneFrameH, phoneFrameW, phoneModel, phoneScreenHeight } from './phone
 import BrowserFrame from './BrowserFrame.jsx'
 import MobileBrowserChrome from './MobileBrowserChrome.jsx'
 import { CANVAS_SCROLLER_ID } from '../../utils/dragAutoScroll.js'
-import { trackPointerDrag } from '../../utils/pointerDrag.js'
+import { usePointerDrag } from '../../ui/usePointerDrag.js'
 import { elementIdFor } from '../../utils/anchors.js'
 import { CANVAS_SELECTION_Z } from './spotlight.js'
 import { zoomScale } from './canvasZoom.js'
@@ -97,6 +97,7 @@ export default function Canvas({
   const page = useMemo(() => withColorModePage(storedPage, previewMode), [storedPage, previewMode])
   const components = page.components
   const viewport = useEditorStore((s) => s.viewport)
+  const trackDrag = usePointerDrag(page.id, viewport)
   const bg = page.background || '#ffffff'
   const bgMobile = page.backgroundMobile || page.background || '#ffffff'
   const pcWidth = page.canvasWidth || CANVAS_WIDTH
@@ -428,7 +429,7 @@ export default function Canvas({
         .map((c) => c.id)
       selectMany(ids)
     }
-    trackPointerDrag(e, { onMove, onEnd: onUp })
+    trackDrag(e, { onMove, onEnd: onUp })
   }
 
   const canvas = (

@@ -491,14 +491,23 @@ function boxFitScript() {
       var root = box.querySelector(':scope > [data-pwb-fit-root]');
       if (root) fitBoxContent(box, root, box.getAttribute('data-pwb-fit'), box.hasAttribute('data-pwb-fit-fill'));
     }
-    function fitAll() {
-      var boxes = document.querySelectorAll('[data-pwb-fit],[data-pwb-container-width]');
+    function fitWithin(scope) {
+      var boxes = scope.querySelectorAll('[data-pwb-fit],[data-pwb-container-width]');
       for (var i = 0; i < boxes.length; i++) fitOne(boxes[i]);
     }
+    function fitAll() { fitWithin(document); }
     function start() {
       var boxes = document.querySelectorAll('[data-pwb-fit],[data-pwb-container-width]');
       if (!boxes.length) return;
       fitAll();
+      // A hidden tab has no measurable width. Fit it once it opens, including
+      // browsers without ResizeObserver and nested canvases inside its panel.
+      document.addEventListener('click', function (event) {
+        var tab = event.target && event.target.closest && event.target.closest('[role="tab"][data-builder-tab]');
+        if (!tab) return;
+        var tabsRoot = tab.closest('[data-builder-tabs]');
+        if (tabsRoot) fitWithin(tabsRoot);
+      });
       if (window.ResizeObserver) {
         var watcher = new ResizeObserver(function (entries) {
           for (var i = 0; i < entries.length; i++) fitOne(entries[i].target);

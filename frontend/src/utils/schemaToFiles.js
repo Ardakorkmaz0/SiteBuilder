@@ -428,6 +428,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
     const tabs = (Array.isArray(p.tabs) ? p.tabs : []).filter((t) => t && t.id)
     const safeTabs = tabs.length ? tabs : [{ id: 't1', label: 'Tab' }]
     const activeId = safeTabs.some((t) => t.id === p.activeId) ? p.activeId : safeTabs[0].id
+    const designW = Math.max(1, Math.round(c.layout?.w || 600))
     const kids = visibleChildren(c)
     const strip = safeTabs
       .map(
@@ -453,7 +454,8 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
           })
           .join('')
         const hidden = t.id === activeId ? '' : ' hidden'
-        return `<div role="tabpanel" data-builder-panel="${esc(t.id)}"${hidden} style="display:block;position:relative;min-height:${panelH}px">${inner}</div>`
+        if (!panelKids.length) return `<div role="tabpanel" data-builder-panel="${esc(t.id)}"${hidden} style="display:block;position:relative;min-height:${panelH}px"></div>`
+        return `<div role="tabpanel" data-builder-panel="${esc(t.id)}" data-pwb-container-width="${designW}" data-pwb-container-height="${panelH}"${hidden} style="display:block;position:relative;min-height:${panelH}px"><div data-pwb-container-root style="position:absolute;left:0;top:0;width:${designW}px;height:${panelH}px;transform-origin:0 0">${inner}</div></div>`
       })
       .join('')
     return `<div data-builder-tabs="${esc(c.id)}" style="display:flex;flex-direction:column;${tabsCssVars(p)};${styleStr}"><div role="tablist">${strip}</div>${panels}</div>`

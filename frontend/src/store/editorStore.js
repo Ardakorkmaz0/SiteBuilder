@@ -1069,7 +1069,7 @@ function clampLayout(l, bounds = {}) {
 // same edges as a single one — they used to differ, and dragging or nudging a
 // MULTI selection could push components off the artboard entirely, where they
 // are invisible and unclickable until an undo or a reload.
-function layoutBoundsFor(page, id, key) {
+function layoutBoundsFor(page, id, key, parentOverride = null) {
   const isTop = isTopLevel(page.components, id)
   if (isTop) {
     if (page.flowMode) return {}
@@ -1079,7 +1079,7 @@ function layoutBoundsFor(page, id, key) {
         : page.canvasWidth || CANVAS_WIDTH,
     }
   }
-  const parent = findParentInTree(page.components, id)
+  const parent = parentOverride || findParentInTree(page.components, id)
   if (!parent) return {}
   const maxX = parentDesignWidth(parent, key === 'mobileLayout' && parent.type === 'region'
     ? page.mobileWidth || MOBILE_CANVAS_WIDTH
@@ -1105,6 +1105,18 @@ function componentLayoutKey(page, id, viewport) {
   }
   const parent = findParentInTree(page.components, id)
   return viewport === 'mobile' && parent?.type === 'region' ? 'mobileLayout' : 'layout'
+}
+
+// Single and batch sizing express the same user intent: HTML auto-fit stops,
+// and a native box fits its content unless the owner explicitly turned it off.
+function markManualSizing(component, next, base, patch) {
+  const sized = patch.w !== undefined || patch.h !== undefined
+  if (sized && component.type === 'html') next.props = { ...component.props, _boxManual: true }
+  const resized = (patch.w !== undefined && patch.w !== base.w) || (patch.h !== undefined && patch.h !== base.h)
+  if (resized && FIT_TYPES.has(component.type) && component.props?.fit !== 'box' && component.props?.fit !== 'off') {
+    next.props = { ...(next.props || component.props), fit: 'box' }
+  }
+  return next
 }
 
 // Clamp an artboard width / fold value to sane bounds (mirrors the backend).
@@ -2004,19 +2016,31 @@ export const useEditorStore = create((set, get) => ({
     set((state) => {
       const page = selectCurrentPage(state)
       let editedMobile = false
-      const apply = (arr) =>
+      const apply = (arr, parentOverride = null, ancestorPatched = false) =>
         arr.map((c) => {
-          const patch = updates[c.id]
+          const requested = updates[c.id]
+          let patch = requested
+          // Moving a selected parent already moves its descendants. Their
+          // positions stay local, while explicit descendant sizes still apply.
+          if (ancestorPatched && requested) {
+            patch = {}
+            if (requested.w !== undefined) patch.w = requested.w
+            if (requested.h !== undefined) patch.h = requested.h
+            if (!Object.keys(patch).length) patch = null
+          }
+          let next = c
           if (patch) {
             const componentKey = componentLayoutKey(page, c.id, state.viewport)
             if (componentKey === 'mobileLayout') editedMobile = true
             const base = c[componentKey] || c.layout || { x: 0, y: 0, w: 200, h: 80 }
-            return {
+            next = markManualSizing(c, {
               ...c,
-              [componentKey]: clampLayout({ ...base, ...patch }, layoutBoundsFor(page, c.id, componentKey)),
-            }
+              [componentKey]: clampLayout({ ...base, ...patch }, layoutBoundsFor(page, c.id, componentKey, parentOverride)),
+            }, base, patch)
           }
-          return Array.isArray(c.children) ? { ...c, children: apply(c.children) } : c
+          return Array.isArray(c.children)
+            ? { ...next, children: apply(c.children, next, ancestorPatched || !!requested) }
+            : next
         })
       const components = apply(page.components)
       const schema =
@@ -2038,8 +2062,9 @@ export const useEditorStore = create((set, get) => ({
     get().record('align-sel-' + mode)
     set((state) => {
       const page = selectCurrentPage(state)
-      const key = page.flowMode ? 'layout' : state.viewport === 'mobile' ? 'mobileLayout' : 'layout'
-      const items = sameParentIds(page.components, ids, state.selectedId)
+      const siblingIds = sameParentIds(page.components, ids, state.selectedId)
+      const key = componentLayoutKey(page, siblingIds[0], state.viewport)
+      const items = siblingIds
         .map((id) => {
           const c = findInTree(page.components, id)
           // Sections (regions) are structural full-width bands — nudging their
@@ -2090,9 +2115,10 @@ export const useEditorStore = create((set, get) => ({
     get().record('distribute-sel-' + axis)
     set((state) => {
       const page = selectCurrentPage(state)
-      const key = page.flowMode ? 'layout' : state.viewport === 'mobile' ? 'mobileLayout' : 'layout'
+      const siblingIds = sameParentIds(page.components, ids, state.selectedId)
+      const key = componentLayoutKey(page, siblingIds[0], state.viewport)
       const sizeKey = axis === 'x' ? 'w' : 'h'
-      const items = sameParentIds(page.components, ids, state.selectedId)
+      const items = siblingIds
         .map((id) => {
           const c = findInTree(page.components, id)
           // Same structural exemption as alignSelection: bands stay put.
@@ -2185,9 +2211,7 @@ export const useEditorStore = create((set, get) => ({
       const page = selectCurrentPage(state)
       const bounds = computeAlignParentBox(page, state.viewport, id, page.components)
       if (!bounds) return {}
-      const baseKey = isTopLevel(page.components, id) && !page.flowMode && state.viewport === 'mobile'
-        ? 'mobileLayout'
-        : 'layout'
+      const baseKey = componentLayoutKey(page, id, state.viewport)
       const components = mapTree(page.components, id, (c) => {
         const base = c[baseKey] || c.layout || { x: 0, y: 0, w: 200, h: 80 }
         const next = applyAlignMode(base, bounds, mode)
@@ -2423,19 +2447,10 @@ export const useEditorStore = create((set, get) => ({
       // align/distribute). Mark the embed so the auto-fit stops overriding the
       // size they chose; the toolbar's "Fit to content" clears the flag to hand
       // the block back to auto-sizing.
-      const sized = patch.w !== undefined || patch.h !== undefined
       let components = mapTree(page.components, id, (c) => {
         const base = c[key] || c.layout || { x: 0, y: 0, w: 200, h: 80 }
         const next = { ...c, [key]: clampLayout({ ...base, ...patch }, { ...bounds, maxX, maxY }) }
-        if (sized && c.type === 'html') next.props = { ...c.props, _boxManual: true }
-        // A block sized by hand fits its box from then on (utils/boxFit.js):
-        // its content grows and shrinks with it instead of being clipped or
-        // left in a corner. Blocks never resized keep drawing as they did.
-        const resized = (patch.w !== undefined && patch.w !== base.w) || (patch.h !== undefined && patch.h !== base.h)
-        if (resized && FIT_TYPES.has(c.type) && c.props?.fit !== 'box' && c.props?.fit !== 'off') {
-          next.props = { ...(next.props || c.props), fit: 'box' }
-        }
-        return next
+        return markManualSizing(c, next, base, patch)
       })
       if (isTop && before?.type === 'region' && patch.h !== undefined) {
         const oldLayout = before[key] || before.layout || {}
