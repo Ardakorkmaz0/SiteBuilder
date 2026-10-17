@@ -43,6 +43,13 @@ contracts. Work stays on `master` with the owner's author/committer identity.
   including mixed selections and region children on flow pages. For example,
   a shared child of width 120 with a stale phone width 200 now scales to 132,
   rather than 220.
+- **Palette placement inside nested fitted containers.** The previous drag
+  and armed-tap calculations divided by only the target's local fit, omitting
+  fitted ancestors. A local drop at `(300,60)` could be stored as `(150,30)`.
+  Both paths now use `dropCoordinates`: canvas zoom is applied once, all
+  positive finite ancestor fits inside the canvas are combined, and markers
+  outside the canvas are excluded. Armed placement still centers the snippet
+  after converting the point into the target's coordinate space.
 
 ## Regression evidence and independent review
 
@@ -65,7 +72,8 @@ New frontend tests in this batch:
 | Published history restore | 5 |
 | Override layer, metadata and stylesheet relations | 7 |
 | Responsive component exports and layer scope/order | 4 |
-| **Total Vitest additions** | **59** |
+| Nested palette drag/tap placement and coordinate helper | 14 |
+| **Total Vitest additions** | **73** |
 
 The focused regression runs were red before the relevant fixes; neighboring
 guards remained green. Independent Codex reviewers also used isolated source
@@ -82,6 +90,16 @@ mutations rather than changing shared production files:
 - Skipping published-document synchronization breaks four restore tests;
   enabling disk writes or clearing the dirty retry barrier breaks separate
   cases. Additional isolated queue/detached-editor probes passed.
+- The nested placement EditorPage cases ran against the old handlers first:
+  four regressions failed and two single-fit controls passed. They cover
+  native and HTML drops, 50 percent canvas zoom and real Sidebar Solid-snippet
+  selection followed by a tap. These tests drive the real page/canvas/store;
+  drag cases capture the DndContext callback boundary and provide client
+  rectangles because jsdom has no drag sensor or layout engine. Eight helper
+  tests cover ancestor boundaries, plain wrappers and invalid scale values.
+  A fresh independent 14-test run passed. Isolated mutations then broke 11
+  tests when ancestor fits were skipped, nine when zoom was doubled, one
+  when the old tap handler was restored and three with the old drag handler.
 
 Claude CLI is unavailable. These independent Codex checks are not Claude
 approval. Claude should review the changes and tests in:
@@ -92,6 +110,8 @@ approval. Claude should review the changes and tests in:
 - `frontend/src/store/editorStore.js`
 - `frontend/src/pages/EditorPage.jsx`
 - `frontend/src/utils/{schemaToFiles,htmlRuntime}.js`
+- `frontend/src/components/editor/Canvas.jsx` and
+  `frontend/src/utils/dropCoordinates.js`
 - Their new neighboring tests and the two E2E specs in commit `c8ebb40`.
 
 ## Practical limits and follow-up
@@ -107,15 +127,14 @@ CSSOM. Unit tests check generated source, scope and structure; the CI mobile
 spec reads real Chromium computed styles across save/reload/reset. jsdom
 results alone are not evidence of the browser's CSS cascade.
 
-One further candidate remains unconfirmed: dropping a palette item inside
-multiple nested fitted containers may need all ancestor scales. Do not report
-this as a fixed or proven bug without a focused reproduction.
+The initially unconfirmed nested palette-drop candidate was reproduced while
+the first fix commit's CI ran, and was fixed in the follow-up described above.
 
 ## Local validation
 
 | Check | Result |
 | --- | --- |
-| Full frontend suite | 249 files, 2,338 passed; 85.35 seconds |
+| Full frontend suite | 251 files, 2,352 passed; 80.95 seconds |
 | Full backend suite | 817 passed; 129.26 seconds |
 | Frontend lint | Passed |
 | Production build | Passed |
@@ -129,7 +148,13 @@ full frontend attempt caught a stale flow-region fixture expectation; its
 expected initial phone width was corrected from 200 to 288 before the final
 full green run.
 
-Local logs: `/tmp/sitebuilder-hardening-{frontend-final,backend,lint,build}.log`.
-The fix commit's CI result is recorded in the delivery message. A deployment
-still requires the owner's new authorization and a green `tests` workflow for
-the exact HEAD.
+Local frontend logs:
+`/tmp/sitebuilder-hardening-{frontend-final,lint,build}.log`.
+The backend result above predates the final frontend-only placement fix.
+
+The first fix commit `08767a5` passed all three jobs in
+[CI run 38970563934](https://github.com/Ardakorkmaz0/SiteBuilder/actions/runs/38970563934),
+including all 97 E2E tests and the three regressions that failed on `c8ebb40`. The final
+placement fix gets its own exact-HEAD CI run; its result is recorded in the
+delivery message. A deployment still requires the owner's new authorization
+and a green `tests` workflow for the exact HEAD.
