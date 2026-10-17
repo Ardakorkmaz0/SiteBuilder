@@ -29,6 +29,7 @@ import { pageDirection, pageLanguage } from '../../utils/seoTags.js'
 import { colorModeFor, withColorModePage } from '../../utils/colorMode.js'
 import { ColorModeRoot } from '../renderer/ColorMode.jsx'
 import { usePhoneEmbedHeights } from './usePhoneEmbedHeights.js'
+import { dropCoordinates } from '../../utils/dropCoordinates.js'
 
 // One editable free canvas, rendered at the active breakpoint's chosen artboard
 // width. PC edits each component's `layout`; Mobile edits its `mobileLayout` on a
@@ -350,12 +351,9 @@ export default function Canvas({
       : null
     let inside = null
     if (holder) {
-      const box = holder.getBoundingClientRect()
-      const scale = canvasScale * (Number(holder.dataset.builderFitScale) || 1)
       inside = {
         parentId: holder.getAttribute('data-builder-droppable-id'),
-        x: (e.clientX - box.left) / scale,
-        y: (e.clientY - box.top) / scale,
+        ...dropCoordinates(holder, e.clientX, e.clientY, canvasElRef.current, canvasScale),
       }
     }
     onPlaceAt((e.clientX - rect.left) / canvasScale, (e.clientY - rect.top) / canvasScale, inside)

@@ -62,6 +62,7 @@ import CanvasZoomControl from '../components/editor/CanvasZoomControl.jsx'
 import FullscreenStage from '../components/editor/FullscreenStage.jsx'
 import useFullscreenEditing from '../components/editor/useFullscreenEditing.js'
 import { readZoom, writeZoom } from '../components/editor/canvasZoom.js'
+import { dropCoordinates } from '../utils/dropCoordinates.js'
 import CanvasPreview from '../components/editor/CanvasPreview.jsx'
 import BrushControls from '../components/editor/BrushControls.jsx'
 import {
@@ -1301,11 +1302,9 @@ function SiteEditor() {
       let y = 12
       const targetEl = findDroppableElement(over.id)
       if (targetEl && translated) {
-        const rect = targetEl.getBoundingClientRect()
-        const canvasScale = Number(document.getElementById('free-canvas')?.dataset?.builderCanvasScale) || 1
-        const fitScale = Number(targetEl.dataset?.builderFitScale) || 1
-        x = (translated.left - rect.left) / (canvasScale * fitScale)
-        y = (translated.top - rect.top) / (canvasScale * fitScale)
+        const point = dropCoordinates(targetEl, translated.left, translated.top, document.getElementById('free-canvas'))
+        x = point.x
+        y = point.y
       }
       // A palette snippet stays the snippet that was dragged: an `html`
       // component inside the container, like one dropped on the page.
