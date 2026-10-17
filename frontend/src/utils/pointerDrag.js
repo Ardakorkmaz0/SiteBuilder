@@ -50,5 +50,5 @@ export function trackPointerDrag(startEvent, { onMove, onEnd } = {}) {
 
   // Ending it early (e.g. the component unmounts mid-drag) goes through the
   // same single exit.
-  return () => end()
+  return () => end({ type: 'pointercancel' })
 }

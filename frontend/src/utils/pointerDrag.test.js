@@ -8,6 +8,13 @@ function pointer(type, props = {}) {
 }
 
 describe('trackPointerDrag', () => {
+  it('reports an explicit cancellation when stopped by its owner', () => {
+    const onEnd = vi.fn()
+    const stop = trackPointerDrag({ pointerId: 1 }, { onEnd })
+    stop()
+    expect(onEnd).toHaveBeenCalledTimes(1)
+    expect(onEnd.mock.calls[0][0]?.type).toBe('pointercancel')
+  })
   it('reports moves until pointerup, then stops listening', () => {
     const onMove = vi.fn()
     const onEnd = vi.fn()

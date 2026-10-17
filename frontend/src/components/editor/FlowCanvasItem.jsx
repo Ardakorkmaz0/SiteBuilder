@@ -21,7 +21,7 @@ import {
 } from '../../utils/regionLayout.js'
 import { autoLayoutChildStyle, autoLayoutContainerStyle } from '../../utils/autoLayout.js'
 import { containerDesignWidth } from '../../utils/containerFit.js'
-import { trackPointerDrag } from '../../utils/pointerDrag.js'
+import { usePointerDrag } from '../../ui/usePointerDrag.js'
 import {
   CHROME_ACCENT,
   HOVER_RING_CLASS,
@@ -86,6 +86,8 @@ export default function FlowCanvasItem({
   const { t } = useLanguage()
   const selectedId = useEditorStore((s) => s.selectedId)
   const viewport = useEditorStore((s) => s.viewport)
+  const currentPageId = useEditorStore((s) => s.currentPageId)
+  const trackDrag = usePointerDrag(currentPageId, viewport)
   const select = useEditorStore((s) => s.selectComponent)
   const setLayout = useEditorStore((s) => s.setLayout)
   const paintComponent = useEditorStore((s) => s.paintComponent)
@@ -166,7 +168,7 @@ export default function FlowCanvasItem({
     }
     // One undo step per gesture; ends on pointerup, cancel or loss of focus.
     useEditorStore.getState().beginHistoryGesture()
-    trackPointerDrag(e, {
+    trackDrag(e, {
       onMove,
       onEnd: () => useEditorStore.getState().endHistoryGesture(),
     })
@@ -635,6 +637,8 @@ function TabsCanvasItem({
   const { t } = useLanguage()
   const selectedId = useEditorStore((s) => s.selectedId)
   const viewport = useEditorStore((s) => s.viewport)
+  const currentPageId = useEditorStore((s) => s.currentPageId)
+  const trackDrag = usePointerDrag(currentPageId, viewport)
   const select = useEditorStore((s) => s.selectComponent)
   const setLayout = useEditorStore((s) => s.setLayout)
   const paintComponent = useEditorStore((s) => s.paintComponent)
@@ -685,7 +689,7 @@ function TabsCanvasItem({
     }
     // One undo step per gesture; ends on pointerup, cancel or loss of focus.
     useEditorStore.getState().beginHistoryGesture()
-    trackPointerDrag(e, {
+    trackDrag(e, {
       onMove,
       onEnd: () => useEditorStore.getState().endHistoryGesture(),
     })
@@ -719,7 +723,7 @@ function TabsCanvasItem({
     }
     // One undo step per gesture; ends on pointerup, cancel or loss of focus.
     useEditorStore.getState().beginHistoryGesture()
-    trackPointerDrag(e, {
+    trackDrag(e, {
       onMove,
       onEnd: () => useEditorStore.getState().endHistoryGesture(),
     })

@@ -92,6 +92,7 @@ function TabsRender({ component, style, viewport, boxScale = 1, editorPreview = 
     component._designTabId ||
     (tabs.some((tab) => tab.id === localActive) ? localActive : initial)
   const kids = Array.isArray(component.children) ? component.children : []
+  const designWidth = Math.max(1, Math.round(component.layout?.w || 600))
   const tablistStyle = {
     ...TAB_STYLES.tablist,
     gap: scaleCssValue(p.tabGap || TAB_STYLES.tablist.gap, boxScale),
@@ -161,9 +162,23 @@ function TabsRender({ component, style, viewport, boxScale = 1, editorPreview = 
           return id === tab.id
         })
         const panelHeight = absoluteChildrenHeight(panelKids, 120)
+        if (!panelKids.length) {
+          return (
+            <div
+              key={tab.id}
+              role="tabpanel"
+              data-builder-panel={tab.id}
+              hidden={!sel}
+              style={{ ...panelStyle, display: sel ? 'block' : 'none', position: 'relative', minHeight: panelHeight }}
+            />
+          )
+        }
         return (
-          <div
+          <ContainerCanvas
             key={tab.id}
+            width={designWidth}
+            height={panelHeight}
+            initialWidth={viewport === 'mobile' ? component.mobileLayout?.w || component.layout?.w : component.layout?.w}
             role="tabpanel"
             data-builder-panel={tab.id}
             hidden={!sel}
@@ -171,7 +186,6 @@ function TabsRender({ component, style, viewport, boxScale = 1, editorPreview = 
               ...panelStyle,
               display: sel ? 'block' : 'none',
               position: 'relative',
-              minHeight: panelHeight,
             }}
           >
             {panelKids.map((c) =>
@@ -194,7 +208,7 @@ function TabsRender({ component, style, viewport, boxScale = 1, editorPreview = 
                 )
               })(),
             )}
-          </div>
+          </ContainerCanvas>
         )
       })}
     </div>
