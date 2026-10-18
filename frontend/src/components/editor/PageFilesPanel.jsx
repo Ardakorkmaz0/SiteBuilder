@@ -1,9 +1,11 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { useEditorStore } from '../../store/editorStore.js'
 import { pageFileName } from '../../utils/pageFiles.js'
 import { countLinksToPage } from '../../utils/pageLinks.js'
 import { FileIcon, FileCodeIcon, FolderIcon, LinkIcon, LayersIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 
 // VS Code-style file explorer, shared by BOTH editor modes: every page is a
 // "file", optionally grouped under collapsible folders (page.folder).
@@ -269,53 +271,82 @@ export default function PageFilesPanel({
           : t('Pages of your design. Click the open page again to toggle the code panel.')}
       </p>
 
-      {addPrompt && (
-        <div
-          className="studio-theme-surface studio-overlay fixed inset-0 z-[200] flex items-center justify-center p-4"
-          onClick={() => setAddPrompt(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-5 text-[var(--studio-text)] shadow-xl"
-            onClick={(e) => e.stopPropagation()}
+      {addPrompt && <NewPageModePrompt onPick={createPage} onCancel={() => setAddPrompt(null)} />}
+    </div>
+  )
+}
+
+// Asked before a new page exists: an empty canvas or an HTML document. It is
+// a modal dialog like the others: it takes the keyboard, keeps Tab inside,
+// and Esc (or Cancel) puts focus back on the button that opened it.
+function NewPageModePrompt({ onPick, onCancel }) {
+  const { t } = useLanguage()
+  const id = useId()
+  const ref = useInitialDialogFocus(true)
+  useEscapeToClose(true, onCancel)
+  const keepTabInside = (event) => {
+    if (event.key !== 'Tab') return
+    const buttons = ref.current.querySelectorAll('button')
+    const first = buttons[0]
+    const last = buttons[buttons.length - 1]
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) {
+      event.preventDefault(); last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault(); first.focus()
+    }
+  }
+  return (
+    <div
+      className="studio-theme-surface studio-overlay fixed inset-0 z-[200] flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
+      <div
+        ref={ref}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${id}-title`}
+        aria-describedby={`${id}-description`}
+        onKeyDown={keepTabInside}
+        className="w-full max-w-sm rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-5 text-[var(--studio-text)] shadow-xl outline-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id={`${id}-title`} className="text-base font-bold text-[#111827]">{t('How should this page start?')}</h3>
+        <p id={`${id}-description`} className="mt-1 text-sm text-[var(--studio-text-muted)]">
+          {t('Each page can use a different mode. You can switch a page later from its toolbar.')}
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => onPick('empty')}
+            className="flex flex-col items-start gap-1 rounded-lg border border-[#e5e7eb] bg-white p-3 text-left hover:border-[#4f46e5] hover:bg-[#eef2ff]"
           >
-            <h3 className="text-base font-bold text-[#111827]">{t('How should this page start?')}</h3>
-            <p className="mt-1 text-sm text-[var(--studio-text-muted)]">
-              {t('Each page can use a different mode. You can switch a page later from its toolbar.')}
-            </p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => createPage('empty')}
-                className="flex flex-col items-start gap-1 rounded-lg border border-[#e5e7eb] bg-white p-3 text-left hover:border-[#4f46e5] hover:bg-[#eef2ff]"
-              >
-                <LayersIcon size={20} className="text-[#4f46e5]" />
-                <span className="text-sm font-semibold text-[#111827]">{t('Empty canvas')}</span>
-                <span className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
-                  {t('Drag-and-drop components on a blank canvas.')}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => createPage('html')}
-                className="flex flex-col items-start gap-1 rounded-lg border border-[#e5e7eb] bg-white p-3 text-left hover:border-[#4f46e5] hover:bg-[#eef2ff]"
-              >
-                <FileCodeIcon size={20} className="text-[#4f46e5]" />
-                <span className="text-sm font-semibold text-[#111827]">{t('HTML page')}</span>
-                <span className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
-                  {t('Upload, paste, or author a full HTML document.')}
-                </span>
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => setAddPrompt(null)}
-              className="mt-4 w-full rounded-lg border border-[#e5e7eb] px-3 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6]"
-            >
-              {t('Cancel')}
-            </button>
-          </div>
+            <LayersIcon size={20} className="text-[#4f46e5]" />
+            <span className="text-sm font-semibold text-[#111827]">{t('Empty canvas')}</span>
+            <span className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
+              {t('Drag-and-drop components on a blank canvas.')}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onPick('html')}
+            className="flex flex-col items-start gap-1 rounded-lg border border-[#e5e7eb] bg-white p-3 text-left hover:border-[#4f46e5] hover:bg-[#eef2ff]"
+          >
+            <FileCodeIcon size={20} className="text-[#4f46e5]" />
+            <span className="text-sm font-semibold text-[#111827]">{t('HTML page')}</span>
+            <span className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
+              {t('Upload, paste, or author a full HTML document.')}
+            </span>
+          </button>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={onCancel}
+          className="mt-4 w-full rounded-lg border border-[#e5e7eb] px-3 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6]"
+        >
+          {t('Cancel')}
+        </button>
+      </div>
     </div>
   )
 }
