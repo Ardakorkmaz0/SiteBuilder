@@ -109,6 +109,7 @@ import {
 } from '../utils/editorLeave.js'
 import { projectSnapshot } from '../utils/projectSnapshot.js'
 import { readEditorRecovery, writeEditorRecovery } from '../utils/editorRecovery.js'
+import { aiWizardOffered, markAiWizardOffered } from '../utils/aiWizardOffer.js'
 import RecoveryDialog from '../components/editor/RecoveryDialog.jsx'
 import SiteConflictDialog from '../components/editor/SiteConflictDialog.jsx'
 import {
@@ -1011,17 +1012,14 @@ function SiteEditor() {
         // than a blank canvas. The flag is set the moment it opens, so
         // closing it never nags again. Only when the AI can actually answer:
         // without a key, the questions led to a "no provider" error at the end.
-        try {
-          const key = 'pwb_wizard_auto_' + id
-          const empty =
-            !pages.some((p) => (p.components || []).length > 0) &&
-            !pages.some((p) => (p.html || '').trim()) &&
-            !(data.html || '').trim()
-          if (!recovery && empty && aiProviderReady() && !localStorage.getItem(key)) {
-            localStorage.setItem(key, '1')
-            setWizardOpen(true)
-          }
-        } catch { /* storage unavailable — skip the auto-open */ }
+        const empty =
+          !pages.some((p) => (p.components || []).length > 0) &&
+          !pages.some((p) => (p.html || '').trim()) &&
+          !(data.html || '').trim()
+        if (!recovery && empty && aiProviderReady() && !aiWizardOffered(id)) {
+          markAiWizardOffered(id)
+          setWizardOpen(true)
+        }
       })
       .catch((e) => active && setError(apiError(e)))
       .finally(() => {

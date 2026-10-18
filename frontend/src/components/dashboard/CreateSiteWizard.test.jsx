@@ -1,10 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import CreateSiteWizard from './CreateSiteWizard.jsx'
 import { useAuthStore } from '../../store/authStore.js'
+import { aiWizardOffered } from '../../utils/aiWizardOffer.js'
+
+const createSite = vi.fn(async () => ({ id: 42 }))
+vi.mock('../../api/sites.js', () => ({ createSite: (...args) => createSite(...args) }))
 
 function openWizard() {
   return render(
@@ -65,5 +69,41 @@ describe('CreateSiteWizard publishing', () => {
     useAuthStore.setState({ user: { id: 2, username: 'guest-abc', is_guest: true } })
     await reachLastStep()
     expect(screen.queryByRole('checkbox', { name: /Publish immediately/ })).toBeNull()
+  })
+})
+
+// Choosing "Blank canvas" is choosing to build the page by hand. The editor
+// then opened the AI site wizard over that choice, on every new blank site.
+describe('CreateSiteWizard and the AI site wizard', () => {
+  async function create(start) {
+    localStorage.setItem('pwb_language', 'en')
+    useAuthStore.setState({ user: { id: 1, username: 'ada', is_guest: false } })
+    const onCreated = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <LanguageProvider>
+          <CreateSiteWizard open onClose={() => {}} onCreated={onCreated} />
+        </LanguageProvider>
+      </MemoryRouter>,
+    )
+    await user.type(screen.getByPlaceholderText('e.g. My Portfolio'), 'Olive Café')
+    await user.click(screen.getByRole('button', { name: 'Next →' }))
+    if (start) await user.click(screen.getByRole('button', { name: start }))
+    await user.click(screen.getByRole('button', { name: 'Next →' }))
+    await user.click(screen.getByRole('button', { name: 'Create and open editor' }))
+    await vi.waitFor(() => expect(onCreated).toHaveBeenCalledWith({ id: 42 }))
+  }
+
+  it('does not offer it on a site started as a blank canvas', async () => {
+    await create(/^Blank canvas/)
+    expect(createSite.mock.lastCall[1].schema.pages[0].mode).toBe('empty')
+    expect(aiWizardOffered(42)).toBe(true)
+  })
+
+  it('leaves it to the editor for a site started from a template', async () => {
+    await create(null)
+    expect(createSite.mock.lastCall[1].schema.pages[0].mode).toBe('html')
+    expect(aiWizardOffered(42)).toBe(false)
   })
 })
