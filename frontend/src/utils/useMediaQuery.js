@@ -2,14 +2,18 @@ import { useCallback, useSyncExternalStore } from 'react'
 
 // Reactive window.matchMedia — drives the editor's narrow-screen layout
 // (auto-collapsed side rails, drawer overlays) on tablets and phones.
-export function useMediaQuery(query) {
+export function useMediaQuery(query, beforeChange) {
   const subscribe = useCallback(
     (onChange) => {
       const mql = window.matchMedia(query)
-      mql.addEventListener('change', onChange)
-      return () => mql.removeEventListener('change', onChange)
+      const notify = (event) => {
+        beforeChange?.(event)
+        onChange()
+      }
+      mql.addEventListener('change', notify)
+      return () => mql.removeEventListener('change', notify)
     },
-    [query],
+    [query, beforeChange],
   )
   return useSyncExternalStore(subscribe, () => matchesQuery(query))
 }

@@ -10,6 +10,7 @@ import {
 import { useEditorStore } from '../../store/editorStore.js'
 import { inlineProjectHtml, minifyGeneratedHtml } from '../../utils/exportFiles.js'
 import { schemaToFiles } from '../../utils/schemaToFiles.js'
+import { componentHtmlFiles, componentPageDocument } from '../../utils/componentSourceDrafts.js'
 import { pageToResponsiveHtml } from '../../utils/pageCode.js'
 import { revealLine } from '../../utils/revealCodeLine.js'
 import CodeLineGlow from './CodeLineGlow.jsx'
@@ -86,39 +87,30 @@ function SnippetSelect({ groups, snippets, onPick }) {
 // A page that is an HTML document, not a canvas design: its file is that
 // document. The schema only holds the (empty) canvas behind it, so writing the
 // page from the schema showed and exported a blank page in its place.
-function documentOf(page, htmlMap) {
-  const html = page?.mode === 'html' ? htmlMap?.[page.id] : ''
-  return typeof html === 'string' && html.trim() ? html : ''
-}
-
 // `htmlMap`: each HTML page's document, by page id (the editor keeps them
 // beside the schema).
-function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = null, initialHtmlDrafts = {}, onInitialDraftsConsumed }, ref) {
+function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = null, htmlDrafts: controlledHtmlDrafts, onHtmlDraftsChange }, ref) {
   const { t } = useLanguage()
   const schema = useEditorStore((state) => state.schema)
   const setCustomCss = useEditorStore((state) => state.setCustomCss)
   const setCustomJs = useEditorStore((state) => state.setCustomJs)
   const rawGeneratedFiles = useMemo(() => schemaToFiles(schema), [schema])
-  const [htmlDrafts, setHtmlDrafts] = useState(initialHtmlDrafts)
-  useEffect(() => { onInitialDraftsConsumed?.() }, [onInitialDraftsConsumed])
+  const [localHtmlDrafts, setLocalHtmlDrafts] = useState({})
+  const htmlDrafts = controlledHtmlDrafts ?? localHtmlDrafts
   const generatedFiles = useMemo(() => {
+    const htmlFiles = componentHtmlFiles(schema, htmlMap, rawGeneratedFiles)
     let pageIndex = 0
     return rawGeneratedFiles.map((item) => {
       if (item.lang === 'html') {
-        const page = schema?.pages?.[pageIndex++]
+        const generated = htmlFiles[pageIndex++]
         const hasDraft = Object.prototype.hasOwnProperty.call(htmlDrafts, item.name)
-        const document = documentOf(page, htmlMap)
-        const written = document || item.content
         return {
-          ...item,
-          pageId: page?.id,
+          ...generated,
           editable: true,
           editableKind: 'html',
           // Its own document: applied and exported as written, with its own
           // stylesheet and script links left alone.
-          ownDocument: !!document,
-          generatedContent: written,
-          content: hasDraft ? htmlDrafts[item.name] : written,
+          content: hasDraft ? htmlDrafts[item.name] : generated.generatedContent,
         }
       }
       if (item.name === 'custom.css') return {
@@ -137,7 +129,16 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
       }
       return item
     })
-  }, [htmlDrafts, htmlMap, rawGeneratedFiles, schema.customCss, schema.customJs, schema.pages])
+  }, [htmlDrafts, htmlMap, rawGeneratedFiles, schema])
+  const setHtmlDrafts = useCallback((update) => {
+    const next = typeof update === 'function' ? update(htmlDrafts) : update
+    const pending = { ...next }
+    for (const item of generatedFiles) {
+      if (item.editableKind === 'html' && pending[item.name] === item.generatedContent) delete pending[item.name]
+    }
+    if (onHtmlDraftsChange) onHtmlDraftsChange(pending)
+    else setLocalHtmlDrafts(pending)
+  }, [generatedFiles, htmlDrafts, onHtmlDraftsChange])
   const base = slugName(schema?.pages?.[0]?.name)
   const pendingExportHtml = useCallback((page) => {
     const item = generatedFiles.find((entry) => entry.pageId === page?.id)
@@ -149,10 +150,10 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
   // One page as a file that stands on its own, and its smaller form. A
   // person's own document is not ours to minify: it goes out as written.
   const standalonePage = useCallback((page) => (
-    pendingExportHtml(page) ?? (documentOf(page, htmlMap) || pageToResponsiveHtml(page || {}, page?.name || 'My Site', schema))
+    pendingExportHtml(page) ?? (componentPageDocument(page, htmlMap) || pageToResponsiveHtml(page || {}, page?.name || 'My Site', schema))
   ), [htmlMap, pendingExportHtml, schema])
   const optimizedPage = useCallback((page) => (
-    pendingExportHtml(page) ?? (documentOf(page, htmlMap) || minifyGeneratedHtml(pageToResponsiveHtml(page || {}, page?.name || 'My Site', schema)))
+    pendingExportHtml(page) ?? (componentPageDocument(page, htmlMap) || minifyGeneratedHtml(pageToResponsiveHtml(page || {}, page?.name || 'My Site', schema)))
   ), [htmlMap, pendingExportHtml, schema])
   const exportPreviewFiles = useMemo(() => {
     const page = schema?.pages?.[0] || {}
@@ -231,7 +232,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
     }
     setHtmlDrafts({})
     return dirtyHtmlFiles.length
-  }, [dirtyHtmlFiles, onApplyHtml, rawGeneratedFiles])
+  }, [dirtyHtmlFiles, onApplyHtml, rawGeneratedFiles, setHtmlDrafts])
 
   useImperativeHandle(ref, () => ({
     applyPendingHtml,
