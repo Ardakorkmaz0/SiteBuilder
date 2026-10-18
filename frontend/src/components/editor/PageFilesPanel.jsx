@@ -118,6 +118,9 @@ export default function PageFilesPanel({
             onBlur={commitRename}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
+                // The same Enter's keypress would reach the page button that
+                // takes focus next and click it (opening the code panel).
+                e.preventDefault()
                 refocusPageRef.current = editingId
                 commitRename()
               }
