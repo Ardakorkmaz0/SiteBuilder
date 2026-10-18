@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useEditorStore } from '../../store/editorStore.js'
 import { pageFileName } from '../../utils/pageFiles.js'
 import { countLinksToPage } from '../../utils/pageLinks.js'
@@ -51,6 +51,18 @@ export default function PageFilesPanel({
     setAddPrompt(null)
   }
 
+  // Enter or Esc in the name field: the field goes away with the keyboard in
+  // it, and focus fell to the top of the page. The page's own button takes it.
+  const rootRef = useRef(null)
+  const refocusPageRef = useRef(null)
+  useEffect(() => {
+    if (editingId || !refocusPageRef.current) return
+    const pageId = refocusPageRef.current
+    refocusPageRef.current = null
+    const buttons = rootRef.current?.querySelectorAll('[data-page-button]') || []
+    ;[...buttons].find((button) => button.dataset.pageButton === pageId)?.focus()
+  }, [editingId])
+
   const commitRename = () => {
     if (editingId && draft.trim()) {
       onBeforePageChange?.()
@@ -100,18 +112,26 @@ export default function PageFilesPanel({
         {editingId === page.id ? (
           <input
             autoFocus
+            aria-label={t('Page name')}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commitRename}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') commitRename()
-              if (e.key === 'Escape') setEditingId(null)
+              if (e.key === 'Enter') {
+                refocusPageRef.current = editingId
+                commitRename()
+              }
+              if (e.key === 'Escape') {
+                refocusPageRef.current = editingId
+                setEditingId(null)
+              }
             }}
             className="w-full min-w-0 rounded border border-[#4f46e5] px-1 py-0.5 text-[12.5px] focus:outline-none"
           />
         ) : (
           <button
             type="button"
+            data-page-button={page.id}
             onClick={() => {
               // Link tool waiting for a target → bind the picked link to this
               // page instead of navigating. bindSourceToPage returns true only
@@ -198,7 +218,7 @@ export default function PageFilesPanel({
   }
 
   return (
-    <div>
+    <div ref={rootRef}>
       {linkArmed && (
         <div className="mb-2 flex items-center gap-1.5 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-2 py-1.5 text-[11px] font-medium text-[#1e40af]">
           <LinkIcon size={13} /> {t('Click a page to link the selected element to it.')}
