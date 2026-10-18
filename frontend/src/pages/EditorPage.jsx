@@ -65,6 +65,7 @@ import { useEditorAutoSave } from '../components/editor/useEditorAutoSave.js'
 import { useLeaveGuard } from '../components/editor/useLeaveGuard.js'
 import { isSiteChanged, useSiteConflict } from '../components/editor/useSiteConflict.js'
 import { useSessionRecovery } from '../components/editor/useSessionRecovery.js'
+import { useEditorSave } from '../components/editor/useEditorSave.js'
 import { readZoom, writeZoom } from '../components/editor/canvasZoom.js'
 import { dropCoordinates } from '../utils/dropCoordinates.js'
 import CanvasPreview from '../components/editor/CanvasPreview.jsx'
@@ -106,7 +107,6 @@ import {
   hasDocumentTextSelection,
   shouldRunEditorAutoSave,
 } from '../utils/editorLeave.js'
-import { createSaveQueue } from '../utils/saveQueue.js'
 import { projectSnapshot } from '../utils/projectSnapshot.js'
 import { readEditorRecovery, writeEditorRecovery } from '../utils/editorRecovery.js'
 import RecoveryDialog from '../components/editor/RecoveryDialog.jsx'
@@ -485,17 +485,8 @@ function SiteEditor() {
   const [metaDirty, setMetaDirty] = useState(false)
   const metaRevisionRef = useRef(0)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [activeType, setActiveType] = useState(null)
-  // Auto-save status: 'idle'|'saving'|'saved'|'error'. Auto-save runs only at
-  // boundaries (tab hidden / leaving the editor), never on every keystroke. It
-  // NEVER touches the undo/redo history (markSaved only clears `dirty`), so you
-  // can still undo after a save — and every save the server keeps as a
-  // restorable version (the History panel), so auto-saved states are recoverable.
-  const [autoSaveState, setAutoSaveState] = useState('idle')
-  const saveQueueRef = useRef(createSaveQueue())
-  const manualSaveCountRef = useRef(0)
   // On unless this site was switched off. A new key on purpose: the old one
   // was written as '0' for every site ever opened, so honouring it would keep
   // auto-save off for everyone who never touched the switch.
@@ -909,6 +900,18 @@ function SiteEditor() {
   })
   const offerRecovery = sessionRecovery.offer
   const saveLifecycleRef = useRef(null)
+  // A save never touches the undo/redo history (markSaved only clears
+  // `dirty`), so Undo still works after one, and the server keeps every save
+  // as a version the History panel can load.
+  const editorSave = useEditorSave({
+    lifecycleRef: saveLifecycleRef,
+    discardRef: leaveGuard.discardRef,
+    conflict,
+    sessionMessageRef: sessionRecovery.messageRef,
+    onError: setError,
+  })
+  const { save, saving, autoSaveState, setAutoSaveState } = editorSave
+  const { refused: autoSaveRefused, setRefused: setAutoSaveRefused } = editorSave
   // Assign during render rather than in a passive effect. A fast edit followed
   // immediately by Ctrl+S/click Save must observe this render's title, HTML map
   // and dirty flags instead of the previous render's closure.
@@ -917,11 +920,6 @@ function SiteEditor() {
     flushWorkspaceDrafts, historyDraftSnapshot, applyHistoryRestore, captureDetachedDraft,
     loading: loading || !!sessionRecovery.draft || conflict.open, autoSaveEnabled, previewing,
   }
-  // An automatic save the server refused for good (the page is over the size
-  // limit, a value it will not take): asking again gets the same answer. Its
-  // reason is shown instead, as a manual Save's would be — before, it said
-  // only "Save failed", and that it was trying again.
-  const [autoSaveRefused, setAutoSaveRefused] = useState(false)
   useEditorAutoSave({
     lifecycleRef: saveLifecycleRef,
     discardRef: leaveGuard.discardRef,
@@ -1798,47 +1796,6 @@ function SiteEditor() {
       return data
   }
 
-  async function save(nextPublished, { auto = false, versionSource, force = false } = {}) {
-    // Every server write goes through one queue. Automatic saves wait behind an
-    // active write instead of being dropped; each queued task invokes the latest
-    // render's performSave so slow requests cannot lose newer work.
-    if (!auto) {
-      manualSaveCountRef.current += 1
-      setSaving(true)
-      setError('')
-    }
-    try {
-      return await saveQueueRef.current.run(
-        () => {
-          // This automatic task may have waited behind an in-flight request.
-          // A later "leave without saving" also cancels queued writes.
-          if (auto && leaveGuard.discardRef.current) return null
-          const latestSave = saveLifecycleRef.current?.performSave || performSave
-          return latestSave(nextPublished, { auto, versionSource, force })
-        },
-      )
-    } catch (e) {
-      setAutoSaveState('error')
-      if (isSiteChanged(e)) {
-        // Nothing was written; the dialog says why and lets the person choose.
-        conflict.refuse({ publish: nextPublished })
-        return null
-      }
-      const status = e?.response?.status
-      if (auto && !sessionRecovery.messageRef.current && status >= 400 && status < 500 && ![401, 408, 429].includes(status)) {
-        setAutoSaveRefused(true)
-        setError(apiError(e))
-        return null
-      }
-      if (!auto) setError(sessionRecovery.messageRef.current || apiError(e))
-      return null
-    } finally {
-      if (!auto) {
-        manualSaveCountRef.current = Math.max(0, manualSaveCountRef.current - 1)
-        if (manualSaveCountRef.current === 0) setSaving(false)
-      }
-    }
-  }
 
   // These values describe content, rather than acknowledgement flags: a save
   // may clear dirty state while an edit made during its request still differs.
@@ -1900,7 +1857,7 @@ function SiteEditor() {
       return saveLifecycleRef.current.historyDraftSnapshot()
     }
     try {
-      return await saveQueueRef.current.run(async () => {
+      return await editorSave.run(async () => {
         if (leftEditorRef.current) return null
         // A save/load pair can race with typing at either request boundary.
         // Retry only a bounded number of times; never replace a newer draft.
