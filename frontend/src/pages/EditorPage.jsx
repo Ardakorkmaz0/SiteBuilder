@@ -64,6 +64,7 @@ import useFullscreenEditing from '../components/editor/useFullscreenEditing.js'
 import { useEditorAutoSave } from '../components/editor/useEditorAutoSave.js'
 import { useLeaveGuard } from '../components/editor/useLeaveGuard.js'
 import { isSiteChanged, useSiteConflict } from '../components/editor/useSiteConflict.js'
+import { useSessionRecovery } from '../components/editor/useSessionRecovery.js'
 import { readZoom, writeZoom } from '../components/editor/canvasZoom.js'
 import { dropCoordinates } from '../utils/dropCoordinates.js'
 import CanvasPreview from '../components/editor/CanvasPreview.jsx'
@@ -107,7 +108,7 @@ import {
 } from '../utils/editorLeave.js'
 import { createSaveQueue } from '../utils/saveQueue.js'
 import { projectSnapshot } from '../utils/projectSnapshot.js'
-import { clearEditorRecovery, readEditorRecovery, SESSION_EXPIRED_EVENT, writeEditorRecovery } from '../utils/editorRecovery.js'
+import { readEditorRecovery, writeEditorRecovery } from '../utils/editorRecovery.js'
 import RecoveryDialog from '../components/editor/RecoveryDialog.jsx'
 import SiteConflictDialog from '../components/editor/SiteConflictDialog.jsx'
 import {
@@ -426,13 +427,6 @@ function SiteEditor() {
   const previewing = useEditorStore((s) => !!s.previewBase)
   const authUser = useAuthStore((s) => s.user)
   const editorOwnerId = useRef(authUser?.id).current
-  const [recoveryDraft, setRecoveryDraft] = useState(null)
-  const restoredRecoveryRef = useRef(null)
-  const sessionEndedRef = useRef(false)
-  const recoveryMessageRef = useRef('')
-  // The session is gone but the editor stayed open (a guest, or a draft that
-  // could not be stored): the error bar offers the download it asks for.
-  const [sessionLost, setSessionLost] = useState(false)
   const loadedSiteRef = useRef(false)
   // Back LEAVES the editor. One history step back is usually another editor
   // (open a site, return, open the next), and moving between pages of a design
@@ -895,6 +889,25 @@ function SiteEditor() {
   // editor (unmount). A ref carries the latest save + dirty flags so the
   // once-bound listeners never fire a stale closure. Undo is unaffected, and the
   // manual Save still owns the linked-file write.
+  const sessionRecovery = useSessionRecovery({
+    ownerId: editorOwnerId,
+    siteId: id,
+    isGuest: !!authUser?.is_guest,
+    onLost: setError,
+    captureProject: () => {
+      if (loading || !loadedSiteRef.current) return null
+      const store = useEditorStore.getState()
+      // The iframe reports dirty state after a debounce. A 401 can arrive while
+      // typing is still in that window, so inspect its live document as well.
+      const liveMap = liveHtmlMap()
+      const liveChanged = Object.keys(liveMap).some((pageId) => liveMap[pageId] !== pageHtmlMap[pageId])
+      const codeDrafts = pendingComponentCode()
+      if (!(store.dirty || htmlDirty || metaDirty || workspaceDirty || liveChanged || Object.keys(codeDrafts).length)) return null
+      const { schema } = projectSnapshot(store.previewBase || store.schema, liveMap)
+      return { schema, title, category, tagsText, currentPageId: store.currentPageId, codeDrafts }
+    },
+  })
+  const offerRecovery = sessionRecovery.offer
   const saveLifecycleRef = useRef(null)
   // Assign during render rather than in a passive effect. A fast edit followed
   // immediately by Ctrl+S/click Save must observe this render's title, HTML map
@@ -902,46 +915,8 @@ function SiteEditor() {
   saveLifecycleRef.current = {
     save, performSave, liveHtmlMap, dirty, htmlDirty, metaDirty, workspaceDirty, published,
     flushWorkspaceDrafts, historyDraftSnapshot, applyHistoryRestore, captureDetachedDraft,
-    loading: loading || !!recoveryDraft || conflict.open, autoSaveEnabled, previewing,
+    loading: loading || !!sessionRecovery.draft || conflict.open, autoSaveEnabled, previewing,
   }
-  const recoveryCaptureRef = useRef(null)
-  recoveryCaptureRef.current = (event) => {
-    if (loading || !loadedSiteRef.current || recoveryDraft) return
-    const store = useEditorStore.getState()
-    // The iframe reports dirty state after a debounce. A 401 can arrive while
-    // typing is still in that window, so inspect its live document as well.
-    const liveMap = liveHtmlMap()
-    const liveChanged = Object.keys(liveMap).some((pageId) => liveMap[pageId] !== pageHtmlMap[pageId])
-    const codeDrafts = pendingComponentCode()
-    if (!(store.dirty || htmlDirty || metaDirty || workspaceDirty || liveChanged || Object.keys(codeDrafts).length)) return
-    const { schema } = projectSnapshot(store.previewBase || store.schema, liveMap)
-    const draft = writeEditorRecovery(editorOwnerId, id, {
-      schema, title, category, tagsText, currentPageId: store.currentPageId,
-      codeDrafts,
-    })
-    if (!draft) {
-      // Quota/private browsing must not turn a failed backup into data loss.
-      event.preventDefault()
-      recoveryMessageRef.current = t('Your session expired and the local draft could not be saved. Download your project before signing in again.')
-      setError(recoveryMessageRef.current)
-      setSessionLost(true)
-    } else if (authUser?.is_guest) {
-      // A guest has no credentials to re-enter a revoked identity. Leave its
-      // live work available for export instead of redirecting to a dead end.
-      event.preventDefault()
-      recoveryMessageRef.current = t('Your guest session expired. Download your project before starting a new session.')
-      setError(recoveryMessageRef.current)
-      setSessionLost(true)
-    }
-  }
-  useEffect(() => {
-    const capture = (event) => {
-      recoveryCaptureRef.current?.(event)
-      if (!event.defaultPrevented) sessionEndedRef.current = true
-    }
-    window.addEventListener(SESSION_EXPIRED_EVENT, capture)
-    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, capture)
-  }, [])
   // An automatic save the server refused for good (the page is over the size
   // limit, a value it will not take): asking again gets the same answer. Its
   // reason is shown instead, as a manual Save's would be — before, it said
@@ -950,10 +925,10 @@ function SiteEditor() {
   useEditorAutoSave({
     lifecycleRef: saveLifecycleRef,
     discardRef: leaveGuard.discardRef,
-    sessionEndedRef,
-    sessionMessageRef: recoveryMessageRef,
+    sessionEndedRef: sessionRecovery.endedRef,
+    sessionMessageRef: sessionRecovery.messageRef,
     autoSaveEnabled,
-    blocked: loading || !!recoveryDraft || conflict.open,
+    blocked: loading || !!sessionRecovery.draft || conflict.open,
     previewing,
     dirty,
     htmlDirty,
@@ -978,7 +953,7 @@ function SiteEditor() {
       // and before the next editor loads its schema into the shared store.
       detachedDraftRef.current = s.captureDetachedDraft()
       const draft = detachedDraftRef.current
-      if (!sessionEndedRef.current && shouldRunEditorAutoSave(s, leaveGuard.discardRef.current) &&
+      if (!sessionRecovery.endedRef.current && shouldRunEditorAutoSave(s, leaveGuard.discardRef.current) &&
           draft && Object.keys(draft.codeDrafts).length) {
         // Unapplied component source is deliberately separate from its canvas.
         // Keep that source locally rather than converting the page on exit.
@@ -989,7 +964,7 @@ function SiteEditor() {
         })
       }
     }
-  }, [editorOwnerId, id, leaveGuard.discardRef])
+  }, [editorOwnerId, id, leaveGuard.discardRef, sessionRecovery.endedRef])
 
   useEffect(() => {
     let active = true
@@ -1032,7 +1007,7 @@ function SiteEditor() {
         }
         // Read only after the API has verified this account can access the site.
         const recovery = readEditorRecovery(editorOwnerId, id)
-        setRecoveryDraft(recovery)
+        offerRecovery(recovery)
         // First-visit onboarding: a completely EMPTY site auto-opens the AI
         // wizard once — "describe it → get a full site" converts far better
         // than a blank canvas. The flag is set the moment it opens, so
@@ -1059,7 +1034,7 @@ function SiteEditor() {
       active = false
       clearTimeout(loadingTimer)
     }
-  }, [id, loadSchema, savedPageOnMount, editorOwnerId, setPageHtmlMap, setComponentSourceDrafts, conflict.baseRevisionRef])
+  }, [id, loadSchema, savedPageOnMount, editorOwnerId, setPageHtmlMap, setComponentSourceDrafts, conflict.baseRevisionRef, offerRecovery])
 
   // Mouse drags start after 5px of travel (so plain clicks stay clicks).
   // Touch drags start after a 250ms hold — the standard long-press pattern
@@ -1814,8 +1789,7 @@ function SiteEditor() {
       if (sameSchema && sameDetachedHtml &&
           htmlRevisionRef.current === htmlRevisionAtSave && metaRevisionRef.current === metaRevisionAtSave &&
           !pendingCode) {
-        clearEditorRecovery(editorOwnerId, id, restoredRecoveryRef.current)
-        restoredRecoveryRef.current = null
+        sessionRecovery.clearRestored()
       }
       setAutoSaveState('saved')
       if (!auto && fileError) {
@@ -1851,12 +1825,12 @@ function SiteEditor() {
         return null
       }
       const status = e?.response?.status
-      if (auto && !recoveryMessageRef.current && status >= 400 && status < 500 && ![401, 408, 429].includes(status)) {
+      if (auto && !sessionRecovery.messageRef.current && status >= 400 && status < 500 && ![401, 408, 429].includes(status)) {
         setAutoSaveRefused(true)
         setError(apiError(e))
         return null
       }
-      if (!auto) setError(recoveryMessageRef.current || apiError(e))
+      if (!auto) setError(sessionRecovery.messageRef.current || apiError(e))
       return null
     } finally {
       if (!auto) {
@@ -1978,36 +1952,31 @@ function SiteEditor() {
   }
 
   function discardAndLeave() {
-    clearEditorRecovery(editorOwnerId, id, restoredRecoveryRef.current)
+    sessionRecovery.clearRestored()
     leaveGuard.finish({ discard: true })
   }
 
   function restoreRecovery() {
-    if (!recoveryDraft) return
-    setPageHtmlMap(loadSchema(recoveryDraft.schema))
+    const draft = sessionRecovery.draft
+    if (!draft) return
+    setPageHtmlMap(loadSchema(draft.schema))
     useEditorStore.setState({ dirty: true })
-    if (recoveryDraft.schema.pages.some((page) => page.id === recoveryDraft.currentPageId)) {
-      useEditorStore.getState().selectPage(recoveryDraft.currentPageId)
+    if (draft.schema.pages.some((page) => page.id === draft.currentPageId)) {
+      useEditorStore.getState().selectPage(draft.currentPageId)
     }
     useEditorStore.getState().setViewport(readLastViewport())
-    setTitle(typeof recoveryDraft.title === 'string' ? recoveryDraft.title : title)
-    setCategory(typeof recoveryDraft.category === 'string' ? recoveryDraft.category : category)
-    setTagsText(typeof recoveryDraft.tagsText === 'string' ? recoveryDraft.tagsText : tagsText)
+    setTitle(typeof draft.title === 'string' ? draft.title : title)
+    setCategory(typeof draft.category === 'string' ? draft.category : category)
+    setTagsText(typeof draft.tagsText === 'string' ? draft.tagsText : tagsText)
     markMetaDirty()
     markHtmlDirty()
-    restoredRecoveryRef.current = recoveryDraft.id
-    const codeDrafts = recoveryDraft.codeDrafts || {}
+    const codeDrafts = draft.codeDrafts || {}
     setComponentSourceDrafts(codeDrafts)
     if (Object.keys(codeDrafts).length) {
       setCanvasMode('source')
     }
-    setRecoveryDraft(null)
+    sessionRecovery.restored()
     setWorkspaceSession((session) => session + 1)
-  }
-
-  function discardRecovery() {
-    clearEditorRecovery(editorOwnerId, id, recoveryDraft?.id)
-    setRecoveryDraft(null)
   }
 
   // When the save meets a conflict, "Save mine anyway" saves and leaves too,
@@ -2261,7 +2230,7 @@ function SiteEditor() {
   const currentPage = storePages[currentPageIndex] || storePages[0]
   const leaveDialog = (
     <>
-      <RecoveryDialog open={!!recoveryDraft} reason={recoveryDraft?.reason} onRestore={restoreRecovery} onDiscard={discardRecovery} />
+      <RecoveryDialog open={!!sessionRecovery.draft} reason={sessionRecovery.draft?.reason} onRestore={restoreRecovery} onDiscard={sessionRecovery.discard} />
       <SiteConflictDialog
         open={conflict.open}
         onReload={() => {
@@ -2695,7 +2664,7 @@ function SiteEditor() {
       {error && (
         <div role="alert" className="flex flex-wrap items-center gap-3 bg-red-50 px-4 py-2 text-sm text-red-600">
           <span className="min-w-0 flex-1">{error}</span>
-          {sessionLost && (
+          {sessionRecovery.lost && (
             <button
               type="button"
               onClick={exportProject}
