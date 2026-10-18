@@ -894,6 +894,8 @@ export function TabsEditor({
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              aria-selected={sel ? 'true' : 'false'}
               onPointerDown={(e) => {
                 e.stopPropagation()
                 if (!brushMode) select(component.id)
