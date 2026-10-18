@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createSite } from '../../api/sites.js'
+import { markAiWizardOffered } from '../../utils/aiWizardOffer.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { TEMPLATE_LAYOUTS, TEMPLATE_LIBRARY, TEMPLATE_LIBRARY_GROUPS, TEMPLATE_SITE_CATEGORY_MAP } from '../../utils/templateLibrary.js'
 import { localizeTemplateHtml } from '../../utils/templateLocalization.js'
@@ -182,6 +183,7 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
         category: TEMPLATE_SITE_CATEGORY_MAP[category.id] || LEGACY_CATEGORY_MAP[category.id] || 'other',
         published: publishNow && !isGuest,
       })
+      if (effectiveMode === 'blank') markAiWizardOffered(site.id)
       onCreated?.(site)
     } catch (e) {
       setError(apiError(e))
