@@ -2653,7 +2653,7 @@ export const TURKISH_TRANSLATIONS = {
   'Dark FAQ': 'Koyu SSS',
   'Simple tabs': 'Sade sekmeler',
   'Pill tabs': 'Kapsül sekmeler',
-  'Drop zone': 'Bırakma alanı',
+  'Dashed frame': 'Kesikli çerçeve',
   'Surface': 'Yüzey',
   'Glass panel': 'Cam panel',
   'Blank custom': 'Boş özel',
