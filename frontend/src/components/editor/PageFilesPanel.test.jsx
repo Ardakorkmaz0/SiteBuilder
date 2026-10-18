@@ -68,3 +68,27 @@ describe('the "How should this page start?" dialog', () => {
     expect(pages[1].mode).toBe('empty')
   })
 })
+
+// Renaming happens in a field that replaces the page's button. It had no
+// name for a screen reader, and when Enter or Esc took it away, focus fell to
+// the top of the page.
+describe('renaming a page', () => {
+  it('names the field and returns focus to the page after Enter', async () => {
+    const user = open()
+    await user.click(screen.getByRole('button', { name: 'Rename page: Home' }))
+    const field = screen.getByRole('textbox', { name: 'Page name' })
+    expect(document.activeElement).toBe(field)
+    await user.clear(field)
+    await user.type(field, 'Start{Enter}')
+    expect(useEditorStore.getState().schema.pages[0].name).toBe('Start')
+    expect(document.activeElement).toHaveAttribute('data-page-button', 'home')
+  })
+
+  it('returns focus to the page after Esc, keeping the old name', async () => {
+    const user = open()
+    await user.click(screen.getByRole('button', { name: 'Rename page: Home' }))
+    await user.type(screen.getByRole('textbox', { name: 'Page name' }), 'x{Escape}')
+    expect(useEditorStore.getState().schema.pages[0].name).toBe('Home')
+    expect(document.activeElement).toHaveAttribute('data-page-button', 'home')
+  })
+})
