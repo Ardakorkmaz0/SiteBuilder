@@ -84,13 +84,15 @@ import { DEVICES, devicesFor, isMobileDevice } from '../utils/htmlDevices.js'
 import { applyThemeToDocument } from '../utils/htmlTheme.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
-import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
+import { schemaToFiles, schemaToSingleHtml } from '../utils/schemaToFiles.js'
+import { componentHtmlFiles, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
+import { inlineProjectHtml } from '../utils/exportFiles.js'
 import { colorModeFor, viewColorMode } from '../utils/colorMode.js'
 import { emptyHtmlDocument } from '../utils/htmlTemplates.js'
 import { apiError } from '../utils/errors.js'
 import { googleFontHrefForTheme } from '../utils/googleFonts.js'
 import { canvasFontFamily, hasOwnTheme } from '../utils/theme.js'
-import { MOBILE_EDITOR_QUERY, NARROW_EDITOR_QUERY, useMediaQuery } from '../utils/useMediaQuery.js'
+import { matchesQuery, MOBILE_EDITOR_QUERY, NARROW_EDITOR_QUERY, useMediaQuery } from '../utils/useMediaQuery.js'
 import { fitHtmlEmbedLayout } from '../utils/htmlEmbedMeasure.js'
 import { pageHasMotion } from '../utils/motion.js'
 import { htmlSnippetSize } from '../utils/htmlSnippetSizing.js'
@@ -424,9 +426,6 @@ function SiteEditor() {
   const authUser = useAuthStore((s) => s.user)
   const editorOwnerId = useRef(authUser?.id).current
   const [recoveryDraft, setRecoveryDraft] = useState(null)
-  const [recoveredCodeKey, setRecoveredCodeKey] = useState('original')
-  const recoveredCodeDraftsRef = useRef(null)
-  const consumeRecoveredCode = useCallback(() => { recoveredCodeDraftsRef.current = null }, [])
   const restoredRecoveryRef = useRef(null)
   const sessionEndedRef = useRef(false)
   const recoveryMessageRef = useRef('')
@@ -658,7 +657,18 @@ function SiteEditor() {
   const currentPageIsHtml =
     (storePages.find((p) => p.id === currentPageId)?.mode || 'empty') === 'html'
   const [htmlDirty, setHtmlDirty] = useState(false)
-  const [workspaceDirty, setWorkspaceDirty] = useState(false)
+  const [htmlWorkspaceDirty, setWorkspaceDirty] = useState(false)
+  const [componentSourceDrafts, updateComponentSourceDrafts] = useState({})
+  const componentSourceDraftsRef = useRef(componentSourceDrafts)
+  const setComponentSourceDrafts = useCallback((drafts) => {
+    componentSourceDraftsRef.current = drafts
+    updateComponentSourceDrafts(drafts)
+  }, [])
+  const pendingComponentDrafts = useMemo(
+    () => pendingComponentSourceDrafts(componentSourceDrafts, editorSchema, pageHtmlMap),
+    [componentSourceDrafts, editorSchema, pageHtmlMap],
+  )
+  const workspaceDirty = htmlWorkspaceDirty || Object.keys(pendingComponentDrafts).length > 0
   const [workspaceSession, setWorkspaceSession] = useState(0)
   const htmlRevisionRef = useRef(0)
 
@@ -729,8 +739,11 @@ function SiteEditor() {
   // preference survives a phone visit. leftOpen/rightOpen are derived, which
   // makes a window resize across the breakpoint reconfigure the rails with no
   // effects involved.
-  const isMobileEditor = useMediaQuery(MOBILE_EDITOR_QUERY)
-  const isNarrow = useMediaQuery(NARROW_EDITOR_QUERY)
+  const preserveHtmlBeforePhone = useCallback(() => {
+    if (matchesQuery(MOBILE_EDITOR_QUERY)) saveLifecycleRef.current?.liveHtmlMap({ commit: true })
+  }, [])
+  const isMobileEditor = useMediaQuery(MOBILE_EDITOR_QUERY, preserveHtmlBeforePhone)
+  const isNarrow = useMediaQuery(NARROW_EDITOR_QUERY, preserveHtmlBeforePhone)
   const [deskLeftOpen, setDeskLeftOpen] = useState(() => {
     try { return localStorage.getItem('pwb_left_open') !== '0' } catch { return true }
   })
@@ -916,7 +929,7 @@ function SiteEditor() {
   // immediately by Ctrl+S/click Save must observe this render's title, HTML map
   // and dirty flags instead of the previous render's closure.
   saveLifecycleRef.current = {
-    save, performSave, dirty, htmlDirty, metaDirty, workspaceDirty, published,
+    save, performSave, liveHtmlMap, dirty, htmlDirty, metaDirty, workspaceDirty, published,
     flushWorkspaceDrafts, historyDraftSnapshot, applyHistoryRestore, captureDetachedDraft,
     loading: loading || !!recoveryDraft || siteConflict, autoSaveEnabled, previewing,
   }
@@ -928,7 +941,7 @@ function SiteEditor() {
     // typing is still in that window, so inspect its live document as well.
     const liveMap = liveHtmlMap()
     const liveChanged = Object.keys(liveMap).some((pageId) => liveMap[pageId] !== pageHtmlMap[pageId])
-    const codeDrafts = codePanelRef.current?.getPendingHtml?.() || {}
+    const codeDrafts = pendingComponentCode()
     if (!(store.dirty || htmlDirty || metaDirty || workspaceDirty || liveChanged || Object.keys(codeDrafts).length)) return
     const { schema } = projectSnapshot(store.previewBase || store.schema, liveMap)
     const draft = writeEditorRecovery(editorOwnerId, id, {
@@ -1095,6 +1108,7 @@ function SiteEditor() {
         // the first page). See utils/projectSnapshot.js.
         const pages = data.schema?.pages || []
         setPageHtmlMap(loadSchema(data.schema, { legacySiteHtml: data.html }))
+        setComponentSourceDrafts({})
         htmlRevisionRef.current = 0
         setHtmlDirty(false)
         // A site's saved schema must not decide which device the editor opens
@@ -1136,7 +1150,7 @@ function SiteEditor() {
       active = false
       clearTimeout(loadingTimer)
     }
-  }, [id, loadSchema, savedPageOnMount, editorOwnerId, setPageHtmlMap])
+  }, [id, loadSchema, savedPageOnMount, editorOwnerId, setPageHtmlMap, setComponentSourceDrafts])
 
   // Mouse drags start after 5px of travel (so plain clicks stay clicks).
   // Touch drags start after a 250ms hold — the standard long-press pattern
@@ -1593,7 +1607,22 @@ function SiteEditor() {
   // into the page we are LEAVING first, so edits can't be lost or leak into
   // the next page. The workspace remounts per page (key={currentPageId}).
   function flushWorkspaceDrafts() {
-    codePanelRef.current?.applyPendingHtml?.('source')
+    if (codePanelRef.current) codePanelRef.current.applyPendingHtml?.('source')
+    else {
+      const drafts = pendingComponentCode()
+      if (Object.keys(drafts).length) {
+        const schema = useEditorStore.getState().schema
+        const files = schemaToFiles(schema)
+        for (const file of componentHtmlFiles(schema, latestHtmlMapRef.current, files)) {
+          if (!Object.prototype.hasOwnProperty.call(drafts, file.name)) continue
+          applyComponentSourceHtml({
+            pageId: file.pageId,
+            html: file.ownDocument ? drafts[file.name] : inlineProjectHtml(drafts[file.name], files),
+          })
+        }
+        setComponentSourceDrafts({})
+      }
+    }
     liveHtmlMap({ commit: true })
   }
 
@@ -1750,6 +1779,12 @@ function SiteEditor() {
     return map
   }
 
+  function pendingComponentCode() {
+    return pendingComponentSourceDrafts(
+      componentSourceDraftsRef.current, useEditorStore.getState().schema, latestHtmlMapRef.current,
+    )
+  }
+
   function captureDetachedDraft() {
     if (!loadedSiteRef.current) return null
     const store = useEditorStore.getState()
@@ -1757,7 +1792,7 @@ function SiteEditor() {
       schema: store.previewBase || store.schema,
       currentPageId: store.currentPageId,
       map: liveHtmlMap(),
-      codeDrafts: codePanelRef.current?.getPendingHtml?.() || {},
+      codeDrafts: pendingComponentCode(),
       title, category, tagsText,
     }
   }
@@ -1868,7 +1903,7 @@ function SiteEditor() {
       const sameSchema = leaving ? leaving.schema === schemaBase : useEditorStore.getState().schema === schemaBase
       if (!leftEditorRef.current && sameSchema) markSaved()
       const sameDetachedHtml = !leaving || JSON.stringify(leaving.map) === JSON.stringify(map)
-      const pendingCode = leaving ? Object.keys(leaving.codeDrafts).length > 0 : codePanelRef.current?.hasPendingHtml?.()
+      const pendingCode = Object.keys(leaving ? leaving.codeDrafts : pendingComponentCode()).length > 0
       if (sameSchema && sameDetachedHtml &&
           htmlRevisionRef.current === htmlRevisionAtSave && metaRevisionRef.current === metaRevisionAtSave &&
           !pendingCode) {
@@ -1932,7 +1967,7 @@ function SiteEditor() {
   function historyDraftSnapshot() {
     const store = useEditorStore.getState()
     const map = liveHtmlMap()
-    const pending = codePanelRef.current?.getPendingHtml?.() || {}
+    const pending = pendingComponentCode()
     return {
       schema: store.previewBase || store.schema,
       html: JSON.stringify(map),
@@ -1957,6 +1992,7 @@ function SiteEditor() {
       htmlRevisionRef.current = 0
       setHtmlDirty(false)
       setWorkspaceDirty(false)
+      setComponentSourceDrafts({})
       // Remount the HTML workspace so a source textarea or editable
       // iframe cannot retain the pre-restore document and auto-save it
       // back over the version the user just loaded.
@@ -2077,9 +2113,9 @@ function SiteEditor() {
     markMetaDirty()
     markHtmlDirty()
     restoredRecoveryRef.current = recoveryDraft.id
-    if (recoveryDraft.codeDrafts && Object.keys(recoveryDraft.codeDrafts).length) {
-      recoveredCodeDraftsRef.current = recoveryDraft.codeDrafts
-      setRecoveredCodeKey(recoveryDraft.id)
+    const codeDrafts = recoveryDraft.codeDrafts || {}
+    setComponentSourceDrafts(codeDrafts)
+    if (Object.keys(codeDrafts).length) {
       setCanvasMode('source')
     }
     setRecoveryDraft(null)
@@ -3324,14 +3360,12 @@ function SiteEditor() {
                   <div className="studio-panel min-h-0 flex-1">
                     <Suspense fallback={<PanelFallback />}>
                       <CodePanel
-                        key={recoveredCodeKey}
                         ref={codePanelRef}
-                        initialHtmlDrafts={recoveredCodeDraftsRef.current || undefined}
-                        onInitialDraftsConsumed={consumeRecoveredCode}
+                        htmlDrafts={componentSourceDrafts}
+                        onHtmlDraftsChange={setComponentSourceDrafts}
                         currentPageId={currentPageId}
                         htmlMap={pageHtmlMap}
                         onApplyHtml={applyComponentSourceHtml}
-                        onDraftDirtyChange={setWorkspaceDirty}
                       />
                     </Suspense>
                   </div>
