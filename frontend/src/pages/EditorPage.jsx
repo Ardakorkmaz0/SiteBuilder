@@ -62,6 +62,7 @@ import CanvasZoomControl from '../components/editor/CanvasZoomControl.jsx'
 import FullscreenStage from '../components/editor/FullscreenStage.jsx'
 import useFullscreenEditing from '../components/editor/useFullscreenEditing.js'
 import { useEditorAutoSave } from '../components/editor/useEditorAutoSave.js'
+import { useLeaveGuard } from '../components/editor/useLeaveGuard.js'
 import { readZoom, writeZoom } from '../components/editor/canvasZoom.js'
 import { dropCoordinates } from '../utils/dropCoordinates.js'
 import CanvasPreview from '../components/editor/CanvasPreview.jsx'
@@ -101,7 +102,6 @@ import {
   canvasClipboardOwnsShortcut,
   editorShortcutScope,
   hasDocumentTextSelection,
-  shouldBlockEditorUnload,
   shouldRunEditorAutoSave,
 } from '../utils/editorLeave.js'
 import { createSaveQueue } from '../utils/saveQueue.js'
@@ -510,9 +510,6 @@ function SiteEditor() {
   })
   // Bumped on every switch INTO View, to force a fresh preview document.
   const [viewNonce, setViewNonce] = useState(0)
-  const [leavePromptOpen, setLeavePromptOpen] = useState(false)
-  const leaveActionRef = useRef(null)
-  const leaveConfirmedRef = useRef(false)
   // The site revision this editor works from (Site.revision on the server).
   // Every save sends it. When another tab or device has saved in between, the
   // server refuses (409) and the conflict dialog asks which version wins:
@@ -524,8 +521,6 @@ function SiteEditor() {
   // failures; when it was one, "Save mine anyway" finishes the leave too.
   const siteConflictCountRef = useRef(0)
   const leaveAfterOverwriteRef = useRef(false)
-  const reloadingRef = useRef(false)
-  const discardLeaveRef = useRef(false)
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPanelLayout, setAiPanelLayout] = useState(readAiPanelLayout)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -901,22 +896,7 @@ function SiteEditor() {
     htmlHistoryRef.current = { currentPageIsHtml, undoHtml: undoOnHtmlPage, redoHtml: redoOnHtmlPage }
   })
 
-  // Warn before closing/refreshing the tab while there are unsaved changes —
-  // losing an edited HTML document or canvas design silently is brutal.
-  useEffect(() => {
-    if (!dirty && !htmlDirty && !metaDirty && !workspaceDirty) return undefined
-    const handler = (e) => {
-      if (reloadingRef.current) return
-      if (!shouldBlockEditorUnload(
-        { dirty, htmlDirty, metaDirty, workspaceDirty },
-        leaveConfirmedRef.current,
-      )) return
-      e.preventDefault()
-      e.returnValue = ''
-    }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [dirty, htmlDirty, metaDirty, workspaceDirty])
+  const leaveGuard = useLeaveGuard({ dirty, htmlDirty, metaDirty, workspaceDirty })
 
   // Auto-save only at natural BOUNDARIES — not on every edit (that churned the
   // toolbar and saved constantly). We persist in the background when the tab is
@@ -978,7 +958,7 @@ function SiteEditor() {
   const [autoSaveRefused, setAutoSaveRefused] = useState(false)
   useEditorAutoSave({
     lifecycleRef: saveLifecycleRef,
-    discardRef: discardLeaveRef,
+    discardRef: leaveGuard.discardRef,
     sessionEndedRef,
     sessionMessageRef: recoveryMessageRef,
     autoSaveEnabled,
@@ -1007,7 +987,7 @@ function SiteEditor() {
       // and before the next editor loads its schema into the shared store.
       detachedDraftRef.current = s.captureDetachedDraft()
       const draft = detachedDraftRef.current
-      if (!sessionEndedRef.current && shouldRunEditorAutoSave(s, discardLeaveRef.current) &&
+      if (!sessionEndedRef.current && shouldRunEditorAutoSave(s, leaveGuard.discardRef.current) &&
           draft && Object.keys(draft.codeDrafts).length) {
         // Unapplied component source is deliberately separate from its canvas.
         // Keep that source locally rather than converting the page on exit.
@@ -1018,7 +998,7 @@ function SiteEditor() {
         })
       }
     }
-  }, [editorOwnerId, id])
+  }, [editorOwnerId, id, leaveGuard.discardRef])
 
   useEffect(() => {
     let active = true
@@ -1806,7 +1786,7 @@ function SiteEditor() {
         // one has saved over since. There is no dialog left to ask in, so the
         // changes are kept as a local draft that this site offers to restore
         // when it is opened again — before, they were gone without a word.
-        if (leftEditorRef.current && !discardLeaveRef.current &&
+        if (leftEditorRef.current && !leaveGuard.discardRef.current &&
             e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
           const latest = detachedDraftRef.current
           writeEditorRecovery(editorOwnerId, id, {
@@ -1869,7 +1849,7 @@ function SiteEditor() {
         () => {
           // This automatic task may have waited behind an in-flight request.
           // A later "leave without saving" also cancels queued writes.
-          if (auto && discardLeaveRef.current) return null
+          if (auto && leaveGuard.discardRef.current) return null
           const latestSave = saveLifecycleRef.current?.performSave || performSave
           return latestSave(nextPublished, { auto, versionSource, force })
         },
@@ -2012,29 +1992,9 @@ function SiteEditor() {
     }
   }
 
-  function requestLeave(action) {
-    if (!dirty && !htmlDirty && !metaDirty && !workspaceDirty) {
-      action?.()
-      return
-    }
-    leaveConfirmedRef.current = false
-    discardLeaveRef.current = false
-    leaveActionRef.current = action
-    setLeavePromptOpen(true)
-  }
-
-  function finishLeave({ discard = false } = {}) {
-    const action = leaveActionRef.current
-    leaveActionRef.current = null
-    leaveConfirmedRef.current = true
-    discardLeaveRef.current = discard
-    setLeavePromptOpen(false)
-    action?.()
-  }
-
   function discardAndLeave() {
     clearEditorRecovery(editorOwnerId, id, restoredRecoveryRef.current)
-    finishLeave({ discard: true })
+    leaveGuard.finish({ discard: true })
   }
 
   function restoreRecovery() {
@@ -2068,18 +2028,11 @@ function SiteEditor() {
   async function saveAndLeave() {
     const conflictsBefore = siteConflictCountRef.current
     const saved = await save()
-    if (saved) finishLeave()
+    if (saved) leaveGuard.finish()
     else leaveAfterOverwriteRef.current = siteConflictCountRef.current !== conflictsBefore
   }
 
-  function stayInEditor() {
-    leaveActionRef.current = null
-    leaveConfirmedRef.current = false
-    discardLeaveRef.current = false
-    setLeavePromptOpen(false)
-  }
-
-  const guardedBack = () => requestLeave(goBack)
+  const guardedBack = () => leaveGuard.request(goBack)
 
   // Pick an .html file from disk, load it into the editor, and keep the
   // handle so every Save writes back to it (Chromium only).
@@ -2328,7 +2281,7 @@ function SiteEditor() {
       <SiteConflictDialog
         open={siteConflict}
         onReload={() => {
-          reloadingRef.current = true
+          leaveGuard.allowUnload()
           window.location.reload()
         }}
         onOverwrite={async () => {
@@ -2338,15 +2291,15 @@ function SiteEditor() {
           const leave = leaveAfterOverwriteRef.current
           leaveAfterOverwriteRef.current = false
           const saved = await save(conflictedPublicationRef.current, { force: true })
-          if (saved && leave) finishLeave()
+          if (saved && leave) leaveGuard.finish()
         }}
       />
       <UnsavedLeaveDialog
-      open={leavePromptOpen}
+      open={leaveGuard.promptOpen}
       saving={saving}
       onSave={saveAndLeave}
       onDiscard={discardAndLeave}
-      onStay={stayInEditor}
+      onStay={leaveGuard.stay}
       />
     </>
   )
@@ -2526,7 +2479,7 @@ function SiteEditor() {
         </button>
         <Link
           to="/"
-          onClick={(event) => { event.preventDefault(); requestLeave(() => navigate('/')) }}
+          onClick={(event) => { event.preventDefault(); leaveGuard.request(() => navigate('/')) }}
           title={t('Sitebuilder home')}
           // Its face is the letter S; that is all a screen reader would say.
           aria-label={t('Sitebuilder home')}
@@ -2718,7 +2671,7 @@ function SiteEditor() {
                     <select value={language} onChange={(event) => setLanguage(event.target.value)} className="studio-input px-2 py-1 text-xs font-semibold"><option value="tr">TR</option><option value="en">EN</option></select>
                   </label>
                   <div className="studio-divider my-1 border-t" />
-                  <button type="button" onClick={() => { setAccountOpen(false); requestLeave(() => navigate('/profile')) }} className="studio-menu-item">{t('Your profile')}</button>
+                  <button type="button" onClick={() => { setAccountOpen(false); leaveGuard.request(() => navigate('/profile')) }} className="studio-menu-item">{t('Your profile')}</button>
                 </div>
               </>
             )}
