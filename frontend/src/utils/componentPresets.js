@@ -382,11 +382,53 @@ const COMPONENT_PRESET_PROPS_TR = {
   },
 }
 
+// Navigation bar and tab presets name their brand, links and tabs in English.
+// On a Turkish screen a navigation bar said "Brand · Home · About · Contact"
+// and tabs "Home · Profile · Contact". The words are translated here; every
+// href and tab id stays as it is.
+export const PRESET_WORDS_TR = {
+  Brand: 'Marka',
+  BRAND: 'MARKA',
+  Navbar: 'Marka',
+  Home: 'Ana sayfa',
+  About: 'Hakkında',
+  Contact: 'İletişim',
+  Features: 'Özellikler',
+  Pricing: 'Fiyatlar',
+  'Sign up': 'Kaydolun',
+  Work: 'Çalışmalar',
+  Blog: 'Blog',
+  Dashboard: 'Panel',
+  Projects: 'Projeler',
+  Team: 'Ekip',
+  Settings: 'Ayarlar',
+  Overview: 'Genel bakış',
+  Analytics: 'Analitik',
+  Customers: 'Müşteriler',
+  Billing: 'Faturalandırma',
+  Docs: 'Belgeler',
+  Login: 'Giriş',
+  Products: 'Ürünler',
+  Solutions: 'Çözümler',
+  Profile: 'Profil',
+  Details: 'Ayrıntılar',
+  FAQ: 'SSS',
+}
+
+function presetWordsTr(props) {
+  const word = (text) => PRESET_WORDS_TR[text] ?? text
+  const words = {}
+  if (typeof props.brand === 'string') words.brand = word(props.brand)
+  if (Array.isArray(props.links)) words.links = props.links.map((link) => ({ ...link, label: word(link.label) }))
+  if (Array.isArray(props.tabs)) words.tabs = props.tabs.map((tab) => ({ ...tab, label: word(tab.label) }))
+  return words
+}
+
 export function componentPresetProps(type, presetId, language = detectInitialLanguage()) {
   const props = COMPONENT_PRESET_PROPS[type]?.[presetId]
   if (!props) return null
-  const local = language === 'tr' ? COMPONENT_PRESET_PROPS_TR[type]?.[presetId] : null
-  return local ? { ...props, ...local } : props
+  if (language !== 'tr') return props
+  return { ...props, ...presetWordsTr(props), ...(COMPONENT_PRESET_PROPS_TR[type]?.[presetId] || {}) }
 }
 
 export function presetsForType(type) {
