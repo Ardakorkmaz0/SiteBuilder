@@ -61,6 +61,7 @@ import { isPreviewMessageSource, previewPageId } from '../utils/previewMessages.
 import CanvasZoomControl from '../components/editor/CanvasZoomControl.jsx'
 import FullscreenStage from '../components/editor/FullscreenStage.jsx'
 import useFullscreenEditing from '../components/editor/useFullscreenEditing.js'
+import { useEditorAutoSave } from '../components/editor/useEditorAutoSave.js'
 import { readZoom, writeZoom } from '../components/editor/canvasZoom.js'
 import { dropCoordinates } from '../utils/dropCoordinates.js'
 import CanvasPreview from '../components/editor/CanvasPreview.jsx'
@@ -97,7 +98,6 @@ import { fitHtmlEmbedLayout } from '../utils/htmlEmbedMeasure.js'
 import { pageHasMotion } from '../utils/motion.js'
 import { htmlSnippetSize } from '../utils/htmlSnippetSizing.js'
 import {
-  EDITOR_AUTO_SAVE_DELAY_MS,
   canvasClipboardOwnsShortcut,
   editorShortcutScope,
   hasDocumentTextSelection,
@@ -971,84 +971,30 @@ function SiteEditor() {
     window.addEventListener(SESSION_EXPIRED_EVENT, capture)
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, capture)
   }, [])
-  useEffect(() => {
-    if (!shouldRunEditorAutoSave(
-      { autoSaveEnabled, loading: loading || !!recoveryDraft || siteConflict, dirty, htmlDirty, metaDirty, workspaceDirty, previewing },
-      discardLeaveRef.current,
-    )) return undefined
-    const timer = window.setTimeout(() => {
-      const s = saveLifecycleRef.current
-      if (shouldRunEditorAutoSave(s, discardLeaveRef.current)) {
-        s.save(undefined, { auto: true })
-      }
-    }, EDITOR_AUTO_SAVE_DELAY_MS)
-    return () => window.clearTimeout(timer)
-  }, [
-    autoSaveEnabled,
-    loading,
-    recoveryDraft,
-    siteConflict,
-    previewing,
-    dirty,
-    htmlDirty,
-    metaDirty,
-    workspaceDirty,
-    editorSchema,
-    pageHtmlMap,
-    title,
-    category,
-    tagsText,
-    published,
-  ])
-  // A failed automatic save is tried again: the server or the connection is
-  // usually back in a moment. It used to wait for the next edit, with "Save
-  // failed" in the header and the work only in this tab. Every 5, 10, 20… up
-  // to 60 seconds, and at once when the browser says it is online again.
-  const autoSaveRetryRef = useRef(0)
   // An automatic save the server refused for good (the page is over the size
   // limit, a value it will not take): asking again gets the same answer. Its
   // reason is shown instead, as a manual Save's would be — before, it said
   // only "Save failed", and that it was trying again.
   const [autoSaveRefused, setAutoSaveRefused] = useState(false)
-  useEffect(() => {
-    if (autoSaveState === 'saved') autoSaveRetryRef.current = 0
-    if (autoSaveState !== 'error' || !autoSaveEnabled || autoSaveRefused) return undefined
-    const attempt = autoSaveRetryRef.current
-    const retry = () => {
-      // A session that has ended will not come back by itself: asking again
-      // only collects the same 401.
-      if (recoveryMessageRef.current) return
-      const s = saveLifecycleRef.current
-      if (!shouldRunEditorAutoSave(s, discardLeaveRef.current)) return
-      autoSaveRetryRef.current = attempt + 1
-      s.save(undefined, { auto: true })
-    }
-    const timer = window.setTimeout(retry, Math.min(60000, 5000 * 2 ** attempt))
-    window.addEventListener('online', retry)
-    return () => {
-      window.clearTimeout(timer)
-      window.removeEventListener('online', retry)
-    }
-  }, [autoSaveState, autoSaveEnabled, autoSaveRefused])
-  useEffect(() => {
-    if (!autoSaveEnabled) return undefined
-    const flush = () => {
-      const s = saveLifecycleRef.current
-      if (shouldRunEditorAutoSave(s, discardLeaveRef.current)) {
-        s.save(undefined, { auto: true })
-      }
-    }
-    const onVisibility = () => { if (document.visibilityState === 'hidden') flush() }
-    document.addEventListener('visibilitychange', onVisibility)
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility)
-    }
-  }, [autoSaveEnabled])
-  // Leaving by the browser's Back button unmounts the editor with no prompt
-  // (the "save before leaving?" dialog only guards the editor's own buttons)
-  // and takes the pending automatic save with it. Send it on the way out. The
-  // rules are the same as for any automatic save: not when it is switched off,
-  // and not after "leave without saving".
+  useEditorAutoSave({
+    lifecycleRef: saveLifecycleRef,
+    discardRef: discardLeaveRef,
+    sessionEndedRef,
+    sessionMessageRef: recoveryMessageRef,
+    autoSaveEnabled,
+    blocked: loading || !!recoveryDraft || siteConflict,
+    previewing,
+    dirty,
+    htmlDirty,
+    metaDirty,
+    workspaceDirty,
+    content: { schema: editorSchema, htmlMap: pageHtmlMap, title, category, tagsText, published },
+    autoSaveState,
+    refused: autoSaveRefused,
+  })
+  // Leaving the editor: its last automatic save goes out from
+  // useEditorAutoSave. Capture what it must send while the workspace and code
+  // panel are still mounted.
   const leftEditorRef = useRef(false)
   const detachedDraftRef = useRef(null)
   useLayoutEffect(() => {
@@ -1073,14 +1019,6 @@ function SiteEditor() {
       }
     }
   }, [editorOwnerId, id])
-  useEffect(() => {
-    return () => {
-      const s = saveLifecycleRef.current
-      if (!sessionEndedRef.current && shouldRunEditorAutoSave(s, discardLeaveRef.current)) {
-        s.save(undefined, { auto: true })
-      }
-    }
-  }, [])
 
   useEffect(() => {
     let active = true
