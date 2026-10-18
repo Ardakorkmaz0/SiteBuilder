@@ -63,6 +63,7 @@ import FullscreenStage from '../components/editor/FullscreenStage.jsx'
 import useFullscreenEditing from '../components/editor/useFullscreenEditing.js'
 import { useEditorAutoSave } from '../components/editor/useEditorAutoSave.js'
 import { useLeaveGuard } from '../components/editor/useLeaveGuard.js'
+import { isSiteChanged, useSiteConflict } from '../components/editor/useSiteConflict.js'
 import { readZoom, writeZoom } from '../components/editor/canvasZoom.js'
 import { dropCoordinates } from '../utils/dropCoordinates.js'
 import CanvasPreview from '../components/editor/CanvasPreview.jsx'
@@ -510,17 +511,7 @@ function SiteEditor() {
   })
   // Bumped on every switch INTO View, to force a fresh preview document.
   const [viewNonce, setViewNonce] = useState(0)
-  // The site revision this editor works from (Site.revision on the server).
-  // Every save sends it. When another tab or device has saved in between, the
-  // server refuses (409) and the conflict dialog asks which version wins:
-  // before, the later save silently replaced the other one's work.
-  const baseRevisionRef = useRef(null)
-  const [siteConflict, setSiteConflict] = useState(false)
-  const conflictedPublicationRef = useRef(undefined)
-  // Counts refused saves, so "Save and leave" can tell a conflict from other
-  // failures; when it was one, "Save mine anyway" finishes the leave too.
-  const siteConflictCountRef = useRef(0)
-  const leaveAfterOverwriteRef = useRef(false)
+  const conflict = useSiteConflict()
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPanelLayout, setAiPanelLayout] = useState(readAiPanelLayout)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -911,7 +902,7 @@ function SiteEditor() {
   saveLifecycleRef.current = {
     save, performSave, liveHtmlMap, dirty, htmlDirty, metaDirty, workspaceDirty, published,
     flushWorkspaceDrafts, historyDraftSnapshot, applyHistoryRestore, captureDetachedDraft,
-    loading: loading || !!recoveryDraft || siteConflict, autoSaveEnabled, previewing,
+    loading: loading || !!recoveryDraft || conflict.open, autoSaveEnabled, previewing,
   }
   const recoveryCaptureRef = useRef(null)
   recoveryCaptureRef.current = (event) => {
@@ -962,7 +953,7 @@ function SiteEditor() {
     sessionEndedRef,
     sessionMessageRef: recoveryMessageRef,
     autoSaveEnabled,
-    blocked: loading || !!recoveryDraft || siteConflict,
+    blocked: loading || !!recoveryDraft || conflict.open,
     previewing,
     dirty,
     htmlDirty,
@@ -1007,7 +998,7 @@ function SiteEditor() {
       .then((data) => {
         if (!active) return
         loadedSiteRef.current = true
-        baseRevisionRef.current = Number.isInteger(data.revision) ? data.revision : null
+        conflict.baseRevisionRef.current = Number.isInteger(data.revision) ? data.revision : null
         setTitle(data.title)
         setSlug(data.slug)
         setPublished(data.published)
@@ -1068,7 +1059,7 @@ function SiteEditor() {
       active = false
       clearTimeout(loadingTimer)
     }
-  }, [id, loadSchema, savedPageOnMount, editorOwnerId, setPageHtmlMap, setComponentSourceDrafts])
+  }, [id, loadSchema, savedPageOnMount, editorOwnerId, setPageHtmlMap, setComponentSourceDrafts, conflict.baseRevisionRef])
 
   // Mouse drags start after 5px of travel (so plain clicks stay clicks).
   // Touch drags start after a 250ms hold — the standard long-press pattern
@@ -1735,7 +1726,7 @@ function SiteEditor() {
       // snapshots ensure we acknowledge only the exact revision sent below.
       const htmlRevisionAtSave = htmlRevisionRef.current
       const metaRevisionAtSave = metaRevisionRef.current
-      const baseRevisionAtSave = baseRevisionRef.current
+      const baseRevisionAtSave = conflict.baseRevisionRef.current
       // Per-page html rides inside the schema; the home page's document is
       // mirrored to site.html so single-page flows (and old data) keep working.
       const { schema, homeHtml: html } = projectSnapshot(schemaBase, map)
@@ -1786,8 +1777,7 @@ function SiteEditor() {
         // one has saved over since. There is no dialog left to ask in, so the
         // changes are kept as a local draft that this site offers to restore
         // when it is opened again — before, they were gone without a word.
-        if (leftEditorRef.current && !leaveGuard.discardRef.current &&
-            e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
+        if (leftEditorRef.current && !leaveGuard.discardRef.current && isSiteChanged(e)) {
           const latest = detachedDraftRef.current
           writeEditorRecovery(editorOwnerId, id, {
             schema: latest ? projectSnapshot(latest.schema, latest.map).schema : schema,
@@ -1800,9 +1790,8 @@ function SiteEditor() {
         }
         throw e
       }
-      if (Number.isInteger(data.revision)) baseRevisionRef.current = data.revision
-      setSiteConflict(false)
-      conflictedPublicationRef.current = undefined
+      if (Number.isInteger(data.revision)) conflict.baseRevisionRef.current = data.revision
+      conflict.resolve()
       setAutoSaveRefused(false)
       publishedRef.current = !!data.published
       setPublished(data.published)
@@ -1856,12 +1845,9 @@ function SiteEditor() {
       )
     } catch (e) {
       setAutoSaveState('error')
-      if (e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
+      if (isSiteChanged(e)) {
         // Nothing was written; the dialog says why and lets the person choose.
-        // Queued ordinary saves must not replace an explicit publish choice.
-        if (typeof nextPublished === 'boolean') conflictedPublicationRef.current = nextPublished
-        siteConflictCountRef.current += 1
-        setSiteConflict(true)
+        conflict.refuse({ publish: nextPublished })
         return null
       }
       const status = e?.response?.status
@@ -1916,7 +1902,7 @@ function SiteEditor() {
       // back over the version the user just loaded.
       setWorkspaceSession((session) => session + 1)
     }
-    if (Number.isInteger(fresh?.revision)) baseRevisionRef.current = fresh.revision
+    if (Number.isInteger(fresh?.revision)) conflict.baseRevisionRef.current = fresh.revision
     if (fresh?.title !== undefined) setTitle(fresh.title)
     if (fresh?.slug !== undefined) setSlug(fresh.slug)
     if (fresh?.category !== undefined) setCategory(fresh.category || 'other')
@@ -1957,7 +1943,7 @@ function SiteEditor() {
           if (leftEditorRef.current) return null
           // The server has moved to this revision even when newer local work
           // prevents us from applying the response. Its next save must use it.
-          if (Number.isInteger(fresh?.revision)) baseRevisionRef.current = fresh.revision
+          if (Number.isInteger(fresh?.revision)) conflict.baseRevisionRef.current = fresh.revision
           if (!sameDraft(beforeRestore, flushDrafts())) {
             useEditorStore.setState({ dirty: true })
             markHtmlDirty()
@@ -1983,9 +1969,8 @@ function SiteEditor() {
     } catch (e) {
       if (leftEditorRef.current) return null
       setAutoSaveState('error')
-      if (e?.response?.status === 409 && e.response.data?.code === 'site_changed') {
-        siteConflictCountRef.current += 1
-        setSiteConflict(true)
+      if (isSiteChanged(e)) {
+        conflict.refuse()
         return null
       }
       throw e
@@ -2025,11 +2010,10 @@ function SiteEditor() {
     setRecoveryDraft(null)
   }
 
-  async function saveAndLeave() {
-    const conflictsBefore = siteConflictCountRef.current
-    const saved = await save()
-    if (saved) leaveGuard.finish()
-    else leaveAfterOverwriteRef.current = siteConflictCountRef.current !== conflictsBefore
+  // When the save meets a conflict, "Save mine anyway" saves and leaves too,
+  // instead of asking again whether to save.
+  function saveAndLeave() {
+    return conflict.saveThen(() => save(), () => leaveGuard.finish())
   }
 
   const guardedBack = () => leaveGuard.request(goBack)
@@ -2279,20 +2263,12 @@ function SiteEditor() {
     <>
       <RecoveryDialog open={!!recoveryDraft} reason={recoveryDraft?.reason} onRestore={restoreRecovery} onDiscard={discardRecovery} />
       <SiteConflictDialog
-        open={siteConflict}
+        open={conflict.open}
         onReload={() => {
           leaveGuard.allowUnload()
           window.location.reload()
         }}
-        onOverwrite={async () => {
-          setSiteConflict(false)
-          // Chosen after "Save and leave": once it is saved, leave as asked
-          // instead of asking again whether to save.
-          const leave = leaveAfterOverwriteRef.current
-          leaveAfterOverwriteRef.current = false
-          const saved = await save(conflictedPublicationRef.current, { force: true })
-          if (saved && leave) leaveGuard.finish()
-        }}
+        onOverwrite={() => conflict.overwrite((publish) => save(publish, { force: true }))}
       />
       <UnsavedLeaveDialog
       open={leaveGuard.promptOpen}
