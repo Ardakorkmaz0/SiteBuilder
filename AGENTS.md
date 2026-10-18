@@ -70,7 +70,8 @@ Match the change to a layer. Most changes need exactly one.
 | A pure function in `frontend/src/utils/` | a unit test next to it |
 | A store action in `store/editorStore.js` | a test in `store/` |
 | Real logic in a hook (retries, focus, the Esc stack) | a hook test next to it |
-| Editor saving, auto-save, leaving, recovery or undo | `pages/EditorPage.<topic>.test.jsx`, driving the real page with `api/sites.js` mocked |
+| Editor saving, auto-save, leaving, conflicts or session recovery | the hook's own test (`components/editor/use<Name>.test.jsx`); for a flow through the whole editor, `pages/EditorPage.<topic>.test.jsx` with `api/sites.js` mocked |
+| Editor undo | `pages/EditorPage.<topic>.test.jsx`, driving the real page with `api/sites.js` mocked |
 | A Django endpoint, permission, throttle or serializer rule | `backend/builder/test_<topic>.py` |
 | A model field | the migration and a backend test |
 | A user-visible flow across more than one page | `frontend/e2e/<flow>.spec.js` |
@@ -126,10 +127,16 @@ Frontend:
   `ui/darkThemeCoverage.test.js` fails on a new hardcoded colour outside its allow-list.
 - Lazy imports use `lazyChunk` from `utils/lazyChunk.js`, so a tab opened before a deploy
   can still load its chunks.
-- Every editor write of a site goes through `save()` in `EditorPage.jsx`: one queue
-  (`utils/saveQueue.js`). Never call `updateSite` from anywhere else. A save sends
-  `base_revision`; when another tab or device saved in between, the server answers
-  409 `site_changed` and the editor asks the user which version wins.
+- Every editor write of a site goes through `save()` from
+  `components/editor/useEditorSave.js`: one queue (`utils/saveQueue.js`). What a save
+  writes is `performSave` in `EditorPage.jsx`. Never call `updateSite` from anywhere
+  else. A save sends `base_revision`; when another tab or device saved in between, the
+  server answers 409 `site_changed` and the editor asks the user which version wins
+  (`useSiteConflict.js`).
+- The editor's save lifecycle lives in hooks beside `useEditorSave.js`:
+  `useEditorAutoSave.js` (when it saves by itself), `useLeaveGuard.js` (leaving with
+  unsaved work), `useSiteConflict.js` (two tabs) and `useSessionRecovery.js` (a session
+  that ends mid-edit). Change the behaviour in the hook, not in `EditorPage.jsx`.
 
 Backend:
 
