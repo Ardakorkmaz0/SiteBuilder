@@ -17,6 +17,12 @@ describe('an unauthorized API response', () => {
     await expect(client.get('/sites/1/', { adapter: refuse })).rejects.toThrow('Unauthorized')
     expect(capture).toHaveBeenCalledTimes(1)
     expect(useAuthStore.getState().token).toBeNull()
+    expect(useAuthStore.getState().sessionEnded).toBe(true)
+  })
+
+  it('tells a server-ended session apart from signing out', () => {
+    useAuthStore.getState().logout()
+    expect(useAuthStore.getState().sessionEnded).toBe(false)
   })
 
   it('keeps the editor accessible if its recovery storage is full', async () => {

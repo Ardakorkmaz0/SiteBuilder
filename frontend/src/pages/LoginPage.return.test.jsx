@@ -35,3 +35,40 @@ describe('signing in after session expiry', () => {
     await waitFor(() => expect(navigate).toHaveBeenCalledWith(target, undefined))
   })
 })
+
+// Sent to sign in because the session ended: the page did not say why, and
+// someone in the middle of editing could believe the work was gone.
+describe('the sign-in page after the session ended', () => {
+  function open(from) {
+    render(<UiThemeProvider><LanguageProvider>
+      <MemoryRouter initialEntries={[{ pathname: '/login', state: { from } }]}><LoginPage /></MemoryRouter>
+    </LanguageProvider></UiThemeProvider>)
+  }
+
+  it('says so, and that editor work was kept, when coming from the editor', () => {
+    useAuthStore.setState({ sessionEnded: true })
+    open('/editor/42')
+    expect(screen.getByRole('status')).toHaveTextContent('Your session ended. Sign in again to continue.')
+    expect(screen.getByRole('status')).toHaveTextContent('Any unsaved changes in the editor were kept on this device')
+  })
+
+  it('does not mention editor work elsewhere', () => {
+    useAuthStore.setState({ sessionEnded: true })
+    open('/admin')
+    expect(screen.getByRole('status')).toHaveTextContent('Your session ended. Sign in again to continue.')
+    expect(screen.getByRole('status')).not.toHaveTextContent('editor')
+  })
+
+  it('says nothing on an ordinary visit', () => {
+    useAuthStore.setState({ sessionEnded: false })
+    open('/editor/42')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('forgets it once signed in', () => {
+    useAuthStore.setState({ sessionEnded: true })
+    useAuthStore.getState().setAuth('t', { id: 1 })
+    expect(useAuthStore.getState().sessionEnded).toBe(false)
+    useAuthStore.getState().logout()
+  })
+})
