@@ -130,7 +130,9 @@ Frontend:
   can still load its chunks.
 - A block moves between the page, sections, containers and tab panels only through the
   store's `moveComponentInto` (dragging uses it via `utils/reparentDrag.js`). It refuses
-  moves the server would undo: deeper than four levels or past 60 children.
+  moves the server would undo (deeper than four levels, past 60 children) and moves the
+  published page cannot show: a pinned block or a full-width bar into a parent. A drag
+  that starts from a multi-selection never changes parents.
 - Every editor write of a site goes through `save()` from
   `components/editor/useEditorSave.js`: one queue (`utils/saveQueue.js`). What a save
   writes is `performSave` in `EditorPage.jsx`. Never call `updateSite` from anywhere
