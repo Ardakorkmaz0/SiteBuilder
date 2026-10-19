@@ -186,6 +186,8 @@ class RegisterView(APIView):
     throttle_scope = 'auth'
 
     def post(self, request):
+        if not isinstance(request.data, dict):
+            return error_response('validation_error', 'Expected an object of fields.')
         if not _verify_recaptcha(request.data.get('recaptcha')):
             return Response(
                 {'detail': 'Captcha verification failed. Please try again.'},
@@ -338,7 +340,12 @@ class PasswordResetRequestView(APIView):
     _OK = {'detail': 'If an account exists for that email, a reset link is on its way.'}
 
     def post(self, request):
-        email = (request.data.get('email') or '').strip().lower()
+        if not isinstance(request.data, dict):
+            return error_response('validation_error', 'Expected an object of fields.')
+        email = request.data.get('email') or ''
+        if not isinstance(email, str):
+            return error_response('validation_error', 'Email must be text.')
+        email = email.strip().lower()
         if not email:
             return error_response('email_required', 'Email is required.')
         # Only usable accounts (active, with a real password) get a link.
@@ -387,9 +394,13 @@ class PasswordResetConfirmView(APIView):
     throttle_scope = 'auth'
 
     def post(self, request):
+        if not isinstance(request.data, dict):
+            return error_response('validation_error', 'Expected an object of fields.')
         uidb64 = request.data.get('uid') or ''
         token = request.data.get('token') or ''
         new_password = request.data.get('new_password') or ''
+        if not all(isinstance(value, str) for value in (uidb64, token, new_password)):
+            return error_response('validation_error', 'Password reset fields must be text.')
         try:
             uid = force_str(urlsafe_base64_decode(uidb64))
             user = User.objects.get(pk=uid)
@@ -459,6 +470,8 @@ class GuestUpgradeView(APIView):
                 {'detail': 'This account is already registered.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if not isinstance(request.data, dict):
+            return error_response('validation_error', 'Expected an object of fields.')
         if not _verify_recaptcha(request.data.get('recaptcha')):
             return Response(
                 {'detail': 'Captcha verification failed. Please try again.'},
@@ -507,6 +520,8 @@ class GuestAdoptView(APIView):
     def post(self, request):
         if is_guest(request.user):
             return guest_blocked('adopt')
+        if not isinstance(request.data, dict):
+            return error_response('validation_error', 'Expected an object of fields.')
         key = str(request.data.get('guest_token') or '').strip()
         if not key:
             return error_response('guest_token_required', 'No guest session to take over.')

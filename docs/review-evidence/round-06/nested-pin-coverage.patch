@@ -1,0 +1,14 @@
+--- a/frontend/src/components/editor/FreeCanvasItem.reparent.test.jsx
++++ b/frontend/src/components/editor/FreeCanvasItem.reparent.test.jsx
+@@ -131,4 +131,11 @@
+     expect(childIds('source')).toEqual(['dragged'])
+     expect(childIds('target')).toEqual([])
+   })
++
++  it.each(['sticky', 'fixed'])('does not outline another parent for an already nested pinned block (%s)', (scrollBehavior) => {
++    load({ text: 'Pinned', scrollBehavior }, { nested: true })
++    expect(drag({ nested: true })).toEqual({ outlined: false })
++    expect(childIds('source')).toEqual(['dragged'])
++    expect(childIds('target')).toEqual([])
++  })
+ })

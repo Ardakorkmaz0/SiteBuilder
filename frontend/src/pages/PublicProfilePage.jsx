@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getPublicProfile } from '../api/profile.js'
 import { addFavorite, removeFavorite } from '../api/explore.js'
@@ -39,6 +39,9 @@ export default function PublicProfilePage() {
   // "loading" without a synchronous reset inside the effect (which React 19's
   // lint — rightly — flags).
   const [state, setState] = useState({ id: null, data: null, error: '' })
+  const pendingFavorites = useRef(new Set())
+  const [favoritingIds, setFavoritingIds] = useState(new Set())
+  const [favoriteError, setFavoriteError] = useState({ id: null, message: '' })
 
   useEffect(() => {
     let alive = true
@@ -57,23 +60,31 @@ export default function PublicProfilePage() {
 
   async function onToggleFav(site) {
     if (!token) { navigate('/login'); return }
+    if (pendingFavorites.current.has(site.id)) return
+    pendingFavorites.current.add(site.id)
+    setFavoritingIds(new Set(pendingFavorites.current))
+    setFavoriteError({ id, message: '' })
     const next = !site.is_favorited
-    const flip = (delta) => setState((st) => ({
-      ...st,
-      data: st.data && {
-        ...st.data,
-        sites: st.data.sites.map((s) =>
-          s.id === site.id
-            ? { ...s, is_favorited: delta > 0, favorite_count: s.favorite_count + delta }
-            : s,
-        ),
-      },
-    }))
-    flip(next ? 1 : -1) // optimistic
     try {
       await (next ? addFavorite(site.id) : removeFavorite(site.id))
-    } catch {
-      flip(next ? -1 : 1) // roll back
+      // A late save belongs to the profile that started it. Keep confirmed
+      // stars until success, as on Explore and Favorites.
+      setState((previous) => previous.id !== id || !previous.data ? previous : {
+        ...previous,
+        data: {
+          ...previous.data,
+          sites: previous.data.sites.map((item) => item.id === site.id && item.is_favorited !== next ? {
+            ...item,
+            is_favorited: next,
+            favorite_count: Math.max(0, (item.favorite_count || 0) + (next ? 1 : -1)),
+          } : item),
+        },
+      })
+    } catch (requestError) {
+      setFavoriteError((previous) => previous.id === id ? { id, message: apiError(requestError) } : previous)
+    } finally {
+      pendingFavorites.current.delete(site.id)
+      setFavoritingIds(new Set(pendingFavorites.current))
     }
   }
 
@@ -96,6 +107,9 @@ export default function PublicProfilePage() {
       </header>
 
       <main className="mx-auto max-w-[1120px] px-3 py-6 sm:px-6 sm:py-9">
+        {favoriteError.id === id && favoriteError.message && (
+          <p role="alert" className="studio-status-danger mb-5 rounded-xl border px-4 py-3 text-sm">{favoriteError.message}</p>
+        )}
         {error ? (
           <div className="dashboard-section-card border-dashed px-5 py-16 text-center">
             <p className="font-medium text-[var(--studio-text)]">{error}</p>
@@ -175,7 +189,7 @@ export default function PublicProfilePage() {
               ) : (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {data.sites.map((site) => (
-                    <ExploreCard key={site.id} site={site} onToggleFav={onToggleFav} />
+                    <ExploreCard key={site.id} site={site} onToggleFav={onToggleFav} favoriting={favoritingIds.has(site.id)} />
                   ))}
                 </div>
               )}

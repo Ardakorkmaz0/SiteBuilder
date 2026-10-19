@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { confirmPasswordReset } from '../api/auth.js'
 import { apiError } from '../utils/errors.js'
@@ -20,6 +20,12 @@ export default function ResetPasswordPage() {
   const strength = passwordStrength(password)
   const badLink = !uid || !token
 
+  useEffect(() => {
+    if (!done) return undefined
+    const redirect = setTimeout(() => navigate('/login'), 1800)
+    return () => clearTimeout(redirect)
+  }, [done, navigate])
+
   async function onSubmit(e) {
     e.preventDefault()
     setError('')
@@ -27,7 +33,6 @@ export default function ResetPasswordPage() {
     try {
       await confirmPasswordReset(uid, token, password)
       setDone(true)
-      setTimeout(() => navigate('/login'), 1800)
     } catch (err) {
       setError(apiError(err, t('This reset link is invalid or has expired.')))
     } finally {

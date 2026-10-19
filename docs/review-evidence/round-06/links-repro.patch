@@ -1,0 +1,84 @@
+diff --git a/frontend/src/utils/reviewerLinks.test.js b/frontend/src/utils/reviewerLinks.test.js
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/utils/reviewerLinks.test.js
+@@ -0,0 +1,79 @@
++import { afterEach, describe, expect, it, vi } from 'vitest'
++import { JSDOM } from 'jsdom'
++import { builderInteractiveJs } from './htmlRuntime.js'
++import { withPublishedLinks } from './publishedPages.js'
++
++const documents = []
++afterEach(() => documents.splice(0).forEach((dom) => dom.window.close()))
++function published({ preview = false, palette = false } = {}) {
++  const dom = new JSDOM('<!doctype html><html><head></head><body><section id="contact"></section><iframe srcdoc="<p>block</p>"></iframe><iframe src="https://embed.example/"></iframe></body></html>', { url: preview ? 'about:blank' : 'https://portfolio.example/about/', runScripts: 'outside-only' })
++  documents.push(dom)
++  const win = dom.window
++  const doc = win.document
++  const parent = preview ? { postMessage: vi.fn() } : win
++  if (preview) Object.defineProperty(win, 'parent', { value: parent })
++  if (palette) {
++    Object.defineProperty(win, 'localStorage', { get() { throw new Error('opaque origin') } })
++    doc.documentElement.setAttribute('data-pwb-theme-base', 'light')
++    doc.documentElement.setAttribute('data-pwb-theme', 'dark')
++  }
++  win.scrollTo = vi.fn()
++  win.eval(builderInteractiveJs())
++  doc.dispatchEvent(new win.Event('DOMContentLoaded'))
++  const links = []
++  doc.addEventListener('click', (event) => {
++    const link = event.target.closest?.('a')
++    if (link) links.push({ href: link.getAttribute('href'), resolved: link.href, prevented: event.defaultPrevented })
++    event.preventDefault()
++  })
++  const post = (data, source = doc.querySelector('iframe').contentWindow) => win.dispatchEvent(new win.MessageEvent('message', { source, data: { type: 'pwb-navigate', ...data } }))
++  return { win, doc, parent, links, post }
++}
++
++describe('reviewer: block navigation', () => {
++  it.each(['/\\elsewhere.example/', '/\n/elsewhere.example/'])('rejects a disguised off-site path: %j', (href) => {
++    const { links, post } = published()
++    post({ href })
++    expect(links).toEqual([])
++  })
++
++  it('rejects explicit off-site, unsafe schemes and an unrelated iframe', () => {
++    const { links, post, doc } = published()
++    post({ href: '//elsewhere.example/' })
++    post({ href: 'javascript:alert(1)' })
++    post({ href: '/s/demo/about/' }, doc.querySelectorAll('iframe')[1].contentWindow)
++    expect(links).toEqual([])
++  })
++
++  it('preserves the chosen palette on an internal page link', () => {
++    const { links, post } = published({ palette: true })
++    post({ href: '/s/demo/about/' })
++    expect(links).toEqual([{ href: 'https://portfolio.example/s/demo/about/?pwb-theme=dark', resolved: 'https://portfolio.example/s/demo/about/?pwb-theme=dark', prevented: false }])
++  })
++
++  it('scrolls only the parent page to an internal anchor', () => {
++    const { links, post, doc } = published()
++    const section = doc.querySelector('section')
++    section.scrollIntoView = vi.fn()
++    post({ hash: '#contact' })
++    expect(section.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
++    expect(links).toEqual([])
++  })
++
++  it('forwards a site href through the viewer and rejects an unrelated iframe', () => {
++    const { parent, post, doc } = published({ preview: true })
++    post({ href: '/s/demo/about/' }, doc.querySelectorAll('iframe')[1].contentWindow)
++    expect(parent.postMessage).not.toHaveBeenCalled()
++    post({ href: '/s/demo/about/' })
++    expect(parent.postMessage).toHaveBeenCalledExactlyOnceWith({ type: 'pwb-navigate', href: '/s/demo/about/' }, '*')
++  })
++})
++
++describe('reviewer: publishing HTML block links', () => {
++  it('retargets an uppercase HTML HREF attribute just like lowercase href', () => {
++    const original = { pages: [{ id: 'home', components: [{ type: 'html', props: { code: '<a HREF="#about">About</a>' } }] }] }
++    const result = withPublishedLinks(original, new Map([['#about', '/s/demo/about/']]))
++    expect(result.pages[0].components[0].props.code).toBe('<a HREF="/s/demo/about/">About</a>')
++    expect(original.pages[0].components[0].props.code).toBe('<a HREF="#about">About</a>')
++  })
++})
