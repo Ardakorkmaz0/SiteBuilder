@@ -72,6 +72,35 @@ describe('an HTML page in the Source workspace', () => {
     expect(zipped.files.find((file) => file.name === 'index.html').content).toContain('Built on the canvas')
   })
 
+  it('keeps authored HTML in the ZIP schema backup without converting canvas pages', () => {
+    const htmlMap = loadMixedSite()
+    renderPanel({ htmlMap })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Editable code project/i }))
+
+    const backup = JSON.parse(zipped.files.find((file) => file.name === 'schema.json').content)
+    expect(backup.pages.find((page) => page.id === 'p2').html).toBe(ABOUT)
+    expect(backup.pages.find((page) => page.id === 'p1').html).toBe('')
+    expect(backup.pages.find((page) => page.id === 'p1').components[0].props.text).toBe('Built on the canvas')
+    expect(useEditorStore.getState().schema.pages[1]).not.toHaveProperty('html')
+  })
+
+  it('puts the same pending authored document in the ZIP HTML and schema backup', () => {
+    const htmlMap = loadMixedSite()
+    renderPanel({ htmlMap })
+    fireEvent.click(screen.getByRole('button', { name: /about\.html/i }))
+    const draft = ABOUT.replace('Written by hand', 'Unsaved source for the backup')
+    fireEvent.change(screen.getByLabelText('HTML source editor'), { target: { value: draft } })
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Editable code project/i }))
+
+    const backup = JSON.parse(zipped.files.find((file) => file.name === 'schema.json').content)
+    expect(backup.pages.find((page) => page.id === 'p2').html).toBe(draft)
+    expect(zipped.files.find((file) => file.name === 'about.html').content).toBe(draft)
+    expect(htmlMap.p2).toBe(ABOUT)
+  })
+
   it('goes into the optimized set untouched, beside the minified canvas pages', () => {
     const htmlMap = loadMixedSite()
     renderPanel({ htmlMap })

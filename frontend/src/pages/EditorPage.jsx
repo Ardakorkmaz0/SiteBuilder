@@ -1711,12 +1711,17 @@ function SiteEditor() {
       // expire and the prompt gets auto-denied — the write would fail
       // silently every time. The link belongs to the page it was created on.
       let fileError = ''
-      const fileHtml = map[localFile?.pageId] ?? html
+      // Old saved links have no page id and belong to Home. An explicit id
+      // must still name an HTML page: replacing a project can remove that
+      // page, and must never write the new Home over the unrelated old file.
+      const linkedPageId = localFile?.pageId ?? schema.pages[0]?.id
+      const linkedPage = schema.pages.find((page) => page.id === linkedPageId)
+      const fileHtml = linkedPage?.mode === 'html' ? map[linkedPageId] ?? '' : undefined
       // Writing the linked local file needs a fresh user gesture (Chrome
       // permission), which an automatic save doesn't have — so auto-save skips
       // the disk write and only persists to the server. The manual Save still
       // updates the file.
-      if (!auto && localFile?.handle && fileHtml) {
+      if (!auto && localFile?.handle && fileHtml !== undefined) {
         try {
           await writeHtmlToHandle(localFile.handle, fileHtml)
         } catch (e) {

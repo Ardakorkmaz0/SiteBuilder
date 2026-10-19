@@ -5,7 +5,8 @@ const fsMocks = vi.hoisted(() => ({
   copyProjectTo: vi.fn(),
 }))
 
-vi.mock('../utils/projectFs.js', () => ({
+vi.mock('../utils/projectFs.js', async (importOriginal) => ({
+  projectHomeFile: (await importOriginal()).projectHomeFile,
   buildTree: vi.fn(() => ({ children: [] })),
   compactTree: vi.fn((tree) => tree),
   copyProjectTo: fsMocks.copyProjectTo,

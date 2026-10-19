@@ -6,6 +6,7 @@ import {
   rememberProjectRoot,
   clearProjectRoot,
   isTextKind,
+  projectHomeFile,
   writeFileToHandle,
 } from '../utils/projectFs.js'
 import { createSaveQueue } from '../utils/saveQueue.js'
@@ -80,12 +81,7 @@ export const useProjectStore = create((set, get) => {
         map.set(f.path, { ...f, original: f.content })
       }
       // Open the home page first if present, else the first file.
-      const paths = [...map.keys()]
-      const home =
-        paths.find((p) => /(^|\/)index\.html?$/i.test(p)) ||
-        paths.find((p) => map.get(p).kind === 'html') ||
-        paths[0] ||
-        null
+      const home = projectHomeFile(map.values())?.path || null
       rememberProjectRoot(rootHandle)
       session = newSession()
       set({

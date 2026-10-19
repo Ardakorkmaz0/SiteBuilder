@@ -56,12 +56,35 @@ function stripHashAndQuery(ref) {
 // Keep parent segments until the reference has been joined to its directory.
 // Browser URLs encode spaces and Unicode; local File names are decoded text.
 function referencePaths(ref, baseDir, rootDir = '') {
+  if (baseDir === null) return []
   let path = stripHashAndQuery(unwrapStaticRef(ref)).trim().replace(/\\/g, '/')
   try { path = decodeURIComponent(path) } catch { /* A literal % is a valid filename. */ }
   if (!path) return []
   const rootPath = normalizePath(path)
   const fromRoot = normalizePath(`${rootDir}/${rootPath}`)
   return path.startsWith('/') ? [fromRoot] : [normalizePath(`${baseDir}/${path}`), fromRoot]
+}
+
+// A document's first base href also applies to inline styles and root-relative
+// references. Keep external bases external instead of matching a local basename.
+function documentBaseDir(doc, htmlPath, rootDir = '') {
+  const href = doc.querySelector('base[href]')?.getAttribute('href')
+  if (!href) return dirname(htmlPath)
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href.trim())) return null
+  const path = normalizePath(htmlPath)
+  const relativePath = rootDir && path.startsWith(`${rootDir}/`) ? path.slice(rootDir.length + 1) : path
+  try {
+    const origin = 'https://project.invalid'
+    const encodedPath = relativePath.split('/').map((part) => encodeURIComponent(part)).join('/')
+    const resolved = new URL(href, new URL(`/${encodedPath}`, origin))
+    if (resolved.origin !== origin) return null
+    const directory = new URL('.', resolved).pathname
+    let decoded = directory
+    try { decoded = decodeURIComponent(directory) } catch { /* Keep literal percent signs. */ }
+    return normalizePath(`${rootDir}/${decoded}`)
+  } catch {
+    return null
+  }
 }
 
 function safeRawText(value, tag) {
@@ -110,7 +133,7 @@ function mimeFor(file) {
   return file.type || MIME_BY_EXT[extname(file.name)] || 'application/octet-stream'
 }
 
-async function fileToDataUrl(file) {
+async function fileToDataUrl(file, ref = '') {
   const buffer = await file.arrayBuffer()
   const bytes = new Uint8Array(buffer)
   let binary = ''
@@ -118,7 +141,10 @@ async function fileToDataUrl(file) {
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
   }
-  return `data:${mimeFor(file)};base64,${btoa(binary)}`
+  const originalRef = String(unwrapStaticRef(ref) || '').trim()
+  const hash = originalRef.indexOf('#')
+  const fragment = hash === -1 ? '' : originalRef.slice(hash)
+  return `data:${mimeFor(file)};base64,${btoa(binary)}${fragment}`
 }
 
 async function inlineCssUrls(css, baseDir, index) {
@@ -133,7 +159,7 @@ async function inlineCssUrls(css, baseDir, index) {
       out += match[0]
     } else {
       const file = resolveFile(ref, baseDir, index)
-      out += file ? `url("${await fileToDataUrl(file)}")` : match[0]
+      out += file ? `url("${await fileToDataUrl(file, ref)}")` : match[0]
     }
     last = match.index + match[0].length
   }
@@ -149,7 +175,7 @@ function copyAttributes(from, to, omit = new Set()) {
 async function inlineSrcset(value, baseDir, index) {
   return transformSrcset(value, async (ref) => {
     const file = resolveFile(ref, baseDir, index)
-    return file ? fileToDataUrl(file) : ''
+    return file ? fileToDataUrl(file, ref) : ''
   })
 }
 
@@ -191,8 +217,8 @@ export async function htmlFilesToDocument(fileList) {
   if (!htmlFile) return ''
 
   const index = buildFileIndex(files)
-  const htmlDir = dirname(filePath(htmlFile))
   const doc = new DOMParser().parseFromString(await htmlFile.text(), 'text/html')
+  const htmlDir = documentBaseDir(doc, filePath(htmlFile), index.rootDir)
 
   for (const link of [...doc.querySelectorAll('link[rel~="stylesheet"][href]')]) {
     const href = link.getAttribute('href')
@@ -228,11 +254,11 @@ export async function htmlFilesToDocument(fileList) {
 
   for (const attr of ['src', 'poster', 'href']) {
     for (const el of [...doc.querySelectorAll(`[${attr}]`)]) {
-      if (el.tagName.toLowerCase() === 'a' && attr === 'href') continue
+      if (['a', 'base'].includes(el.tagName.toLowerCase()) && attr === 'href') continue
       const ref = el.getAttribute(attr)
       if (!isLocalRef(ref)) continue
       const file = resolveFile(ref, htmlDir, index)
-      if (file) el.setAttribute(attr, await fileToDataUrl(file))
+      if (file) el.setAttribute(attr, await fileToDataUrl(file, ref))
     }
   }
 
@@ -252,10 +278,10 @@ export async function htmlFilesToDocument(fileList) {
 // a File System Access `handle` we data-URL on demand).
 // ---------------------------------------------------------------------------
 
-async function handleToDataUrl(entry) {
+async function handleToDataUrl(entry, ref = '') {
   if (!entry?.handle) return ''
   try {
-    return await fileToDataUrl(await entry.handle.getFile())
+    return await fileToDataUrl(await entry.handle.getFile(), ref)
   } catch {
     return ''
   }
@@ -300,7 +326,7 @@ async function inlineCssUrlsMap(css, baseDir, filesMap) {
       out += match[0]
     } else {
       const entry = resolveInMap(ref, baseDir, filesMap)
-      const url = entry ? await handleToDataUrl(entry) : ''
+      const url = entry ? await handleToDataUrl(entry, ref) : ''
       out += url ? `url("${url}")` : match[0]
     }
     last = match.index + match[0].length
@@ -317,8 +343,8 @@ async function inlineCssUrlsMap(css, baseDir, filesMap) {
 //   the no-network srcdoc iframe. serializeDocument strips data-pwb-injected.
 export async function assemblePreviewHtml(htmlText, htmlPath, filesMap, opts = {}) {
   const forEdit = !!opts.forEdit
-  const htmlDir = dirname(normalizePath(htmlPath || ''))
   const doc = new DOMParser().parseFromString(String(htmlText || ''), 'text/html')
+  const htmlDir = documentBaseDir(doc, htmlPath || '')
 
   for (const link of [...doc.querySelectorAll('link[rel~="stylesheet"][href]')]) {
     const href = link.getAttribute('href')
@@ -335,11 +361,10 @@ export async function assemblePreviewHtml(htmlText, htmlPath, filesMap, opts = {
     else link.replaceWith(style)
   }
 
-  for (const style of [...doc.querySelectorAll('style:not([data-pwb-injected])')]) {
-    style.textContent = safeRawText(await inlineCssUrlsMap(style.textContent, htmlDir, filesMap), 'style')
-  }
-
   if (!forEdit) {
+    for (const style of [...doc.querySelectorAll('style:not([data-pwb-injected])')]) {
+      style.textContent = safeRawText(await inlineCssUrlsMap(style.textContent, htmlDir, filesMap), 'style')
+    }
     for (const script of [...doc.querySelectorAll('script[src]')]) {
       const src = script.getAttribute('src')
       if (!isLocalRef(src)) continue
@@ -353,23 +378,22 @@ export async function assemblePreviewHtml(htmlText, htmlPath, filesMap, opts = {
     }
   }
 
-  for (const el of [...doc.querySelectorAll('[style]')]) {
-    el.setAttribute('style', await inlineCssUrlsMap(el.getAttribute('style'), htmlDir, filesMap))
-  }
-
   // Data-URL local assets for the VIEW only. In Edit we keep the original
   // src/href (which may be a `{% static %}` tag) so saving the file back never
   // bakes a data URL — or a resolved path — into the template.
   if (!forEdit) {
+    for (const el of [...doc.querySelectorAll('[style]')]) {
+      el.setAttribute('style', await inlineCssUrlsMap(el.getAttribute('style'), htmlDir, filesMap))
+    }
     for (const attr of ['src', 'poster', 'href']) {
       for (const el of [...doc.querySelectorAll(`[${attr}]`)]) {
-        if (el.tagName.toLowerCase() === 'a' && attr === 'href') continue
+        if (['a', 'base'].includes(el.tagName.toLowerCase()) && attr === 'href') continue
         if (el.tagName.toLowerCase() === 'link' && attr === 'href' && /stylesheet/i.test(el.rel)) continue
         const ref = el.getAttribute(attr)
         if (!isLocalRef(ref)) continue
         const entry = resolveInMap(ref, htmlDir, filesMap)
         if (entry?.kind === 'asset') {
-          const url = await handleToDataUrl(entry)
+          const url = await handleToDataUrl(entry, ref)
           if (url) el.setAttribute(attr, url)
         }
       }
@@ -377,7 +401,7 @@ export async function assemblePreviewHtml(htmlText, htmlPath, filesMap, opts = {
     for (const el of doc.querySelectorAll('[srcset]')) {
       el.setAttribute('srcset', await transformSrcset(el.getAttribute('srcset'), async (ref) => {
         const entry = resolveInMap(ref, htmlDir, filesMap)
-        return entry?.kind === 'asset' ? handleToDataUrl(entry) : ''
+        return entry?.kind === 'asset' ? handleToDataUrl(entry, ref) : ''
       }))
     }
     // Server-side template languages (Django/Jinja `{% … %}` / `{{ … }}`) can't
@@ -457,13 +481,13 @@ function chipifyTemplateTags(node) {
 // tree. Reuses the same ref-resolution as the preview assembler; external URLs
 // (http(s)://, //cdn) are skipped. Returns a de-duplicated path list.
 export function linkedFilesFor(htmlPath, htmlContent, filesMap) {
-  const htmlDir = dirname(normalizePath(htmlPath || ''))
   let doc
   try {
     doc = new DOMParser().parseFromString(String(htmlContent || ''), 'text/html')
   } catch {
     return []
   }
+  const htmlDir = documentBaseDir(doc, htmlPath || '')
   const out = []
   const seen = new Set()
   const add = (ref) => {
@@ -573,10 +597,10 @@ export function needsBuildToRender(htmlText, htmlPath, filesMap) {
   } catch {
     return ''
   }
-  const baseDir = dirname(normalizePath(htmlPath || ''))
+  const baseDir = documentBaseDir(doc, htmlPath || '')
   for (const s of doc.querySelectorAll('script[type="module"][src]')) {
     const ref = s.getAttribute('src')
-    if (isLocalRef(ref) && !resolveInMap(ref, baseDir, filesMap)) return 'bundler'
+    if (baseDir !== null && isLocalRef(ref) && !resolveInMap(ref, baseDir, filesMap)) return 'bundler'
   }
   if (/\{%[^%]*%\}|\{\{[^}]*\}\}/.test(html)) return 'template'
   return ''

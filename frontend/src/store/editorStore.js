@@ -1419,10 +1419,18 @@ export const useEditorStore = create((set, get) => ({
   importSchema: (file) => {
     // The dashboard's "Export project" wraps the site ({ format, version,
     // site: { schema, … } }); the editor's own export is the design itself.
-    const raw = file?.format === 'sitebuilder-project' ? file.site?.schema : file
+    const wrappedSite = file?.format === 'sitebuilder-project' ? file.site : null
+    const raw = file?.format === 'sitebuilder-project' ? wrappedSite?.schema : file
     const valid = raw && Array.isArray(raw.pages) && raw.pages.length > 0
     if (!valid) return false
-    const { schema: normalized, htmlMap } = splitPageHtml(normalizeSchema(raw, { filterUnknown: true }))
+    const { schema: normalized, htmlMap } = splitPageHtml(
+      normalizeSchema(raw, { filterUnknown: true }), wrappedSite?.html,
+    )
+    // Legacy exports predate per-page mode as well as per-page HTML. Show
+    // their recovered document, while retaining the canvas for Remove HTML.
+    if (raw.pages[0]?.mode == null && htmlMap[normalized.pages[0].id]) {
+      normalized.pages[0] = { ...normalized.pages[0], mode: 'html' }
+    }
     get().record('import')
     set(() => {
       return {

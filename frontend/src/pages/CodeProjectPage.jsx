@@ -10,6 +10,7 @@ import {
   loadProjectRoot,
   openProjectFolder,
   pingDevServer,
+  projectHomeFile,
   readProject,
   supportsProjectFolder,
 } from '../utils/projectFs.js'
@@ -318,9 +319,7 @@ export default function CodeProjectPage() {
     ;(async () => {
       const cands = await detectDevServer(rootHandle, { probePorts: false })
       const map = useProjectStore.getState().files
-      const home =
-        [...map.values()].find((f) => /(^|\/)index\.html?$/i.test(f.path)) ||
-        [...map.values()].find((f) => f.kind === 'html')
+      const home = projectHomeFile(map.values())
       const build = home ? needsBuildToRender(home.content || '', home.path, map) : ''
       const isApp = cands.length > 0 || build === 'bundler' || build === 'template'
       const framework =

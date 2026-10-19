@@ -1,0 +1,67 @@
+--- a/frontend/src/utils/htmlRuntime.standalone.test.js
++++ b/frontend/src/utils/htmlRuntime.standalone.test.js
+@@ -311,3 +311,64 @@
+     expect(parent.postMessage).toHaveBeenCalledWith({ type: 'pwb-navigate', href: '/s/demo/about-us/' }, '*')
+   })
+ })
++
++
++describe('round 8 independent link review', () => {
++  function requested(href, { preview = false, foreign = false } = {}) {
++    const opened = page('<iframe srcdoc="<p>block</p>"></iframe><iframe src="https://elsewhere.example/embed"></iframe>', { preview })
++    const links = []
++    opened.doc.addEventListener('click', (event) => {
++      const link = event.target.closest?.('a')
++      if (link) links.push({ attribute: link.getAttribute('href'), destination: link.href })
++      event.preventDefault()
++    })
++    const source = opened.doc.querySelectorAll('iframe')[foreign ? 1 : 0].contentWindow
++    opened.win.dispatchEvent(new opened.win.MessageEvent('message', { source, data: { type: 'pwb-navigate', href } }))
++    return { ...opened, links }
++  }
++
++  it.each(['/safe/..//elsewhere.example/', '/%2e//elsewhere.example/', '/safe/%2e%2e//elsewhere.example/'])('never turns the normalized path %j into another host', (href) => {
++    const { links } = requested(href)
++    for (const link of links) expect(new URL(link.destination).origin).toBe('https://portfolio.example')
++  })
++
++  it.each(['/\\elsewhere.example/', '/\r/elsewhere.example/', '/\n/elsewhere.example/', '/\t/elsewhere.example/', '//elsewhere.example/', 'javascript:alert(1)'])('rejects a non-site address %j', (href) => {
++    expect(requested(href).links).toEqual([])
++  })
++
++  it('writes the normalized site path, including its query and fragment', () => {
++    expect(requested('/s/demo/../about/?from=block#details').links).toEqual([
++      { attribute: '/s/about/?from=block#details', destination: 'https://portfolio.example/s/about/?from=block#details' },
++    ])
++  })
++
++  it('passes an own block href to the viewer parent once without its other properties', () => {
++    const { parent, links } = requested('/s/demo/about/', { preview: true })
++    expect(links).toEqual([])
++    expect(parent.postMessage).toHaveBeenCalledTimes(1)
++    expect(parent.postMessage).toHaveBeenCalledWith({ type: 'pwb-navigate', href: '/s/demo/about/' }, '*')
++  })
++
++  it('never passes a foreign frame href to the viewer parent', () => {
++    const { parent, links } = requested('/s/demo/about/', { preview: true, foreign: true })
++    expect(links).toEqual([])
++    expect(parent.postMessage).not.toHaveBeenCalled()
++  })
++
++  it('rejects an own block path on a non-http standalone export', () => {
++    const dom = new JSDOM('<html><body><iframe srcdoc="<p>block</p>"></iframe></body></html>', {
++      url: 'file:///tmp/round8/about.html', runScripts: 'outside-only',
++    })
++    documents.push(dom)
++    const win = dom.window
++    const links = []
++    win.document.addEventListener('click', (event) => { links.push(event.target.getAttribute('href')); event.preventDefault() })
++    win.eval(builderInteractiveJs())
++    win.document.dispatchEvent(new win.Event('DOMContentLoaded'))
++    win.dispatchEvent(new win.MessageEvent('message', {
++      source: win.document.querySelector('iframe').contentWindow,
++      data: { type: 'pwb-navigate', href: '/about/' },
++    }))
++    expect(links).toEqual([])
++  })
++})

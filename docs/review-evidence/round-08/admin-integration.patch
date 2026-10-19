@@ -1,0 +1,49 @@
+diff --git a/frontend/src/components/admin/AdminActivity.round8-review.test.jsx b/frontend/src/components/admin/AdminActivity.round8-review.test.jsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/admin/AdminActivity.round8-review.test.jsx
+@@ -0,0 +1,44 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest'
++import { render, screen } from '@testing-library/react'
++import LanguageProvider from '../../i18n/LanguageProvider.jsx'
++import { translate } from '../../i18n/language.js'
++import AdminActivity from './AdminActivity.jsx'
++import { AccountChips } from './adminUi.jsx'
++import { auditDetail } from './adminData.js'
++import { listAdminActivity } from '../../api/admin.js'
++
++vi.mock('../../api/admin.js', () => ({ listAdminActivity: vi.fn() }))
++const tr = (key, variables) => translate('tr', key, variables)
++beforeEach(() => {
++  localStorage.setItem('pwb_language', 'tr')
++  vi.clearAllMocks()
++})
++
++describe('round 8 review: audit presentation', () => {
++  it.each([
++    ['inappropriate', 'Uygunsuz veya saldırgan'],
++    ['copyright', 'Telif ihlali veya kimliğe bürünme'],
++    ['other', 'Diğer'],
++  ])('translates the server reason %s', (reason, expected) => {
++    expect(auditDetail(`Report 7 (${reason})`, tr)).toBe(`7 numaralı şikâyet: ${expected}`)
++  })
++
++  it('renders translated details through the real activity component', async () => {
++    listAdminActivity.mockResolvedValue({ count: 3, results: [
++      { id: 1, action: 'site.delete', label: 'Deleted the site', detail: 'Owner @ada' },
++      { id: 2, action: 'report.resolve', label: 'Resolved a report', detail: 'Report 12 (spam)' },
++      { id: 3, action: 'component.purge', label: 'Deleted a block everywhere', detail: '4 copies removed' },
++    ].map((entry) => ({ ...entry, at: '2026-10-20T00:00:00Z', actor: { username: 'reviewer' }, target: { type: 'site', id: 8, repr: 'Review site' }, source: 'console' })) })
++    render(<LanguageProvider><AdminActivity onOpen={vi.fn()} /></LanguageProvider>)
++    expect(await screen.findByText('· Sahibi: @ada')).toBeInTheDocument()
++    expect(screen.getByText('· 12 numaralı şikâyet: Spam veya yanıltıcı')).toBeInTheDocument()
++    expect(screen.getByText('· 4 kopya silindi')).toBeInTheDocument()
++    expect(listAdminActivity).toHaveBeenCalledTimes(1)
++  })
++
++  it('renders the staff badge with its own Turkish key', () => {
++    render(<LanguageProvider><AccountChips account={{ is_staff: true, is_superuser: false, is_active: true }} /></LanguageProvider>)
++    expect(screen.getByText('Admin', { exact: true })).toBeInTheDocument()
++    expect(screen.queryByText('Yönetim', { exact: true })).not.toBeInTheDocument()
++  })
++})

@@ -2,10 +2,39 @@
 // explorer renders them ("compact folders"), so a deep wrapper folder never
 // buries the files inside it.
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildTree, compactTree, detectDevServer, frameworkFromPackageJson } from './projectFs.js'
+import { buildTree, compactTree, detectDevServer, frameworkFromPackageJson, projectHomeFile } from './projectFs.js'
 
 const filesOf = (...paths) =>
   paths.map((p) => ({ path: p, name: p.split('/').pop(), kind: 'html' }))
+
+describe('projectHomeFile', () => {
+  it.each(['index.html', 'INDEX.HTM'])('prefers the root %s to an earlier nested index', (home) => {
+    expect(projectHomeFile(filesOf('docs/index.html', home))?.path).toBe(home)
+  })
+
+  it('keeps a nested index as the fallback when no root home exists', () => {
+    expect(projectHomeFile(filesOf('about.html', 'site/index.htm'))?.path).toBe('site/index.htm')
+  })
+
+  it('opens an HTML document ahead of other kinds when there is no index', () => {
+    expect(projectHomeFile([
+      { path: 'assets/logo.png', kind: 'asset' },
+      { path: 'assets/site.css', kind: 'css' },
+      { path: 'pages/about.html', kind: 'html' },
+    ])?.path).toBe('pages/about.html')
+  })
+
+  it('keeps the first non-HTML file as the final fallback', () => {
+    expect(projectHomeFile([
+      { path: 'assets/site.css', kind: 'css' },
+      { path: 'main.js', kind: 'js' },
+    ])?.path).toBe('assets/site.css')
+  })
+
+  it('returns no home for an empty project', () => {
+    expect(projectHomeFile([])).toBeNull()
+  })
+})
 
 describe('compactTree', () => {
   it('folds a single-child directory chain into one node, keeping the deepest path', () => {
