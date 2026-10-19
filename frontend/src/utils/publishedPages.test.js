@@ -157,6 +157,21 @@ describe('publishedPagesFor', () => {
     expect(home.html).toContain('href=&quot;#top&quot;')
   })
 
+  it('points a link in an HTML block at the page however its attribute is cased', () => {
+    const site = {
+      theme: {},
+      pages: [
+        { id: 'home', name: 'Home', components: [{ id: 'block', type: 'html', props: { code: '<a HREF="#about">About</a>' }, layout: { x: 0, y: 0, w: 400, h: 100 } }] },
+        { id: 'about', name: 'About us', components: [] },
+      ],
+    }
+
+    const [home] = publishedPagesFor(site, {}, 'Ada', 'ada-site')
+
+    expect(home.html).not.toContain('#about')
+    expect(home.html).toContain('/s/ada-site/about-us/')
+  })
+
   // An HTML page is published as its own file, and "Go to page" (or the link
   // tool) writes #<pageId> into it. Only the canvas schema was retargeted, so
   // on the served site those links went nowhere.

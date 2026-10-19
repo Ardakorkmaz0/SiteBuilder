@@ -64,6 +64,17 @@ const INTERACTIVE_SCRIPT = `
     function sitePath(value) {
       return typeof value === 'string' && /^\\/(?!\\/)/.test(value);
     }
+    // A path that resolves on this site. The parser reads "/\\x" and "/<line
+    // break>/x" as "//x", another site, so the address it makes is what counts.
+    function onThisSite(value) {
+      if (!sitePath(value)) return '';
+      try {
+        var url = new URL(value, location.href);
+        return url.host === location.host && /^https?:$/.test(url.protocol)
+          ? url.pathname + url.search + url.hash
+          : '';
+      } catch (e) { return ''; }
+    }
     function safeDestination(value) {
       try {
         var url = new URL(value, location.href);
@@ -349,9 +360,10 @@ const INTERACTIVE_SCRIPT = `
         try { parent.postMessage(up, '*'); } catch (e) {}
         return;
       }
-      if (sitePath(data.href)) {
+      var address = onThisSite(data.href);
+      if (address) {
         var link = document.createElement('a');
-        link.setAttribute('href', data.href);
+        link.setAttribute('href', address);
         link.style.display = 'none';
         document.body.appendChild(link);
         link.click();

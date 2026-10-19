@@ -282,6 +282,15 @@ describe('a link in an HTML block', () => {
     expect(links).toEqual([['/s/demo/about-us/', false]])
   })
 
+  // The URL parser reads a backslash as a slash and drops line breaks, so
+  // these name another site although they start with one slash.
+  it.each(['/\\elsewhere.example/', '/\n/elsewhere.example/', '/\t/elsewhere.example/'])('to another site written as a path (%j) is not followed', (href) => {
+    const { win, doc } = page('<iframe srcdoc="<p>block</p>"></iframe>')
+    const links = followed(doc)
+    post(win, doc.querySelector('iframe').contentWindow, { type: 'pwb-navigate', href })
+    expect(links).toEqual([])
+  })
+
   it('to a part of the page scrolls the page there', () => {
     const { win, doc } = page('<section id="contact"></section><iframe srcdoc="<p>block</p>"></iframe>')
     const section = doc.getElementById('contact')
