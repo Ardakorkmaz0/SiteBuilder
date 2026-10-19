@@ -14,7 +14,7 @@ import {
 } from '../utils/theme.js'
 import { componentPresetStyles, componentPresetProps } from '../utils/componentPresets.js'
 import { recolorHtml } from '../utils/htmlRecolor.js'
-import { regionContentWidth } from '../utils/regionLayout.js'
+import { regionContentWidth, regionDisplayPatchToDesign } from '../utils/regionLayout.js'
 import { anchorOf, anchorProblem, elementIdFor, retargetLinks, slugifyAnchor } from '../utils/anchors.js'
 import { splitPageHtml } from '../utils/projectSnapshot.js'
 import { normalizeLanguageTag } from '../utils/languages.js'
@@ -94,6 +94,29 @@ function mapPage(schema, id, updater) {
 // just at the top level. Top-level mobile auto-layout still only runs on the
 // page's roots.
 const PARENT_TYPES = new Set(['container', 'tabs', 'region'])
+// The server keeps four levels below the page and 60 children per parent, and
+// drops what lies beyond when the site is saved (validators.sanitize_component).
+const MAX_NESTING_DEPTH = 4
+const MAX_CHILDREN = 60
+const MIN_MOVED_SIZE = 8
+
+// How many levels below the page `id` sits: 0 for a top-level block, -1 if absent.
+function depthOf(components, id, depth = 0) {
+  for (const c of components) {
+    if (c.id === id) return depth
+    if (hasKids(c)) {
+      const found = depthOf(c.children, id, depth + 1)
+      if (found >= 0) return found
+    }
+  }
+  return -1
+}
+
+function subtreeHeight(node) {
+  return hasKids(node) && node.children.length
+    ? 1 + Math.max(...node.children.map(subtreeHeight))
+    : 0
+}
 const hasKids = (c) => PARENT_TYPES.has(c.type) && Array.isArray(c.children)
 const TEXT_BRUSH_TYPES = new Set(['heading', 'text', 'list', 'quote', 'icon', 'linkbutton'])
 const FIELD_BRUSH_TYPES = new Set(['input', 'select'])
@@ -2932,6 +2955,117 @@ export const useEditorStore = create((set, get) => ({
         dirty: true,
       }
     })
+  },
+
+  // Drag an existing block into a section, container or tab panel, or out of
+  // one onto the page (`targetId` null). Before, a block dropped over a
+  // section only lay on top of it: it stayed behind when the section moved,
+  // reflowed or was deleted. `point` is where its top-left lands, in the
+  // target's own coordinates for the breakpoint being edited — a section's
+  // visible grid (`displayWidth` when it is narrower than its design), a
+  // container's or tab panel's design space, or the page. The block keeps its
+  // id, props, styles and children; the other breakpoint gets the place a new
+  // block would get there. One undo step with the drag that did it.
+  moveComponentInto: (id, targetId, point = {}) => {
+    const state = get()
+    const page = selectCurrentPage(state)
+    const comps = page.components || []
+    const node = findInTree(comps, id)
+    if (!node || node.type === 'region' || node.id === targetId) return false
+    const oldParent = findParentInTree(comps, id)
+    if ((oldParent?.id ?? null) === (targetId ?? null)) return false
+    const target = targetId ? findInTree(comps, targetId) : null
+    if (targetId) {
+      if (!target || !PARENT_TYPES.has(target.type) || findInTree([node], targetId)) return false
+      if ((target.children || []).length >= MAX_CHILDREN) return false
+      if (depthOf(comps, targetId) + 1 + subtreeHeight(node) > MAX_NESTING_DEPTH) return false
+    }
+    get().record('move-into')
+    set((current) => {
+      const currentPage = selectCurrentPage(current)
+      const all = currentPage.components || []
+      const onMobile = current.viewport === 'mobile'
+      const mobileWidth = currentPage.mobileWidth || MOBILE_CANVAS_WIDTH
+      const pcW = currentPage.canvasWidth || CANVAS_WIDTH
+      const px = Math.max(0, Math.round(Number(point.x) || 0))
+      const py = Math.max(0, Math.round(Number(point.y) || 0))
+      const pc = node.layout || {}
+      const pcSize = { w: Math.max(MIN_MOVED_SIZE, Math.round(pc.w || 200)), h: Math.max(MIN_MOVED_SIZE, Math.round(pc.h || 80)) }
+      const phone = node.mobileLayout || pc
+      const phoneW = Math.min(Math.max(MIN_MOVED_SIZE, Math.round(phone.w || pcSize.w)), mobileWidth - MOBILE_PAD * 2)
+      const phoneH = Math.max(MIN_MOVED_SIZE, Math.round(phone.h || pcSize.h))
+      const bottomOf = (list, key) => list.reduce((max, c) => {
+        const l = c[key] || c.layout || {}
+        return Math.max(max, (l.y || 0) + (l.h || 0))
+      }, 0)
+      // A tab panel's tag only means something inside those tabs.
+      const rest = { ...node }
+      delete rest.tabId
+      let moved
+      if (target) {
+        const parentW = parentDesignWidth(target) || pcW
+        const siblings = target.children || []
+        if (target.type === 'region' && onMobile) {
+          const pcBottom = bottomOf(siblings, 'layout')
+          moved = {
+            ...rest,
+            mobileLayout: clampLayout({ x: px, y: py, w: phoneW, h: phoneH }, { maxX: mobileWidth }),
+            layout: clampLayout(
+              { x: MOBILE_PAD, y: pcBottom ? pcBottom + MOBILE_GAP : MOBILE_PAD, w: Math.min(pcSize.w, parentW - MOBILE_PAD * 2), h: pcSize.h },
+              { maxX: parentW },
+            ),
+          }
+        } else if (target.type === 'region') {
+          const w = Math.min(pcSize.w, parentW)
+          const display = Number(point.displayWidth)
+          const x = display > 0 && display < parentW
+            ? regionDisplayPatchToDesign({ ...node, layout: { ...pc, x: px, w } }, { x: px, w }, { x: px, w }, parentW, display, 'pc').x
+            : px
+          const phoneBottom = bottomOf(siblings, 'mobileLayout')
+          moved = {
+            ...rest,
+            layout: clampLayout({ x, y: py, w, h: pcSize.h }, { maxX: parentW }),
+            mobileLayout: clampLayout(
+              { x: MOBILE_PAD, y: phoneBottom ? phoneBottom + MOBILE_GAP : MOBILE_PAD, w: phoneW, h: phoneH },
+              { maxX: mobileWidth },
+            ),
+          }
+        } else {
+          // A container or tab panel is drawn from its desktop design on both
+          // breakpoints (scaled down to fit), so the point is in that space.
+          moved = {
+            ...rest,
+            layout: clampLayout({ x: px, y: py, w: Math.min(pcSize.w, parentW), h: pcSize.h }, { maxX: parentW }),
+            mobileLayout: { x: 0, y: 0, w: phoneW, h: phoneH },
+          }
+        }
+        if (target.type === 'tabs') {
+          moved.tabId = target.props?.activeId || target.props?.tabs?.[0]?.id || ''
+        }
+      } else if (onMobile) {
+        moved = {
+          ...rest,
+          mobileLayout: clampLayout({ x: px, y: py, w: phoneW, h: phoneH }, { maxX: mobileWidth }),
+          layout: clampLayout({ x: 24, y: bottomOf(all, 'layout') + 16, w: Math.min(pcSize.w, pcW), h: pcSize.h }, { maxX: pcW }),
+        }
+      } else {
+        moved = {
+          ...rest,
+          layout: clampLayout({ x: px, y: py, w: Math.min(pcSize.w, pcW), h: pcSize.h }, { maxX: pcW }),
+          mobileLayout: clampLayout(
+            { x: MOBILE_PAD, y: bottomOf(all, 'mobileLayout') + MOBILE_GAP, w: phoneW, h: phoneH },
+            { maxX: mobileWidth },
+          ),
+        }
+      }
+      const without = removeFromTree(all, id)
+      const nextComps = target ? addChildToTree(without, targetId, moved) : [...without, moved]
+      const schema = onMobile
+        ? mapPage(current.schema, currentPage.id, (p) => ({ ...p, components: nextComps, mobileManual: true }))
+        : withComponents(current.schema, currentPage.id, nextComps)
+      return { schema, selectedId: id, selectedIds: [id], dirty: true }
+    })
+    return true
   },
 
   moveRegion: (id, direction) => {
