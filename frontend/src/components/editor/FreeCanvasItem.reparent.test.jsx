@@ -123,6 +123,13 @@ describe('a block inside a container let go over another', () => {
     expect(childIds('target')).toEqual(['dragged'])
   })
 
+  it.each(['sticky', 'fixed'])('keeps its parent, and outlines no other, when it is pinned (%s)', (scrollBehavior) => {
+    load({ text: 'Pinned', scrollBehavior }, { nested: true })
+    expect(drag({ nested: true })).toEqual({ outlined: false })
+    expect(childIds('source')).toEqual(['dragged'])
+    expect(childIds('target')).toEqual([])
+  })
+
   it('keeps its parent when it was pressed as part of a multi-selection', () => {
     load({ text: 'Plain' }, { nested: true })
     s().selectComponent('dragged')
