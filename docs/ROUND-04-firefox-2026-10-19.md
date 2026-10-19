@@ -146,4 +146,38 @@ işinin toplamı (runner kullanımı) ayrı ölçülecek.
 - Backend: **817 geçti**, 164,39 sn; 602 mevcut uyarı. Model/migration değişmedi.
 - `git diff --check` temiz. Dev sunucusu başlatılmadı, yerel/üretim verisi değiştirilmedi.
 
-Firefox CI incelemesi devam ediyor; bu bölüm tamamlanmadan tur bitmiş sayılmıyor.
+### İlk Firefox koşusu ve düzeltilen test sorunları
+
+[`f16bee6`, koşu 39266780743](https://github.com/Ardakorkmaz0/SiteBuilder/actions/runs/39266780743):
+Chromium 98/98 (97 tarayıcı + setup), frontend ve backend geçti. Firefox 1 kalıcı
+hata, 1 retry'da geçen kararsız test ve 96 doğrudan geçen test bildirdi (setup dahil).
+
+- `editor-canvas-stress.spec.js` dışarı bırakılan çocukta iki denemede de yalnız
+  x koordinatını 580 yerine **581** buldu. DOM ebeveyn değişimi ve y/w/h doğruydu.
+  Trace fare başlangıcı `(421.941055,319.428284)`, bitişi
+  `(838.441055,527.678284)` idi; amaçlanan x farkı 416,5 ekran pikseli.
+  Kurulu Playwright 1.63.0'ın Firefox adaptörü
+  (`node_modules/playwright-core/lib/coreBundle.js`, `ffInput.ts` bölümü)
+  move/down/up koordinatlarını `Math.floor` ile gönderiyor: gerçek fark 417.
+  Fit ölçeğinde bu yaklaşık 500,60 tasarım pikseli; 581 sonucu bu girişle uyumlu.
+  Test artık **%80 ve %100** açık yakınlaştırmada tam piksel başlangıç ve hareket
+  kullanıyor. Aynı literal `(580,360,180,60)`, ebeveynin sabit kalması, tek kopya
+  ve tek undo/redo beklentileri korunuyor. Hata toleransı artırılmadı. İlk fixture
+  kutusu ve ölçekler de doğrulanıyor. Uygulama kodu değiştirilmedi.
+- `editor-workflow-sweep.spec.js` SEO okumada ilk denemede `seo.title` için
+  `undefined` erişimiyle kırıldı, retry geçti. Kaydet düğmesinin tıklanması asenkron
+  yazmanın bitmesini garanti etmiyor; ilk GET eski ve geçerli satırı döndürebiliyor.
+  Poll artık her okumanın HTTP 200 olduğunu kontrol edip henüz bulunmayan `seo`
+  anahtarını bekliyor. Yalnız başlık yerine başlık/açıklama/paylaşım resmi/favicon
+  için literal nesnenin tamamını doğruluyor. Ek sabit bekleme eklenmedi.
+
+Keşif artık her tarayıcıda **98 vaka + 1 API setup**. Tüm paket tekrar CI'da
+çalıştırılacak. Bu iki değişiklik test düzeltmesidir; bölüm 1'deki Claude üretim
+kodu bulgularına düzeltme uygulanmadı.
+
+İlk (başarısız) denemenin ölçümü: Chromium işi 562 sn, Firefox 740 sn;
+E2E işlerinin toplamı 1302 sn (önce 605 sn). Workflow 744 sn (12:24), taban
+615 sn (10:15): **+129 sn, yaklaşık %21**. Bu Firefox tekrarlarını içerir;
+temiz koşunun süresi aşağıda ayrıca raporlanmalı.
+
+Firefox düzeltmelerinin CI doğrulaması devam ediyor; tur henüz bitmiş sayılmıyor.
