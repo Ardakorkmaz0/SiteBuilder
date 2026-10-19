@@ -22,6 +22,7 @@ import {
 import { autoLayoutChildStyle, autoLayoutContainerStyle } from '../../utils/autoLayout.js'
 import { containerDesignWidth } from '../../utils/containerFit.js'
 import { usePointerDrag } from '../../ui/usePointerDrag.js'
+import { createReparentTracker } from '../../utils/reparentDrag.js'
 import {
   CHROME_ACCENT,
   HOVER_RING_CLASS,
@@ -681,17 +682,33 @@ function TabsCanvasItem({
     const sx = e.clientX
     const sy = e.clientY
     const orig = { x, y }
+    // Let go over another section, container or tab panel, it moves there;
+    // let go on the page outside its own, it moves out onto the page.
+    const itemEl = e.currentTarget
+    const itemRect = itemEl.getBoundingClientRect()
+    const reparent = createReparentTracker({
+      itemEl,
+      canvas: itemEl.closest('#free-canvas'),
+      currentParentId: itemEl.parentElement?.closest('[data-builder-droppable-id]')?.getAttribute('data-builder-droppable-id') ?? null,
+      grab: { x: sx - itemRect.left, y: sy - itemRect.top },
+      start: { x: sx, y: sy },
+    })
     function onMove(ev) {
       applyLayout({
         x: orig.x + (ev.clientX - sx) / interactionScale,
         y: orig.y + (ev.clientY - sy) / interactionScale,
       })
+      reparent.move(ev.clientX, ev.clientY)
     }
     // One undo step per gesture; ends on pointerup, cancel or loss of focus.
     useEditorStore.getState().beginHistoryGesture()
     trackDrag(e, {
       onMove,
-      onEnd: () => useEditorStore.getState().endHistoryGesture(),
+      onEnd: (ev) => {
+        const landing = ev?.type === 'pointerup' ? reparent.end(ev.clientX, ev.clientY) : (reparent.cancel(), null)
+        if (landing) useEditorStore.getState().moveComponentInto(component.id, landing.targetId, landing.point)
+        useEditorStore.getState().endHistoryGesture()
+      },
     })
   }
 

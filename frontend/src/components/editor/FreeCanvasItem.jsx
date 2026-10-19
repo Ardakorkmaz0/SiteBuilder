@@ -5,6 +5,7 @@ import { ContainerEditor, RegionEditor, TabsEditor } from './FlowCanvasItem.jsx'
 import { snapDraggedRect, snapThresholdFor } from '../../utils/snapping.js'
 import { beginDragScroll } from '../../utils/dragAutoScroll.js'
 import { usePointerDrag } from '../../ui/usePointerDrag.js'
+import { createReparentTracker } from '../../utils/reparentDrag.js'
 import { embedAspectLock } from '../../utils/htmlSnippetSizing.js'
 import { fixedRailInset } from '../../utils/railInset.js'
 import { BRUSH_CURSOR } from './brushCursor.js'
@@ -308,6 +309,18 @@ export default function FreeCanvasItem({
     // the pointer delta below — without it the item would slide out from under
     // the finger by exactly however far the canvas moved.
     const drag = beginDragScroll((p) => moveTo(p.x, p.y))
+    // A lone block let go over a section, container or tab panel moves into
+    // it (moveComponentInto). Full-width bands stay bands of the page.
+    const itemEl = e.currentTarget
+    const itemRect = itemEl.getBoundingClientRect()
+    const reparent = groupIds.length === 1 && !viewportStretch
+      ? createReparentTracker({
+          itemEl,
+          canvas: itemEl.closest('#free-canvas'),
+          grab: { x: sx - itemRect.left, y: sy - itemRect.top },
+          start: { x: sx, y: sy },
+        })
+      : null
 
     function moveTo(clientX, clientY) {
       const base = origins[component.id]
@@ -348,10 +361,15 @@ export default function FreeCanvasItem({
       onMove: (ev) => {
         drag.track(ev)
         moveTo(ev.clientX, ev.clientY)
+        reparent?.move(ev.clientX, ev.clientY)
       },
-      onEnd: () => {
+      onEnd: (ev) => {
         drag.stop()
         clearDragGuides()
+        // Only a real release moves it: a drag ended by leaving the page
+        // (pointercancel) stays where it is.
+        const landing = ev?.type === 'pointerup' ? reparent?.end(ev.clientX, ev.clientY) : (reparent?.cancel(), null)
+        if (landing) useEditorStore.getState().moveComponentInto(component.id, landing.targetId, landing.point)
         useEditorStore.getState().endHistoryGesture()
       },
     })
