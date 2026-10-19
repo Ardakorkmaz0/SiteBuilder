@@ -34,7 +34,7 @@ export function AccountChips({ account }) {
   return (
     <>
       {account.is_superuser && <Chip tone="info">{t('Superuser')}</Chip>}
-      {!account.is_superuser && account.is_staff && <Chip tone="info">{t('Admin')}</Chip>}
+      {!account.is_superuser && account.is_staff && <Chip tone="info">{t('Administrator')}</Chip>}
       {account.is_guest && <Chip>{t('Guest')}</Chip>}
       {!account.is_active && <Chip tone="danger">{t('Suspended')}</Chip>}
     </>

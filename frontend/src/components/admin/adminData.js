@@ -39,6 +39,28 @@ export function formatRelative(value, language) {
   return format.format(0, 'minute')
 }
 
+// The server writes an audit entry's detail as English text (views.py,
+// `_log_admin`), and old entries keep it. These are the shapes it writes;
+// anything else (a list of setting names) is shown as written.
+const REPORT_REASONS = {
+  spam: 'Spam or misleading',
+  inappropriate: 'Inappropriate or offensive',
+  copyright: 'Copyright or impersonation',
+  malware: 'Malicious or phishing',
+  other: 'Other',
+}
+
+export function auditDetail(detail, translate) {
+  const text = String(detail || '')
+  let match = text.match(/^Owner @(.+)$/)
+  if (match) return translate('Owner: @{username}', { username: match[1] })
+  match = text.match(/^Report (\d+) \(([^)]*)\)$/)
+  if (match) return translate('Report {id}: {reason}', { id: match[1], reason: REPORT_REASONS[match[2]] ? translate(REPORT_REASONS[match[2]]) : match[2] })
+  match = text.match(/^(\d+) copies removed$/)
+  if (match) return translate('{count} copies removed', { count: match[1] })
+  return text
+}
+
 export function formatBytes(bytes, language) {
   const value = Number(bytes || 0)
   const units = ['B', 'KB', 'MB', 'GB']
