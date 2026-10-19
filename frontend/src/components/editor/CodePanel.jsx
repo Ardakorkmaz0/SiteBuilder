@@ -8,9 +8,9 @@ import {
   useState,
 } from 'react'
 import { useEditorStore } from '../../store/editorStore.js'
-import { inlineProjectHtml, minifyGeneratedHtml } from '../../utils/exportFiles.js'
+import { minifyGeneratedHtml } from '../../utils/exportFiles.js'
 import { schemaToFiles } from '../../utils/schemaToFiles.js'
-import { componentHtmlFiles, componentPageDocument } from '../../utils/componentSourceDrafts.js'
+import { componentHtmlFiles, componentPageDocument, componentSourceHtml } from '../../utils/componentSourceDrafts.js'
 import { pageToResponsiveHtml } from '../../utils/pageCode.js'
 import { revealLine } from '../../utils/revealCodeLine.js'
 import CodeLineGlow from './CodeLineGlow.jsx'
@@ -145,7 +145,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
     if (!item || item.content === item.generatedContent) return null
     // Exports include Source edits before Apply. Authored HTML keeps its own
     // asset links; canvas drafts embed the same assets as Apply HTML does.
-    return item.ownDocument ? item.content : inlineProjectHtml(item.content, rawGeneratedFiles)
+    return componentSourceHtml(item, item.content, rawGeneratedFiles)
   }, [generatedFiles, rawGeneratedFiles])
   // One page as a file that stands on its own, and its smaller form. A
   // person's own document is not ours to minify: it goes out as written.
@@ -226,7 +226,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
     for (const item of dirtyHtmlFiles) {
       onApplyHtml({
         pageId: item.pageId,
-        html: item.ownDocument ? item.content : inlineProjectHtml(item.content, rawGeneratedFiles),
+        html: componentSourceHtml(item, item.content, rawGeneratedFiles),
         nextMode,
       })
     }
@@ -351,7 +351,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
     if (!onApplyHtml || file?.editableKind !== 'html') return
     onApplyHtml({
       pageId: file.pageId,
-      html: file.ownDocument ? file.content : inlineProjectHtml(file.content, rawGeneratedFiles),
+      html: componentSourceHtml(file, file.content, rawGeneratedFiles),
       nextMode: 'source',
     })
     setHtmlDrafts((drafts) => {
