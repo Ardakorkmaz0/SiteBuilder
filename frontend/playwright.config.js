@@ -58,6 +58,7 @@ export default defineConfig({
       // The suite signs in, signs up and shares far more often than a person.
       env: {
         PYTHONUNBUFFERED: '1',
+        DJANGO_SETTINGS_MODULE: 'config.e2e_settings',
         DJANGO_THROTTLE_AUTH: '1000/min',
         DJANGO_THROTTLE_GUEST: '1000/min',
         DJANGO_THROTTLE_SHARE: '1000/hour',

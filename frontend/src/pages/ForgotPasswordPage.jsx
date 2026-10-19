@@ -8,7 +8,7 @@ import { useLanguage } from '../i18n/useLanguage.js'
 export default function ForgotPasswordPage() {
   const { t } = useLanguage()
   const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
+  const [sentEmail, setSentEmail] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -18,7 +18,7 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     try {
       await requestPasswordReset(email)
-      setSent(true)
+      setSentEmail(email)
     } catch (err) {
       setError(apiError(err, t('Could not send the reset email.')))
     } finally {
@@ -36,9 +36,9 @@ export default function ForgotPasswordPage() {
         </Link>
       )}
     >
-      {sent ? (
+      {sentEmail !== null ? (
         <div role="status" className="studio-status-success rounded-lg border px-3 py-3 text-sm leading-6">
-          {t('If an account exists for {email}, a reset link is on its way. Check your inbox (and spam folder).', { email })}
+          {t('If an account exists for {email}, a reset link is on its way. Check your inbox (and spam folder).', { email: sentEmail })}
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-5">

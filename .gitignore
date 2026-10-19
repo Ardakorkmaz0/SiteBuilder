@@ -112,5 +112,6 @@ ai_outputs/
 
 # Playwright end-to-end runs
 frontend/e2e/.auth/
+frontend/e2e/.mail/
 frontend/test-results/
 frontend/playwright-report/

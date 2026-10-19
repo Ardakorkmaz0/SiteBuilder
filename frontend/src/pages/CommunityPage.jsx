@@ -10,7 +10,7 @@
 // not be the place that assumption is tested — a preview should never be able
 // to run something the library was supposed to have refused.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import DashboardHeader from '../components/dashboard/DashboardHeader.jsx'
 import UseComponentDialog from '../components/community/UseComponentDialog.jsx'
 import ReportComponentDialog from '../components/community/ReportComponentDialog.jsx'
@@ -161,20 +161,20 @@ export default function CommunityPage() {
   // block is visible at all.
   const [scope, setScope] = useState('')
 
-  const load = useCallback(() => {
-    setLoading(true)
-    setError('')
-    listComponents({ category, q: query, scope })
-      .then((data) => setItems(data?.results || []))
-      .catch(() => setError(t('Could not load the community library.')))
-      .finally(() => setLoading(false))
-  }, [category, query, scope, t])
-
   useEffect(() => {
-    // Typing should not fire a request per keystroke.
-    const timer = setTimeout(load, query ? 350 : 0)
-    return () => clearTimeout(timer)
-  }, [load, query])
+    let current = true
+    // Typing should not fire a request per keystroke. A superseded request
+    // must not replace the new shelf, its error, or its loading state.
+    const timer = setTimeout(() => {
+      setLoading(true)
+      setError('')
+      listComponents({ category, q: query, scope })
+        .then((data) => { if (current) setItems(data?.results || []) })
+        .catch(() => { if (current) setError(t('Could not load the community library.')) })
+        .finally(() => { if (current) setLoading(false) })
+    }, query ? 350 : 0)
+    return () => { current = false; clearTimeout(timer) }
+  }, [category, query, scope, t])
 
   // A failed request used to be swallowed and the card changed anyway, so the
   // page said a block was gone (or private) while the library still offered it.

@@ -3,7 +3,7 @@
 // render it without the power to run anything.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../ui/UiThemeProvider.jsx'
@@ -284,5 +284,52 @@ describe('when there is nothing to show', () => {
     renderPage()
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the community library.')
     expect(screen.queryByText('Nothing here yet.')).toBeNull()
+  })
+})
+
+
+describe('the current community request', () => {
+  it.each(['success', 'failure'])('keeps newer filtered results after an older %s arrives', async (outcome) => {
+    let resolveOld
+    let rejectOld
+    listComponents.mockImplementationOnce(() => new Promise((resolve, reject) => {
+      resolveOld = resolve
+      rejectOld = reject
+    })).mockResolvedValueOnce({ results: [{ ...CARD, id: 8, title: 'Portfolio block' }] })
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(listComponents).toHaveBeenCalledTimes(1))
+
+    await user.click(screen.getByRole('button', { name: 'Portfolio', exact: true }))
+    await screen.findByTitle('Portfolio block')
+    await act(async () => {
+      if (outcome === 'success') resolveOld({ results: [CARD] })
+      else rejectOld(new Error('An old request failed'))
+    })
+
+    expect(screen.getByTitle('Portfolio block')).toBeInTheDocument()
+    expect(screen.queryByTitle('Pricing card')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(listComponents).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps loading the new filter when an older request settles first', async () => {
+    let resolveOld
+    let resolveCurrent
+    listComponents.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveCurrent = resolve }))
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(listComponents).toHaveBeenCalledTimes(1))
+    await user.click(screen.getByRole('button', { name: 'Portfolio', exact: true }))
+    await waitFor(() => expect(listComponents).toHaveBeenCalledTimes(2))
+
+    await act(async () => resolveOld({ results: [CARD] }))
+    expect(screen.getByRole('status')).toHaveAttribute('aria-label', 'Loading…')
+    expect(screen.queryByTitle('Pricing card')).not.toBeInTheDocument()
+    await act(async () => resolveCurrent({ results: [{ ...CARD, id: 8, title: 'Portfolio block' }] }))
+    expect(screen.getByTitle('Portfolio block')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })
