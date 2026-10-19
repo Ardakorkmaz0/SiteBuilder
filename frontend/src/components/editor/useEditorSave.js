@@ -25,14 +25,14 @@ export function useEditorSave({ lifecycleRef, discardRef, conflict, sessionMessa
   const [saving, setSaving] = useState(false)
   const [autoSaveState, setAutoSaveState] = useState('idle')
   const [refused, setRefused] = useState(false)
-  // The error bar shows a refusal's reason until a save goes through.
-  const showingRefusalRef = useRef(false)
+  // The refusal reason the error bar shows until a save goes through, or ''.
+  const refusalRef = useRef('')
 
   async function save(nextPublished, { auto = false, versionSource, force = false } = {}) {
     if (!auto) {
       manualCountRef.current += 1
       setSaving(true)
-      showingRefusalRef.current = false
+      refusalRef.current = ''
       onError('')
     }
     try {
@@ -42,10 +42,13 @@ export function useEditorSave({ lifecycleRef, discardRef, conflict, sessionMessa
         if (auto && discardRef.current) return null
         return lifecycleRef.current.performSave(nextPublished, { auto, versionSource, force })
       })
-      if (saved && showingRefusalRef.current) {
-        showingRefusalRef.current = false
+      if (saved && refusalRef.current) {
+        const refusal = refusalRef.current
+        refusalRef.current = ''
         setRefused(false)
-        onError('')
+        // Only the refusal: the save that went through may have put up a
+        // newer message (the server took it, the linked local file did not).
+        onError((shown) => (shown === refusal ? '' : shown))
       }
       return saved
     } catch (e) {
@@ -58,8 +61,8 @@ export function useEditorSave({ lifecycleRef, discardRef, conflict, sessionMessa
       const status = e?.response?.status
       if (auto && !sessionMessageRef.current && status >= 400 && status < 500 && ![401, 408, 429].includes(status)) {
         setRefused(true)
-        showingRefusalRef.current = true
-        onError(apiError(e))
+        refusalRef.current = apiError(e)
+        onError(refusalRef.current)
         return null
       }
       if (!auto) onError(sessionMessageRef.current || apiError(e))

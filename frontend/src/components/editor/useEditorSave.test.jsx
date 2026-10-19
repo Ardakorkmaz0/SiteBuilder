@@ -14,9 +14,11 @@ function setup() {
   const discardRef = { current: false }
   const sessionMessageRef = { current: '' }
   const conflict = { refuse: vi.fn() }
-  const onError = vi.fn()
+  // The error bar, as the editor's setError keeps it: a value or an update.
+  const bar = { text: '' }
+  const onError = vi.fn((value) => { bar.text = typeof value === 'function' ? value(bar.text) : value })
   const view = renderHook(() => useEditorSave({ lifecycleRef, discardRef, conflict, sessionMessageRef, onError }))
-  return { ...view, lifecycleRef, discardRef, sessionMessageRef, conflict, onError }
+  return { ...view, lifecycleRef, discardRef, sessionMessageRef, conflict, onError, bar }
 }
 
 const failure = (status, data = {}) => Object.assign(new Error(`HTTP ${status}`), { response: { status, data } })
@@ -163,9 +165,34 @@ describe('a save that fails', () => {
       .mockRejectedValueOnce(failure(413, { detail: 'Too big to keep.' }))
       .mockResolvedValueOnce({ revision: 2 })
     await act(() => ctx.result.current.save(undefined, { auto: true }))
-    expect(ctx.onError).toHaveBeenLastCalledWith('Too big to keep.')
+    expect(ctx.bar.text).toBe('Too big to keep.')
     await act(() => ctx.result.current.save(undefined, { auto: true }))
-    expect(ctx.onError).toHaveBeenLastCalledWith('')
+    expect(ctx.bar.text).toBe('')
+    expect(ctx.result.current.refused).toBe(false)
+  })
+
+  it('takes off only the refusal: a message the successful save put up stays', async () => {
+    const ctx = setup()
+    const automatic = deferred()
+    const manual = deferred()
+    ctx.lifecycleRef.current.performSave = vi.fn()
+      .mockImplementationOnce(() => automatic.promise)
+      .mockImplementationOnce(async () => {
+        await manual.promise
+        // The editor's performSave: the server took it, the linked file did not.
+        ctx.onError('Saved to the server, but writing index.html failed: denied')
+        return { revision: 2 }
+      })
+    let a, b
+    act(() => { a = ctx.result.current.save(undefined, { auto: true }) })
+    await act(async () => { await Promise.resolve() })
+    // Save is pressed while the automatic save is still out; the server then
+    // refuses the automatic one, and takes the manual one.
+    act(() => { b = ctx.result.current.save() })
+    await act(async () => { automatic.reject(failure(413, { detail: 'Too big to keep.' })); await a })
+    expect(ctx.bar.text).toBe('Too big to keep.')
+    await act(async () => { manual.resolve(); await b })
+    expect(ctx.bar.text).toBe('Saved to the server, but writing index.html failed: denied')
     expect(ctx.result.current.refused).toBe(false)
   })
 
