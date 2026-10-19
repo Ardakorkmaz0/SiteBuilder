@@ -4,7 +4,7 @@ Başlangıç: temiz `master`, `git pull --ff-only` sonrası `2728f1f` (istenen `
 
 ## 1. Claude değişikliklerinin çapraz incelemesi
 
-İncelenen commitler: `c1d8859`, `6f717d1`, `c5f907b`, `66c9cbd`, `3c29b7e`. Tüm bozmalar `git archive HEAD` ile oluşturulmuş bağımsız `/tmp` kopyalarında yapıldı; asıl çalışma ağacı stash/revert edilmedi. **İnceleme konusu üretim kodu düzeltilmedi.**
+İncelenen commitler: `c1d8859`, `6f717d1`, `c5f907b`, `66c9cbd`, `3c29b7e`. Tüm bozmalar bağımsız `/tmp` kaynak kopyalarında yapıldı (çoğu `git archive HEAD`, Türkçe koruması ilgili iki dosyanın kopyası); asıl çalışma ağacı stash/revert edilmedi. **İnceleme konusu üretim kodu düzeltilmedi.**
 
 ### Açık bulgular
 
@@ -43,7 +43,7 @@ Gelen kutusu için 80 karakterlik alan adı (`dt`) ve 140 karakterlik boşluksuz
 | Reset tamamlandıktan veya yanıt gelmeden önce ayrılan kişi sonradan `/login`'e gönderiliyordu | 1800ms yönlendirmesi effect'e taşındı, unmount cleanup eklendi; geç yanıt yeni timer kuramıyor | Auth UI paketinde iki ayrılma vakası kırmızı |
 | Reset e-postası beklerken alan değiştirilince gönderilmeyen adres başarı mesajında görünüyordu | İstek sırasında gönderilen adres başarı durumuna kaydediliyor | Bekleyen istekte adres değiştirme vakası kırmızı; auth UI toplamı 3 kırmızı / 6 yeşil |
 | Toplulukta eski başarı/hata/finally yeni filtre sonucunu veya yükleniyor durumunu eziyordu | Etki cleanup'ı eski isteğin üç durum güncellemesini de geçersiz kılıyor | Üç yeni yarış vakası kırmızı |
-| Herkese açık profilde favori yazıları çakışıyor ve hata sessiz kalıyordu | Kart başına bekleme kilidi, yalnız sunucu onayından sonra yıldız/sayaç, görünür `apiError`, yeniden deneme ve profile bağlı geç yanıt | Sosyal UI son testleri eski iki üretim dosyasıyla 4 kırmızı / 20 yeşil |
+| Herkese açık profilde favori yazıları çakışıyor ve hata sessiz kalıyordu | Kart başına bekleme kilidi, yalnız sunucu onayından sonra yıldız/sayaç, görünür `apiError`, yeniden deneme ve profile bağlı geç yanıt | İlk 24 sosyal UI testi eski iki üretim dosyasıyla 4 kırmızı / 20 yeşil; ek profil-rota vakası bundan sonra eklendi |
 
 **48 yeni birim/API vakası:** backend 32, auth UI 9, sosyal UI 7. Sosyal UI'daki yedinci vaka bağımsız incelemenin önerdiği rota değişimi testidir: yeni profilin favori hatası görünürken eski profilin geç hatası onu silemez. Bu vaka güncel kodda yeşil, catch profil koruması kaldırılınca kırmızıdır.
 
@@ -76,6 +76,8 @@ Dört yeni Playwright senaryosu iki projede keşfediliyor: Chromium 102 + Firefo
 ## 4. Kontroller ve teslim
 
 Yerel tam kontroller geçti: **280 dosya / 2579 Vitest testi (87,42s), 849 pytest testi (150,85s), lint ve build**. Son eklenen profil-rota vakasıyla profil dosyası ayrıca 4/4 geçti. Build mevcut chunk boyutu uyarısı, pytest staticfiles uyarıları verdi; hata yok. Raporla aynı commit'in push sonrası GitHub Actions `tests` çalışması esas alınmalıdır; eski `1ada939` yeşili bu yeni değişiklikler için kanıt sayılmaz. CI sonucu görev tesliminde ayrıca kontrol edilir.
+
+Kod commit'i `4b1aa31` için başlatılan dört işin kalıcı kaydı: [tests / 39308236114](https://github.com/Ardakorkmaz0/SiteBuilder/actions/runs/39308236114). Bu bağlantı gerçek sonucu gösterir; test keşfi veya önceki commit'in yeşili yerine kullanılmalıdır. Sonraki rapor açıklaması commit'inde uygulama/test kodu değiştirilmedi; teslimde en son HEAD'in CI'ı da kontrol edilir.
 
 - `frontend`: lint, tam Vitest (`NODE_OPTIONS=--no-experimental-webstorage`, Node 26), build.
 - `backend`: tam pytest. Model değişikliği/migrasyon yok.
