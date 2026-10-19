@@ -46,6 +46,16 @@ export function isTextKind(kind) {
   return kind === 'html' || kind === 'css' || kind === 'js'
 }
 
+// A nested documentation page may sort before the site's actual entry point.
+// Use the same home file for the initial editor tab and project classification.
+export function projectHomeFile(files) {
+  const entries = [...files]
+  return entries.find((file) => /^index\.html?$/i.test(file.path)) ||
+    entries.find((file) => /(^|\/)index\.html?$/i.test(file.path)) ||
+    entries.find((file) => file.kind === 'html') ||
+    entries[0] || null
+}
+
 function skipDir(name) {
   // Explicit noise folders + every dotfolder (.git, .vscode, .next, .cache, …).
   return SKIP_DIRS.has(name) || String(name).startsWith('.')

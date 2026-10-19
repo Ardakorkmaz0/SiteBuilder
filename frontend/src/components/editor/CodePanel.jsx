@@ -10,6 +10,7 @@ import {
 import { useEditorStore } from '../../store/editorStore.js'
 import { minifyGeneratedHtml } from '../../utils/exportFiles.js'
 import { schemaToFiles } from '../../utils/schemaToFiles.js'
+import { projectSnapshot } from '../../utils/projectSnapshot.js'
 import { componentHtmlFiles, componentPageDocument, componentSourceHtml } from '../../utils/componentSourceDrafts.js'
 import { pageToResponsiveHtml } from '../../utils/pageCode.js'
 import { revealLine } from '../../utils/revealCodeLine.js'
@@ -100,7 +101,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
   const generatedFiles = useMemo(() => {
     const htmlFiles = componentHtmlFiles(schema, htmlMap, rawGeneratedFiles)
     let pageIndex = 0
-    return rawGeneratedFiles.map((item) => {
+    const output = rawGeneratedFiles.map((item) => {
       if (item.lang === 'html') {
         const generated = htmlFiles[pageIndex++]
         const hasDraft = Object.prototype.hasOwnProperty.call(htmlDrafts, item.name)
@@ -129,6 +130,20 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
       }
       return item
     })
+    const documents = { ...htmlMap }
+    for (const file of output) {
+      if (file.lang !== 'html') continue
+      const page = schema.pages.find((entry) => entry.id === file.pageId)
+      if (file.ownDocument || (page?.mode === 'html' && file.content !== file.generatedContent)) {
+        documents[file.pageId] = file.content
+      }
+    }
+    // The portable backup must hold the same live documents as the HTML
+    // files. Canvas pages keep their components, without generated HTML.
+    const snapshot = projectSnapshot(schema, documents).schema
+    return output.map((item) => item.name === 'schema.json'
+      ? { ...item, content: JSON.stringify(snapshot, null, 2) }
+      : item)
   }, [htmlDrafts, htmlMap, rawGeneratedFiles, schema])
   const setHtmlDrafts = useCallback((update) => {
     const next = typeof update === 'function' ? update(htmlDrafts) : update
@@ -302,10 +317,11 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
   function downloadCleanProject() {
     setExportMenuOpen(false)
     const htmlByName = new Map(htmlFiles.map((item) => [item.name, item.content]))
+    const backup = generatedFiles.find((item) => item.name === 'schema.json')
     const output = rawGeneratedFiles.map((item) => (
       item.lang === 'html' && htmlByName.has(item.name)
         ? { ...item, content: htmlByName.get(item.name) }
-        : item
+        : item.name === 'schema.json' ? backup : item
     ))
     saveAs(`${base}-project.zip`, zipFiles(output))
   }

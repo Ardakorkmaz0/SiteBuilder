@@ -300,3 +300,136 @@ describe('matchingCssRules', () => {
     expect(out).toEqual([])
   })
 })
+
+
+describe('portable local reference semantics', () => {
+  it.each(['import', 'preview'])('preserves SVG fragments when %s converts local assets to data URLs', async (mode) => {
+    const html = '<style>.logo{mask-image:url("sprite.svg?v=2#logo")}</style>' +
+      '<img src="sprite.svg#logo"><source srcset="sprite.svg#logo 1x, sprite.svg#detail 2x">' +
+      '<svg><use href="sprite.svg#logo"></use></svg>'
+    const svg = sourceFile('sprite.svg', 'svg', 'image/svg+xml')
+    const out = mode === 'import'
+      ? await htmlFilesToDocument([sourceFile('index.html', html), svg])
+      : await assemblePreviewHtml(html, 'index.html', new Map([
+        ['sprite.svg', { path: 'sprite.svg', kind: 'asset', handle: { getFile: async () => svg } }],
+      ]))
+    const doc = parseHtml(out)
+    expect(doc.querySelector('img').getAttribute('src')).toBe('data:image/svg+xml;base64,c3Zn#logo')
+    expect(doc.querySelector('use').getAttribute('href')).toBe('data:image/svg+xml;base64,c3Zn#logo')
+    expect(doc.querySelector('source').getAttribute('srcset')).toBe('data:image/svg+xml;base64,c3Zn#logo 1x, data:image/svg+xml;base64,c3Zn#detail 2x')
+    expect(doc.querySelector('style').textContent).toBe('.logo{mask-image:url("data:image/svg+xml;base64,c3Zn#logo")}')
+  })
+
+  it.each(['../assets/', '/assets/'])('resolves an imported document base %s from the selected folder root', async (base) => {
+    const html = `<base href="${base}"><link rel="stylesheet" href="css/theme.css"><script src="app.js"></script>` +
+      '<style>.inline{background:url(logo.png)}</style><img src="logo.png">'
+    const out = await htmlFilesToDocument([
+      sourceFile('site/pages/index.html', html),
+      sourceFile('site/assets/css/theme.css', '.linked{background:url(../logo.png)}'),
+      sourceFile('site/assets/app.js', 'window.fromBase = true'),
+      sourceFile('site/assets/logo.png', 'right'),
+      sourceFile('site/pages/css/theme.css', '.wrong{color:red}'),
+      sourceFile('site/pages/app.js', 'window.fromBase = false'),
+      sourceFile('site/pages/logo.png', 'wrong'),
+    ])
+    const doc = parseHtml(out)
+    expect(doc.querySelector('base').getAttribute('href')).toBe(base)
+    expect(doc.querySelector('img').getAttribute('src')).toBe('data:image/png;base64,cmlnaHQ=')
+    expect(doc.querySelector('script').textContent).toBe('window.fromBase = true')
+    expect([...doc.querySelectorAll('style')].map((style) => style.textContent)).toEqual([
+      '.linked{background:url("data:image/png;base64,cmlnaHQ=")}',
+      '.inline{background:url("data:image/png;base64,cmlnaHQ=")}',
+    ])
+  })
+
+  it.each([false, true])('honors the document base in a code preview (forEdit=%s) without changing its source references', async (forEdit) => {
+    const html = '<base href="../assets/"><link rel="stylesheet" href="css/theme.css">' +
+      '<script type="module" src="app.js"></script><img src="logo.png">'
+    const files = new Map([
+      ['assets/css/theme.css', { path: 'assets/css/theme.css', kind: 'css', content: '.linked{background:url(../logo.png)}' }],
+      ['assets/app.js', { path: 'assets/app.js', kind: 'js', content: 'window.fromBase = true' }],
+      ['assets/logo.png', assetEntry('assets/logo.png', 'right')],
+      ['pages/css/theme.css', { path: 'pages/css/theme.css', kind: 'css', content: '.wrong{color:red}' }],
+      ['pages/logo.png', assetEntry('pages/logo.png', 'wrong')],
+    ])
+    const doc = parseHtml(await assemblePreviewHtml(html, 'pages/index.html', files, { forEdit }))
+    expect(doc.querySelector('base').getAttribute('href')).toBe('../assets/')
+    expect(doc.querySelector('style').textContent).toBe('.linked{background:url("data:image/png;base64,cmlnaHQ=")}')
+    expect(linkedFilesFor('pages/index.html', html, files)).toEqual(['assets/css/theme.css', 'assets/app.js'])
+    expect(needsBuildToRender(html, 'pages/index.html', files)).toBe('')
+    if (forEdit) {
+      const saved = parseHtml(serializeDocument(doc))
+      expect(saved.querySelector('base').getAttribute('href')).toBe('../assets/')
+      expect(saved.querySelector('link').getAttribute('href')).toBe('css/theme.css')
+      expect(saved.querySelector('script').getAttribute('src')).toBe('app.js')
+      expect(saved.querySelector('img').getAttribute('src')).toBe('logo.png')
+      expect(saved.querySelector('style')).toBeNull()
+    } else {
+      expect(doc.querySelector('script').textContent).toBe('window.fromBase = true')
+      expect(doc.querySelector('img').getAttribute('src')).toBe('data:image/png;base64,cmlnaHQ=')
+    }
+  })
+
+  it.each(['https://cdn.example/assets/', '//cdn.example/assets/', 'file:///assets/'])('never substitutes local files for references under a non-project base %s', async (base) => {
+    const html = `<base href="${base}"><link rel="stylesheet" href="theme.css">` +
+      '<script type="module" src="app.js"></script><style>.inline{background:url(/logo.png)}</style><img src="/logo.png">'
+    const files = new Map([
+      ['theme.css', { path: 'theme.css', kind: 'css', content: '.wrong{color:red}' }],
+      ['app.js', { path: 'app.js', kind: 'js', content: 'window.wrong = true' }],
+      ['logo.png', assetEntry('logo.png', 'wrong')],
+    ])
+    const imported = await htmlFilesToDocument([
+      sourceFile('index.html', html), sourceFile('theme.css', '.wrong{color:red}'),
+      sourceFile('app.js', 'window.wrong = true'), sourceFile('logo.png', 'wrong'),
+    ])
+    const preview = await assemblePreviewHtml(html, 'index.html', files)
+    for (const output of [imported, preview]) {
+      const doc = parseHtml(output)
+      expect(doc.querySelector('base').getAttribute('href')).toBe(base)
+      expect(doc.querySelector('link').getAttribute('href')).toBe('theme.css')
+      expect(doc.querySelector('script').getAttribute('src')).toBe('app.js')
+      expect(doc.querySelector('img').getAttribute('src')).toBe('/logo.png')
+      expect(doc.querySelector('style').textContent).toBe('.inline{background:url(/logo.png)}')
+    }
+    expect(linkedFilesFor('index.html', html, files)).toEqual([])
+    expect(needsBuildToRender(html, 'index.html', files)).toBe('')
+  })
+})
+
+
+describe('editable HTML reference preservation', () => {
+  it.each(['style element', 'style attribute'])('keeps authored asset URLs in a saved %s', async (where) => {
+    const html = where === 'style element'
+      ? '<base href="../assets/"><style>.hero{background:url("logo.png")}</style>'
+      : '<base href="../assets/"><div style="background:url(logo.png)">Hero</div>'
+    const files = new Map([['assets/logo.png', assetEntry('assets/logo.png', 'right')]])
+    const edit = parseHtml(await assemblePreviewHtml(html, 'pages/index.html', files, { forEdit: true }))
+    const saved = parseHtml(serializeDocument(edit))
+    const viewed = parseHtml(await assemblePreviewHtml(html, 'pages/index.html', files))
+    expect(saved.querySelector('base').getAttribute('href')).toBe('../assets/')
+    if (where === 'style element') {
+      expect(saved.querySelector('style').textContent).toBe('.hero{background:url("logo.png")}')
+      expect(viewed.querySelector('style').textContent).toBe('.hero{background:url("data:image/png;base64,cmlnaHQ=")}')
+    } else {
+      expect(saved.querySelector('div').getAttribute('style')).toBe('background:url(logo.png)')
+      expect(viewed.querySelector('div').getAttribute('style')).toBe('background:url("data:image/png;base64,cmlnaHQ=")')
+    }
+  })
+
+  it.each(['pages#draft', 'pages?draft'])('treats %s as a literal local directory when resolving base href', async (folder) => {
+    const html = '<base href="./"><link rel="stylesheet" href="theme.css">'
+    const files = new Map([
+      [`${folder}/theme.css`, { path: `${folder}/theme.css`, kind: 'css', content: 'body{color:green}' }],
+      ['theme.css', { path: 'theme.css', kind: 'css', content: 'body{color:red}' }],
+    ])
+    const preview = parseHtml(await assemblePreviewHtml(html, `${folder}/index.html`, files))
+    const imported = parseHtml(await htmlFilesToDocument([
+      sourceFile(`${folder}/index.html`, html),
+      sourceFile(`${folder}/theme.css`, 'body{color:green}'),
+      sourceFile('theme.css', 'body{color:red}'),
+    ]))
+    expect(preview.querySelector('style').textContent).toBe('body{color:green}')
+    expect(imported.querySelector('style').textContent).toBe('body{color:green}')
+    expect(linkedFilesFor(`${folder}/index.html`, html, files)).toEqual([`${folder}/theme.css`])
+  })
+})
