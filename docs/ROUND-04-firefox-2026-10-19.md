@@ -105,7 +105,8 @@ bırakılırsa clamp, dışarıda bırakılırsa sayfaya reparent. Yeni test DOM
 tek kopya, literal `(580,360,180,60)`, ebeveynin sabit kalması ve tek undo/redo'yu
 denetliyor. Son Chromium koşusu
 [39263473935](https://github.com/Ardakorkmaz0/SiteBuilder/actions/runs/39263473935)
-yeşil; aynı spec Firefox turunda da çalışacak.
+yeşil. Firefox turunda içeride bırakma geçti; dışarı bırakma testi aşağıdaki
+giriş koordinatı düzeltmesinden sonra iki yakınlaştırmada da geçti.
 
 Store/export ve React probe'ları iç içe kaplar, dört düzey sınırı, iki **ayrı**
 tabs bileşeni arasında doğru aktif panel, fixed/navbar/çoklu seçim ve ölçek
@@ -128,15 +129,15 @@ hata raporlarının adları tarayıcıya göre ayrılır. Chromium override ayar
 Temel alınan resmi [Playwright projects](https://playwright.dev/docs/test-projects)
 ve [CI](https://playwright.dev/docs/ci) belgeleri. Yerelde tarayıcı kurma/çalıştırma
 yapılmadı; `npm run e2e -- --list` ile keşif kontrol edildi. Gerçek Firefox sonuçları
-push sonrası bu bölüme eklenecek.
+ve test düzeltmeleri aşağıda.
 
 ### Süre tabanı
 
 `f299b3d` başarılı koşusu `39263473935`: E2E işi **605 sn (10:05)**;
 tarayıcı kurulumu 22 sn, test adımı **558 sn (9:18)**. Tam workflow oluşturma→son
 güncelleme **615 sn (10:15)**. Bu tek koşu karşılaştırmasıdır; runner yükü ve
-indirme süreleri değişebilir. Yeni matriste hem kritik yol (bekleme) hem iki E2E
-işinin toplamı (runner kullanımı) ayrı ölçülecek.
+indirme süreleri değişebilir. Yeni matriste kritik yol (bekleme) ve iki E2E
+işinin toplamı aşağıda ayrı veriliyor.
 
 ## 3. Yerel doğrulama
 
@@ -172,7 +173,7 @@ hata, 1 retry'da geçen kararsız test ve 96 doğrudan geçen test bildirdi (set
   için literal nesnenin tamamını doğruluyor. Ek sabit bekleme eklenmedi.
 
 Keşif artık her tarayıcıda **98 vaka + 1 API setup**. Tüm paket tekrar CI'da
-çalıştırılacak. Bu iki değişiklik test düzeltmesidir; bölüm 1'deki Claude üretim
+çalıştırıldı. Bu iki değişiklik test düzeltmesidir; bölüm 1'deki Claude üretim
 kodu bulgularına düzeltme uygulanmadı.
 
 İlk (başarısız) denemenin ölçümü: Chromium işi 562 sn, Firefox 740 sn;
@@ -180,4 +181,35 @@ E2E işlerinin toplamı 1302 sn (önce 605 sn). Workflow 744 sn (12:24), taban
 615 sn (10:15): **+129 sn, yaklaşık %21**. Bu Firefox tekrarlarını içerir;
 temiz koşunun süresi aşağıda ayrıca raporlanmalı.
 
-Firefox düzeltmelerinin CI doğrulaması devam ediyor; tur henüz bitmiş sayılmıyor.
+### Başarılı tekrar koşusu ve süre farkı
+
+[`1592fa1`, koşu 39293992345](https://github.com/Ardakorkmaz0/SiteBuilder/actions/runs/39293992345)
+tamamlandı: **success**. Chromium **99 geçti**, Firefox **99 geçti** (her birinde
+98 tarayıcı vakası + 1 API setup). İki işin günlüklerinde retry/kararsız test
+kalmadı. Frontend ve backend de yeşil. Bu koşu uygulama hatası göstermedi;
+bulunan iki Firefox kırılması test varsayımı/zamanlamasıydı.
+
+| Ölçüm | Önce: f299b3d | Sonra: 1592fa1 | Fark |
+| --- | ---: | ---: | ---: |
+| Chromium E2E işi | 10:05 | 10:14 | +0:09 |
+| Chromium test adımı | 9:18 | 9:20 | +0:02 |
+| Firefox E2E işi | — | 11:52 | Yeni |
+| Firefox test adımı | — | 11:03 | Yeni |
+| Workflow oluşturma → bitiş | 10:15 | **11:57** | **+1:42, yaklaşık %16,6** |
+| İki E2E işinin süreleri toplamı | 10:05 | **22:06** | **+12:01, yaklaşık %119** |
+| Tüm iş sürelerinin toplamı | 18:19 | 31:38 | +13:19, yaklaşık %73 |
+
+Tarayıcı kurulum adımı Chromium'da 22 sn (önce de 22), Firefox'ta 23 sn sürdü.
+Matris sayesinde tarayıcı süreleri kullanıcı beklemesinde toplanmıyor; çalıştırılan
+iş süresi ise büyüyor. Bu tek başarılı koşu çifti; runner yükü ve ağ farkı içerir,
+sabit süre garantisi değildir. Tam paket korunuyor; Firefox alt kümeye indirilmedi.
+
+Son test düzeltmelerinden sonra lint, Playwright keşfi (197 vaka: ortak setup +
+98 Chromium + 98 Firefox) ve `git diff --check` geçti. Yerel Vitest/backend/build
+sonuçları yukarıda; sonraki değişiklikler yalnız E2E testleri ve rapordu. Aynı
+üretim kaynakları CI'da yeniden lint/Vitest/build/pytest/migration kontrollerinden geçti.
+
+**Tur 4 tamamlandı.** Claude Tur 5'e başlamadan bu rapordaki yedi bulguyu ve sınır
+test açığını değerlendirmeli; değerlendirme olmadan üretim düzeltmesi varsayılmamalı.
+Firefox test değişikliklerini de çapraz incelemeli. Kayıt yarışı ve taşıma köşesi
+için uygulanabilir test kanıtları depoda, üretim düzeltmeleri yapılmadı.
