@@ -144,7 +144,9 @@ test('cut and paste between pages keep anchors, nested content and both narrower
   } finally { await api(request, 'DELETE', `/sites/${siteId}/`) }
 })
 
-test('a nested child stays inside its parent after a pointer move beyond the parent bounds and one undo', async ({ page, request }) => {
+// A child pushed against its parent's edge, and let go inside the parent,
+// stays in it, held at the edge.
+test('a nested child pushed past its parent edge but let go inside stays inside, held at the edge', async ({ page, request }) => {
   const { siteId } = await createFixture(request)
   try {
     await edit(page, siteId)
@@ -154,9 +156,11 @@ test('a nested child stays inside its parent after a pointer move beyond the par
     const canvasScale = await page.locator('#free-canvas').evaluate((element) => element.getBoundingClientRect().width / 1000)
     const innerScale = Number(await page.locator('[data-builder-droppable-id="container"]').getAttribute('data-builder-fit-scale'))
     const rect = await block(page, 'inner').boundingBox()
+    // From the child's middle (130, 80 in the 620 x 300 container) to
+    // (550, 275): still inside the container, past where the child fits.
     await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2)
     await page.mouse.down()
-    await page.mouse.move(rect.x + rect.width / 2 + 500 * canvasScale * innerScale, rect.y + rect.height / 2 + 250 * canvasScale * innerScale, { steps: 8 })
+    await page.mouse.move(rect.x + rect.width / 2 + 420 * canvasScale * innerScale, rect.y + rect.height / 2 + 195 * canvasScale * innerScale, { steps: 8 })
     await page.mouse.up()
     await expect.poll(() => box(page, 'inner')).toEqual({ ...original, x: 440, y: 240 })
     await expect.poll(() => box(page, 'container')).toEqual(parent)
@@ -165,6 +169,36 @@ test('a nested child stays inside its parent after a pointer move beyond the par
     await expect.poll(() => box(page, 'inner')).toEqual(original)
     await page.keyboard.press('Control+y')
     await expect.poll(() => box(page, 'inner')).toEqual({ ...original, x: 440, y: 240 })
+  } finally { await api(request, 'DELETE', `/sites/${siteId}/`) }
+})
+
+// Let go outside its parent, a child moves out onto the page where it was
+// let go; one undo puts it back.
+test('a nested child let go outside its parent moves onto the page, and one undo puts it back', async ({ page, request }) => {
+  const { siteId } = await createFixture(request)
+  try {
+    await edit(page, siteId)
+    await pick(page, 'inner')
+    const original = await box(page, 'inner')
+    const parent = await box(page, 'container')
+    const canvasScale = await page.locator('#free-canvas').evaluate((element) => element.getBoundingClientRect().width / 1000)
+    const innerScale = Number(await page.locator('[data-builder-droppable-id="container"]').getAttribute('data-builder-fit-scale'))
+    const rect = await block(page, 'inner').boundingBox()
+    // Held by its middle and let go at (630, 330) in the container, which
+    // sits at (40, 60) on the page: its top-left lands at (580, 360).
+    await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(rect.x + rect.width / 2 + 500 * canvasScale * innerScale, rect.y + rect.height / 2 + 250 * canvasScale * innerScale, { steps: 8 })
+    await page.mouse.up()
+    await expect(block(page, 'container').locator('[data-cid="inner"]')).toHaveCount(0)
+    await expect(block(page, 'inner')).toHaveCount(1)
+    await expect.poll(() => box(page, 'inner')).toEqual({ x: 580, y: 360, w: 180, h: 60 })
+    await expect.poll(() => box(page, 'container')).toEqual(parent)
+    await page.keyboard.press('Control+z')
+    await expect(block(page, 'container').locator('[data-cid="inner"]')).toHaveCount(1)
+    await expect.poll(() => box(page, 'inner')).toEqual(original)
+    await page.keyboard.press('Control+y')
+    await expect(block(page, 'container').locator('[data-cid="inner"]')).toHaveCount(0)
   } finally { await api(request, 'DELETE', `/sites/${siteId}/`) }
 })
 
