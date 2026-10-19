@@ -858,14 +858,6 @@ function SiteEditor() {
     if (link.href !== themeFontHref) link.href = themeFontHref
   }, [themeFontHref])
 
-  // Enable folder selection on the folder input (non-standard attribute).
-  useEffect(() => {
-    if (folderInputRef.current) {
-      folderInputRef.current.webkitdirectory = true
-      folderInputRef.current.directory = true
-    }
-  }, [])
-
   // Keep the global Ctrl+Z listener pointed at the right history (html
   // snapshot stacks vs canvas store) without re-binding it every render.
   useEffect(() => {
@@ -2607,6 +2599,8 @@ function SiteEditor() {
         ref={folderInputRef}
         type="file"
         multiple
+        webkitdirectory=""
+        directory=""
         onChange={(event) => {
           importFiles(event.target.files)
           event.target.value = ''

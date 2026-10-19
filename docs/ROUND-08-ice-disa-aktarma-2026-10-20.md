@@ -21,7 +21,7 @@ Başlangıç: temiz `master`, `git pull --ff-only` sonrası `5a10346`. Tur 7 rap
 
 Kanıt yamaları `docs/review-evidence/round-08/` içindedir. Bilinen kırmızıları ana CI'a uygulamadık. Bunlar jsdom/dönüşüm testleridir; tarayıcı gezinmesi, yerleşim veya ekran okuyucu onayı olarak sunulmaz.
 
-## 2. Tur 8'de bulunan ve düzeltilen sekiz hata
+## 2. Tur 8'de bulunan ve düzeltilen dokuz hata
 
 | Hata | Son davranış ve kırmızı kanıt |
 | --- | --- |
@@ -33,12 +33,13 @@ Kanıt yamaları `docs/review-evidence/round-08/` içindedir. Bilinen kırmızı
 | Eski proje sarmalayıcısındaki `site.html` kayboluyordu | importSchema legacy belgeyi home haritasına taşır; eski biçimde mode yoksa HTML editörü açılır, saklanan canvas tasarımı korunur. Sayfanın kendi HTML'si önceliklidir. İlk belge kaybı ve bağımsız incelemede bulunan mode'suz gösterim ayrı kırmızı kanıtlarla doğrulandı; aynı eski yedek uyumluluğu hatası olarak sayıldı. |
 | JSON import bağlı sayfayı kaldırınca eski dosyaya yeni Home yazılıyordu | Açık bağlı id hâlâ var olan HTML sayfasına ait olmalıdır; başka sayfa/komponent tasarımı eski dosyayı ezmez. Kimliksiz eski handle home'a bağlı kalır. Gerçek EditorPage/import/Ctrl+S testi eski kaynakta kırmızı. |
 | Bilerek boşaltılan bağlı HTML diske yazılmıyordu | Boş string geçerli yazıdır; yalnız olmayan hedef `undefined` ile ayrılır. Otomatik kayıt disk yazmaz. Gerçek kaynak alanını boşaltıp Ctrl+S testi eski kaynakta kırmızı. |
+| Proje klasörü girdisi klasör seçimine geçemiyordu | İlk render yükleniyor ekranıdır; bir kez çalışan efekt o anda bulunmayan file input'a `webkitdirectory` atayamıyordu. Alan hazır olduğunda normal dosya seçicisi kalıyordu. Klasör nitelikleri doğrudan JSX'e taşındı; her mount'ta doğru DOM oluşur. Yeni gerçek E2E, düzeltmeden önce tarayıcının directory yüklemeyi reddetmesiyle kırmızıydı. |
 
 Backend/API/model değişikliği veya yeni kullanıcı metni yok. Yeni ZIP importer, module bundler veya ertelenmiş yayın özelliği eklenmedi.
 
 ### Bağımsız incelemenin geliştirme sırasında yakaladıkları
 
-HTML base düzeltmesinin ilk sürümü `pages#draft/` ve `pages?draft/` klasörlerini URL'ye encode etmeden veriyordu; kökteki yanlış CSS'yi seçti. Bu **bizim yeni eklediğimiz regresyondu**, eski HEAD'de yoktu; sekiz eski hataya eklenmedi. Yazar iddiayı kendi iki kırmızı vakasıyla doğrulayıp segment kodlamasını düzeltti. Aynı inceleme önceden var olan Edit inline CSS kaynak değişimini de buldu; yukarıdaki sekizin içine alındı. Son HTML test dosyası 41/41 yeşil, bağımsız ilave prob/normal base denemeleriyle 47/47 yeşil; son üç bozma da yakalandı.
+HTML base düzeltmesinin ilk sürümü `pages#draft/` ve `pages?draft/` klasörlerini URL'ye encode etmeden veriyordu; kökteki yanlış CSS'yi seçti. Bu **bizim yeni eklediğimiz regresyondu**, eski HEAD'de yoktu; eski hata sayısına eklenmedi. Yazar iddiayı kendi iki kırmızı vakasıyla doğrulayıp segment kodlamasını düzeltti. Aynı inceleme önceden var olan Edit inline CSS kaynak değişimini de buldu; yukarıdaki dokuzun içine alındı. Son HTML test dosyası 41/41 yeşil, bağımsız ilave prob/normal base denemeleriyle 47/47 yeşil; son üç bozma da yakalandı.
 
 CodePanel değişikliği dört bağımsız bozmanın dördünü; yerel klasör değişikliği beş bozmanın beşini yakaladı. Eski kaynak ve yeni testler geçici arşivde tekrar koşturuldu; ana kaynak stash/revert edilmedi. Legacy mode eksikliği de yazarın ilk düzeltmesinden sonra bağımsız kontrolle bulunup kendi kırmızı kanıtıyla tamamlandı. Bu alt incelemeler **Claude'un bir sonraki tur çapraz incelemesinin yerine geçmez**.
 
@@ -62,10 +63,12 @@ Yeni testler istek intercept etmez. Her test kendi hesabı/sitesiyle çalışır
 
 - İlk kapsam taraması: 9 ilgili dosya / 100 test yeşil.
 - Tam backend: **849 test yeşil, 141,53 saniye**; mevcut 634 staticfiles uyarısı, hata yok.
-- Tam frontend: **285 dosya / 2623 test yeşil, 87,30 saniye** (`NODE_OPTIONS=--no-experimental-webstorage`, 4 worker).
+- Tam frontend: **285 dosya / 2623 test yeşil, 81,70 saniye** (`NODE_OPTIONS=--no-experimental-webstorage`, 4 worker; klasör seçimi düzeltmesinden sonra yeniden çalıştırıldı).
 - ESLint, build ve `git diff --check` geçti. Build mevcut 500 kB chunk uyarısını verdi; hata yok. Backend modeli/migrasyonu değişmedi.
 - Playwright keşfi: **211 vaka / 24 dosya** (105 Chromium + 105 Firefox + ortak setup). CI'da her job kendi setup'ını çalıştırır.
 - Commit/push sonrasında en son HEAD'in `tests` CI kaydı okunmadan iş tamamlanmış sayılmaz. Önceki `5a10346` yeşili yeni değişikliklerin kanıtı değildir. CI linki ve sonucu görev tesliminde belirtilir.
+
+İlk kod commit'i `d0dab99` için [CI / 39342537474](https://github.com/Ardakorkmaz0/SiteBuilder/actions/runs/39342537474) frontend/backend işleri yeşil. Chromium ve Firefox'un her birinde 105 passed / 1 failed: klasör E2E'si `File input does not support directories` ile iki denemede de kırıldı; ZIP yeniden içe aktarma ve hatalı JSON/HTML indirme senaryoları geçti. Kaynak incelemesi, loading sırasında input yokken çalışan tek seferlik efektin klasör niteliğini hiç kurmadığını doğruladı. Bu test hatası olarak gizlenmedi; mevcut uygulamanın dokuzuncu hatası olarak düzeltildi. Üç E2E sayısı değişmedi; aynı kırmızı vaka düzeltmenin regresyon testidir. Bağımsız kaynak kontrolü, klasör niteliklerinin yalnız klasör input'unda her mount'ta oluştuğunu doğruladı; lint, derleme ve tam frontend takımı yeniden yeşil. Nihai teslimde bu düzeltmeyi içeren son HEAD'in tam CI sonucu esas alınır.
 
 ## 5. Sınırlar ve Claude'a devir
 
