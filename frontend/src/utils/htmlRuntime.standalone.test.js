@@ -254,3 +254,51 @@ describe('a form in an HTML block', () => {
     expect(block.postMessage).toHaveBeenCalledWith({ type: 'pwb-form-result', ok: true }, '*')
   })
 })
+
+// A link in an HTML block cannot take the visitor anywhere: the block is a
+// sandboxed frame. It asks the page around it, which used to ignore the
+// request, so a block's link to another page of a published site did nothing.
+describe('a link in an HTML block', () => {
+  const post = (win, source, data) => win.dispatchEvent(new win.MessageEvent('message', { source, data }))
+  // The links the page followed, and whether the runtime let each one go.
+  function followed(doc) {
+    const links = []
+    doc.addEventListener('click', (event) => {
+      const link = event.target.closest?.('a')
+      if (link) links.push([link.getAttribute('href'), event.defaultPrevented])
+      event.preventDefault()
+    })
+    return links
+  }
+
+  it('to a page of the site is followed by the published page, from its own blocks only', () => {
+    const { win, doc } = page('<iframe srcdoc="<p>block</p>"></iframe><iframe src="https://video.example/embed"></iframe>')
+    const [block, foreign] = [...doc.querySelectorAll('iframe')].map((frame) => frame.contentWindow)
+    const links = followed(doc)
+    post(win, foreign, { type: 'pwb-navigate', href: '/s/demo/about-us/' })
+    post(win, block, { type: 'pwb-navigate', href: '//elsewhere.example/' })
+    post(win, block, { type: 'pwb-navigate', href: 'javascript:alert(1)' })
+    post(win, block, { type: 'pwb-navigate', href: '/s/demo/about-us/' })
+    expect(links).toEqual([['/s/demo/about-us/', false]])
+  })
+
+  it('to a part of the page scrolls the page there', () => {
+    const { win, doc } = page('<section id="contact"></section><iframe srcdoc="<p>block</p>"></iframe>')
+    const section = doc.getElementById('contact')
+    section.scrollIntoView = vi.fn()
+    post(win, doc.querySelector('iframe').contentWindow, { type: 'pwb-navigate', hash: '#contact' })
+    expect(section.scrollIntoView).toHaveBeenCalledTimes(1)
+  })
+
+  it('is passed up by a page shown inside the viewer, where a page link switches the page', () => {
+    const { win, doc, parent } = page('<iframe srcdoc="<p>block</p>"></iframe>', { preview: true })
+    post(win, doc.querySelector('iframe').contentWindow, { type: 'pwb-navigate', hash: '#page_about' })
+    expect(parent.postMessage).toHaveBeenCalledWith({ type: 'pwb-navigate', hash: '#page_about' }, '*')
+  })
+
+  it('in the block itself asks the page around it to go to a path of the site', () => {
+    const { win, doc, parent } = page('<a href="/s/demo/about-us/">About</a>', { preview: true })
+    expect(clickWasPrevented(win, doc.querySelector('a'))).toBe(true)
+    expect(parent.postMessage).toHaveBeenCalledWith({ type: 'pwb-navigate', href: '/s/demo/about-us/' }, '*')
+  })
+})

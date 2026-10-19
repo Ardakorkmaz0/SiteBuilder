@@ -130,6 +130,33 @@ describe('publishedPagesFor', () => {
     expect(home.html).toContain('https://x.dev')
   })
 
+  // A text band's button and a link in an HTML block are page links too (the
+  // link control offers pages for both, and pageLinks.js counts them), but
+  // only fields named `href` were retargeted: on the served site they went
+  // nowhere.
+  it('points a text band button and the links in an HTML block at the other pages', () => {
+    const site = {
+      theme: {},
+      pages: [
+        {
+          id: 'home', name: 'Home',
+          components: [
+            { id: 'band', type: 'section', props: { heading: 'Hi', buttonText: 'About', buttonHref: '#about' }, layout: { x: 0, y: 0, w: 1000, h: 280 } },
+            { id: 'block', type: 'html', props: { code: '<a href="#about">About</a> <a href="#top">Top</a>' }, layout: { x: 0, y: 300, w: 400, h: 100 } },
+          ],
+        },
+        { id: 'about', name: 'About us', components: [] },
+      ],
+    }
+
+    const [home] = publishedPagesFor(site, {}, 'Ada', 'ada-site')
+
+    expect(home.html).not.toContain('#about')
+    // The band's button, and the block's link inside its srcdoc.
+    expect(home.html.match(/\/s\/ada-site\/about-us\//g)).toHaveLength(2)
+    expect(home.html).toContain('href=&quot;#top&quot;')
+  })
+
   // An HTML page is published as its own file, and "Go to page" (or the link
   // tool) writes #<pageId> into it. Only the canvas schema was retargeted, so
   // on the served site those links went nowhere.

@@ -61,6 +61,9 @@ const INTERACTIVE_SCRIPT = `
     function standalone() {
       return window.parent === window && location.protocol !== 'about:';
     }
+    function sitePath(value) {
+      return typeof value === 'string' && /^\\/(?!\\/)/.test(value);
+    }
     function safeDestination(value) {
       try {
         var url = new URL(value, location.href);
@@ -249,6 +252,11 @@ const INTERACTIVE_SCRIPT = `
       // base. Unsafe URL schemes never become a navigation escape hatch.
       if (standalone() && safeDestination(href)) return;
       event.preventDefault();
+      // A path of the site, from an HTML block (a published page's link to
+      // another page): the block cannot leave its frame, the page around it can.
+      if (!standalone() && sitePath(href)) {
+        try { parent.postMessage({ type: 'pwb-navigate', href: href }, '*'); } catch (e) {}
+      }
     }
     // Forms inside a sandboxed iframe (allow-scripts WITHOUT allow-same-origin)
     // try to navigate to their action URL on submit. Empty / hash / relative
@@ -326,6 +334,35 @@ const INTERACTIVE_SCRIPT = `
         if (frames[i].contentWindow === source) return true;
       }
       return false;
+    }
+    // A link in one of this page's HTML blocks, which cannot take the visitor
+    // anywhere itself. The published page follows it as a link of its own (so
+    // the palette goes along) or scrolls to the part of the page it names; a
+    // page shown in the viewer passes it up, where a #pageId switches pages.
+    function followBlockLink(event) {
+      var data = event.data;
+      if (!data || data.type !== 'pwb-navigate' || !ownBlock(event.source)) return;
+      if (!standalone()) {
+        var up = { type: 'pwb-navigate' };
+        if (typeof data.hash === 'string') up.hash = data.hash;
+        if (typeof data.href === 'string') up.href = data.href;
+        try { parent.postMessage(up, '*'); } catch (e) {}
+        return;
+      }
+      if (sitePath(data.href)) {
+        var link = document.createElement('a');
+        link.setAttribute('href', data.href);
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        return;
+      }
+      if (typeof data.hash !== 'string' || data.hash.charAt(0) !== '#') return;
+      var id;
+      try { id = decodeURIComponent(data.hash.slice(1)); } catch (e) { return; }
+      var target = id && document.getElementById(id);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     function answerBlock(block, ok) {
       try { block.postMessage({ type: 'pwb-form-result', ok: ok }, '*'); } catch (e) {}
@@ -445,6 +482,7 @@ const INTERACTIVE_SCRIPT = `
         }
       });
       window.addEventListener('message', relayBlockForm);
+      window.addEventListener('message', followBlockLink);
       // The menu button is written into the page with an English label.
       var navToggles = document.querySelectorAll('[data-builder-mobile-nav-toggle]');
       for (var n = 0; n < navToggles.length; n++) {
