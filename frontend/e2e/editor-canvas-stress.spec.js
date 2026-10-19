@@ -1,5 +1,5 @@
 // Mixed coordinate spaces, clipboard ownership and history across pages and
-// devices. Existing blocks stay in their parent when dragged to its boundary.
+// devices. A release inside the parent clamps the child; outside reparents it.
 import { test, expect, api, openEditor, save } from './support.js'
 
 const properties = (page) => page.locator('[data-tour="properties"]')
@@ -172,35 +172,43 @@ test('a nested child pushed past its parent edge but let go inside stays inside,
   } finally { await api(request, 'DELETE', `/sites/${siteId}/`) }
 })
 
-// Let go outside its parent, a child moves out onto the page where it was
-// let go; one undo puts it back.
-test('a nested child let go outside its parent moves onto the page, and one undo puts it back', async ({ page, request }) => {
-  const { siteId } = await createFixture(request)
-  try {
-    await edit(page, siteId)
-    await pick(page, 'inner')
-    const original = await box(page, 'inner')
-    const parent = await box(page, 'container')
-    const canvasScale = await page.locator('#free-canvas').evaluate((element) => element.getBoundingClientRect().width / 1000)
-    const innerScale = Number(await page.locator('[data-builder-droppable-id="container"]').getAttribute('data-builder-fit-scale'))
-    const rect = await block(page, 'inner').boundingBox()
-    // Held by its middle and let go at (630, 330) in the container, which
-    // sits at (40, 60) on the page: its top-left lands at (580, 360).
-    await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2)
-    await page.mouse.down()
-    await page.mouse.move(rect.x + rect.width / 2 + 500 * canvasScale * innerScale, rect.y + rect.height / 2 + 250 * canvasScale * innerScale, { steps: 8 })
-    await page.mouse.up()
-    await expect(block(page, 'container').locator('[data-cid="inner"]')).toHaveCount(0)
-    await expect(block(page, 'inner')).toHaveCount(1)
-    await expect.poll(() => box(page, 'inner')).toEqual({ x: 580, y: 360, w: 180, h: 60 })
-    await expect.poll(() => box(page, 'container')).toEqual(parent)
-    await page.keyboard.press('Control+z')
-    await expect(block(page, 'container').locator('[data-cid="inner"]')).toHaveCount(1)
-    await expect.poll(() => box(page, 'inner')).toEqual(original)
-    await page.keyboard.press('Control+y')
-    await expect(block(page, 'container').locator('[data-cid="inner"]')).toHaveCount(0)
-  } finally { await api(request, 'DELETE', `/sites/${siteId}/`) }
-})
+// Use explicit scales with integral pointer travel. Playwright's Firefox input
+// floors fractional coordinates, so a fit-scale gesture cannot promise an exact 500px
+// design-space delta. Keep literal geometry assertions at both zoom levels.
+for (const zoom of [80, 100]) {
+  test(`a nested child let go outside its parent moves onto the page at ${zoom}% zoom, and one undo puts it back`, async ({ page, request }) => {
+    const { siteId } = await createFixture(request)
+    try {
+      await page.addInitScript((percent) => localStorage.setItem('pwb_canvas_zoom', String(percent)), zoom)
+      await edit(page, siteId)
+      await pick(page, 'inner')
+      const original = await box(page, 'inner')
+      const parent = await box(page, 'container')
+      expect(original).toEqual({ x: 40, y: 50, w: 180, h: 60 })
+      const canvasScale = await page.locator('#free-canvas').evaluate((element) => element.getBoundingClientRect().width / 1000)
+      const innerScale = Number(await page.locator('[data-builder-droppable-id="container"]').getAttribute('data-builder-fit-scale'))
+      expect(canvasScale).toBe(zoom / 100)
+      expect(innerScale).toBe(1)
+      const rect = await block(page, 'inner').boundingBox()
+      const start = { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) }
+      // Move (500, 250) design pixels from the initial page position (80, 110).
+      // The release is outside the parent; the top-left lands at (580, 360).
+      await page.mouse.move(start.x, start.y)
+      await page.mouse.down()
+      await page.mouse.move(start.x + 500 * canvasScale, start.y + 250 * canvasScale, { steps: 8 })
+      await page.mouse.up()
+      await expect(block(page, 'container').locator('[data-cid="inner"]')).toHaveCount(0)
+      await expect(block(page, 'inner')).toHaveCount(1)
+      await expect.poll(() => box(page, 'inner')).toEqual({ x: 580, y: 360, w: 180, h: 60 })
+      await expect.poll(() => box(page, 'container')).toEqual(parent)
+      await page.keyboard.press('Control+z')
+      await expect(block(page, 'container').locator('[data-cid="inner"]')).toHaveCount(1)
+      await expect.poll(() => box(page, 'inner')).toEqual(original)
+      await page.keyboard.press('Control+y')
+      await expect(block(page, 'container').locator('[data-cid="inner"]')).toHaveCount(0)
+    } finally { await api(request, 'DELETE', `/sites/${siteId}/`) }
+  })
+}
 
 test('hidden nested content can be recovered from the other device without losing its parent', async ({ page, request }) => {
   const { siteId } = await createFixture(request)

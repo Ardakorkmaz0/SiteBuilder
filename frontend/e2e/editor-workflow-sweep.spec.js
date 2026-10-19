@@ -156,7 +156,17 @@ test('control center persists SEO and content changes then exposes undo on the c
   await center(page).getByLabel('SEO description', { exact: true }).fill('Search description saved from editor tools.')
   await center(page).getByLabel('Favicon URL', { exact: true }).fill('https://example.test/favicon.ico')
   await center(page).getByRole('button', { name: 'Save SEO settings', exact: true }).click()
-  await expect.poll(async () => (await api(request, 'GET', `/sites/${siteId}/`)).data.site_options.seo.title).toBe('Custom search title')
+  await expect.poll(async () => {
+    const response = await api(request, 'GET', `/sites/${siteId}/`)
+    expect(response.status).toBe(200)
+    // The first read may arrive before the queued SEO write adds this key.
+    return response.data.site_options?.seo
+  }).toEqual({
+    title: 'Custom search title',
+    description: 'Search description saved from editor tools.',
+    socialImage: '',
+    favicon: 'https://example.test/favicon.ico',
+  })
   await center(page).getByRole('button', { name: 'Content', exact: true }).click()
   const heading = center(page).locator('label').filter({ hasText: 'Heading' }).getByRole('textbox')
   await heading.fill('Updated managed headline')
