@@ -16,7 +16,8 @@ import { isSiteChanged } from './useSiteConflict.js'
 //   status; performSave sets 'saving' and 'saved', a failure sets 'error'.
 // - Failures: a conflict opens its dialog; an automatic save the server
 //   refused for good (over the size limit, a value it will not take) shows
-//   why and is not retried (`refused`); a manual save shows the server's
+//   why and is not retried (`refused`) until a save goes through, which also
+//   takes the reason off the error bar; a manual save shows the server's
 //   reason, or why the session ended.
 export function useEditorSave({ lifecycleRef, discardRef, conflict, sessionMessageRef, onError }) {
   const [queue] = useState(createSaveQueue)
@@ -24,20 +25,29 @@ export function useEditorSave({ lifecycleRef, discardRef, conflict, sessionMessa
   const [saving, setSaving] = useState(false)
   const [autoSaveState, setAutoSaveState] = useState('idle')
   const [refused, setRefused] = useState(false)
+  // The error bar shows a refusal's reason until a save goes through.
+  const showingRefusalRef = useRef(false)
 
   async function save(nextPublished, { auto = false, versionSource, force = false } = {}) {
     if (!auto) {
       manualCountRef.current += 1
       setSaving(true)
+      showingRefusalRef.current = false
       onError('')
     }
     try {
-      return await queue.run(() => {
+      const saved = await queue.run(() => {
         // This automatic save may have waited behind one in flight, and a
         // "leave without saving" since then cancels it.
         if (auto && discardRef.current) return null
         return lifecycleRef.current.performSave(nextPublished, { auto, versionSource, force })
       })
+      if (saved && showingRefusalRef.current) {
+        showingRefusalRef.current = false
+        setRefused(false)
+        onError('')
+      }
+      return saved
     } catch (e) {
       setAutoSaveState('error')
       if (isSiteChanged(e)) {
@@ -48,6 +58,7 @@ export function useEditorSave({ lifecycleRef, discardRef, conflict, sessionMessa
       const status = e?.response?.status
       if (auto && !sessionMessageRef.current && status >= 400 && status < 500 && ![401, 408, 429].includes(status)) {
         setRefused(true)
+        showingRefusalRef.current = true
         onError(apiError(e))
         return null
       }

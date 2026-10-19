@@ -157,6 +157,24 @@ describe('a save that fails', () => {
     expect(ctx.onError).toHaveBeenCalledWith('Too big to keep.')
   })
 
+  it('takes the refusal off the error bar once a save goes through', async () => {
+    const ctx = setup()
+    ctx.lifecycleRef.current.performSave = vi.fn()
+      .mockRejectedValueOnce(failure(413, { detail: 'Too big to keep.' }))
+      .mockResolvedValueOnce({ revision: 2 })
+    await act(() => ctx.result.current.save(undefined, { auto: true }))
+    expect(ctx.onError).toHaveBeenLastCalledWith('Too big to keep.')
+    await act(() => ctx.result.current.save(undefined, { auto: true }))
+    expect(ctx.onError).toHaveBeenLastCalledWith('')
+    expect(ctx.result.current.refused).toBe(false)
+  })
+
+  it('leaves the error bar alone when an automatic save goes through after no refusal', async () => {
+    const ctx = setup()
+    await act(() => ctx.result.current.save(undefined, { auto: true }))
+    expect(ctx.onError).not.toHaveBeenCalled()
+  })
+
   it.each([401, 408, 429, 500])('keeps retrying an automatic save after a %i', async (status) => {
     const ctx = setup()
     ctx.lifecycleRef.current.performSave = vi.fn(async () => { throw failure(status) })
