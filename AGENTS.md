@@ -116,7 +116,8 @@ Frontend:
 - Every user-visible string goes through `t('English text')` from `useLanguage()`. The
   English text is the key, and `src/i18n/translations.js` holds its Turkish value.
   `i18n/translations.coverage.test.js` fails when one is missing. Turkish copy addresses the
-  user formally ("siz").
+  user formally ("siz"); `i18n/translations.formal.test.js` fails on "sen" forms. Short
+  command labels ("Kaydet", "Menüyü aç") stay in the usual imperative.
 - Server calls go through `src/api/*.js` (the axios client in `api/client.js`). Show a
   server error with `apiError(err)` from `utils/errors.js`. It turns the backend's `code`
   into a translated message; add a new code to `API_CODE_MESSAGES`.
@@ -127,6 +128,9 @@ Frontend:
   `ui/darkThemeCoverage.test.js` fails on a new hardcoded colour outside its allow-list.
 - Lazy imports use `lazyChunk` from `utils/lazyChunk.js`, so a tab opened before a deploy
   can still load its chunks.
+- A block moves between the page, sections, containers and tab panels only through the
+  store's `moveComponentInto` (dragging uses it via `utils/reparentDrag.js`). It refuses
+  moves the server would undo: deeper than four levels or past 60 children.
 - Every editor write of a site goes through `save()` from
   `components/editor/useEditorSave.js`: one queue (`utils/saveQueue.js`). What a save
   writes is `performSave` in `EditorPage.jsx`. Never call `updateSite` from anywhere
