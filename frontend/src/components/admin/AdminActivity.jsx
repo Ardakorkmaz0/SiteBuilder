@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { listAdminActivity } from '../../api/admin.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { Chip, Empty, ErrorBox, Loading, Pager, SearchField, SectionHeading, SortSelect } from './adminUi.jsx'
-import { formatDate, formatRelative, useAdminData, useDebounced } from './adminData.js'
+import { auditDetail, formatDate, formatRelative, useAdminData, useDebounced } from './adminData.js'
 
 const TARGETS = [
   ['', 'Everything'], ['user', 'Accounts'], ['site', 'Sites'],
@@ -56,7 +56,7 @@ export default function AdminActivity({ onOpen }) {
                     {openable(entry)
                       ? <button type="button" onClick={() => open(entry)} className="font-medium text-[var(--studio-text)] hover:underline">{entry.target.repr}</button>
                       : <span className="font-medium text-[var(--studio-text)]">{entry.target.repr}</span>}
-                    {entry.detail && <span> · {entry.detail}</span>}
+                    {entry.detail && <span> · {auditDetail(entry.detail, t)}</span>}
                   </p>
                 </div>
               </li>
