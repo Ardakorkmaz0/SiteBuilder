@@ -48,18 +48,18 @@ export function publishedHref(slug, path) {
   return path ? `/s/${slug}/${path}/` : `/s/${slug}/`
 }
 
-function retarget(value, links) {
+function retarget(value, links, key = '') {
   if (Array.isArray(value)) return value.map((item) => retarget(item, links))
   if (value && typeof value === 'object') {
     const out = {}
-    for (const [key, inner] of Object.entries(value)) {
-      out[key] = key === 'href' && typeof inner === 'string' && links.has(inner)
-        ? links.get(inner)
-        : retarget(inner, links)
-    }
+    for (const [name, inner] of Object.entries(value)) out[name] = retarget(inner, links, name)
     return out
   }
-  return value
+  if (typeof value !== 'string') return value
+  // A link field: `href`, or a text band's `buttonHref`.
+  if (/href$/i.test(key) && links.has(value)) return links.get(value)
+  // Markup, as in an HTML block's code: its <a href="#pageId">.
+  return value.includes('href') ? withPublishedHtmlLinks(value, links) : value
 }
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
