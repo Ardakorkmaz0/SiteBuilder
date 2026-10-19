@@ -81,7 +81,7 @@ describe('AppInfo starting guide', () => {
     localStorage.setItem('pwb_language', 'tr')
     renderInfo()
     await user.click(screen.getByRole('button', { name: 'Rehber' }))
-    for (const name of ['Sıfırdan tasarla', 'HTML dosyanı yükle', 'Yerel projeni aç']) {
+    for (const name of ['Sıfırdan tasarla', 'HTML dosyası yükle', 'Yerel proje aç']) {
       expect(screen.getByRole('heading', { name })).toBeInTheDocument()
     }
   })
