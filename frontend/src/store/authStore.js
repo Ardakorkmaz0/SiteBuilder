@@ -42,6 +42,9 @@ function activeStore() {
 export const useAuthStore = create((set) => ({
   token: restored.token,
   user: restored.user,
+  // The server ended the session (signed out everywhere, a password reset),
+  // rather than the person signing out. The sign-in page says so.
+  sessionEnded: false,
 
   setAuth: (token, user, remember = true) => {
     const store = remember ? localStorage : sessionStorage
@@ -54,7 +57,7 @@ export const useAuthStore = create((set) => ({
     // and a spare copy of its token is exposure with nothing to buy.
     if (user?.is_guest) writeGuestCookie(token, user)
     else clearGuestCookie()
-    set({ token, user })
+    set({ token, user, sessionEnded: false })
   },
 
   // Refresh just the user (e.g. after a profile/avatar update) — write to
@@ -66,13 +69,13 @@ export const useAuthStore = create((set) => ({
     set({ user })
   },
 
-  logout: () => {
+  logout: ({ sessionEnded = false } = {}) => {
     for (const s of [localStorage, sessionStorage]) {
       s.removeItem(TOKEN_KEY)
       s.removeItem(USER_KEY)
     }
     clearGuestCookie()
-    set({ token: null, user: null })
+    set({ token: null, user: null, sessionEnded })
   },
 }))
 

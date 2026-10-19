@@ -28,7 +28,7 @@ client.interceptors.response.use(
       const event = new Event(SESSION_EXPIRED_EVENT, { cancelable: true })
       // Capture the live editor before ProtectedRoute unmounts it. If storage
       // is unavailable the editor cancels the redirect so export remains possible.
-      if (window.dispatchEvent(event)) useAuthStore.getState().logout()
+      if (window.dispatchEvent(event)) useAuthStore.getState().logout({ sessionEnded: true })
     }
     return Promise.reject(error)
   },

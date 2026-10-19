@@ -21,6 +21,9 @@ export default function LoginPage() {
   const { state } = useLocation()
   const from = editorReturnPath(state?.from)
   const setAuth = useAuthStore((s) => s.setAuth)
+  // Sent here because the session ended, not by choice: without a word the
+  // sign-in page looked as if the work had been thrown away.
+  const sessionEnded = useAuthStore((s) => s.sessionEnded)
   // Whoever was here a second ago. If it was a guest, their sites follow them
   // into the account they are signing into. Selected field by field: a
   // selector that builds an object hands zustand a new snapshot on every
@@ -70,6 +73,12 @@ export default function LoginPage() {
         </>
       )}
     >
+      {sessionEnded && !error && (
+        <div role="status" className="studio-status-info rounded-lg border px-3 py-2 text-sm">
+          {t('Your session ended. Sign in again to continue.')}
+          {from !== '/' && ` ${t('Any unsaved changes in the editor were kept on this device; you can restore them after signing in.')}`}
+        </div>
+      )}
       {error && (
         <div role="alert" className="studio-status-danger rounded-lg border px-3 py-2 text-sm">
           {error}
