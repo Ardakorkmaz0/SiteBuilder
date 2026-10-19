@@ -59,7 +59,7 @@ function retarget(value, links, key = '') {
   // A link field: `href`, or a text band's `buttonHref`.
   if (/href$/i.test(key) && links.has(value)) return links.get(value)
   // Markup, as in an HTML block's code: its <a href="#pageId">.
-  return value.includes('href') ? withPublishedHtmlLinks(value, links) : value
+  return /href/i.test(value) ? withPublishedHtmlLinks(value, links) : value
 }
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
