@@ -678,15 +678,21 @@ function TabsCanvasItem({
       onBrushUse(brushColor)
       return
     }
+    // Pressed as part of a multi-selection, it is dragged alone but, like a
+    // group on the page, keeps its parent.
+    const { selectedIds } = useEditorStore.getState()
+    const fromGroup = selectedIds.length > 1 && selectedIds.includes(component.id)
     select(component.id)
     const sx = e.clientX
     const sy = e.clientY
     const orig = { x, y }
     // Let go over another section, container or tab panel, it moves there;
-    // let go on the page outside its own, it moves out onto the page.
+    // let go on the page outside its own, it moves out onto the page. A
+    // pinned block keeps its parent (see moveComponentInto).
     const itemEl = e.currentTarget
     const itemRect = itemEl.getBoundingClientRect()
-    const reparent = createReparentTracker({
+    const pinned = ['fixed', 'sticky'].includes(component.props?.scrollBehavior)
+    const reparent = fromGroup || pinned ? null : createReparentTracker({
       itemEl,
       canvas: itemEl.closest('#free-canvas'),
       currentParentId: itemEl.parentElement?.closest('[data-builder-droppable-id]')?.getAttribute('data-builder-droppable-id') ?? null,
@@ -698,14 +704,14 @@ function TabsCanvasItem({
         x: orig.x + (ev.clientX - sx) / interactionScale,
         y: orig.y + (ev.clientY - sy) / interactionScale,
       })
-      reparent.move(ev.clientX, ev.clientY)
+      reparent?.move(ev.clientX, ev.clientY)
     }
     // One undo step per gesture; ends on pointerup, cancel or loss of focus.
     useEditorStore.getState().beginHistoryGesture()
     trackDrag(e, {
       onMove,
       onEnd: (ev) => {
-        const landing = ev?.type === 'pointerup' ? reparent.end(ev.clientX, ev.clientY) : (reparent.cancel(), null)
+        const landing = ev?.type === 'pointerup' ? reparent?.end(ev.clientX, ev.clientY) : (reparent?.cancel(), null)
         if (landing) useEditorStore.getState().moveComponentInto(component.id, landing.targetId, landing.point)
         useEditorStore.getState().endHistoryGesture()
       },

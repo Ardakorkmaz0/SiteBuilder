@@ -407,13 +407,15 @@ function swapRegionPositions(components, id, direction) {
   return components.map((component) => updates[component.id] ? { ...component, ...updates[component.id] } : component)
 }
 
-function addChildToTree(components, parentId, child) {
+// `placed`: the child already has its place and tab (a block moved in);
+// otherwise a new tab child at (0, 0) is stacked below the panel's others.
+function addChildToTree(components, parentId, child, { placed = false } = {}) {
   return components.map((c) => {
     if (c.id === parentId && PARENT_TYPES.has(c.type)) {
       // Tabs assign their new child to the currently-active design tab so the
       // drop visually lands in the panel the user is looking at.
       let tagged = child
-      if (c.type === 'tabs') {
+      if (c.type === 'tabs' && !placed) {
         const tabId = c.props?.activeId || (c.props?.tabs?.[0]?.id ?? '')
         const firstTabId = c.props?.tabs?.[0]?.id ?? tabId
         const sameTab = (c.children || []).filter((kid) => (kid.tabId || firstTabId) === tabId)
@@ -433,7 +435,7 @@ function addChildToTree(components, parentId, child) {
       }
       return { ...c, children: [...(c.children || []), tagged] }
     }
-    if (hasKids(c)) return { ...c, children: addChildToTree(c.children, parentId, child) }
+    if (hasKids(c)) return { ...c, children: addChildToTree(c.children, parentId, child, { placed }) }
     return c
   })
 }
@@ -2977,6 +2979,11 @@ export const useEditorStore = create((set, get) => ({
     const target = targetId ? findInTree(comps, targetId) : null
     if (targetId) {
       if (!target || !PARENT_TYPES.has(target.type) || findInTree([node], targetId)) return false
+      // The published site pins and stretches top-level blocks only: inside
+      // a parent, a pinned block would scroll away and a full-width bar
+      // would shrink to its box.
+      if (['fixed', 'sticky'].includes(node.props?.scrollBehavior)) return false
+      if (node.type === 'navbar' && node.props?.navLayout !== 'vertical' && node.props?.widthMode !== 'boxed') return false
       if ((target.children || []).length >= MAX_CHILDREN) return false
       if (depthOf(comps, targetId) + 1 + subtreeHeight(node) > MAX_NESTING_DEPTH) return false
     }
@@ -3059,7 +3066,7 @@ export const useEditorStore = create((set, get) => ({
         }
       }
       const without = removeFromTree(all, id)
-      const nextComps = target ? addChildToTree(without, targetId, moved) : [...without, moved]
+      const nextComps = target ? addChildToTree(without, targetId, moved, { placed: true }) : [...without, moved]
       const schema = onMobile
         ? mapPage(current.schema, currentPage.id, (p) => ({ ...p, components: nextComps, mobileManual: true }))
         : withComponents(current.schema, currentPage.id, nextComps)
