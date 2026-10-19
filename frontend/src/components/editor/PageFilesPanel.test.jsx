@@ -1,14 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import { useEditorStore } from '../../store/editorStore.js'
 import PageFilesPanel from './PageFilesPanel.jsx'
 
-function open() {
+function open(props = {}) {
   render(
     <LanguageProvider>
-      <PageFilesPanel mode="empty" />
+      <PageFilesPanel mode="empty" {...props} />
     </LanguageProvider>,
   )
   return userEvent.setup()
@@ -74,7 +74,8 @@ describe('the "How should this page start?" dialog', () => {
 // the top of the page.
 describe('renaming a page', () => {
   it('names the field and returns focus to the page after Enter', async () => {
-    const user = open()
+    const onActiveClick = vi.fn()
+    const user = open({ onActiveClick })
     await user.click(screen.getByRole('button', { name: 'Rename page: Home' }))
     const field = screen.getByRole('textbox', { name: 'Page name' })
     expect(document.activeElement).toBe(field)
@@ -82,6 +83,7 @@ describe('renaming a page', () => {
     await user.type(field, 'Start{Enter}')
     expect(useEditorStore.getState().schema.pages[0].name).toBe('Start')
     expect(document.activeElement).toHaveAttribute('data-page-button', 'home')
+    expect(onActiveClick).not.toHaveBeenCalled()
   })
 
   it('returns focus to the page after Esc, keeping the old name', async () => {

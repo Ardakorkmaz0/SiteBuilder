@@ -1,4 +1,11 @@
 import { schemaToFiles } from './schemaToFiles.js'
+import { inlineProjectHtml } from './exportFiles.js'
+
+export function componentSourceHtml(file, html, files) {
+  // Authored documents own their asset links. Only canvas-generated source
+  // needs the project's generated CSS and JavaScript embedded for portability.
+  return file.ownDocument ? html : inlineProjectHtml(html, files)
+}
 
 export function componentPageDocument(page, htmlMap) {
   const html = page?.mode === 'html' ? htmlMap?.[page.id] : ''

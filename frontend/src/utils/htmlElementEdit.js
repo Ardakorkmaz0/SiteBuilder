@@ -203,8 +203,15 @@ function returnPcInline(el, name) {
 function setMobileStyle(el, name, value) {
   const attr = mobileAttr(name)
   const variable = `${MOBILE_VAR_PREFIX}${name}`
+  // A new shorthand replaces the phone's earlier side choices, just as an
+  // inline PC shorthand does. Otherwise the later side rules keep winning.
+  const sides = RELATED_SIDES[name] || []
+  const had = el.hasAttribute(attr) || sides.some((side) => el.hasAttribute(mobileAttr(side)))
+  sides.forEach((side) => {
+    el.removeAttribute(mobileAttr(side))
+    el.style.removeProperty(`${MOBILE_VAR_PREFIX}${side}`)
+  })
   if (value === '' || value == null) {
-    const had = el.hasAttribute(attr)
     el.removeAttribute(attr)
     el.style.removeProperty(variable)
     if (had) returnPcInline(el, name)
@@ -947,6 +954,15 @@ export function applyMobileElementPatch(el, patch = {}) {
   direct('overflow', 'overflow')
 
   if (patch.alignBlock !== undefined) {
+    if (patch.alignBlock) {
+      try {
+        const view = el.ownerDocument?.defaultView
+        if (view?.getComputedStyle(el).display === 'inline') {
+          setMobileStyle(el, 'display', 'block')
+          setMobileStyle(el, 'width', 'fit-content')
+        }
+      } catch { /* ignore — margins still apply */ }
+    }
     if (patch.alignBlock === 'left') {
       setMobileStyle(el, 'margin-left', '0')
       setMobileStyle(el, 'margin-right', 'auto')

@@ -3,6 +3,14 @@
 This round starts from `2ca96ee`. The last deployed commit remains `8b9e1f0`;
 there is no deployment instruction for the changes in this report.
 
+Later deployment note: after this report, the owner explicitly requested deployment.
+Commit `c87bf56` was deployed after the `tests` workflow
+[39168843573](https://github.com/Ardakorkmaz0/SiteBuilder/actions/runs/39168843573)
+passed. The live server commit and `assets/index-D5wpNc1N.js` bundle were verified.
+The opening paragraph records the situation when this report was first written;
+it is not the current deployment status. Round 2 changes are not included in that
+deployment.
+
 ## Reproduced source ownership failures
 
 CI run [39041682089](https://github.com/Ardakorkmaz0/SiteBuilder/actions/runs/39041682089)

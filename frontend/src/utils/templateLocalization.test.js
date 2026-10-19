@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { localizeTemplateHtml } from './templateLocalization.js'
 import { VERTICAL_CATEGORY_SEEDS, VERTICAL_TEMPLATE_TRANSLATIONS } from './templateCatalogData.js'
 import { TEMPLATE_LIBRARY } from './templateLibrary.js'
+import { resumeTemplate } from './htmlTemplates.js'
 
 describe('template localization', () => {
   const sample = '<!doctype html><html><body><nav aria-label="Open menu">Home</nav><h1>About</h1><button title="Get in touch">Get in touch</button><script>const label = "Home"</script></body></html>'
@@ -21,6 +22,34 @@ describe('template localization', () => {
     const html = localizeTemplateHtml(sample, 'en')
     expect(html).toContain('lang="en"')
     expect(html).toContain('Get in touch')
+  })
+
+  it.each([
+    ['resume', resumeTemplate],
+    ...TEMPLATE_LIBRARY.find((category) => category.id === 'cv').variants.map((template) => [template.id, template.build]),
+  ])('translates the ongoing employment date in the %s CV starter', (id, build) => {
+    const source = build('Example')
+    const turkish = new DOMParser().parseFromString(localizeTemplateHtml(source, 'tr'), 'text/html')
+    const english = new DOMParser().parseFromString(localizeTemplateHtml(source, 'en'), 'text/html')
+
+    expect(turkish.body.textContent, id).toContain('2022 — Günümüz')
+    expect(turkish.body.textContent).not.toContain('Present')
+    expect(english.body.textContent).toContain('2022 — Present')
+    expect(english.body.textContent).not.toContain('Günümüz')
+  })
+
+  it('localizes the known CV date placeholder without changing links, identifiers or executable text', () => {
+    const source = '<!doctype html><html><head><style>#Present::after { content: "2022 — Present"; }</style></head><body><a id="Present" href="/2022-Present">2022 — Present</a><p>Present Studio</p><p>2021 — Present</p><script>const date = "2022 — Present";</script><pre>2022 — Present</pre><code>2022 — Present</code></body></html>'
+    const doc = new DOMParser().parseFromString(localizeTemplateHtml(source, 'tr'), 'text/html')
+
+    expect(doc.querySelector('a').textContent).toBe('2022 — Günümüz')
+    expect(doc.querySelector('a').id).toBe('Present')
+    expect(doc.querySelector('a').getAttribute('href')).toBe('/2022-Present')
+    expect([...doc.querySelectorAll('p')].map((paragraph) => paragraph.textContent)).toEqual(['Present Studio', '2021 — Present'])
+    expect(doc.querySelector('style').textContent).toBe('#Present::after { content: "2022 — Present"; }')
+    expect(doc.querySelector('script').textContent).toBe('const date = "2022 — Present";')
+    expect(doc.querySelector('pre').textContent).toBe('2022 — Present')
+    expect(doc.querySelector('code').textContent).toBe('2022 — Present')
   })
 
   it('meaningfully translates every template category and switches back to English', () => {

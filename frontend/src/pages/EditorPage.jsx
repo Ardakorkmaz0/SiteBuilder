@@ -90,8 +90,7 @@ import { applyThemeToDocument } from '../utils/htmlTheme.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
 import { schemaToFiles, schemaToSingleHtml } from '../utils/schemaToFiles.js'
-import { componentHtmlFiles, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
-import { inlineProjectHtml } from '../utils/exportFiles.js'
+import { componentHtmlFiles, componentSourceHtml, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
 import { colorModeFor, viewColorMode } from '../utils/colorMode.js'
 import { emptyHtmlDocument } from '../utils/htmlTemplates.js'
 import { apiError } from '../utils/errors.js'
@@ -1497,7 +1496,7 @@ function SiteEditor() {
           if (!Object.prototype.hasOwnProperty.call(drafts, file.name)) continue
           applyComponentSourceHtml({
             pageId: file.pageId,
-            html: file.ownDocument ? drafts[file.name] : inlineProjectHtml(drafts[file.name], files),
+            html: componentSourceHtml(file, drafts[file.name], files),
           })
         }
         setComponentSourceDrafts({})

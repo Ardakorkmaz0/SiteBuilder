@@ -77,6 +77,7 @@ const TEMPLATE_TEXT_TR = {
   Career: 'Kariyer',
   Toolkit: 'Araçlar',
   'Senior Product Designer': 'Kıdemli Ürün Tasarımcısı',
+  '2022 — Present': '2022 — Günümüz',
   'Product Designer': 'Ürün Tasarımcısı',
   'UI Designer': 'Arayüz Tasarımcısı',
   'B.A. Visual Design': 'Görsel Tasarım Lisansı',
