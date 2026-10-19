@@ -310,10 +310,11 @@ export default function FreeCanvasItem({
     // the finger by exactly however far the canvas moved.
     const drag = beginDragScroll((p) => moveTo(p.x, p.y))
     // A lone block let go over a section, container or tab panel moves into
-    // it (moveComponentInto). Full-width bands stay bands of the page.
+    // it (moveComponentInto). Full-width bands stay bands of the page, and a
+    // pinned block stays pinned to it.
     const itemEl = e.currentTarget
     const itemRect = itemEl.getBoundingClientRect()
-    const reparent = groupIds.length === 1 && !viewportStretch
+    const reparent = groupIds.length === 1 && !viewportStretch && !pinMode
       ? createReparentTracker({
           itemEl,
           canvas: itemEl.closest('#free-canvas'),

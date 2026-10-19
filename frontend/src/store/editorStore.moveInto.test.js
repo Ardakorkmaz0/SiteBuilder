@@ -109,6 +109,13 @@ describe('tab panels', () => {
     store().moveComponentInto('heading', null, { x: 0, y: 0 })
     expect(find('heading')).not.toHaveProperty('tabId')
   })
+
+  it('keeps a drop at the panel corner there, as in a section or container', () => {
+    // Let go a little above and left of the panel: held at its corner.
+    store().moveComponentInto('heading', 'tabs', { x: -30, y: -10 })
+    expect(find('heading').layout).toEqual({ x: 0, y: 0, w: 400, h: 60 })
+    expect(find('heading').tabId).toBe('two')
+  })
 })
 
 describe('moves that are refused', () => {
@@ -123,6 +130,19 @@ describe('moves that are refused', () => {
   it('into itself or into its own child', () => {
     unchanged(() => store().moveComponentInto('box', 'box', { x: 0, y: 0 }))
     unchanged(() => store().moveComponentInto('box', 'inner', { x: 0, y: 0 }))
+  })
+
+  it('into a parent, of a pinned block or a full-width bar, which the published page pins and stretches only on the page', () => {
+    store().updateProps('heading', { scrollBehavior: 'sticky' })
+    expect(store().moveComponentInto('heading', 'box', { x: 0, y: 0 })).toBe(false)
+    store().updateProps('heading', { scrollBehavior: 'fixed' })
+    expect(store().moveComponentInto('heading', 'box', { x: 0, y: 0 })).toBe(false)
+    store().loadSchema({ pages: [{ ...page(), components: [...page().components, node('bar', 'navbar', { x: 0, y: 0, w: 1000, h: 64 })] }] })
+    expect(store().moveComponentInto('bar', 'box', { x: 0, y: 0 })).toBe(false)
+    expect(find('box').children.map((c) => c.id)).toEqual(['inner'])
+    // Drawn as a box, a bar is a block like any other.
+    store().updateProps('bar', { widthMode: 'boxed' })
+    expect(store().moveComponentInto('bar', 'box', { x: 0, y: 0 })).toBe(true)
   })
 
   it('of a section, which stays a band of the page', () => {

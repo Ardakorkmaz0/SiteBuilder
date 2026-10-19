@@ -99,6 +99,13 @@ describe('on release', () => {
     expect(tracker.end(300, 610)).toEqual({ targetId: null, point: { x: 400, y: 1120 } })
   })
 
+  it('takes a press that travelled 4 px, the click limit, as a drag', () => {
+    const tracker = createReparentTracker({ itemEl: item, canvas, currentParentId: 'section', start: { x: 300, y: 600 } })
+    under = [item, canvas]
+    expect(tracker.end(303.9, 600)).toBeNull()
+    expect(tracker.end(304, 600)).toEqual({ targetId: null, point: { x: 408, y: 1100 } })
+  })
+
   it('stays put when the browser cannot say what is under the pointer', () => {
     delete document.elementsFromPoint
     const tracker = createReparentTracker({ itemEl: item, canvas, currentParentId: 'section' })
