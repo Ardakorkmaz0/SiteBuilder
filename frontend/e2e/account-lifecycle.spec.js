@@ -7,8 +7,10 @@ test.use({ isolatedAccount: false, storageState: { cookies: [], origins: [] } })
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('pwb_language', 'en')
-    localStorage.setItem('pwb_editor_tour_v1', '1')
+    try {
+      localStorage.setItem('pwb_language', 'en')
+      localStorage.setItem('pwb_editor_tour_v1', '1')
+    } catch { /* Sandboxed previews cannot access storage. */ }
   })
 })
 
