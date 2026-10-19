@@ -38,6 +38,15 @@ export default defineConfig({
         storageState: 'e2e/.auth/state.json',
       },
     },
+    {
+      name: 'firefox',
+      dependencies: ['setup'],
+      use: {
+        ...devices['Desktop Firefox'],
+        viewport: { width: 1440, height: 900 },
+        storageState: 'e2e/.auth/state.json',
+      },
+    },
   ],
   webServer: [
     {
