@@ -58,8 +58,14 @@ jobs:
         run: pytest -q
 
   e2e:
-    name: End-to-end (Playwright)
+    name: End-to-end (${{ matrix.browser }})
     runs-on: ubuntu-latest
+    # Each browser owns its backend, database and rate limits. Keep one
+    # worker per job without making the browsers wait for each other.
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -83,16 +89,16 @@ jobs:
         run: npm ci
       - name: Browser
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Run
         # playwright.config.js starts the Django server and Vite itself.
         working-directory: frontend
-        run: npm run e2e
+        run: npm run e2e -- --project=${{ matrix.browser }}
       - name: Keep the report of a failed run
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.browser }}
           path: |
             frontend/playwright-report
             frontend/test-results

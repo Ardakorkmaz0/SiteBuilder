@@ -1,0 +1,37 @@
+--- a/frontend/src/components/editor/useEditorSave.test.jsx
++++ b/frontend/src/components/editor/useEditorSave.test.jsx
+@@ -204,3 +204,34 @@
+     expect(ctx.result.current.saving).toBe(false)
+   })
+ })
++
++
++describe('a queued save after an automatic refusal', () => {
++  it('retains a newer local-file warning from the successful manual save', async () => {
++    const ctx = setup()
++    const automaticResult = deferred()
++    const manualResult = deferred()
++    const diskWarning = 'Saved to the server, but writing index.html failed: permission denied'
++    ctx.lifecycleRef.current.performSave = vi.fn()
++      .mockImplementationOnce(() => automaticResult.promise)
++      .mockImplementationOnce(async () => {
++        await manualResult.promise
++        // performSave reports a disk-write failure after updateSite succeeds.
++        ctx.onError(diskWarning)
++        return { revision: 2 }
++      })
++    let automatic, manual
++    act(() => { automatic = ctx.result.current.save(undefined, { auto: true }) })
++    await act(async () => { await Promise.resolve() })
++    // Save was pressed before the automatic refusal reached its catch.
++    act(() => { manual = ctx.result.current.save() })
++    await act(async () => {
++      automaticResult.reject(failure(413, { detail: 'Too big to keep.' }))
++      await automatic
++      manualResult.resolve()
++      await manual
++    })
++    expect(ctx.lifecycleRef.current.performSave).toHaveBeenCalledTimes(2)
++    expect(ctx.onError).toHaveBeenLastCalledWith(diskWarning)
++  })
++})

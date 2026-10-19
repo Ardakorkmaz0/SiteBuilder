@@ -1,0 +1,98 @@
+--- /dev/null
++++ b/frontend/src/components/editor/FreeCanvasItem.crossReview.test.jsx
+@@ -0,0 +1,39 @@
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
++import { fireEvent, render } from '@testing-library/react'
++import LanguageProvider from '../../i18n/LanguageProvider.jsx'
++import FreeCanvasItem from './FreeCanvasItem.jsx'
++import { useEditorStore, selectCurrentPage } from '../../store/editorStore.js'
++const s = () => useEditorStore.getState()
++const page = () => selectCurrentPage(s())
++const node=(id,type,layout,props={},children)=>({id,type,layout,props,styles:{},...(children?{children}:{} )})
++const get=(id,list=page().components)=>list.flatMap(n=>[n,...(n.children?flatten(n.children):[])]).find(n=>n.id===id)
++const flatten=list=>list.flatMap(n=>[n,...(n.children?flatten(n.children):[])])
++function Canvas(){const p=useEditorStore(selectCurrentPage);return <LanguageProvider><div id="canvas-scroll"><div id="free-canvas" data-builder-canvas-scale="1">{p.components.map(c=><FreeCanvasItem key={c.id} component={c} canvasScale={1}/>)}</div></div></LanguageProvider>}
++const rect=(left,top,width,height)=>({left,top,width,height,right:left+width,bottom:top+height,x:left,y:top})
++function load(type='text',props={},nested=false){
++ s().loadSchema({pages:[{id:'p',name:'Home',mode:'empty',canvasWidth:1000,mobileWidth:390,mobileManual:true,components:[
++ node('target','container',{x:400,y:100,w:400,h:300},{},[]),
++ ...(nested?[node('source','container',{x:40,y:500,w:400,h:300},{},[node('dragged',type,{x:40,y:40,w:180,h:60},props)])]:[node('dragged',type,{x:40,y:500,w:180,h:60},props)]),
++ node('other','text',{x:40,y:900,w:180,h:60},{text:'Other'})]}]});s().setViewport('pc')
++}
++function perform(nested=false){
++ const v=render(<Canvas/>);const canvas=v.container.querySelector('#free-canvas');canvas.getBoundingClientRect=()=>rect(0,0,1000,2000)
++ const marker=v.container.querySelector('[data-builder-droppable-id="target"]');marker.getBoundingClientRect=()=>rect(400,100,400,300)
++ const item=v.container.querySelector('[data-cid="dragged"]');item.getBoundingClientRect=()=>rect(40,nested?540:500,180,60)
++ document.elementsFromPoint=vi.fn(()=>[marker,canvas]);
++ fireEvent.pointerDown(item,{button:0,clientX:80,clientY:nested?570:530})
++ fireEvent(window,new MouseEvent('pointermove',{bubbles:true,clientX:480,clientY:180}))
++ fireEvent(window,new MouseEvent('pointerup',{bubbles:true,clientX:480,clientY:180}))
++ return {v}
++}
++beforeEach(()=>{globalThis.ResizeObserver=class{observe(){}disconnect(){}}})
++afterEach(()=>{delete document.elementsFromPoint;vi.restoreAllMocks()})
++describe('review guard probes',()=>{
++ it('fixed pinned stays on page',()=>{load('text',{scrollBehavior:'fixed'});perform();expect(page().components.map(n=>n.id)).toContain('dragged')})
++ it('sticky pinned stays on page',()=>{load('text',{scrollBehavior:'sticky'});perform();expect(page().components.map(n=>n.id)).toContain('dragged')})
++ it('full width navbar stays on page',()=>{load('navbar',{brand:'Nav'});perform();expect(page().components.map(n=>n.id)).toContain('dragged')})
++ it('boxed navbar stays on page',()=>{load('navbar',{brand:'Nav',widthMode:'boxed'});perform();expect(page().components.map(n=>n.id)).toContain('dragged')})
++ it('vertical navbar stays on page',()=>{load('navbar',{brand:'Nav',navLayout:'vertical'});perform();expect(page().components.map(n=>n.id)).toContain('dragged')})
++ it('top-level multiselection stays on page',()=>{load();s().selectComponent('dragged');s().toggleSelect('other');perform();expect(page().components.map(n=>n.id)).toContain('dragged');expect(get('target').children).toHaveLength(0)})
++ it('nested multiselection stays in parent',()=>{load('text',{},true);s().selectComponent('dragged');s().toggleSelect('other');perform(true);expect(get('source').children.map(n=>n.id)).toContain('dragged');expect(get('target').children).toHaveLength(0)})
++})
+--- /dev/null
++++ b/frontend/src/store/editorStore.moveInto.crossReview.test.js
+@@ -0,0 +1,53 @@
++import { beforeEach, describe, expect, it } from 'vitest'
++import { useEditorStore, selectCurrentPage } from './editorStore.js'
++import { schemaToFiles } from '../utils/schemaToFiles.js'
++const s=()=>useEditorStore.getState();const p=()=>selectCurrentPage(s())
++const node=(id,type,layout,props={},children)=>({id,type,layout,props,styles:{},...(children?{children}:{} )})
++const all=(nodes=p().components)=>nodes.flatMap(n=>[n,...(n.children?all(n.children):[])])
++const find=id=>all().find(n=>n.id===id)
++const tabsProps={tabs:[{id:'one',label:'One'},{id:'two',label:'Two'}],activeId:'two'}
++beforeEach(()=>{s().loadSchema({pages:[{id:'p',name:'Home',mode:'empty',canvasWidth:1000,mobileWidth:390,mobileManual:true,components:[
++ node('text','text',{x:50,y:700,w:100,h:50},{text:'Moving text'}),
++ node('tabsA','tabs',{x:10,y:100,w:600,h:300},tabsProps,[]),
++ node('tabsB','tabs',{x:10,y:450,w:600,h:300},{tabs:[{id:'b1',label:'B One'},{id:'b2',label:'B Two'}],activeId:'b2'},[]),
++ node('box','container',{x:10,y:800,w:600,h:300},{},[node('nested','container',{x:20,y:30,w:300,h:100},{},[])]),
++ node('section','region',{x:0,y:1200,w:1000,h:400},{contentWidth:980},[]),
++]}]});s().setViewport('pc')})
++function exported(){const files=schemaToFiles(s().schema);return {html:new DOMParser().parseFromString(files.find(f=>f.name==='index.html').content,'text/html'),css:files.find(f=>f.name==='styles.css').content}}
++describe('tab and exported coordinate review',()=>{
++ it('keeps an explicit tab origin drop at (0, 0)',()=>{
++  expect(s().moveComponentInto('text','tabsA',{x:0,y:0})).toBe(true)
++  const {html}=exported();const text=html.getElementById('text')
++  expect({stored:find('text').layout,exported:{x:text.style.left,y:text.style.top}}).toEqual({stored:{x:0,y:0,w:100,h:50},exported:{x:'0px',y:'0px'}})
++ })
++ it('uses a destination tab tag and exported position across separate tab blocks',()=>{
++  expect(s().moveComponentInto('text','tabsA',{x:120,y:30})).toBe(true)
++  expect(find('text').tabId).toBe('two')
++  expect(s().moveComponentInto('text','tabsB',{x:80,y:40})).toBe(true)
++  expect(find('text').tabId).toBe('b2')
++  const {html}=exported();const text=html.getElementById('text')
++  expect(text?.closest('[data-builder-panel]')?.getAttribute('data-builder-panel')).toBe('b2')
++  expect(text?.style.left).toBe('80px');expect(text?.style.top).toBe('40px')
++  expect(html.querySelector('[data-builder-tabs="tabsA"]')?.textContent).not.toContain('Moving text')
++ })
++ it('keeps literal container-child export coordinates after moving into a nested parent',()=>{
++  expect(s().moveComponentInto('text','nested',{x:60,y:20})).toBe(true)
++  expect(find('text').layout).toEqual({x:60,y:20,w:100,h:50})
++  const {html}=exported();const text=html.getElementById('text')
++  expect(text?.style.left).toBe('60px');expect(text?.style.top).toBe('20px')
++  expect(text?.parentElement?.parentElement?.parentElement?.id).toBe('nested')
++ })
++ it('exports new section desktop and phone positions into matching rules',()=>{
++  expect(s().moveComponentInto('text','section',{x:120,y:40})).toBe(true)
++  const {html,css}=exported();expect(html.getElementById('text')?.className).toContain('region-section-text')
++  expect(css).toContain('.region-section-text { position:absolute;top:40px;height:50px;left:120px;width:100px;')
++  expect(css).toContain('.region-section-text { left:16px;right:auto;top:16px;width:358px;height:32px;')
++ })
++ it('cannot transfer a child to another tab in its current tab block',()=>{
++  expect(s().moveComponentInto('text','tabsA',{x:12,y:12})).toBe(true)
++  expect(find('text').tabId).toBe('two')
++  s().setActiveTab('tabsA','one')
++  expect(s().moveComponentInto('text','tabsA',{x:12,y:12})).toBe(false)
++  expect(find('text').tabId).toBe('two')
++ })
++})
