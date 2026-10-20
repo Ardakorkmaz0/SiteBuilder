@@ -673,8 +673,10 @@ class SharedComponent(models.Model):
         ('private', 'Private — only you'),
     ]
 
-    # Authorship survives the account: a block already copied into other
-    # people's sites should not lose its attribution if the author leaves.
+    # When the account is deleted the block leaves the library with it (the
+    # owner's decision, round 7): the public views ask for an active author.
+    # The row itself is kept, unattributed, so a moderator can still find and
+    # purge the copies other people took.
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

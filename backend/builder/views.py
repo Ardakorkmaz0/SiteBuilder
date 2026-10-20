@@ -1927,9 +1927,10 @@ class SharedComponentListView(ListAPIView):
                   .select_related('author')
                   .order_by('-created_at'))
         else:
+            # Only blocks whose author still has an active account: a
+            # suspended author's are hidden, a deleted one's left with them.
             qs = (SharedComponent.objects
-                  .filter(status='published', visibility='public')
-                  .filter(Q(author__is_active=True) | Q(author__isnull=True))
+                  .filter(status='published', visibility='public', author__is_active=True)
                   .select_related('author')
                   .order_by('-hot_score'))
         category = (self.request.query_params.get('category') or '').strip()
@@ -1952,9 +1953,9 @@ def _visible_component(user, component_id):
                  .first())
     if not component:
         return None
-    # A suspended author's blocks are invisible to everyone.
-    # A deleted author (author=None) does not hide the block.
-    if component.author_id is not None and not component.author.is_active:
+    # A suspended author's blocks are invisible to everyone, and a deleted
+    # author's (author=None) left the library with the account.
+    if component.author_id is None or not component.author.is_active:
         return None
     if component.visibility == 'public':
         return component
@@ -2142,9 +2143,7 @@ class SharedComponentViewCountView(APIView):
         # being viewed either — the counter must not keep climbing behind a
         # door that is closed.
         SharedComponent.objects.filter(
-            pk=component_id, status='published', visibility='public',
-        ).filter(
-            Q(author__is_active=True) | Q(author__isnull=True),
+            pk=component_id, status='published', visibility='public', author__is_active=True,
         ).update(view_count=F('view_count') + 1)
         component = SharedComponent.objects.filter(pk=component_id).first()
         if component:
