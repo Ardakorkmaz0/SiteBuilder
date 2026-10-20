@@ -49,19 +49,24 @@ export default function PageFilesPanel({
     onBeforePageChange?.()
     addPage(t('New Page'), addPrompt.folder, mode)
     setAddPrompt(null)
+    // The new page takes the keyboard (it went back to "+ File", which said
+    // nothing about the page that now exists).
+    refocusPageRef.current = useEditorStore.getState().currentPageId
+    setRefocusTick((tick) => tick + 1)
   }
 
   // Enter or Esc in the name field: the field goes away with the keyboard in
   // it, and focus fell to the top of the page. The page's own button takes it.
   const rootRef = useRef(null)
   const refocusPageRef = useRef(null)
+  const [refocusTick, setRefocusTick] = useState(0)
   useEffect(() => {
     if (editingId || !refocusPageRef.current) return
     const pageId = refocusPageRef.current
     refocusPageRef.current = null
     const buttons = rootRef.current?.querySelectorAll('[data-page-button]') || []
     ;[...buttons].find((button) => button.dataset.pageButton === pageId)?.focus()
-  }, [editingId])
+  }, [editingId, refocusTick])
 
   const commitRename = () => {
     if (editingId && draft.trim()) {
