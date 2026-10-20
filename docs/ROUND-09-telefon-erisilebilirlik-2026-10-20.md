@@ -44,7 +44,7 @@ Hayatta kalan tek bozma (dış base kontrolünü kaldırmak) **eşdeğer bir boz
 - **Herkese açık uçlar:** blok listesi, ayrıntı, görüntülenme sayacı ve "kullan" artık etkin bir yazar istiyor. Yazarı silinmiş blok kütüphaneden kalkıyor. Var olan sahipsiz bloklar da hemen kapsanıyor; migration gerekmedi.
 - **Satır korunuyor:** satır yazarsız kalıyor, böylece moderatör başka sitelere alınmış kopyaları gerektiğinde yine silebiliyor.
 - **Admin listesi:** bu bloklarda "Yazarı silinmiş, kütüphanede değil" rozeti ve "Silinmiş hesap" yazısı var.
-- **Testler:** backend'de üç vaka. Yazar varken blok listede ve ayrıntıda görünüyor. Silinince anonim liste ve ayrıntı 404 veriyor; sayaç ve `use_count` artmıyor; başka kullanıcının "kullan" isteği 404 alıyor ve hedef sitenin şeması değişmiyor. Moderatör listesinde satır duruyor. Eski kuralı sabitleyen bir regresyon testi yeni kurala göre güncellendi.
+- **Testler:** backend'de üç vaka. Yazar varken blok listede ve ayrıntıda görünüyor. Silinince anonim liste boş dönüyor (200, boş `results`), ayrıntı 404 veriyor; sayaç ve `use_count` artmıyor; başka kullanıcının "kullan" isteği 404 alıyor ve hedef sitenin şeması değişmiyor. Moderatör listesinde satır duruyor. Eski kuralı sabitleyen bir regresyon testi yeni kurala göre güncellendi.
 
 ## 4. Firefox'taki kararsız test: gerçek veri kaybıydı (`6bb7445`)
 
