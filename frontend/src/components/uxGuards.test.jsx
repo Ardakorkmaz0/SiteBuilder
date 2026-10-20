@@ -134,6 +134,8 @@ describe('responsive and accessibility guards', () => {
 
   it('uses the persistent header for site and creator search', async () => {
     renderWithShell(<ExplorePage />)
+    expect(screen.queryByRole('searchbox', { name: 'Search sites and creators' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Search', exact: true }))
     expect(screen.getByRole('searchbox', { name: 'Search sites and creators' })).toBeInTheDocument()
     expect(screen.queryByRole('searchbox', { name: 'Search community sites' })).not.toBeInTheDocument()
   })

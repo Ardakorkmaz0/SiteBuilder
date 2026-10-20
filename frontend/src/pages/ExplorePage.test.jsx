@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { addFavorite, listExplore, removeFavorite } from '../api/explore.js'
@@ -28,14 +28,21 @@ beforeEach(() => {
   vi.mocked(removeFavorite).mockReset()
 })
 
+async function favoriteControl(name = 'Favorite') {
+  if (!screen.queryByRole('menuitemcheckbox', { name, exact: true })) {
+    fireEvent.click(await screen.findByRole('button', { name: 'More actions', exact: true }))
+  }
+  return screen.findByRole('menuitemcheckbox', { name, exact: true })
+}
+
 describe('ExplorePage favorite saves', () => {
   it('reloads account-specific favorite state after logging out and switching accounts', async () => {
     useAuthStore.setState({ user: { id: 200, username: 'first' }, token: 'first-session' })
     const first = render(<LanguageProvider><MemoryRouter><ExplorePage /></MemoryRouter></LanguageProvider>)
-    await screen.findByRole('button', { name: 'Favorite' })
+    await favoriteControl()
     first.unmount()
     const returned = render(<LanguageProvider><MemoryRouter><ExplorePage /></MemoryRouter></LanguageProvider>)
-    expect(await screen.findByRole('button', { name: 'Favorite' })).toHaveAttribute('aria-pressed', 'false')
+    expect(await favoriteControl()).toHaveAttribute('aria-checked', 'false')
     expect(listExplore).toHaveBeenCalledTimes(1)
     returned.unmount()
     useAuthStore.getState().logout()
@@ -43,7 +50,7 @@ describe('ExplorePage favorite saves', () => {
     vi.mocked(listExplore).mockResolvedValueOnce({ results: [{ ...site, is_favorited: true }], next: null })
 
     render(<LanguageProvider><MemoryRouter><ExplorePage /></MemoryRouter></LanguageProvider>)
-    expect(await screen.findByRole('button', { name: 'Unfavorite' })).toHaveAttribute('aria-pressed', 'true')
+    expect(await favoriteControl('Unfavorite')).toHaveAttribute('aria-checked', 'true')
     expect(listExplore).toHaveBeenCalledTimes(2)
   })
 
@@ -51,33 +58,34 @@ describe('ExplorePage favorite saves', () => {
     let rejectSave
     vi.mocked(addFavorite).mockImplementationOnce(() => new Promise((_, reject) => { rejectSave = reject }))
     render(<LanguageProvider><MemoryRouter><ExplorePage /></MemoryRouter></LanguageProvider>)
-    const button = await screen.findByRole('button', { name: 'Favorite' })
-    fireEvent.click(button)
-    fireEvent.click(button)
+    fireEvent.click(await favoriteControl())
+    const pending = await favoriteControl()
+    fireEvent.click(pending)
     expect(addFavorite).toHaveBeenCalledTimes(1)
-    expect(button).toBeDisabled()
-    expect(button).toHaveAttribute('aria-pressed', 'false')
+    expect(pending).toBeDisabled()
+    expect(pending).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByTitle('Favorites')).toHaveTextContent('4')
     await act(async () => rejectSave(new Error('Save unavailable')))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Save unavailable')
-    expect(button).toBeEnabled()
-    expect(button).toHaveAttribute('aria-pressed', 'false')
+    expect(pending).toBeEnabled()
+    expect(pending).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByTitle('Favorites')).toHaveTextContent('4')
     vi.mocked(addFavorite).mockResolvedValueOnce({})
-    fireEvent.click(button)
-    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'true'))
+    fireEvent.click(pending)
+    expect(await favoriteControl('Unfavorite')).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTitle('Favorites')).toHaveTextContent('5')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 
     vi.mocked(removeFavorite).mockRejectedValueOnce(new Error('Removal unavailable'))
-    fireEvent.click(button)
+    fireEvent.click(await favoriteControl('Unfavorite'))
     expect(await screen.findByRole('alert')).toHaveTextContent('Removal unavailable')
-    expect(button).toHaveAttribute('aria-pressed', 'true')
+    const retry = await favoriteControl('Unfavorite')
+    expect(retry).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTitle('Favorites')).toHaveTextContent('5')
     vi.mocked(removeFavorite).mockResolvedValueOnce({})
-    fireEvent.click(button)
-    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'false'))
+    fireEvent.click(retry)
+    expect(await favoriteControl()).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByTitle('Favorites')).toHaveTextContent('4')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(addFavorite).toHaveBeenCalledTimes(2)
@@ -121,7 +129,8 @@ describe('ExplorePage templates', () => {
     })
     render(<LanguageProvider><MemoryRouter><ExplorePage /></MemoryRouter></LanguageProvider>)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Use as template' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Use as template' }))
 
     expect(await screen.findByRole('dialog', { name: 'An account is needed' })).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -157,3 +166,50 @@ describe('ExplorePage greeting', () => {
   })
 })
 
+
+describe('ExplorePage discovery layout', () => {
+  it('features the ranked community site and lets category details reset the feed', async () => {
+    vi.mocked(listExplore)
+      .mockResolvedValueOnce({ results: [{ ...site, category: 'portfolio' }], next: null })
+      .mockResolvedValueOnce({ results: [], next: null })
+      .mockResolvedValueOnce({ results: [site], next: null })
+    render(<LanguageProvider><MemoryRouter><ExplorePage /></MemoryRouter></LanguageProvider>)
+    expect(await screen.findByRole('link', { name: 'View featured site: Explore site' })).toHaveAttribute('href', '/site/explore-site')
+    const options = screen.getByRole('complementary', { name: 'Explore options' })
+    fireEvent.click(within(options).getByRole('button', { name: 'Portfolio', exact: true }))
+    await screen.findByText('No published sites in this category.')
+    expect(listExplore).toHaveBeenLastCalledWith({ category: 'portfolio', search: '', page: 1 })
+    expect(screen.queryByRole('link', { name: 'View featured site: Explore site' })).not.toBeInTheDocument()
+    const details = within(options).getByText('Filter details').closest('details')
+    expect(details).not.toHaveAttribute('open')
+    fireEvent.click(within(options).getByText('Filter details'))
+    fireEvent.click(within(details).getByRole('button', { name: 'Show all categories' }))
+    expect(await screen.findByRole('link', { name: 'View featured site: Explore site' })).toHaveAttribute('href', '/site/explore-site')
+    expect(listExplore).toHaveBeenLastCalledWith({ category: '', search: '', page: 1 })
+  })
+})
+
+it('scrolls category results to the feed heading instead of the sticky category panel', async () => {
+  vi.mocked(listExplore)
+    .mockResolvedValueOnce({ results: [site], next: null })
+    .mockResolvedValueOnce({ results: [{ ...site, id: 8 }], next: null })
+  render(<LanguageProvider><MemoryRouter><ExplorePage /></MemoryRouter></LanguageProvider>)
+  await screen.findByRole('link', { name: 'Explore site', exact: true })
+  const heading = screen.getByRole('heading', { name: 'Discover ideas', exact: true })
+  const options = screen.getByRole('group', { name: 'Site categories' })
+  const headingBounds = vi.spyOn(heading, 'getBoundingClientRect').mockReturnValue({ top: 200 })
+  const stickyBounds = vi.spyOn(options, 'getBoundingClientRect').mockReturnValue({ top: 20 })
+  const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  const previousY = Object.getOwnPropertyDescriptor(window, 'scrollY')
+  Object.defineProperty(window, 'scrollY', { configurable: true, value: 600 })
+  try {
+    fireEvent.click(within(options).getByRole('button', { name: 'Portfolio', exact: true }))
+    await waitFor(() => expect(listExplore).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(scroll).toHaveBeenCalledWith({ top: 776, behavior: 'auto' }))
+  } finally {
+    headingBounds.mockRestore()
+    stickyBounds.mockRestore()
+    scroll.mockRestore()
+    Object.defineProperty(window, 'scrollY', previousY)
+  }
+})

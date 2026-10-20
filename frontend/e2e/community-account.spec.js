@@ -31,10 +31,10 @@ test('profile edits, explore search, favorites and a site report reach the real 
     await page.getByRole('button', { name: 'Portfolio', exact: true }).click()
     const card = cardFor(page, title)
     await expect(card).toBeVisible()
+    await card.getByRole('button', { name: 'More actions', exact: true }).click()
     const favorited = reply(page, `/sites/${site.id}/favorite/`)
-    await card.getByRole('button', { name: 'Favorite', exact: true }).click()
+    await card.getByRole('menuitemcheckbox', { name: 'Favorite', exact: true }).click()
     expect((await favorited).status()).toBe(201)
-    await expect(card.getByRole('button', { name: 'Unfavorite', exact: true })).toHaveAttribute('aria-pressed', 'true')
     const favorites = await api(request, 'GET', '/favorites/')
     expect(favorites.status).toBe(200)
     expect(rows(favorites.data).map((item) => item.id)).toContain(site.id)
@@ -52,6 +52,7 @@ test('profile edits, explore search, favorites and a site report reach the real 
     await page.goto('/favorites')
     await expect(page.getByText('No favorites yet', { exact: true })).toBeVisible()
 
+    await page.getByRole('button', { name: 'Search', exact: true }).click()
     const search = page.getByRole('searchbox', { name: 'Search sites and creators', exact: true })
     await search.fill(title)
     await search.press('Enter')
@@ -76,6 +77,38 @@ test('profile edits, explore search, favorites and a site report reach the real 
   } finally {
     expect((await api(request, 'DELETE', `/sites/${site.id}/`, undefined, author.token)).status).toBe(204)
   }
+})
+
+test('dashboard search expands on demand and phone navigation keeps three working destinations', async ({ page }) => {
+  await page.goto('/')
+  const search = page.getByRole('searchbox', { name: 'Search sites and creators', exact: true })
+  const searchTrigger = page.getByRole('button', { name: 'Search', exact: true })
+  await expect(search).toHaveCount(0)
+  await searchTrigger.click()
+  await expect(search).toBeVisible()
+  await expect(search).toBeFocused()
+  await search.press('Escape')
+  await expect(search).toHaveCount(0)
+  await expect(searchTrigger).toBeFocused()
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  const navigation = page.getByRole('navigation', { name: 'Quick navigation', exact: true })
+  await expect(navigation).toBeVisible()
+  await expect(navigation.getByRole('link')).toHaveCount(3)
+  const destinations = [
+    ['My sites', '/sites'],
+    ['Favorites', '/favorites'],
+    ['Explore', '/'],
+  ]
+  for (const [name, path] of destinations) {
+    const link = navigation.getByRole('link', { name, exact: true })
+    await expect(link).toHaveAttribute('href', path)
+    await link.click()
+    await expect(page).toHaveURL(new URL(path, 'http://localhost:5173').href)
+    await expect(navigation.getByRole('link', { name, exact: true })).toHaveAttribute('aria-current', 'page')
+  }
+  await page.getByRole('button', { name: 'Account menu', exact: true }).click()
+  await expect(page.getByRole('link', { name: 'Profile', exact: true })).toBeVisible()
 })
 
 test('a community block can be found, previewed, reported and copied into an owned draft', async ({ page, request }) => {
