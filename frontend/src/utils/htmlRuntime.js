@@ -64,15 +64,16 @@ const INTERACTIVE_SCRIPT = `
     function sitePath(value) {
       return typeof value === 'string' && /^\\/(?!\\/)/.test(value);
     }
-    // A path that resolves on this site. The parser reads "/\\x" and "/<line
-    // break>/x" as "//x", another site, so the address it makes is what counts.
+    // A path that resolves on this site, as a full address. The parser reads
+    // "/\\x" and "/<line break>/x" as "//x", another site; and a path that
+    // resolves to "//x" ("/a/..//x") turns into another site again if it is
+    // written back as a relative link. So the address it makes is checked,
+    // and that address, not a path, is what the link gets.
     function onThisSite(value) {
       if (!sitePath(value)) return '';
       try {
         var url = new URL(value, location.href);
-        return url.host === location.host && /^https?:$/.test(url.protocol)
-          ? url.pathname + url.search + url.hash
-          : '';
+        return url.host === location.host && /^https?:$/.test(url.protocol) ? url.href : '';
       } catch (e) { return ''; }
     }
     function safeDestination(value) {

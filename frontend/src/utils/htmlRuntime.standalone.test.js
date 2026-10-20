@@ -279,7 +279,7 @@ describe('a link in an HTML block', () => {
     post(win, block, { type: 'pwb-navigate', href: '//elsewhere.example/' })
     post(win, block, { type: 'pwb-navigate', href: 'javascript:alert(1)' })
     post(win, block, { type: 'pwb-navigate', href: '/s/demo/about-us/' })
-    expect(links).toEqual([['/s/demo/about-us/', false]])
+    expect(links).toEqual([['https://portfolio.example/s/demo/about-us/', false]])
   })
 
   // The URL parser reads a backslash as a slash and drops line breaks, so
@@ -288,6 +288,38 @@ describe('a link in an HTML block', () => {
     const { win, doc } = page('<iframe srcdoc="<p>block</p>"></iframe>')
     const links = followed(doc)
     post(win, doc.querySelector('iframe').contentWindow, { type: 'pwb-navigate', href })
+    expect(links).toEqual([])
+  })
+
+  // Resolved, these are paths of this site that begin with "//": written back
+  // as a relative link, the browser read them as another site.
+  it.each(['/safe/..//elsewhere.example/', '/%2e//elsewhere.example/', '/safe/%2e%2e//elsewhere.example/'])('to a path that resolves to "//…" (%j) stays on this site', (href) => {
+    const { win, doc } = page('<iframe srcdoc="<p>block</p>"></iframe>')
+    const destinations = []
+    doc.addEventListener('click', (event) => {
+      const link = event.target.closest?.('a')
+      if (link) destinations.push(new URL(link.href).origin)
+      event.preventDefault()
+    })
+    post(win, doc.querySelector('iframe').contentWindow, { type: 'pwb-navigate', href })
+    expect(destinations).toEqual(['https://portfolio.example'])
+  })
+
+  it('is followed to the address it resolves to, with its query and fragment', () => {
+    const { win, doc } = page('<iframe srcdoc="<p>block</p>"></iframe>')
+    const links = followed(doc)
+    post(win, doc.querySelector('iframe').contentWindow, { type: 'pwb-navigate', href: '/s/demo/../about/?from=block#details' })
+    expect(links).toEqual([['https://portfolio.example/s/about/?from=block#details', false]])
+  })
+
+  it('is not followed by a page that is not on the web (a file opened from disk)', () => {
+    const dom = new JSDOM('<html><body><iframe srcdoc="<p>block</p>"></iframe></body></html>', { url: 'file:///home/ada/site/about.html', runScripts: 'outside-only' })
+    documents.push(dom)
+    const win = dom.window
+    win.eval(builderInteractiveJs())
+    win.document.dispatchEvent(new win.Event('DOMContentLoaded'))
+    const links = followed(win.document)
+    post(win, win.document.querySelector('iframe').contentWindow, { type: 'pwb-navigate', href: '/about/' })
     expect(links).toEqual([])
   })
 
@@ -303,6 +335,15 @@ describe('a link in an HTML block', () => {
     const { win, doc, parent } = page('<iframe srcdoc="<p>block</p>"></iframe>', { preview: true })
     post(win, doc.querySelector('iframe').contentWindow, { type: 'pwb-navigate', hash: '#page_about' })
     expect(parent.postMessage).toHaveBeenCalledWith({ type: 'pwb-navigate', hash: '#page_about' }, '*')
+  })
+
+  it('to a path of the site is passed up once by a page shown inside the viewer, as it is', () => {
+    const { win, doc, parent } = page('<iframe srcdoc="<p>block</p>"></iframe>', { preview: true })
+    const links = followed(doc)
+    post(win, doc.querySelector('iframe').contentWindow, { type: 'pwb-navigate', href: '/s/demo/about/' })
+    expect(links).toEqual([])
+    expect(parent.postMessage).toHaveBeenCalledTimes(1)
+    expect(parent.postMessage).toHaveBeenCalledWith({ type: 'pwb-navigate', href: '/s/demo/about/' }, '*')
   })
 
   it('in the block itself asks the page around it to go to a path of the site', () => {
