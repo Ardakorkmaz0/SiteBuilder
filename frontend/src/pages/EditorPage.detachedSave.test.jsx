@@ -66,7 +66,7 @@ async function openEditor() {
     <NavigateToSiteTwo />
     <Routes>
       <Route path="/editor/:id" element={<EditorPage />} />
-      <Route path="/profile" element={<h1>Outside the editor</h1>} />
+      <Route path="/sites" element={<h1>Outside the editor</h1>} />
     </Routes>
   </MemoryRouter></LanguageProvider></UiThemeProvider>)
   await waitFor(() => expect(useEditorStore.getState().currentPageId).toBe('home-1'), SLOW)

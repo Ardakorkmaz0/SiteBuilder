@@ -15,9 +15,9 @@ beforeEach(() => {
   useAuthStore.setState({ user: { id: 700, username: 'tester' }, token: 'test-session' })
 })
 
-function renderHeader() {
+function renderHeader(current) {
   return render(<UiThemeProvider><LanguageProvider><MemoryRouter>
-    <DashboardHeader />
+    <DashboardHeader current={current} />
     <input aria-label="Outside the header" />
   </MemoryRouter></LanguageProvider></UiThemeProvider>)
 }
@@ -29,10 +29,13 @@ describe('DashboardHeader Escape focus', () => {
     const trigger = screen.getByRole('button', { name: 'Account menu' })
     await user.click(trigger)
     await user.tab()
-    expect(screen.getByRole('link', { name: 'Profile and projects' })).toHaveFocus()
+    // The menu's first entry, not the Profile tab in the navigation.
+    const entry = document.activeElement
+    expect(entry).toHaveAccessibleName('Profile')
+    expect(entry.closest('nav')).toBeNull()
     await user.keyboard('{Escape}')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('link', { name: 'Profile and projects' })).not.toBeInTheDocument()
+    expect(entry).not.toBeInTheDocument()
     expect(trigger).toHaveFocus()
   })
 
@@ -59,5 +62,28 @@ describe('DashboardHeader Escape focus', () => {
     await user.keyboard('{Escape}')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect(outside).toHaveFocus()
+  })
+})
+
+// The sites used to share a page with the profile (/profile#projects). Each is
+// its own tab now, and the tab of the page you are on says so.
+describe('DashboardHeader tabs', () => {
+  it('sends My sites and Profile to their own pages', () => {
+    renderHeader('profile')
+    const nav = screen.getByRole('navigation', { name: 'Navigation' })
+    expect(within(nav).getByRole('link', { name: 'My sites' })).toHaveAttribute('href', '/sites')
+    const profile = within(nav).getByRole('link', { name: 'Profile' })
+    expect(profile).toHaveAttribute('href', '/profile')
+    expect(profile).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getByRole('link', { name: 'My sites' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('lists each page once in the phone menu', async () => {
+    const user = userEvent.setup()
+    renderHeader('projects')
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    const menu = screen.getByRole('navigation', { name: 'Mobile navigation' })
+    expect(within(menu).getAllByRole('link', { name: 'Profile' })).toHaveLength(1)
+    expect(within(menu).getByRole('link', { name: 'My sites' })).toHaveAttribute('aria-current', 'page')
   })
 })

@@ -37,9 +37,10 @@ export function DashboardAvatar({ user, size = 32 }) {
 
 const NAV_ITEMS = [
   { id: 'explore', label: 'Explore', to: '/', icon: GlobeIcon },
-  { id: 'projects', label: 'My sites', to: '/profile#projects', icon: FolderIcon },
+  { id: 'projects', label: 'My sites', to: '/sites', icon: FolderIcon },
   { id: 'community', label: 'Blocks', to: '/community', icon: LayersIcon },
   { id: 'favorites', label: 'Favorites', to: '/favorites', icon: StarIcon },
+  { id: 'profile', label: 'Profile', to: '/profile', icon: UserIcon },
 ]
 
 // `showSearch` is off on the search page itself, which carries its own search
@@ -165,7 +166,10 @@ export default function DashboardHeader({ current = '', showSearch = true }) {
                 </div>
                 <div className="my-1 border-t studio-divider" />
                 <Link to="/profile" onClick={() => setAccountOpen(false)} className="studio-menu-item">
-                  <UserIcon size={16} /> {t('Profile and projects')}
+                  <UserIcon size={16} /> {t('Profile')}
+                </Link>
+                <Link to="/sites" onClick={() => setAccountOpen(false)} className="studio-menu-item">
+                  <FolderIcon size={16} /> {t('My sites')}
                 </Link>
                 {user?.is_staff && (
                   <Link to="/admin" onClick={() => setAccountOpen(false)} className="studio-menu-item">
@@ -215,9 +219,6 @@ export default function DashboardHeader({ current = '', showSearch = true }) {
                 <NavIcon size={16} /> {t(label)}
               </Link>
             ))}
-            <Link to="/profile" onClick={() => setMobileOpen(false)} className="studio-menu-item">
-              <UserIcon size={16} /> {t('Profile and projects')}
-            </Link>
             {user?.is_staff && (
               <Link to="/admin" onClick={() => setMobileOpen(false)} className="studio-menu-item">
                 <ShieldIcon size={16} /> {t('Admin')}

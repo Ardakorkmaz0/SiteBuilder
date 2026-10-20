@@ -138,7 +138,7 @@ describe('a save made from an older revision', () => {
           <MemoryRouter initialEntries={['/editor/1']}>
             <Routes>
               <Route path="/editor/:id" element={<EditorPage />} />
-              <Route path="/profile" element={<p>profile page</p>} />
+              <Route path="/sites" element={<p>sites page</p>} />
             </Routes>
           </MemoryRouter>
         </LanguageProvider>
@@ -177,7 +177,7 @@ describe('a save made from an older revision', () => {
           <MemoryRouter initialEntries={['/editor/1']}>
             <Routes>
               <Route path="/editor/:id" element={<EditorPage />} />
-              <Route path="/profile" element={<p>profile page</p>} />
+              <Route path="/sites" element={<p>sites page</p>} />
             </Routes>
           </MemoryRouter>
         </LanguageProvider>
@@ -192,7 +192,7 @@ describe('a save made from an older revision', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Save mine anyway' }))
 
-    expect(await screen.findByText('profile page', {}, SLOW)).toBeInTheDocument()
+    expect(await screen.findByText('sites page', {}, SLOW)).toBeInTheDocument()
     expect(updateSite).toHaveBeenCalledTimes(2)
     expect(updateSite.mock.calls[1][1]).not.toHaveProperty('base_revision')
   }, 30000)

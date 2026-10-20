@@ -4,9 +4,11 @@ import SitePreview from './SitePreview.jsx'
 import {
   ArrowRightIcon,
   CheckIcon,
+  ClockIcon,
   CodeIcon,
   CopyIcon,
   EyeIcon,
+  FileIcon,
   GlobeIcon,
   MoreHorizontalIcon,
   PinIcon,
@@ -15,6 +17,7 @@ import {
 } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { siteAddress } from '../../utils/siteAddress.js'
+import { formatRelativeActivity } from '../../utils/siteSort.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 function HealthPill({ complete, children }) {
@@ -39,7 +42,7 @@ export default function OwnerSiteCard({
   onExport,
   busyAction,
 }) {
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
   const address = siteAddress(site)
   const [menuOpen, setMenuOpen] = useState(false)
   useEscapeToClose(menuOpen, () => setMenuOpen(false))
@@ -69,7 +72,7 @@ export default function OwnerSiteCard({
   }
 
   return (
-    <article className="sb-frame group relative flex h-full flex-col overflow-visible rounded-[var(--studio-radius-lg)] border border-[var(--studio-border)] bg-[var(--studio-panel-raised)]">
+    <article className="sb-frame group relative flex h-full flex-col overflow-visible rounded-[var(--studio-radius-lg)] border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] transition-[border-color,box-shadow] duration-150 hover:border-[color-mix(in_srgb,var(--studio-accent)_40%,var(--studio-border))] hover:shadow-[var(--studio-shadow)]">
       {isPinned && (
         <span className="absolute left-4 top-4 z-10 inline-flex items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--studio-accent)_30%,var(--studio-border))] bg-[color-mix(in_srgb,var(--studio-panel-raised)_90%,transparent)] px-2.5 py-1 text-[10px] font-bold text-[var(--studio-accent-hover)] shadow-sm backdrop-blur">
           <PinIcon size={11} /> {t('Pinned')}
@@ -95,6 +98,7 @@ export default function OwnerSiteCard({
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <span className={`dashboard-status ${site.published ? 'dashboard-status-live' : ''}`}>
+              <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
               {site.published ? t('Published') : t('Draft')}
             </span>
             <div ref={menuRef} className="relative">
@@ -144,10 +148,17 @@ export default function OwnerSiteCard({
           </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-4 text-[11px] text-[var(--studio-text-faint)]">
-          <span className="flex items-center gap-1"><EyeIcon size={13} /> {(site.view_count || 0).toLocaleString()}</span>
-          <span className="flex items-center gap-1"><StarIcon size={13} /> {(site.favorite_count || 0).toLocaleString()}</span>
-          <span className="ml-auto">{t('{count} pages', { count: health.page_count || 1 })}</span>
+        {/* The figures carry their names for a screen reader; on screen the
+            icon says it. */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[11px] text-[var(--studio-text-faint)]">
+          <span className="flex items-center gap-1"><EyeIcon size={13} /> <span className="sr-only">{t('Views')}:</span> {(site.view_count || 0).toLocaleString()}</span>
+          <span className="flex items-center gap-1"><StarIcon size={13} /> <span className="sr-only">{t('Favorites')}:</span> {(site.favorite_count || 0).toLocaleString()}</span>
+          <span className="flex items-center gap-1"><FileIcon size={12} /> {t('{count} pages', { count: health.page_count || 1 })}</span>
+          {site.updated_at && (
+            <span className="ml-auto flex min-w-0 items-center gap-1">
+              <ClockIcon size={12} /> <span className="truncate">{t('Edited {time}', { time: formatRelativeActivity(site.updated_at, language) })}</span>
+            </span>
+          )}
         </div>
         <div className="mt-auto flex items-center gap-2 border-t border-[var(--studio-border)] pt-3.5">
           <Link to={`/editor/${site.id}`} aria-label={`${t('Continue editing')}: ${site.title}`} className="studio-btn studio-btn-accent min-h-9 flex-1 px-3">

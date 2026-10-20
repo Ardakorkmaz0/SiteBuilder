@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { getProfile, updateProfile, uploadAvatar } from '../api/profile.js'
 import { fetchMe } from '../api/auth.js'
-import { listSites, createSite, deleteSite, cloneSite, getSite } from '../api/sites.js'
+import { listSites } from '../api/sites.js'
 import { useAuthStore } from '../store/authStore.js'
 import { apiError } from '../utils/errors.js'
-import { useGuestGate } from '../utils/useGuestGate.jsx'
 import { formatRelativeActivity, orderSites } from '../utils/siteSort.js'
 import { useScrollRestore } from '../utils/useScrollRestore.js'
-import OwnerSiteCard from '../components/dashboard/OwnerSiteCard.jsx'
 import DashboardHeader, { DashboardAvatar } from '../components/dashboard/DashboardHeader.jsx'
 import {
+  ArrowRightIcon,
   CheckIcon,
   ClockIcon,
   GithubIcon,
@@ -19,7 +18,6 @@ import {
   LinkIcon,
   MapPinIcon,
   PlusIcon,
-  SearchIcon,
   XSocialIcon,
 } from '../components/icons.jsx'
 import { profileLinks } from '../utils/profileLinks.js'
@@ -28,23 +26,20 @@ import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 import { accountName } from '../utils/accountName.js'
 
 const LINK_ICONS = { website: LinkIcon, github: GithubIcon, twitter: XSocialIcon, instagram: InstagramIcon }
-const PINNED_PROJECTS_KEY = 'pwb_pinned_projects'
 
-function initialPinnedProjects() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(PINNED_PROJECTS_KEY) || '[]')
-    return new Set(Array.isArray(stored) ? stored : [])
-  } catch {
-    return new Set()
-  }
+// The sites used to live on this page, under #projects. An address kept from
+// then (a bookmark, an open tab's menu) still reaches them.
+export default function ProfilePage() {
+  const { hash } = useLocation()
+  if (hash === '#projects') return <Navigate to="/sites" replace />
+  return <Profile />
 }
 
-export default function ProfilePage() {
+function Profile() {
   const { language, t } = useLanguage()
-  useDocumentTitle(t('Profile and projects'))
+  useDocumentTitle(t('Profile'))
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
-  const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')
@@ -75,13 +70,6 @@ export default function ProfilePage() {
 
   const [sites, setSites] = useState([])
   const [sitesLoading, setSitesLoading] = useState(true)
-  const [query, setQuery] = useState('')
-  const [siteFilter, setSiteFilter] = useState('all')
-  const [siteSort, setSiteSort] = useState('updated')
-  const [pinnedIds, setPinnedIds] = useState(initialPinnedProjects)
-  const [busyAction, setBusyAction] = useState('')
-  const [newTitle, setNewTitle] = useState('')
-  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     getProfile()
@@ -106,11 +94,6 @@ export default function ProfilePage() {
       .finally(() => setSitesLoading(false))
   }, [])
 
-  const visibleSites = useMemo(() => orderSites(sites, query, {
-    filter: siteFilter,
-    sort: siteSort,
-    pinnedIds,
-  }), [pinnedIds, query, siteFilter, siteSort, sites])
   const stats = useMemo(() => ({
     total: sites.length,
     published: sites.filter((site) => site.published).length,
@@ -171,79 +154,6 @@ export default function ProfilePage() {
     }
   }
 
-  // A guest at the site limit is told what an account changes, with the way to
-  // one, instead of a line of red text.
-  const { gate: guestGate, dialog: guestDialog } = useGuestGate()
-
-  async function onCreate(event) {
-    event.preventDefault()
-    if (!newTitle.trim()) return
-    setCreating(true)
-    try {
-      const site = await createSite(newTitle.trim())
-      navigate(`/editor/${site.id}`)
-    } catch (requestError) {
-      setCreating(false)
-      if (requestError?.response?.data?.code === 'guest_forbidden' && guestGate('limit')) return
-      setError(apiError(requestError))
-    }
-  }
-
-  async function onDelete(id) {
-    if (!window.confirm(t('Delete this site? This cannot be undone.'))) return
-    try {
-      await deleteSite(id)
-      setSites((previous) => previous.filter((site) => site.id !== id))
-    } catch (requestError) {
-      setError(apiError(requestError))
-    }
-  }
-
-  function onTogglePin(site) {
-    setPinnedIds((previous) => {
-      const next = new Set(previous)
-      if (next.has(site.id)) next.delete(site.id)
-      else next.add(site.id)
-      localStorage.setItem(PINNED_PROJECTS_KEY, JSON.stringify([...next]))
-      return next
-    })
-  }
-
-  async function onDuplicate(site) {
-    setBusyAction(`duplicate-${site.id}`)
-    setError('')
-    try {
-      const copy = await cloneSite(site.slug)
-      setSites((previous) => [{ ...copy, favorite_count: 0 }, ...previous])
-    } catch (requestError) {
-      if (requestError?.response?.data?.code === 'guest_forbidden' && guestGate('limit')) return
-      setError(apiError(requestError))
-    } finally {
-      setBusyAction('')
-    }
-  }
-
-  async function onExport(site) {
-    setBusyAction(`export-${site.id}`)
-    setError('')
-    try {
-      const project = await getSite(site.id)
-      const blob = new Blob([
-        JSON.stringify({ format: 'sitebuilder-project', version: 1, site: project }, null, 2),
-      ], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = `${site.slug || 'site'}.sitebuilder.json`
-      anchor.click()
-      URL.revokeObjectURL(url)
-    } catch (requestError) {
-      setError(apiError(requestError))
-    } finally {
-      setBusyAction('')
-    }
-  }
-
   const profileUser = {
     ...user,
     avatar_url: profile?.avatar_url || user?.avatar_url,
@@ -264,14 +174,14 @@ export default function ProfilePage() {
       <a href="#profile-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-[var(--studio-panel-raised)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--studio-accent-hover)] focus:shadow-lg">
         {t('Skip to content')}
       </a>
-      <DashboardHeader current="projects" />
+      <DashboardHeader current="profile" />
 
       <main id="profile-main" className="dashboard-container">
         <div className="dashboard-page-heading">
           <div>
             <div>
-              <h1 className="text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">{t('Profile and projects')}</h1>
-              <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('Manage your public identity and every site in one place.')}</p>
+              <h1 className="text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">{t('Profile')}</h1>
+              <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('Your public identity across Sitebuilder.')}</p>
             </div>
           </div>
           {user?.id && (
@@ -369,35 +279,36 @@ export default function ProfilePage() {
           </section>
         )}
 
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(17rem,0.72fr)_minmax(0,1.55fr)]">
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(17rem,0.8fr)]">
           <section className="dashboard-section-card p-5 sm:p-6" aria-labelledby="profile-details-heading">
             <h2 id="profile-details-heading" className="text-lg font-semibold text-[var(--studio-text)]">{t('Profile details')}</h2>
             <p className="mt-1 text-xs leading-5 text-[var(--studio-text-muted)]">{t('Update the name and bio shown across Sitebuilder.')}</p>
 
             {!loading && (
               <form onSubmit={onSave} className="mt-5 space-y-4">
-                <div>
-                  <label htmlFor="profile-display-name" className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Display name')}</label>
-                  <input
-                    className="studio-input w-full px-3 py-2 text-sm"
-                    id="profile-display-name"
-                    placeholder={user?.is_guest ? t('Your name') : profile?.username}
-                    value={displayName}
-                    maxLength={80}
-                    onChange={(event) => setDisplayName(event.target.value)}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="profile-headline" className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Headline')}</label>
-                  <input
-                    className="studio-input w-full px-3 py-2 text-sm"
-                    id="profile-headline"
-                    placeholder={t('e.g. Product designer')}
-                    value={meta.headline}
-                    maxLength={80}
-                    onChange={setMetaField('headline')}
-                  />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="profile-display-name" className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Display name')}</label>
+                    <input
+                      className="studio-input w-full px-3 py-2 text-sm"
+                      id="profile-display-name"
+                      placeholder={user?.is_guest ? t('Your name') : profile?.username}
+                      value={displayName}
+                      maxLength={80}
+                      onChange={(event) => setDisplayName(event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="profile-headline" className="mb-1.5 block text-xs font-semibold text-[var(--studio-text-muted)]">{t('Headline')}</label>
+                    <input
+                      className="studio-input w-full px-3 py-2 text-sm"
+                      id="profile-headline"
+                      placeholder={t('e.g. Product designer')}
+                      value={meta.headline}
+                      maxLength={80}
+                      onChange={setMetaField('headline')}
+                    />
+                  </div>
                 </div>
                 <div>
                   <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -475,122 +386,53 @@ export default function ProfilePage() {
             )}
           </section>
 
-          <section className="dashboard-section-card p-5" aria-labelledby="launch-checklist-heading">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 id="launch-checklist-heading" className="font-semibold text-[var(--studio-text)]">{t('Make your workspace ready')}</h2>
-              </div>
-              <span className="text-xs font-bold text-[var(--studio-accent-hover)]">{completedLaunchSteps}/{launchSteps.length}</span>
-            </div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--studio-control)]">
-              <span className="block h-full rounded-full bg-[var(--studio-accent)]" style={{ width: `${completedLaunchSteps / launchSteps.length * 100}%` }} />
-            </div>
-            <div className="mt-4 space-y-2.5">
-              {launchSteps.map((step) => (
-                <div key={step.label} className="flex items-center gap-2 text-xs">
-                  <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${step.done ? 'border-[var(--studio-success)] bg-[var(--studio-success-soft)] text-[var(--studio-success)]' : 'border-[var(--studio-border)] text-[var(--studio-text-faint)]'}`}>
-                    {step.done && <CheckIcon size={12} />}
-                  </span>
-                  <span className={step.done ? 'text-[var(--studio-text-muted)] line-through' : 'font-medium text-[var(--studio-text)]'}>{step.label}</span>
+          <div className="space-y-6">
+            <section className="dashboard-section-card p-5" aria-labelledby="launch-checklist-heading">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 id="launch-checklist-heading" className="font-semibold text-[var(--studio-text)]">{t('Make your workspace ready')}</h2>
                 </div>
-              ))}
-            </div>
-          </section>
-
-          {recentActivity.length > 0 && (
-            <section className="dashboard-section-card p-5" aria-labelledby="activity-heading">
-              <h2 id="activity-heading" className="font-semibold text-[var(--studio-text)]">{t('Recent changes')}</h2>
-              <div className="mt-4 space-y-3">
-                {recentActivity.map((site) => (
-                  <Link key={site.id} to={`/editor/${site.id}`} className="flex items-start gap-3 rounded-lg p-1.5 hover:bg-[var(--studio-control-hover)]">
-                    <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[var(--studio-control)] text-[var(--studio-text-muted)]"><ClockIcon size={13} /></span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-xs font-semibold text-[var(--studio-text)]">{site.title}</span>
-                      <span className="mt-0.5 block text-[10px] text-[var(--studio-text-faint)]">{t('Edited {time}', { time: formatRelativeActivity(site.updated_at, language) })}</span>
+                <span className="text-xs font-bold text-[var(--studio-accent-hover)]">{completedLaunchSteps}/{launchSteps.length}</span>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--studio-control)]">
+                <span className="block h-full rounded-full bg-[var(--studio-accent)]" style={{ width: `${completedLaunchSteps / launchSteps.length * 100}%` }} />
+              </div>
+              <div className="mt-4 space-y-2.5">
+                {launchSteps.map((step) => (
+                  <div key={step.label} className="flex items-center gap-2 text-xs">
+                    <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${step.done ? 'border-[var(--studio-success)] bg-[var(--studio-success-soft)] text-[var(--studio-success)]' : 'border-[var(--studio-border)] text-[var(--studio-text-faint)]'}`}>
+                      {step.done && <CheckIcon size={12} />}
                     </span>
-                  </Link>
+                    <span className={step.done ? 'text-[var(--studio-text-muted)] line-through' : 'font-medium text-[var(--studio-text)]'}>{step.label}</span>
+                  </div>
                 ))}
               </div>
             </section>
-          )}
-          </div>
 
-          <section id="projects" className="dashboard-section-card min-w-0 p-5 sm:p-6" aria-labelledby="projects-heading">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 id="projects-heading" className="text-lg font-semibold text-[var(--studio-text)]">{t('My sites')}</h2>
-                <p className="mt-1 text-xs leading-5 text-[var(--studio-text-muted)]">{t('Create, search, and manage every site you own.')}</p>
-              </div>
-              <form onSubmit={onCreate} className="flex min-w-0 gap-2">
-                <input
-                  className="studio-input min-w-0 flex-1 px-3 py-2 text-sm sm:w-44"
-                  placeholder={t('New site title')}
-                  aria-label={t('New site title')}
-                  value={newTitle}
-                  onChange={(event) => setNewTitle(event.target.value)}
-                />
-                <button type="submit" disabled={creating || !newTitle.trim()} className="studio-btn studio-btn-primary shrink-0 px-3">
-                  <PlusIcon size={15} /> <span className="hidden sm:inline">{creating ? t('Creating…') : t('Create')}</span>
-                </button>
-              </form>
-            </div>
-
-            {sites.length > 0 && (
-              <div className="mt-5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--studio-text-faint)]"><SearchIcon size={15} /></span>
-                  <input
-                    className="studio-input w-full py-2 pl-9 pr-3 text-sm"
-                    placeholder={t('Search your sites…')}
-                    aria-label={t('Search your sites…')}
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
+            {recentActivity.length > 0 && (
+              <section className="dashboard-section-card p-5" aria-labelledby="activity-heading">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 id="activity-heading" className="font-semibold text-[var(--studio-text)]">{t('Recent changes')}</h2>
+                  <Link to="/sites" className="flex items-center gap-1 text-xs font-semibold text-[var(--studio-accent-hover)] hover:underline">
+                    {t('All sites')} <ArrowRightIcon size={13} />
+                  </Link>
                 </div>
-                <select aria-label={t('Filter projects')} value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)} className="studio-input min-h-9 px-3 text-xs font-semibold">
-                  <option value="all">{t('All projects')}</option>
-                  <option value="published">{t('Published')}</option>
-                  <option value="draft">{t('Drafts')}</option>
-                  <option value="pinned">{t('Pinned')}</option>
-                </select>
-                <select aria-label={t('Sort projects')} value={siteSort} onChange={(event) => setSiteSort(event.target.value)} className="studio-input min-h-9 px-3 text-xs font-semibold">
-                  <option value="updated">{t('Recently updated')}</option>
-                  <option value="name">{t('Name')}</option>
-                  <option value="views">{t('Most viewed')}</option>
-                  <option value="favorites">{t('Most favorited')}</option>
-                </select>
-              </div>
+                <div className="mt-4 space-y-3">
+                  {recentActivity.map((site) => (
+                    <Link key={site.id} to={`/editor/${site.id}`} className="flex items-start gap-3 rounded-lg p-1.5 hover:bg-[var(--studio-control-hover)]">
+                      <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[var(--studio-control)] text-[var(--studio-text-muted)]"><ClockIcon size={13} /></span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-semibold text-[var(--studio-text)]">{site.title}</span>
+                        <span className="mt-0.5 block text-[10px] text-[var(--studio-text-faint)]">{t('Edited {time}', { time: formatRelativeActivity(site.updated_at, language) })}</span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
             )}
-
-            {sitesLoading ? (
-              <p className="mt-6 text-sm text-[var(--studio-text-muted)]">{t('Loading…')}</p>
-            ) : sites.length === 0 ? (
-              <div className="mt-6 rounded-xl border border-dashed border-[var(--studio-border)] py-12 text-center">
-                <p className="font-medium text-[var(--studio-text)]">{t('No sites yet')}</p>
-                <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('Create your first site above.')}</p>
-              </div>
-            ) : visibleSites.length === 0 ? (
-              <p className="mt-6 text-sm text-[var(--studio-text-muted)]">{t('No sites match “{query}”.', { query })}</p>
-            ) : (
-              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-                {visibleSites.map((site) => (
-                  <OwnerSiteCard
-                    key={site.id}
-                    site={site}
-                    isPinned={pinnedIds.has(site.id)}
-                    onTogglePin={onTogglePin}
-                    onDelete={({ id }) => onDelete(id)}
-                    onDuplicate={onDuplicate}
-                    onExport={onExport}
-                    busyAction={busyAction}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+          </div>
         </div>
       </main>
-      {guestDialog}
     </div>
   )
 }

@@ -431,7 +431,7 @@ function SiteEditor() {
   // Back LEAVES the editor. One history step back is usually another editor
   // (open a site, return, open the next), and moving between pages of a design
   // is what the page list is for — this button is the way out.
-  const goBack = useCallback(() => navigate(lastPageOutside('/profile')), [navigate])
+  const goBack = useCallback(() => navigate(lastPageOutside('/sites')), [navigate])
   const theme = useEditorStore((s) => s.schema.theme)
   // The open page's own theme, when it keeps one ("This page only").
   const openPageTheme = useEditorStore((s) => s.schema.pages.find((p) => p.id === s.currentPageId)?.theme)
