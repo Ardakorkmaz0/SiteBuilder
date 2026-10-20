@@ -81,3 +81,16 @@ describe('ExploreCard', () => {
     expect(screen.getByRole('button', { name: /Creating copy/ })).toBeDisabled()
   })
 })
+
+// Every card on Explore has the same star, "Use as template" and "View":
+// moving from control to control, a screen reader never said which site.
+describe('an explore card control', () => {
+  it('says which site it acts on', () => {
+    localStorage.setItem('pwb_language', 'en')
+    renderCard({ onToggleFav: vi.fn(), onRemix: vi.fn() })
+    expect(screen.getByRole('button', { name: 'Favorite' })).toHaveAccessibleDescription('Modern Portfolio')
+    expect(screen.getByRole('button', { name: /Use as template/ })).toHaveAccessibleDescription('Modern Portfolio')
+    expect(screen.getByRole('link', { name: 'View' })).toHaveAccessibleDescription('Modern Portfolio')
+  })
+})
+
