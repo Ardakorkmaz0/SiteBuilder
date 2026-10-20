@@ -11,6 +11,9 @@ describe('an audit entry detail', () => {
     expect(auditDetail('Owner @ada', tr)).toBe('Sahibi: @ada')
     expect(auditDetail('Report 12 (spam)', tr)).toBe('12 numaralı şikâyet: Spam veya yanıltıcı')
     expect(auditDetail('Report 3 (malware)', tr)).toBe('3 numaralı şikâyet: Zararlı veya kimlik avı')
+    expect(auditDetail('Report 4 (inappropriate)', tr)).toBe('4 numaralı şikâyet: Uygunsuz veya saldırgan')
+    expect(auditDetail('Report 6 (copyright)', tr)).toBe('6 numaralı şikâyet: Telif ihlali veya kimliğe bürünme')
+    expect(auditDetail('Report 8 (other)', tr)).toBe('8 numaralı şikâyet: Diğer')
     expect(auditDetail('4 copies removed', tr)).toBe('4 kopya silindi')
   })
 
