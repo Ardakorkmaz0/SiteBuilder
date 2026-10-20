@@ -2,7 +2,7 @@
 // visible labels used to sit beside their fields without naming them, so the
 // form read as a row of unnamed text boxes.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { fireEvent, render, screen } from '@testing-library/react'
 import LanguageProvider from '../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../ui/UiThemeProvider.jsx'
@@ -40,10 +40,29 @@ describe('the profile form', () => {
       </MemoryRouter>,
     )
 
-    for (const name of ['Display name', 'Headline', 'Bio', 'Location', 'Website', 'New site title']) {
+    for (const name of ['Display name', 'Headline', 'Bio', 'Location', 'Website']) {
       expect(await screen.findByRole('textbox', { name })).toBeInTheDocument()
     }
-    expect(await screen.findByRole('textbox', { name: 'Search your sites…' })).toBeInTheDocument()
+  })
+})
+
+// The sites moved to their own page. An address kept from when they lived
+// here, under #projects, still reaches them.
+describe('the old address of the site list', () => {
+  it('opens My sites', async () => {
+    render(
+      <MemoryRouter initialEntries={['/profile#projects']}>
+        <UiThemeProvider>
+          <LanguageProvider>
+            <Routes>
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/sites" element={<h1>Sites page</h1>} />
+            </Routes>
+          </LanguageProvider>
+        </UiThemeProvider>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('heading', { name: 'Sites page' })).toBeInTheDocument()
   })
 })
 

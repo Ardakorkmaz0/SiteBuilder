@@ -27,6 +27,7 @@ const ExplorePage = lazyChunk(() => import('./pages/ExplorePage.jsx'))
 const PreviewPage = lazyChunk(() => import('./pages/PreviewPage.jsx'))
 const CodeProjectPage = lazyChunk(() => import('./pages/CodeProjectPage.jsx'))
 const ProfilePage = lazyChunk(() => import('./pages/ProfilePage.jsx'))
+const SitesPage = lazyChunk(() => import('./pages/SitesPage.jsx'))
 const PublicProfilePage = lazyChunk(() => import('./pages/PublicProfilePage.jsx'))
 const FavoritesPage = lazyChunk(() => import('./pages/FavoritesPage.jsx'))
 const SearchPage = lazyChunk(() => import('./pages/SearchPage.jsx'))
@@ -106,6 +107,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ThemedPage><CodeProjectPage /></ThemedPage>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sites"
+            element={
+              <ProtectedRoute>
+                <ThemedPage><SitesPage /></ThemedPage>
               </ProtectedRoute>
             }
           />
