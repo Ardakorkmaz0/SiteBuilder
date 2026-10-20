@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import SitePreview from './SitePreview.jsx'
 import { ArrowRightIcon, CopyIcon, StarIcon, EyeIcon, PinIcon } from '../icons.jsx'
@@ -33,6 +34,8 @@ export default function ExploreCard({
   const { t } = useLanguage()
   const favoriteLabel = site.is_favorited ? t('Unfavorite') : t('Favorite')
   const pinLabel = site.pinned ? t('Unpin from the home page') : t('Pin to the home page')
+  // Every card has the same controls: each one names its site as well.
+  const titleId = useId()
 
   return (
     <article className="dashboard-site-card group">
@@ -41,6 +44,7 @@ export default function ExploreCard({
           to={`/site/${site.slug}`}
           className="dashboard-site-card-preview"
           title={t('Open the live site')}
+          aria-describedby={titleId}
         >
           <SitePreview site={site} source="public" height={164} framed={false} />
         </Link>
@@ -52,6 +56,7 @@ export default function ExploreCard({
           aria-pressed={site.is_favorited}
           title={favoriteLabel}
           aria-label={favoriteLabel}
+          aria-describedby={titleId}
           className={`dashboard-site-card-favorite ${site.is_favorited ? 'dashboard-site-card-favorite-active' : ''}`}
         >
           <StarIcon size={17} filled={site.is_favorited} />
@@ -65,6 +70,7 @@ export default function ExploreCard({
             aria-pressed={!!site.pinned}
             title={pinLabel}
             aria-label={pinLabel}
+            aria-describedby={titleId}
             className={`dashboard-site-card-pin ${site.pinned ? 'dashboard-site-card-pin-active' : ''}`}
           >
             <PinIcon size={16} />
@@ -85,7 +91,7 @@ export default function ExploreCard({
             </span>
           )}
           <Link to={`/site/${site.slug}`} className="dashboard-site-card-title-link">
-            <h2 className="truncate text-base font-bold tracking-[-0.025em] text-[var(--studio-text)]">{site.title}</h2>
+            <h2 id={titleId} className="truncate text-base font-bold tracking-[-0.025em] text-[var(--studio-text)]">{site.title}</h2>
           </Link>
         </div>
 
@@ -121,12 +127,13 @@ export default function ExploreCard({
               type="button"
               disabled={remixing}
               onClick={() => onRemix(site)}
+              aria-describedby={titleId}
               className="dashboard-site-card-remix"
             >
               <CopyIcon size={13} /> {remixing ? t('Creating copy…') : t('Use as template')}
             </button>
           )}
-          <Link to={`/site/${site.slug}`} className="dashboard-site-card-open">
+          <Link to={`/site/${site.slug}`} aria-describedby={titleId} className="dashboard-site-card-open">
             <span>{t('View')}</span>
             <span className="dashboard-site-card-open-icon"><ArrowRightIcon size={13} /></span>
           </Link>
