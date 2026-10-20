@@ -16,6 +16,11 @@ import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 // `mode`: 'html' shows has-document dots + import; 'pages' is the component
 // editor variant (every page always "has" content).
 
+// The page a chooser just created, until a page list shows and focuses it.
+let newPageToFocus = null
+const rememberNewPage = (pageId) => { newPageToFocus = pageId }
+const forgetNewPage = (pageId) => { if (newPageToFocus === pageId) newPageToFocus = null }
+
 export default function PageFilesPanel({
   htmlMap = {},
   mode = 'html',
@@ -50,8 +55,9 @@ export default function PageFilesPanel({
     addPage(t('New Page'), addPrompt.folder, mode)
     setAddPrompt(null)
     // The new page takes the keyboard (it went back to "+ File", which said
-    // nothing about the page that now exists).
-    refocusPageRef.current = useEditorStore.getState().currentPageId
+    // nothing about the page that now exists). Kept outside this panel: a
+    // page in the other editor mode is listed by a freshly mounted one.
+    rememberNewPage(useEditorStore.getState().currentPageId)
     setRefocusTick((tick) => tick + 1)
   }
 
@@ -61,12 +67,16 @@ export default function PageFilesPanel({
   const refocusPageRef = useRef(null)
   const [refocusTick, setRefocusTick] = useState(0)
   useEffect(() => {
-    if (editingId || !refocusPageRef.current) return
-    const pageId = refocusPageRef.current
-    refocusPageRef.current = null
+    if (editingId) return
+    const pageId = refocusPageRef.current || newPageToFocus
+    if (!pageId) return
     const buttons = rootRef.current?.querySelectorAll('[data-page-button]') || []
-    ;[...buttons].find((button) => button.dataset.pageButton === pageId)?.focus()
-  }, [editingId, refocusTick])
+    const button = [...buttons].find((item) => item.dataset.pageButton === pageId)
+    if (!button) return
+    refocusPageRef.current = null
+    forgetNewPage(pageId)
+    button.focus()
+  }, [editingId, refocusTick, pages])
 
   const commitRename = () => {
     if (editingId && draft.trim()) {
