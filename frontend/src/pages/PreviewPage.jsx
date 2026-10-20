@@ -314,7 +314,7 @@ export default function PreviewPage() {
     const pages = site?.schema?.pages || []
     let settled = false
     const pick = () => {
-      const h = decodeURIComponent((window.location.hash || '').replace(/^#/, ''))
+      const h = previewPageId(window.location.hash)
       if (pages.some((p) => p.id === h)) {
         setActiveId(h)
         settled = true

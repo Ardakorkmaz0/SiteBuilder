@@ -91,6 +91,42 @@ describe('public preview message authorization', () => {
   })
 })
 
+describe('public preview URL hashes', () => {
+  it('opens the home page when the initial URL contains a malformed escape', async () => {
+    window.history.replaceState(null, '', '/site/security-preview#%E0%A4%A')
+    await mount()
+    expect(screen.getByTitle('Security preview').srcdoc).toContain('Home page')
+  })
+
+  it('keeps the selected page after a malformed hash and still accepts encoded page ids', async () => {
+    getPublicSite.mockResolvedValue({
+      ...site,
+      schema: { pages: [site.schema.pages[0], { ...site.schema.pages[1], id: 'contact us' }] },
+    })
+    window.history.replaceState(null, '', '/site/security-preview#contact%20us')
+    await mount()
+    expect(screen.getByTitle('Security preview').srcdoc).toContain('Contact page')
+    const errors = []
+    const onError = (event) => { errors.push(event.error); event.preventDefault() }
+    window.addEventListener('error', onError)
+    try {
+      act(() => {
+        window.history.replaceState(null, '', '/site/security-preview#%E0%A4%A')
+        window.dispatchEvent(new HashChangeEvent('hashchange'))
+      })
+      expect(errors).toEqual([])
+    } finally {
+      window.removeEventListener('error', onError)
+    }
+    expect(screen.getByTitle('Security preview').srcdoc).toContain('Contact page')
+    act(() => {
+      window.history.replaceState(null, '', '/site/security-preview#home')
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    await waitFor(() => expect(screen.getByTitle('Security preview').srcdoc).toContain('Home page'))
+  })
+})
+
 describe('private review message authorization', () => {
   it('only lets the current preview change the page attached to feedback', async () => {
     await mount(true)

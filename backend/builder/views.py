@@ -44,7 +44,7 @@ from .ai_policy import local_ai_available, provider_refusal, public_ai_policy
 from .shared_marks import insert_before_body_end, strip_marked, wrap_marked
 from .access import SHARE_OPEN, SHARE_PRIVATE, is_public, is_reachable, public_sites, share_access
 from .accounts import normalise_username
-from .throttles import ScopedIPRateThrottle
+from .throttles import PublicFormRateThrottle, ScopedIPRateThrottle
 from .models import (
     _domain_verification_token,
     Favorite,
@@ -840,14 +840,24 @@ class SiteViewSet(viewsets.ModelViewSet):
         site = self.get_object()
 
         if request.method == 'POST':
-            mode = str(request.data.get('mode') or '').strip()
-            if mode:
-                if mode not in dict(Site.SHARE_CHOICES):
-                    return error_response('invalid_share_mode', 'Unknown sharing mode.')
-                site.share_mode = mode
-                site.save(update_fields=['share_mode', 'updated_at'])
+            if not isinstance(request.data, dict):
+                return error_response('validation_error', 'Sharing settings must be an object.')
+            mode = request.data.get('mode')
+            if mode is None:
+                mode = ''
+            if not isinstance(mode, str):
+                return error_response('invalid_share_mode', 'Unknown sharing mode.')
+            mode = mode.strip()
+            if mode and mode not in dict(Site.SHARE_CHOICES):
+                return error_response('invalid_share_mode', 'Unknown sharing mode.')
 
-            add = str(request.data.get('add') or '').strip()
+            add = request.data.get('add')
+            if add is None:
+                add = ''
+            if not isinstance(add, str):
+                return error_response('validation_error', 'Enter an account username to invite.')
+            add = add.strip()
+            person = None
             if add:
                 person = User.objects.filter(username__iexact=add, is_active=True).first()
                 if person is None:
@@ -856,11 +866,32 @@ class SiteViewSet(viewsets.ModelViewSet):
                     return error_response('already_owner', 'That is the owner of this project.')
                 if is_guest(person):
                     return error_response('user_not_found', 'No account with that username.')
-                SiteViewer.objects.get_or_create(site=site, user=person)
 
             remove = request.data.get('remove')
-            if remove:
-                SiteViewer.objects.filter(site=site, user_id=remove).delete()
+            remove_id = None
+            if remove is not None and remove != '':
+                if isinstance(remove, bool) or not isinstance(remove, (int, str)):
+                    return error_response('validation_error', 'Enter a positive account id to remove.')
+                try:
+                    remove_id = int(remove)
+                except (ValueError, TypeError):
+                    return error_response('validation_error', 'Enter a positive account id to remove.')
+                if remove_id <= 0:
+                    return error_response('validation_error', 'Enter a positive account id to remove.')
+
+            # Validate every operation before opening a link, then apply the
+            # whole permission change under one lock. A refused invite or a
+            # failed viewer write must leave a private project private.
+            with transaction.atomic():
+                site = get_object_or_404(Site.objects.select_for_update(), pk=site.pk, owner=request.user)
+                if mode:
+                    site.share_mode = mode
+                    site.save(update_fields=['share_mode', 'updated_at'])
+                if person is not None:
+                    SiteViewer.objects.get_or_create(site=site, user=person)
+                if remove_id is not None:
+                    SiteViewer.objects.filter(site=site, user_id=remove_id).delete()
+                return Response(self._share_state(site, request))
 
         return Response(self._share_state(site, request))
 
@@ -1253,6 +1284,10 @@ class SiteViewCountView(APIView):
 
 class PublicFormSubmissionView(APIView):
     permission_classes = [AllowAny]
+    throttle_scope = 'public_form'
+
+    def get_throttles(self):
+        return [*super().get_throttles(), PublicFormRateThrottle()]
 
     def post(self, request, slug):
         try:
