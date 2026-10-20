@@ -61,7 +61,7 @@ export default function AdminBlocks() {
               <li key={block.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-[var(--studio-text)]">{block.title}</span>
+                    <span id={`admin-block-${block.id}`} className="font-medium text-[var(--studio-text)]">{block.title}</span>
                     <Chip tone={STATUS_TONE[block.status]}>{t(STATUS_LABEL[block.status] || block.status)}</Chip>
                     {block.visibility === 'private' && <Chip>{t('Private')}</Chip>}
                     {!block.author && <Chip tone="warning">{t('Author deleted, not in the library')}</Chip>}
@@ -73,15 +73,15 @@ export default function AdminBlocks() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {block.status === 'published' && (
-                    <button type="button" disabled={busy === block.id} onClick={() => act(block, 'remove')} className="studio-btn studio-btn-secondary">{t('Unlist block')}</button>
+                    <button type="button" disabled={busy === block.id} aria-describedby={`admin-block-${block.id}`} onClick={() => act(block, 'remove')} className="studio-btn studio-btn-secondary">{t('Unlist block')}</button>
                   )}
                   {block.status === 'removed' && (
-                    <button type="button" disabled={busy === block.id} onClick={() => act(block, 'restore')} className="studio-btn studio-btn-secondary">{t('Put back in the library')}</button>
+                    <button type="button" disabled={busy === block.id} aria-describedby={`admin-block-${block.id}`} onClick={() => act(block, 'restore')} className="studio-btn studio-btn-secondary">{t('Put back in the library')}</button>
                   )}
                   {block.use_count > 0 && (
                     <button
                       type="button"
-                      disabled={busy === block.id}
+                      disabled={busy === block.id} aria-describedby={`admin-block-${block.id}`}
                       onClick={() => act(block, 'purge')}
                       className="studio-btn border-[color-mix(in_srgb,var(--studio-danger)_45%,var(--studio-border))] text-[var(--studio-danger)] hover:bg-[var(--studio-danger-soft)]"
                     >

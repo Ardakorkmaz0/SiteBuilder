@@ -10,7 +10,7 @@
 // not be the place that assumption is tested — a preview should never be able
 // to run something the library was supposed to have refused.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import DashboardHeader from '../components/dashboard/DashboardHeader.jsx'
 import UseComponentDialog from '../components/community/UseComponentDialog.jsx'
 import ReportComponentDialog from '../components/community/ReportComponentDialog.jsx'
@@ -43,6 +43,8 @@ const CATEGORIES = [
 // One card = one real component, rendered in isolation at a readable size.
 function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVisibility, mine, t }) {
   const isPrivate = component.visibility === 'private'
+  // Every card has the same buttons: each one names its block as well.
+  const titleId = useId()
 
   useEffect(() => {
     // Counted once per card that actually appears, and by POST — a render or a
@@ -84,7 +86,7 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
       </div>
 
       <div className="dashboard-site-card-body">
-        <h3 className="truncate text-base font-semibold text-[var(--studio-text)]">{component.title}</h3>
+        <h3 id={titleId} className="truncate text-base font-semibold text-[var(--studio-text)]">{component.title}</h3>
         {component.description && (
           <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--studio-text-muted)]">{component.description}</p>
         )}
@@ -107,6 +109,7 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
                 onClick={() => onVisibility(component, isPrivate ? 'public' : 'private')}
                 title={isPrivate ? t('Make public') : t('Make private')}
                 aria-label={isPrivate ? t('Make public') : t('Make private')}
+                aria-describedby={titleId}
                 className="dashboard-site-card-remix"
               >
                 {isPrivate ? <GlobeIcon size={13} /> : <BanIcon size={13} />}
@@ -116,6 +119,7 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
                 onClick={() => onWithdraw(component)}
                 title={t('Withdraw')}
                 aria-label={t('Withdraw')}
+                aria-describedby={titleId}
                 className="dashboard-site-card-remix"
               >
                 <TrashIcon size={13} />
@@ -127,12 +131,13 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
               onClick={() => onReport(component)}
               title={t('Report this block')}
               aria-label={t('Report this block')}
+                aria-describedby={titleId}
               className="dashboard-site-card-remix"
             >
               <FlagIcon size={13} />
             </button>
           )}
-          <button type="button" onClick={() => onUse(component)} className="dashboard-site-card-open">
+          <button type="button" onClick={() => onUse(component)} aria-describedby={titleId} className="dashboard-site-card-open">
             <span>{t('Use this')}</span>
             <span className="dashboard-site-card-open-icon"><ArrowRightIcon size={13} /></span>
           </button>

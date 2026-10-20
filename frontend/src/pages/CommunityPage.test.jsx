@@ -142,6 +142,15 @@ describe('looking closer before taking', () => {
 })
 
 describe('who may do what to a block', () => {
+  // Every card has the same "Use this" and "Report this block": moving from
+  // button to button, a screen reader said those words and never which block.
+  it('says which block a card button acts on', async () => {
+    renderPage()
+    await screen.findByTitle('Pricing card')
+    expect(screen.getByRole('button', { name: 'Use this' })).toHaveAccessibleDescription('Pricing card')
+    expect(screen.getByRole('button', { name: 'Report this block' })).toHaveAccessibleDescription('Pricing card')
+  })
+
   it('offers a stranger the report action, not the withdraw one', async () => {
     renderPage()
     await screen.findByTitle('Pricing card')
