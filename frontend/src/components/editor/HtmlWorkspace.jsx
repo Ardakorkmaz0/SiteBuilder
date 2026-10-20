@@ -267,6 +267,8 @@ function scrollOnceScript(index) {
 // Editor-only extras appended to the view srcDoc (kept out of saved HTML —
 // saving reads the html prop / edit DOM, never the view document).
 const HTML_ZOOM_KEY = 'pwb_html_canvas_zoom'
+// How long Edit waits for its reading of the page before opening without it.
+const READING_TIMEOUT_MS = 3000
 const HTML_RESIZE_OVERLAY_ATTR = 'data-pwb-resize-overlay'
 const HTML_RESIZE_MIN = 20
 const HTML_RESIZE_EDGE = 14
@@ -657,6 +659,8 @@ function HtmlWorkspace({
   // is ready — needed when edit/link is restored on mount (the first effect run
   // happens before the iframe body exists).
   const [loadTick, setLoadTick] = useState(0)
+  // The document the stage iframe has actually loaded (see `preparing`).
+  const [loadedSrcDoc, setLoadedSrcDoc] = useState(null)
   // Link-tool guidance as [message, values], translated where it is shown:
   // the listeners that set it outlive a language switch.
   const [linkHint, setLinkHint] = useState(null)
@@ -1733,6 +1737,7 @@ function HtmlWorkspace({
       onLinkArmedChange?.(false)
     }
     loadedDocRef.current = doc
+    setLoadedSrcDoc(iframeRef.current?.getAttribute('srcdoc') ?? null)
     // Tell the tool manager the document is now ready, so a restored edit/link
     // surface binds its listeners (the first effect pass ran before this load).
     setLoadTick((tick) => tick + 1)
@@ -1957,6 +1962,20 @@ function HtmlWorkspace({
   // The same goes for a document Edit was reseeded with (undo, redo, a PC/phone
   // switch): the older reading is of another document, so a new one is taken.
   const measuring = mode === 'edit' && !readingIsCurrent && !!String(html || '').trim()
+  // Laying the reading over the edit document reloads it, and anything typed
+  // into the document before that was lost (on /code every entry into Edit is
+  // read again). So the edit surface is inert until the document it keeps is
+  // the one loaded. A reading that never comes (a script that hangs) gives up
+  // after a few seconds: Edit then opens without it.
+  const preparing = mode === 'edit' && (measuring || loadedSrcDoc !== srcDoc)
+  useEffect(() => {
+    if (!measuring) return undefined
+    const seed = editSeed
+    const timer = window.setTimeout(() => {
+      setGenerated((current) => (current?.seed === seed ? current : { key: documentKey(seed), seed, css: '', live: '' }))
+    }, READING_TIMEOUT_MS)
+    return () => window.clearTimeout(timer)
+  }, [measuring, editSeed])
   const measureIframe = measuring ? (
     <iframe
       key={`measure-${nonce}`}
@@ -1993,6 +2012,8 @@ function HtmlWorkspace({
       allow={HTML_ALLOW}
       allowFullScreen
       onLoad={onIframeLoad}
+      inert={preparing || undefined}
+      aria-busy={preparing || undefined}
       style={{
         width: '100%',
         height: '100%',
