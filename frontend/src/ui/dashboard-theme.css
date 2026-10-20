@@ -1,0 +1,63 @@
+/* Phase one: the dashboard chrome and its dialogs. Auth and editing routes
+   have no DashboardHeader, so their existing tokens remain unchanged. */
+:root[data-surface="app"]:has(.dashboard-header) {
+  --font-display: "Instrument Sans", "Inter", "Segoe UI", system-ui, sans-serif;
+  --studio-accent: #1f6feb;
+  --studio-accent-hover: #185cce;
+  --studio-accent-pressed: #154eaf;
+  --studio-accent-text: #0960c9;
+  --studio-accent-fill: #1f6feb;
+  --studio-accent-fill-hover: #185cce;
+  --studio-accent-soft: #e8eff9;
+  --studio-on-accent: #ffffff;
+  --studio-shell: #f0f3f8;
+  --studio-panel: #f0f3f8;
+  --studio-panel-raised: #ffffff;
+  --studio-panel-muted: #e9eef5;
+  --studio-surface: var(--studio-panel-raised);
+  --studio-control: #e9eef5;
+  --studio-control-hover: #dfe6f0;
+  --studio-border: #d6deea;
+  --studio-border-strong: #b7c4d5;
+  --studio-text: #1c2533;
+  --studio-text-muted: #556276;
+  --studio-text-faint: #616e80;
+  --studio-focus-ring: color-mix(in srgb, var(--studio-accent) 28%, transparent);
+  --studio-radius-sm: 5px;
+  --studio-radius: 7px;
+  --studio-radius-lg: 9px;
+  --studio-radius-xl: 10px;
+  --studio-radius-2xl: 12px;
+  --studio-shadow-sm: 0 2px 4px rgba(20, 35, 58, 0.03), 0 8px 22px rgba(20, 35, 58, 0.06);
+  --studio-shadow: 0 14px 36px rgba(20, 35, 58, 0.11);
+  --studio-shadow-lg: 0 26px 64px rgba(20, 35, 58, 0.17);
+  --studio-shadow-menu: 0 16px 40px rgba(20, 35, 58, 0.18);
+}
+
+:root[data-surface="app"][data-ui-theme="dark"]:has(.dashboard-header) {
+  --studio-accent: #2879ef;
+  --studio-accent-hover: #8cbbff;
+  --studio-accent-pressed: #1f62c6;
+  --studio-accent-text: #8cbbff;
+  --studio-accent-fill: #2168d2;
+  --studio-accent-fill-hover: #1f6feb;
+  --studio-accent-soft: #17283f;
+  --studio-on-accent: #ffffff;
+  --studio-shell: #0d1117;
+  --studio-panel: #0d1117;
+  --studio-panel-raised: #161c25;
+  --studio-panel-muted: #111720;
+  --studio-surface: var(--studio-panel-raised);
+  --studio-control: #202938;
+  --studio-control-hover: #293447;
+  --studio-border: #2b3646;
+  --studio-border-strong: #46566d;
+  --studio-text: #e7edf5;
+  --studio-text-muted: #a5b1c3;
+  --studio-text-faint: #93a3b8;
+  --studio-focus-ring: color-mix(in srgb, var(--studio-accent) 45%, transparent);
+  --studio-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.16), 0 8px 22px rgba(0, 0, 0, 0.22);
+  --studio-shadow: 0 14px 36px rgba(0, 0, 0, 0.4);
+  --studio-shadow-lg: 0 26px 64px rgba(0, 0, 0, 0.55);
+  --studio-shadow-menu: 0 16px 40px rgba(0, 0, 0, 0.6);
+}

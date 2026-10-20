@@ -1,0 +1,241 @@
+/* Dashboard chrome only: editor and authentication routes do not mount it. */
+:root[data-surface="app"] .dashboard-header {
+  background: var(--studio-panel-raised);
+  border-bottom: 1px solid var(--studio-border);
+  backdrop-filter: none;
+}
+:root[data-surface="app"] .dashboard-header-inner {
+  max-width: none;
+  min-height: 4.5rem;
+  padding: 0.75rem 2rem;
+  gap: 1.75rem;
+}
+:root[data-surface="app"] .dashboard-brand {
+  flex: none;
+  gap: 0.65rem;
+}
+:root[data-surface="app"] .dashboard-brand-name {
+  color: var(--studio-text);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+:root[data-surface="app"] .dashboard-primary-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-right: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+}
+:root[data-surface="app"] .dashboard-nav-link {
+  position: relative;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-radius: var(--studio-radius);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+:root[data-surface="app"] .dashboard-nav-link-active {
+  background: var(--studio-control);
+  color: var(--studio-text);
+  box-shadow: none;
+}
+:root[data-surface="app"] .dashboard-nav-link:hover {
+  transform: translateY(-2px);
+}
+:root[data-surface="app"] .dashboard-header-tools {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+:root[data-surface="app"] .dashboard-header-tools > * {
+  flex: none;
+}
+:root[data-surface="app"] .dashboard-guest-link {
+  display: none;
+  max-width: 15rem;
+  overflow: hidden;
+  color: var(--studio-text-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-surface="app"] .dashboard-guest-link:hover {
+  color: var(--studio-accent-text);
+}
+:root[data-surface="app"] .dashboard-search-trigger,
+:root[data-surface="app"] .dashboard-overflow-trigger {
+  width: 2.5rem;
+  min-height: 2.5rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--studio-text-muted);
+}
+:root[data-surface="app"] .dashboard-search-trigger:is(:hover, [aria-expanded="true"]),
+:root[data-surface="app"] .dashboard-overflow-trigger:is(:hover, [aria-expanded="true"]) {
+  border-color: var(--studio-border);
+  color: var(--studio-text);
+  background: var(--studio-control);
+}
+:root[data-surface="app"] .dashboard-overflow-trigger {
+  display: none;
+}
+:root[data-surface="app"] .dashboard-guide-control .app-info-trigger span {
+  display: none;
+}
+:root[data-surface="app"] .dashboard-account-trigger {
+  padding: 0.25rem;
+  min-height: 2.5rem;
+  border-color: transparent;
+  border-radius: var(--studio-radius);
+  background: transparent;
+}
+:root[data-surface="app"] .dashboard-account-name,
+:root[data-surface="app"] .dashboard-account-chevron {
+  display: none;
+}
+:root[data-surface="app"] .dashboard-account-name {
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-surface="app"] .dashboard-account-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 1.5rem;
+  width: min(18rem, calc(100vw - 2rem));
+  padding: 0.5rem;
+  z-index: 45;
+  animation: dashboard-menu-enter 180ms ease both;
+}
+:root[data-surface="app"] .dashboard-search-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(44rem, 100%);
+  margin-left: auto;
+  padding: 0 2rem 1rem;
+  animation: dashboard-menu-enter 220ms ease both;
+}
+:root[data-surface="app"] .dashboard-search-panel > form {
+  max-width: none;
+}
+:root[data-surface="app"] .dashboard-search-panel .dashboard-search {
+  border-radius: var(--studio-radius);
+}
+:root[data-surface="app"] .dashboard-search-panel > .studio-icon-btn {
+  flex: none;
+}
+:root[data-surface="app"] .dashboard-mobile-link-active {
+  background: var(--studio-control);
+  color: var(--studio-text);
+}
+:root[data-surface="app"] .dashboard-mobile-preferences {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.5rem;
+  color: var(--studio-text-muted);
+  font-size: 0.75rem;
+}
+:root[data-surface="app"] .dashboard-mobile-guide {
+  padding: 0 0.5rem 0.5rem;
+}
+:root[data-surface="app"] .dashboard-bottom-nav {
+  display: none;
+}
+@keyframes dashboard-menu-enter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (min-width: 1024px) {
+  :root[data-surface="app"] .dashboard-mobile-menu { display: none; }
+}
+@media (min-width: 1280px) {
+  :root[data-surface="app"] .dashboard-account-name,
+  :root[data-surface="app"] .dashboard-account-chevron {
+    display: block;
+  }
+  :root[data-surface="app"] .dashboard-account-trigger {
+    padding-right: 0.65rem;
+  }
+  :root[data-surface="app"] .dashboard-guide-control .app-info-trigger span {
+    display: inline;
+  }
+}
+@media (min-width: 1600px) {
+  :root[data-surface="app"] .dashboard-guest-link { display: block; }
+}
+@media (max-width: 1279.98px) {
+  :root[data-surface="app"] .dashboard-header-inner { gap: 0.75rem; padding-inline: 1.25rem; }
+  :root[data-surface="app"] .dashboard-nav-link { padding-inline: 0.6rem; gap: 0.35rem; }
+}
+@media (max-width: 1023.98px) {
+  :root[data-surface="app"] body:has(.dashboard-bottom-nav) {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+  :root[data-surface="app"] .dashboard-header-inner {
+    min-height: 4rem;
+    padding: 0.6rem 1rem;
+    gap: 0.75rem;
+  }
+  :root[data-surface="app"] .dashboard-primary-nav,
+  :root[data-surface="app"] .dashboard-header-language,
+  :root[data-surface="app"] .dashboard-guide-control {
+    display: none;
+  }
+  :root[data-surface="app"] .dashboard-overflow-trigger { display: inline-flex; }
+  :root[data-surface="app"] .dashboard-header-tools { gap: 0.3rem; }
+  :root[data-surface="app"] .dashboard-search-panel { padding: 0 1rem 0.75rem; }
+  :root[data-surface="app"] .dashboard-account-menu { right: 1rem; }
+  :root[data-surface="app"] .dashboard-mobile-menu {
+    border-top: 1px solid var(--studio-border);
+    max-height: calc(100dvh - 8.5rem - env(safe-area-inset-bottom));
+    animation: dashboard-menu-enter 180ms ease both;
+  }
+  :root[data-surface="app"] .dashboard-bottom-nav {
+    position: fixed;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    z-index: 30;
+    inset: auto 0 0;
+    padding: 0.4rem max(0.5rem, env(safe-area-inset-right)) calc(0.4rem + env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
+    border-top: 1px solid var(--studio-border);
+    background: var(--studio-panel-raised);
+    box-shadow: var(--studio-shadow);
+  }
+  :root[data-surface="app"] .dashboard-bottom-nav a {
+    display: flex;
+    min-height: 3.25rem;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.25rem;
+    border-radius: var(--studio-radius);
+    color: var(--studio-text-muted);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    transition: background-color 160ms ease, color 160ms ease;
+  }
+  :root[data-surface="app"] .dashboard-bottom-nav a:is(:hover, [aria-current="page"]) {
+    background: var(--studio-control);
+    color: var(--studio-text);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-surface="app"] .dashboard-header *,
+  :root[data-surface="app"] .dashboard-bottom-nav * {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
