@@ -41,5 +41,11 @@ describe('a block row', () => {
     expect(await screen.findByRole('button', { name: 'Bloğu listeden kaldır' })).toHaveAccessibleDescription('Pricing card')
     expect(screen.getByRole('button', { name: 'Her yerden sil' })).toHaveAccessibleDescription('Pricing card')
   })
+
+  it('says which block "put back" acts on too', async () => {
+    listAdminComponents.mockResolvedValue({ count: 1, results: [{ ...block(6, 'Taken down card', { id: 4, username: 'ada' }), status: 'removed' }] })
+    render(<LanguageProvider><AdminBlocks /></LanguageProvider>)
+    expect(await screen.findByRole('button', { name: 'Kütüphaneye geri koy' })).toHaveAccessibleDescription('Taken down card')
+  })
 })
 

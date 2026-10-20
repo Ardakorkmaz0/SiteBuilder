@@ -92,5 +92,11 @@ describe('an explore card control', () => {
     expect(screen.getByRole('button', { name: /Use as template/ })).toHaveAccessibleDescription('Modern Portfolio')
     expect(screen.getByRole('link', { name: 'View' })).toHaveAccessibleDescription('Modern Portfolio')
   })
+
+  it('says which site the admin pin acts on', () => {
+    localStorage.setItem('pwb_language', 'en')
+    renderCard({ onTogglePin: vi.fn() })
+    expect(screen.getByRole('button', { name: 'Pin to the home page' })).toHaveAccessibleDescription('Modern Portfolio')
+  })
 })
 
