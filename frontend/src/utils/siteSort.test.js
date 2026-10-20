@@ -39,4 +39,11 @@ describe('orderSites', () => {
     expect(formatRelativeActivity('2026-03-02T00:00:00Z', 'en', now)).toBe('yesterday')
     expect(formatRelativeActivity('2026-03-02T00:00:00Z', 'tr', now)).toBe('dün')
   })
+
+  // It fills "Edited {time}": "Edited now" and "şimdi düzenlendi" did not read.
+  it('says a change from the last minute was made just now', () => {
+    const now = new Date('2026-03-03T00:00:30Z').getTime()
+    expect(formatRelativeActivity('2026-03-03T00:00:00Z', 'en', now)).toBe('just now')
+    expect(formatRelativeActivity('2026-03-03T00:00:00Z', 'tr', now)).toBe('az önce')
+  })
 })

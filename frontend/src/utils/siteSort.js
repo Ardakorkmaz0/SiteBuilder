@@ -44,5 +44,6 @@ export function formatRelativeActivity(value, language = 'en', now = Date.now())
         .format(-Math.floor(elapsed / size), unit)
     }
   }
-  return language === 'tr' ? 'şimdi' : 'now'
+  // Read inside "Edited {time}", so a phrase that fits there.
+  return language === 'tr' ? 'az önce' : 'just now'
 }
