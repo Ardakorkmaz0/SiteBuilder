@@ -112,7 +112,7 @@ export function ReportsTab() {
                     <span className="studio-status-danger rounded-full border px-2 py-0.5 text-[11px] font-semibold">
                       {t(r.reason_label || r.reason)}
                     </span>
-                    <span className="font-semibold text-[var(--studio-text)]">{r.site_title}</span>
+                    <span id={`site-report-${r.id}`} className="font-semibold text-[var(--studio-text)]">{r.site_title}</span>
                     <span className="text-xs text-[var(--studio-text-faint)]">{t('by')} @{r.site_owner}</span>
                     {!r.site_published && (
                       <span className="dashboard-status">{t('Not public')}</span>
@@ -125,7 +125,7 @@ export function ReportsTab() {
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  <Link to={`/site/${r.site_slug}`} className="rounded-lg border border-[var(--studio-border)] px-3 py-1.5 text-xs font-semibold text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]">
+                  <Link to={`/site/${r.site_slug}`} aria-describedby={`site-report-${r.id}`} className="rounded-lg border border-[var(--studio-border)] px-3 py-1.5 text-xs font-semibold text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]">
                     {t('View')}
                   </Link>
                   {r.status === 'open' && (
@@ -134,6 +134,7 @@ export function ReportsTab() {
                         <button
                           onClick={() => onTakedown(r)}
                           disabled={busy === r.id}
+                          aria-describedby={`site-report-${r.id}`}
                           className="rounded-lg border border-[color-mix(in_srgb,var(--studio-danger)_35%,var(--studio-border))] px-3 py-1.5 text-xs font-semibold text-[var(--studio-danger)] hover:bg-[var(--studio-danger-soft)] disabled:opacity-50"
                         >
                           {t('Unpublish site')}
@@ -142,6 +143,7 @@ export function ReportsTab() {
                       <button
                         onClick={() => onResolve(r, 'resolve')}
                         disabled={busy === r.id}
+                          aria-describedby={`site-report-${r.id}`}
                         className="rounded-[var(--studio-radius)] border border-[color-mix(in_srgb,var(--studio-success)_45%,var(--studio-border))] px-3 py-1.5 text-xs font-semibold text-[var(--studio-success)] hover:bg-[var(--studio-success-soft)] disabled:opacity-50"
                       >
                         {t('Resolve')}
@@ -149,6 +151,7 @@ export function ReportsTab() {
                       <button
                         onClick={() => onResolve(r, 'dismiss')}
                         disabled={busy === r.id}
+                          aria-describedby={`site-report-${r.id}`}
                         className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] disabled:opacity-50"
                       >
                         {t('Dismiss')}
@@ -272,7 +275,7 @@ export function ComponentReportsTab() {
                     <span className="studio-status-danger rounded-full border px-2 py-0.5 text-[11px] font-semibold">
                       {t(r.reason_label || r.reason)}
                     </span>
-                    <span className="font-semibold text-[var(--studio-text)]">{r.component_title}</span>
+                    <span id={`block-report-${r.id}`} className="font-semibold text-[var(--studio-text)]">{r.component_title}</span>
                     <span className="text-xs text-[var(--studio-text-faint)]">{t('by')} @{r.component_author}</span>
                     {r.component_status !== 'published' && (
                       <span className="dashboard-status">
@@ -295,6 +298,7 @@ export function ComponentReportsTab() {
                       <button
                         onClick={() => onModerate(r, 'remove')}
                         disabled={busy === r.id}
+                      aria-describedby={`block-report-${r.id}`}
                         className="rounded-lg border border-[color-mix(in_srgb,var(--studio-danger)_35%,var(--studio-border))] px-3 py-1.5 text-xs font-semibold text-[var(--studio-danger)] hover:bg-[var(--studio-danger-soft)] disabled:opacity-50"
                       >
                         {t('Unlist block')}
@@ -303,6 +307,7 @@ export function ComponentReportsTab() {
                     <button
                       onClick={() => onModerate(r, 'purge')}
                       disabled={busy === r.id}
+                      aria-describedby={`block-report-${r.id}`}
                       className="rounded-[var(--studio-radius)] border border-[color-mix(in_srgb,var(--studio-danger)_45%,var(--studio-border))] px-3 py-1.5 text-xs font-semibold text-[var(--studio-danger)] hover:bg-[var(--studio-danger-soft)] disabled:opacity-50"
                     >
                       {t('Delete everywhere')}
@@ -310,6 +315,7 @@ export function ComponentReportsTab() {
                     <button
                       onClick={() => onResolve(r, 'dismiss')}
                       disabled={busy === r.id}
+                      aria-describedby={`block-report-${r.id}`}
                       className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] disabled:opacity-50"
                     >
                       {t('Dismiss')}

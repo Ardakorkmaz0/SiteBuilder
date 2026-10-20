@@ -33,3 +33,13 @@ describe('the admin block list', () => {
     expect(kept).toHaveTextContent('@ada')
   })
 })
+
+describe('a block row', () => {
+  it('says which block its buttons act on', async () => {
+    listAdminComponents.mockResolvedValue({ count: 1, results: [{ ...block(3, 'Pricing card', { id: 4, username: 'ada' }), use_count: 2 }] })
+    render(<LanguageProvider><AdminBlocks /></LanguageProvider>)
+    expect(await screen.findByRole('button', { name: 'Bloğu listeden kaldır' })).toHaveAccessibleDescription('Pricing card')
+    expect(screen.getByRole('button', { name: 'Her yerden sil' })).toHaveAccessibleDescription('Pricing card')
+  })
+})
+

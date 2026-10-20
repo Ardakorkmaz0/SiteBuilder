@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import { ReportsTab } from './AdminModeration.jsx'
 import { listReports } from '../../api/admin.js'
@@ -29,3 +30,17 @@ describe('an empty report queue', () => {
     expect(listReports).toHaveBeenLastCalledWith('all', 1)
   })
 })
+
+describe('an open site report', () => {
+  it('says which site its buttons act on', async () => {
+    listReports.mockResolvedValue({ count: 1, results: [{
+      id: 5, reason: 'spam', reason_label: 'Spam or misleading', site_title: 'Ada Studio', site_slug: 'ada', site_owner: 'ada',
+      site_published: true, detail: '', reporter_username: 'bob', created_at: '2026-10-20T00:00:00Z', status: 'open',
+    }] })
+    render(<MemoryRouter><LanguageProvider><ReportsTab /></LanguageProvider></MemoryRouter>)
+    expect(await screen.findByRole('button', { name: 'Çözümle' })).toHaveAccessibleDescription('Ada Studio')
+    expect(screen.getByRole('button', { name: 'Reddet' })).toHaveAccessibleDescription('Ada Studio')
+    expect(screen.getByRole('link', { name: 'Görüntüle' })).toHaveAccessibleDescription('Ada Studio')
+  })
+})
+
