@@ -1,4 +1,4 @@
-"""Limits on creating identities must survive switching between those identities."""
+"""Limits tied to a verified IP must survive switching caller identities."""
 from rest_framework.throttling import ScopedRateThrottle
 
 
@@ -15,4 +15,23 @@ class ScopedIPRateThrottle(ScopedRateThrottle):
         return self.cache_format % {
             'scope': self.scope,
             'ident': self.get_ident(request),
+        }
+
+
+class PublicFormRateThrottle(ScopedIPRateThrottle):
+    """One visitor's inbox budget, shared by API, published and customer URLs."""
+
+    def get_cache_key(self, request, view):
+        if request.method != 'POST':
+            return None
+        # The database identity survives a renamed slug, a different URL or a
+        # customer's host. Authentication never grants another visitor budget.
+        from .models import Site
+
+        site_id = Site.objects.filter(slug=view.kwargs.get('slug')).values_list('pk', flat=True).first()
+        if site_id is None:
+            return None
+        return self.cache_format % {
+            'scope': self.scope,
+            'ident': f'{site_id}:{self.get_ident(request)}',
         }

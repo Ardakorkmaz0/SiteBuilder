@@ -1,0 +1,592 @@
+{
+  "links_blocks": [
+    {
+      "name": "relative-checked-address",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  1 failed | 5 passed (6)",
+        "Tests  5 failed | 46 passed (51)",
+        "Duration  1.92s (transform 969ms, setup 523ms, import 1.31s, tests 1.28s, environment 3.57s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-relative-checked-address.log"
+    },
+    {
+      "name": "remove-protocol-guard",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  1 failed | 5 passed (6)",
+        "Tests  1 failed | 50 passed (51)",
+        "Duration  1.85s (transform 833ms, setup 594ms, import 1.21s, tests 1.28s, environment 3.23s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-remove-protocol-guard.log"
+    },
+    {
+      "name": "drop-query",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  1 failed | 5 passed (6)",
+        "Tests  1 failed | 50 passed (51)",
+        "Duration  1.87s (transform 923ms, setup 603ms, import 1.29s, tests 1.27s, environment 3.39s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-drop-query.log"
+    },
+    {
+      "name": "drop-fragment",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  1 failed | 5 passed (6)",
+        "Tests  1 failed | 50 passed (51)",
+        "Duration  1.85s (transform 897ms, setup 553ms, import 1.22s, tests 1.28s, environment 3.28s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-drop-fragment.log"
+    },
+    {
+      "name": "remove-own-block",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  1 failed | 5 passed (6)",
+        "Tests  1 failed | 50 passed (51)",
+        "Duration  1.83s (transform 909ms, setup 547ms, import 1.24s, tests 1.25s, environment 3.30s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-remove-own-block.log"
+    },
+    {
+      "name": "remove-viewer-href",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  1 failed | 5 passed (6)",
+        "Tests  1 failed | 50 passed (51)",
+        "Duration  1.95s (transform 1.06s, setup 533ms, import 1.39s, tests 1.34s, environment 3.58s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-remove-viewer-href.log"
+    },
+    {
+      "name": "raw-activity-detail",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  1 failed | 5 passed (6)",
+        "Tests  1 failed | 50 passed (51)",
+        "Duration  2.03s (transform 982ms, setup 658ms, import 1.28s, tests 2.23s, environment 3.30s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-raw-activity-detail.log"
+    },
+    {
+      "name": "omit-copyright-reason",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  2 failed | 4 passed (6)",
+        "Tests  2 failed | 49 passed (51)",
+        "Duration  1.90s (transform 976ms, setup 557ms, import 1.31s, tests 1.27s, environment 3.55s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-omit-copyright-reason.log"
+    },
+    {
+      "name": "old-admin-badge",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  1 failed | 5 passed (6)",
+        "Tests  1 failed | 50 passed (51)",
+        "Duration  1.82s (transform 853ms, setup 524ms, import 1.25s, tests 1.27s, environment 3.28s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-old-admin-badge.log"
+    },
+    {
+      "name": "old-empty-term",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  1 failed | 5 passed (6)",
+        "Tests  1 failed | 50 passed (51)",
+        "Duration  2.30s (transform 942ms, setup 611ms, import 1.26s, tests 2.29s, environment 3.88s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-old-empty-term.log"
+    },
+    {
+      "name": "old-reports-term",
+      "exit_code": 0,
+      "summary": [
+        "Test Files  6 passed (6)",
+        "Tests  51 passed (51)",
+        "Duration  2.03s (transform 1.04s, setup 542ms, import 1.42s, tests 1.39s, environment 3.59s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-old-reports-term.log"
+    },
+    {
+      "name": "old-report-not-found-term",
+      "exit_code": 0,
+      "summary": [
+        "Test Files  6 passed (6)",
+        "Tests  51 passed (51)",
+        "Duration  2.03s (transform 1.06s, setup 559ms, import 1.42s, tests 1.33s, environment 3.96s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-old-report-not-found-term.log"
+    },
+    {
+      "name": "remove-deleted-badge",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  1 failed | 5 passed (6)",
+        "Tests  1 failed | 50 passed (51)",
+        "Duration  2.31s (transform 1.26s, setup 713ms, import 1.66s, tests 1.45s, environment 4.79s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-remove-deleted-badge.log"
+    },
+    {
+      "name": "old-deleted-account-label",
+      "exit_code": 1,
+      "summary": [
+        "Test Files  1 failed | 5 passed (6)",
+        "Tests  1 failed | 50 passed (51)",
+        "Duration  1.95s (transform 859ms, setup 688ms, import 1.25s, tests 1.37s, environment 3.51s)"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-old-deleted-account-label.log"
+    }
+  ],
+  "links_blocks_backend": [
+    {
+      "name": "public-list-allows-orphans",
+      "exit_code": 1,
+      "summary": [
+        "3 failed, 2 passed, 5 warnings in 2.13s"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-public-list-allows-orphans.log"
+    },
+    {
+      "name": "detail-allows-orphans",
+      "exit_code": 1,
+      "summary": [
+        "2 failed, 3 passed, 5 warnings in 2.32s"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-detail-allows-orphans.log"
+    },
+    {
+      "name": "counter-allows-orphans",
+      "exit_code": 1,
+      "summary": [
+        "2 failed, 3 passed, 5 warnings in 2.39s"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-counter-allows-orphans.log"
+    },
+    {
+      "name": "delete-block-with-author",
+      "exit_code": 1,
+      "summary": [
+        "2 failed, 3 passed, 4 warnings in 1.72s"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-delete-block-with-author.log"
+    },
+    {
+      "name": "hide-orphans-from-admin",
+      "exit_code": 1,
+      "summary": [
+        "1 failed, 4 passed, 5 warnings in 1.59s"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-hide-orphans-from-admin.log"
+    },
+    {
+      "name": "use-bypasses-visibility",
+      "exit_code": 1,
+      "summary": [
+        "2 failed, 3 passed, 5 warnings in 1.68s"
+      ],
+      "log": "/tmp/sitebuilder-round10-links-blocks-mutant-use-bypasses-visibility.log"
+    }
+  ],
+  "focus": [
+    {
+      "label": "baseline",
+      "returncode": 0,
+      "summary": [
+        "Test Files  1 passed (1)",
+        "Tests  6 passed (6)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-baseline.log"
+    },
+    {
+      "label": "positive-baseline",
+      "returncode": 0,
+      "summary": [
+        "Test Files  1 passed (1)",
+        "Tests  7 passed (7)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-positive-baseline.log"
+    },
+    {
+      "label": "mutation-late-blur-not-tracked",
+      "returncode": 1,
+      "summary": [
+        "⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯",
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 5 passed (6)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-mutation-late-blur-not-tracked.log"
+    },
+    {
+      "label": "mutation-original-focus-suppressed",
+      "returncode": 1,
+      "summary": [
+        "⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯",
+        "Test Files  1 failed (1)",
+        "Tests  2 failed | 4 passed (6)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-mutation-original-focus-suppressed.log"
+    },
+    {
+      "label": "mutation-only-nearest-area",
+      "returncode": 1,
+      "summary": [
+        "⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯",
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 5 passed (6)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-mutation-only-nearest-area.log"
+    },
+    {
+      "label": "mutation-hidden-candidate-allowed",
+      "returncode": 0,
+      "summary": [
+        "Test Files  1 passed (1)",
+        "Tests  6 passed (6)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-mutation-hidden-candidate-allowed.log"
+    },
+    {
+      "label": "positive-mutant-hidden-candidate-allowed",
+      "returncode": 1,
+      "summary": [
+        "⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯",
+        "Test Files  1 failed (1)",
+        "Tests  5 failed | 2 passed (7)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-positive-mutant-hidden-candidate-allowed.log"
+    },
+    {
+      "label": "mutation-intentional-focus-does-not-cancel",
+      "returncode": 0,
+      "summary": [
+        "Test Files  1 passed (1)",
+        "Tests  6 passed (6)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-mutation-intentional-focus-does-not-cancel.log"
+    },
+    {
+      "label": "positive-mutant-intentional-focus-does-not-cancel",
+      "returncode": 1,
+      "summary": [
+        "⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯",
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 6 passed (7)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-positive-mutant-intentional-focus-does-not-cancel.log"
+    },
+    {
+      "label": "mutation-outer-area-first",
+      "returncode": 0,
+      "summary": [
+        "Test Files  1 passed (1)",
+        "Tests  6 passed (6)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-mutation-outer-area-first.log"
+    },
+    {
+      "label": "positive-mutant-outer-area-first",
+      "returncode": 1,
+      "summary": [
+        "⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯",
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 6 passed (7)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-positive-mutant-outer-area-first.log"
+    },
+    {
+      "label": "mutation-disabled-not-observed",
+      "returncode": 1,
+      "summary": [
+        "⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯",
+        "Test Files  1 failed (1)",
+        "Tests  4 failed | 2 passed (6)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-mutation-disabled-not-observed.log"
+    },
+    {
+      "label": "restored",
+      "returncode": 0,
+      "summary": [
+        "Test Files  1 passed (1)",
+        "Tests  6 passed (6)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-restored.log"
+    },
+    {
+      "label": "positive-restored",
+      "returncode": 0,
+      "summary": [
+        "Test Files  1 passed (1)",
+        "Tests  7 passed (7)"
+      ],
+      "log": "/tmp/sitebuilder-round10-focus-positive-restored.log"
+    }
+  ],
+  "inert_cards_pages": [
+    {
+      "name": "no-inert",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-review-no-inert.log"
+    },
+    {
+      "name": "unlock-before-final-load",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-review-unlock-before-final-load.log"
+    },
+    {
+      "name": "late-timeout",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-review-late-timeout.log"
+    },
+    {
+      "name": "no-timer-cleanup",
+      "exit": 0,
+      "log": "/tmp/sitebuilder-round10-review-no-timer-cleanup.log"
+    },
+    {
+      "name": "omit-seed-timer-dependency",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-review-omit-seed-timer-dependency.log"
+    },
+    {
+      "name": "no-new-page-refocus-tick",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-review-no-new-page-refocus-tick.log"
+    },
+    {
+      "name": "first-page-focus",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-review-first-page-focus.log"
+    },
+    {
+      "name": "wrong-community-description",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-review-wrong-community-description.log"
+    },
+    {
+      "name": "no-admin-restore-description",
+      "exit": 0,
+      "log": "/tmp/sitebuilder-round10-review-no-admin-restore-description.log"
+    },
+    {
+      "name": "no-component-report-descriptions",
+      "exit": 0,
+      "log": "/tmp/sitebuilder-round10-review-no-component-report-descriptions.log"
+    },
+    {
+      "name": "no-explore-pin-description",
+      "exit": 0,
+      "log": "/tmp/sitebuilder-round10-review-no-explore-pin-description.log"
+    },
+    {
+      "name": "restored",
+      "exit": 0,
+      "log": "/tmp/sitebuilder-round10-inert-cards-pages-restored.log"
+    }
+  ],
+  "api_security": [
+    {
+      "label": "mutation-baseline",
+      "returncode": 0,
+      "summary": [
+        "36 passed, 30 warnings in 2.54s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-baseline.log"
+    },
+    {
+      "label": "mutation-site-owner-guard",
+      "returncode": 1,
+      "summary": [
+        "2 failed, 1 passed, 3 warnings in 1.16s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-site-owner-guard.log"
+    },
+    {
+      "label": "mutation-image-owner-guard",
+      "returncode": 1,
+      "summary": [
+        "2 failed, 1 passed, 3 warnings in 1.65s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-image-owner-guard.log"
+    },
+    {
+      "label": "mutation-version-parent-binding",
+      "returncode": 1,
+      "summary": [
+        "1 failed, 1 warning in 0.87s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-version-parent-binding.log"
+    },
+    {
+      "label": "mutation-submission-parent-binding",
+      "returncode": 1,
+      "summary": [
+        "2 failed, 2 warnings in 1.05s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-submission-parent-binding.log"
+    },
+    {
+      "label": "mutation-comment-parent-binding",
+      "returncode": 1,
+      "summary": [
+        "1 failed, 1 warning in 0.83s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-comment-parent-binding.log"
+    },
+    {
+      "label": "mutation-five-mb-edge-refused",
+      "returncode": 1,
+      "summary": [
+        "2 failed, 1 warning in 0.91s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-five-mb-edge-refused.log"
+    },
+    {
+      "label": "mutation-aggregate-budget-removed",
+      "returncode": 0,
+      "summary": [
+        "9 passed, 4 warnings in 0.87s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-aggregate-budget-removed.log"
+    },
+    {
+      "label": "new-aggregate-probe-mutant",
+      "returncode": 1,
+      "summary": [
+        "1 failed in 0.14s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-new-aggregate-probe-mutant.log"
+    },
+    {
+      "label": "mutation-partial-temporary-file-not-closed",
+      "returncode": 1,
+      "summary": [
+        "4 failed, 2 warnings in 0.88s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-partial-temporary-file-not-closed.log"
+    },
+    {
+      "label": "mutation-shared-html-limit-relaxed",
+      "returncode": 1,
+      "summary": [
+        "1 failed, 1 warning in 1.00s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-shared-html-limit-relaxed.log"
+    },
+    {
+      "label": "mutation-published-page-limit-relaxed",
+      "returncode": 1,
+      "summary": [
+        "1 failed, 1 warning in 0.99s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-published-page-limit-relaxed.log"
+    },
+    {
+      "label": "mutation-share-early-mode-write",
+      "returncode": 1,
+      "summary": [
+        "# A failed assertion must not print private review-link values in row dumps.",
+        "# A failed assertion must not print private review-link values in row dumps.",
+        "# A failed assertion must not print private review-link values in row dumps.",
+        "# A failed assertion must not print private review-link values in row dumps.",
+        "# A failed assertion must not print private review-link values in row dumps.",
+        "# A failed assertion must not print private review-link values in row dumps.",
+        "# A failed assertion must not print private review-link values in row dumps.",
+        "7 failed, 2 passed, 9 warnings in 0.98s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-share-early-mode-write.log"
+    },
+    {
+      "label": "mutation-share-atomic-removed",
+      "returncode": 1,
+      "summary": [
+        "# A failed assertion must not print private review-link values in row dumps.",
+        "1 failed, 1 warning in 0.86s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-share-atomic-removed.log"
+    },
+    {
+      "label": "mutation-restored",
+      "returncode": 0,
+      "summary": [
+        "36 passed, 30 warnings in 2.58s"
+      ],
+      "log": "/tmp/sitebuilder-round10-api-mutation-restored.log"
+    }
+  ],
+  "public_form_review": [
+    {
+      "name": "dedicated-removed",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-form-peer-dedicated-removed.log"
+    },
+    {
+      "name": "identity-user",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-form-peer-identity-user.log"
+    },
+    {
+      "name": "site-id-removed",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-form-peer-site-id-removed.log"
+    },
+    {
+      "name": "alias-path-key",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-form-peer-alias-path-key.log"
+    },
+    {
+      "name": "raw-xff-key",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-form-peer-raw-xff-key.log"
+    },
+    {
+      "name": "global-caps-removed",
+      "exit": 1,
+      "log": "/tmp/sitebuilder-round10-form-peer-global-caps-removed.log"
+    },
+    {
+      "name": "restored",
+      "exit": 0,
+      "log": "/tmp/sitebuilder-round10-form-peer-restored.log"
+    }
+  ],
+  "sharing_review_final": [
+    {
+      "name": "early-mode-write",
+      "exit_code": 1,
+      "summary": [
+        "8 failed, 13 passed, 20 warnings in 1.32s"
+      ],
+      "log": "/tmp/sitebuilder-round10-sharing-mutant-early-mode-write.log"
+    },
+    {
+      "name": "remove-atomic",
+      "exit_code": 1,
+      "summary": [
+        "1 failed, 20 passed, 20 warnings in 1.15s"
+      ],
+      "log": "/tmp/sitebuilder-round10-sharing-mutant-remove-atomic.log"
+    },
+    {
+      "name": "remove-viewer-site-scope",
+      "exit_code": 1,
+      "summary": [
+        "1 failed, 20 passed, 20 warnings in 1.13s"
+      ],
+      "log": "/tmp/sitebuilder-round10-sharing-mutant-remove-viewer-site-scope.log"
+    },
+    {
+      "name": "allow-boolean-remove",
+      "exit_code": 1,
+      "summary": [
+        "1 failed, 20 passed, 20 warnings in 1.12s"
+      ],
+      "log": "/tmp/sitebuilder-round10-sharing-mutant-allow-boolean-remove.log"
+    }
+  ]
+}

@@ -9,6 +9,14 @@ describe('apiError', () => {
       .toBe('Site bulunamadı.')
   })
 
+  it.each([
+    ['Sharing settings must be an object.', 'Paylaşım ayarları geçersiz.'],
+    ['Enter an account username to invite.', 'Davet edilecek hesabın kullanıcı adını girin.'],
+    ['Enter a positive account id to remove.', 'Çıkarılacak hesabın kimliği pozitif bir sayı olmalıdır.'],
+  ])('localizes sharing validation: %s', (detail, expected) => {
+    expect(apiError({ response: { data: { code: 'validation_error', detail } } })).toBe(expected)
+  })
+
   it('localizes DRF validation codes without relying on English details', () => {
     expect(apiError({ response: { data: {
       code: 'validation_error',

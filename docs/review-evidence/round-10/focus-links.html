@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Round 10 real LinksEditor focus review</title><style>body{font:18px sans-serif;margin:30px;max-width:800px}button,textarea,select,input{font:inherit;margin:8px;padding:10px}button:focus{outline:4px solid blue}pre{white-space:pre-wrap}</style><h1>Production LinksEditor keyboard review</h1><p>Real React component, language provider boundary, unchanged production focus rescue. Disposable in-memory links only.</p><button id="outside">Outside</button><div id="fixture"></div><button id="close">Close</button><pre id="log"></pre>
+<script type="module">
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import { LinksEditor } from '/src/components/editor/controls.jsx'
+import { LanguageContext } from '/src/i18n/context.js'
+import { installFocusRescue } from '/src/ui/focusRescue.js'
+installFocusRescue(document)
+const log=document.querySelector('#log')
+const record=value=>{log.textContent+=value+'\n'}
+document.addEventListener('focusin', e=>record('Focus: '+(e.target.id || e.target.textContent || e.target.tagName)))
+document.addEventListener('keydown', e=>{if(['Tab','Enter'].includes(e.key))record('Keyboard: '+e.key+' trusted='+e.isTrusted)})
+function Fixture(){
+ const [links,setLinks]=React.useState([{label:'Temporary review link',href:'#top'}])
+ return React.createElement(LanguageContext.Provider,{value:{language:'en',t:key=>key}},React.createElement(LinksEditor,{label:'Review links',value:links,onChange:next=>{setLinks(next);setTimeout(()=>record('Result: '+(document.activeElement.id || document.activeElement.tagName)),100)}}))
+}
+createRoot(document.querySelector('#fixture')).render(React.createElement(Fixture))
+</script></html>

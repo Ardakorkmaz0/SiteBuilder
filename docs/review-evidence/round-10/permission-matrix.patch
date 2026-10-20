@@ -1,0 +1,58 @@
+--- /dev/null
++++ b/backend/builder/test_round10_permission_matrix_probe.py
+@@ -0,0 +1,55 @@
++import pytest
++from unittest.mock import patch
++from django.contrib.auth.models import User
++from rest_framework.test import APIClient
++from .models import Site, SiteVersion, FormSubmission, ReviewComment, UploadedImage, SiteViewer
++
++READS=['site','versions','submissions','comments','analytics','domain','share','image','review']
++WRITES=['patch-site','delete-site','checkpoint','restore','overwrite','pin','delete-version','mark-submission','delete-submission','resolve-comment','domain-write','domain-verify','regenerate-review','share-write','patch-image','delete-image']
++
++@pytest.mark.django_db
++@pytest.mark.parametrize('role',['anonymous','stranger','owner'])
++@pytest.mark.parametrize('action',READS+WRITES)
++def test_permission_matrix_preserves_rows_on_every_refusal(role,action):
++    owner=User.objects.create_user('matrix-owner'); stranger=User.objects.create_user('matrix-stranger')
++    site=Site.objects.create(owner=owner,title='Private matrix',share_mode='off',custom_domain='matrix.example')
++    version=SiteVersion.snapshot(site,source='manual',force=True)
++    submission=FormSubmission.objects.create(site=site,data={'message':'Private'})
++    comment=ReviewComment.objects.create(site=site,author_name='Author',body='Private feedback')
++    image=UploadedImage.objects.create(owner=owner,file='images/matrix.png',size=1,width=1,height=1)
++    api=APIClient()
++    if role!='anonymous': api.force_authenticate(owner if role=='owner' else stranger)
++    root=f'/api/sites/{site.pk}/'
++    routes={
++      'site':('get',root,None,200), 'versions':('get',root+'versions/',None,200),
++      'submissions':('get',root+'submissions/',None,200), 'comments':('get',root+'comments/',None,200),
++      'analytics':('get',root+'analytics/',None,200), 'domain':('get',root+'domain/',None,200),
++      'share':('get',root+'share/',None,200), 'image':('get',f'/api/images/{image.pk}/',None,200),
++      'review':('get',f'/api/public/reviews/{site.review_token}/',None,200),
++      'patch-site':('patch',root,{'title':'Changed title'},200), 'delete-site':('delete',root,None,204),
++      'checkpoint':('post',root+'versions/checkpoint/',{'label':'New checkpoint'},201),
++      'restore':('post',root+f'versions/{version.pk}/restore/',{},200),
++      'overwrite':('post',root+f'versions/{version.pk}/overwrite/',{},200),
++      'pin':('patch',root+f'versions/{version.pk}/pin/',{'pinned':True},200),
++      'delete-version':('delete',root+f'versions/{version.pk}/',None,204),
++      'mark-submission':('patch',root+f'submissions/{submission.pk}/',{'is_read':True},200),
++      'delete-submission':('delete',root+f'submissions/{submission.pk}/',None,204),
++      'resolve-comment':('patch',root+f'comments/{comment.pk}/resolve/',{'resolved':True},200),
++      'domain-write':('post',root+'domain/',{'domain':'new-matrix.example'},200),
++      'domain-verify':('post',root+'domain/verify/',{},200),
++      'regenerate-review':('post',root+'review-link/regenerate/',{},200),
++      'share-write':('post',root+'share/',{'mode':'people'},200),
++      'patch-image':('patch',f'/api/images/{image.pk}/',{'alt':'Updated image description'},200),
++      'delete-image':('delete',f'/api/images/{image.pk}/',None,204),
++    }
++    method,path,data,success=routes[action]
++    models=[Site,SiteVersion,FormSubmission,ReviewComment,UploadedImage,SiteViewer]
++    def snapshot(): return [list(model.objects.order_by('pk').values()) for model in models]
++    before=snapshot()
++    with patch('builder.views.check_domain',return_value=(True,'connected')):
++      response=getattr(api,method)(path,data,format='multipart' if action=='patch-image' else 'json')
++    expected=success if role=='owner' else (404 if action=='review' or role=='stranger' else 401)
++    assert response.status_code==expected
++    unchanged=snapshot()==before
++    if role!='owner' or action in READS: assert unchanged
++    else: assert not unchanged

@@ -1,0 +1,57 @@
+--- /dev/null
++++ b/frontend/src/components/admin/adminTerms.round10-review.test.js
+@@ -0,0 +1,11 @@
++import { describe, expect, it } from 'vitest'
++import { translate } from '../../i18n/language.js'
++
++describe('round 10 exact admin complaint terminology', () => {
++  it('calls the report section complaints', () => {
++    expect(translate('tr', 'Reports')).toBe('Şikâyetler')
++  })
++  it('calls a missing report a complaint', () => {
++    expect(translate('tr', 'Report not found.')).toBe('Şikâyet bulunamadı.')
++  })
++})
+--- /dev/null
++++ b/backend/builder/test_round10_deleted_author_review.py
+@@ -0,0 +1,40 @@
++import pytest
++from django.urls import reverse
++from rest_framework.test import APIClient
++from .models import SharedComponent, Site
++from .test_shared_components import author, taker, moderator, GOOD, client_for, used_by
++
++
++@pytest.mark.django_db
++def test_deleted_author_reports_and_list_status_are_consistent(author, taker):
++    component = SharedComponent.objects.create(author=author, **GOOD)
++    author.delete()
++    anonymous = APIClient()
++    listed = anonymous.get(reverse('shared-components'))
++    assert listed.status_code == 200
++    assert listed.data['results'] == []
++    report = client_for(taker).post(reverse('shared-component-report', args=[component.pk]), {'reason': 'spam'}, format='json')
++    assert report.status_code == 404
++    assert component.reports.count() == 0
++    component.refresh_from_db()
++    assert component.author_id is None
++    assert component.view_count == 0
++    assert component.use_count == 0
++
++
++@pytest.mark.django_db
++def test_moderator_can_purge_a_deleted_authors_existing_copy(author, taker, moderator):
++    component = SharedComponent.objects.create(author=author, **GOOD)
++    site = used_by(taker, component)
++    site.refresh_from_db()
++    assert site.schema['pages'][0]['components'][0]['props']['_sharedFrom'] == component.pk
++    before_revision = site.revision
++    author.delete()
++    response = client_for(moderator).post(reverse('admin-component-moderate', args=[component.pk]), {'action': 'purge'}, format='json')
++    assert response.status_code == 200
++    site.refresh_from_db()
++    assert site.schema['pages'][0]['components'] == []
++    assert site.revision == before_revision + 1
++    component.refresh_from_db()
++    assert component.author_id is None
++    assert component.status == 'removed'

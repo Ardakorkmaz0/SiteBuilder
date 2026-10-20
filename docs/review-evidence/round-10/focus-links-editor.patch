@@ -1,0 +1,33 @@
+diff --git a/frontend/src/ui/focusRescue.round10-links-editor.test.jsx b/frontend/src/ui/focusRescue.round10-links-editor.test.jsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/ui/focusRescue.round10-links-editor.test.jsx
+@@ -0,0 +1,28 @@
++import { useState } from 'react'
++import { afterEach, describe, expect, it } from 'vitest'
++import { render, screen } from '@testing-library/react'
++import userEvent from '@testing-library/user-event'
++import LanguageProvider from '../i18n/LanguageProvider.jsx'
++import { LinksEditor } from '../components/editor/controls.jsx'
++import { installFocusRescue } from './focusRescue.js'
++let uninstall
++const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
++afterEach(() => uninstall?.())
++function Example() {
++  const [links, setLinks] = useState([{ label: 'Only link', href: '#top' }])
++  return <LanguageProvider><LinksEditor label="Navigation" value={links} onChange={setLinks} /></LanguageProvider>
++}
++describe('round 10 actual application removal path', () => {
++  it('keeps the keyboard in LinksEditor after its last link is removed', async () => {
++    localStorage.setItem('pwb_language', 'en')
++    render(<Example />)
++    uninstall = installFocusRescue(document)
++    const user = userEvent.setup()
++    await user.tab()
++    expect(screen.getByRole('button', { name: 'Remove', exact: true })).toHaveFocus()
++    await user.keyboard('{Enter}')
++    await settle()
++    expect(screen.queryByRole('button', { name: 'Remove', exact: true })).not.toBeInTheDocument()
++    expect(screen.getByRole('button', { name: '+ Add link', exact: true })).toHaveFocus()
++  })
++})

@@ -1,0 +1,70 @@
+diff --git a/frontend/src/ui/focusRescue.round10-boundaries.test.js b/frontend/src/ui/focusRescue.round10-boundaries.test.js
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/ui/focusRescue.round10-boundaries.test.js
+@@ -0,0 +1,65 @@
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
++import { installFocusRescue } from './focusRescue.js'
++const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
++let uninstall
++beforeEach(() => {
++  document.body.innerHTML = '<button id="outside">Outside</button><div role="dialog"><div id="row"><button id="mark">Mark read</button><button id="delete">Delete</button></div></div>'
++  uninstall = installFocusRescue(document)
++})
++afterEach(() => uninstall())
++const lose = async (control) => { control.blur(); control.disabled = true; await settle() }
++const replacement = () => { const control = document.createElement('button'); control.textContent = 'Mark unread'; return control }
++describe('round 10 independent review boundaries', () => {
++  it('focuses a direct replacement when an enabled active control is removed', async () => {
++    const mark = document.getElementById('mark')
++    mark.focus()
++    const unread = replacement()
++    mark.replaceWith(unread)
++    await settle()
++    expect(document.activeElement).toBe(unread)
++  })
++
++  it('finds the surviving dialog when the active row is removed without a disabled phase', async () => {
++    const close = document.createElement('button'); close.textContent = 'Close'
++    document.querySelector('[role=dialog]').prepend(close)
++    document.getElementById('mark').focus()
++    document.getElementById('row').remove()
++    await settle()
++    expect(document.activeElement).toBe(close)
++  })
++
++  it('does not revive an intentionally abandoned enabled control on a later async update', async () => {
++    const mark = document.getElementById('mark')
++    mark.focus(); mark.blur()
++    mark.disabled = true
++    await settle()
++    mark.disabled = false
++    await settle()
++    expect(document.activeElement).toBe(document.body)
++  })
++
++  it('skips a disabled tabindex control before a valid replacement', async () => {
++    const mark = document.getElementById('mark'); mark.focus(); await lose(mark)
++    const trap = document.createElement('button'); trap.textContent = 'Unavailable'; trap.disabled = true; trap.tabIndex = 0
++    const unread = replacement(); mark.replaceWith(trap, unread)
++    await settle()
++    expect(document.activeElement).toBe(unread)
++  })
++
++  it('never tries to restore an original control now inside an inert section', async () => {
++    const mark = document.getElementById('mark'); mark.focus(); await lose(mark)
++    const focus = vi.spyOn(mark, 'focus')
++    document.getElementById('row').setAttribute('inert', '')
++    mark.disabled = false
++    await settle()
++    expect(focus).not.toHaveBeenCalled()
++  })
++
++  it('never tries a replacement hidden by display:none above the nearest area', async () => {
++    const mark = document.getElementById('mark'); mark.focus(); await lose(mark)
++    document.querySelector('[role=dialog]').style.display = 'none'
++    const unread = replacement(); const focus = vi.spyOn(unread, 'focus'); mark.replaceWith(unread)
++    await settle()
++    expect(focus).not.toHaveBeenCalled()
++  })
++})

@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Round 10 keyboard focus review</title>
+<style>body{font:18px sans-serif;max-width:900px;margin:35px}button{font:inherit;padding:12px;margin:8px}button:focus{outline:4px solid blue}#dialog{border:2px solid gray;padding:15px}pre{white-space:pre-wrap}</style>
+<h1>Round 10 keyboard focus review</h1><p>Disposable DOM harness. The production focus rescue is imported unchanged. Use Tab and Enter.</p>
+<button id="outside">Outside</button><section id="dialog" role="dialog" aria-label="Review dialog"><div id="row"><button id="action">Run action</button></div><button id="close">Close</button></section><pre id="log" aria-live="polite"></pre>
+<script type="module">
+import { installFocusRescue } from '/src/ui/focusRescue.js'
+installFocusRescue(document)
+const scenario=new URL(location.href).searchParams.get('scenario') || 'reenable'
+const log=document.querySelector('#log')
+const record=(value)=>{log.textContent+=value+'\n'}
+record('Scenario: '+scenario)
+document.addEventListener('focusin', e=>record('Focus: '+e.target.id))
+document.addEventListener('keydown', e=>{if(['Tab','Enter'].includes(e.key))record('Keyboard: '+e.key+' trusted='+e.isTrusted)})
+document.querySelector('#action').addEventListener('click', event=>{
+ const button=event.currentTarget
+ record('Action started: trusted='+event.isTrusted)
+ if(scenario==='remove-immediate'){button.remove();setTimeout(()=>record('Result: '+document.activeElement.id),100);return}
+ button.disabled=true
+ setTimeout(()=>{
+  if(scenario==='replace'){const replacement=document.createElement('button');replacement.id='replacement';replacement.textContent='Replacement';button.replaceWith(replacement)}
+  else if(scenario==='remove-row'){document.querySelector('#row').remove()}
+  else{button.disabled=false}
+  setTimeout(()=>record('Result: '+document.activeElement.id),100)
+ },1500)
+})
+</script></html>

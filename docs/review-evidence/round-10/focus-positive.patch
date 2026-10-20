@@ -1,0 +1,47 @@
+diff --git a/frontend/src/ui/focusRescue.round10-positive.test.js b/frontend/src/ui/focusRescue.round10-positive.test.js
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/ui/focusRescue.round10-positive.test.js
+@@ -0,0 +1,42 @@
++import { afterEach, beforeEach, describe, expect, it } from 'vitest'
++import { installFocusRescue } from './focusRescue.js'
++const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
++let uninstall
++beforeEach(() => {
++  document.body.innerHTML = '<button id="outside">Outside</button><div role="dialog"><div id="row"><button id="mark">Mark read</button><button id="delete">Delete</button></div></div>'
++  uninstall = installFocusRescue(document)
++})
++afterEach(() => uninstall())
++const lose = async (control) => { control.blur(); control.disabled = true; await settle() }
++const replacement = () => { const control = document.createElement('button'); control.textContent = 'Mark unread'; return control }
++describe('round 10 independent positive rescue probes', () => {
++  it.each(['hidden', 'inert', 'aria-hidden', 'display:none', 'visibility:hidden'])('skips a %s replacement', async (hidden) => {
++    const mark = document.getElementById('mark'); mark.focus(); await lose(mark)
++    const trap = document.createElement('button'); trap.textContent = 'Hidden'
++    if (hidden === 'hidden') trap.hidden = true
++    if (hidden === 'inert') trap.setAttribute('inert', '')
++    if (hidden === 'aria-hidden') trap.setAttribute('aria-hidden', 'true')
++    if (hidden === 'display:none') trap.style.display = 'none'
++    if (hidden === 'visibility:hidden') trap.style.visibility = 'hidden'
++    const unread = replacement(); mark.replaceWith(trap, unread)
++    await settle()
++    expect(document.activeElement).toBe(unread)
++  })
++
++  it('cancels the old rescue when another chosen control is subsequently blurred too', async () => {
++    const mark = document.getElementById('mark'); mark.focus(); await lose(mark)
++    const outside = document.getElementById('outside'); outside.focus(); outside.blur()
++    mark.disabled = false
++    await settle()
++    expect(document.activeElement).toBe(document.body)
++  })
++
++  it('chooses within the nearest surviving row before a dialog-wide close button', async () => {
++    const close = document.createElement('button'); close.textContent = 'Close'
++    document.querySelector('[role=dialog]').prepend(close)
++    const mark = document.getElementById('mark'); mark.focus(); await lose(mark)
++    const unread = replacement(); mark.replaceWith(unread)
++    await settle()
++    expect(document.activeElement).toBe(unread)
++  })
++})
