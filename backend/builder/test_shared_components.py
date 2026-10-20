@@ -636,3 +636,47 @@ class TestCopiesBeyondTheComponentList:
         live = PublishedPage.objects.get(site=canvas).html
         assert f'data-pwb-shared-from="{drop.pk}"' not in live
         assert f'data-pwb-shared-from="{keep.pk}"' in live
+
+
+class TestAuthorDeleted:
+    """The owner's decision (round 7): when an account is deleted, its blocks
+    leave the library too. The row stays, unattributed, so a moderator can
+    still find and purge the copies other people took."""
+
+    def test_while_the_author_has_an_account_the_block_is_on_offer(self, author, taker):
+        component = SharedComponent.objects.create(author=author, **GOOD)
+        listed = APIClient().get(reverse('shared-components'))
+        assert [row['id'] for row in listed.data['results']] == [component.pk]
+        assert APIClient().get(reverse('shared-component', args=[component.pk])).status_code == 200
+
+    def test_the_block_leaves_the_library_with_the_account(self, author, taker):
+        component = SharedComponent.objects.create(author=author, **GOOD)
+        author.delete()
+        component.refresh_from_db()
+        assert component.author_id is None
+
+        anonymous = APIClient()
+        assert anonymous.get(reverse('shared-components')).data['results'] == []
+        assert anonymous.get(reverse('shared-component', args=[component.pk])).status_code == 404
+        anonymous.post(reverse('shared-component-view', args=[component.pk]))
+        component.refresh_from_db()
+        assert component.view_count == 0
+
+        site = Site.objects.get(owner=taker)
+        res = client_for(taker).post(
+            reverse('shared-component-use', args=[component.pk]),
+            {'site_id': site.pk, 'page_id': 'page_home'}, format='json',
+        )
+        assert res.status_code == 404
+        site.refresh_from_db()
+        assert site.schema['pages'][0]['components'] == []
+        component.refresh_from_db()
+        assert component.use_count == 0
+
+    def test_a_moderator_still_sees_the_unattributed_block(self, author, moderator):
+        component = SharedComponent.objects.create(author=author, **GOOD)
+        author.delete()
+        res = client_for(moderator).get(reverse('admin-components'))
+        rows = {row['id']: row for row in res.data['results']}
+        assert component.pk in rows
+        assert rows[component.pk]['author'] is None

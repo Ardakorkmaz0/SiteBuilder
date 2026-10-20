@@ -64,10 +64,11 @@ export default function AdminBlocks() {
                     <span className="font-medium text-[var(--studio-text)]">{block.title}</span>
                     <Chip tone={STATUS_TONE[block.status]}>{t(STATUS_LABEL[block.status] || block.status)}</Chip>
                     {block.visibility === 'private' && <Chip>{t('Private')}</Chip>}
+                    {!block.author && <Chip tone="warning">{t('Author deleted, not in the library')}</Chip>}
                     {block.open_reports > 0 && <Chip tone="warning">{t('{count} open reports', { count: block.open_reports })}</Chip>}
                   </p>
                   <p className="mt-0.5 text-xs text-[var(--studio-text-muted)]">
-                    @{block.author?.username || '?'} · {t('{count} uses', { count: formatNumber(block.use_count, language) })} · {t('{count} views', { count: formatNumber(block.view_count, language) })} · {formatRelative(block.created_at, language)}
+                    {block.author ? `@${block.author.username}` : t('Deleted account')} · {t('{count} uses', { count: formatNumber(block.use_count, language) })} · {t('{count} views', { count: formatNumber(block.view_count, language) })} · {formatRelative(block.created_at, language)}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

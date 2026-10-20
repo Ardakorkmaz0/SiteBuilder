@@ -2821,6 +2821,8 @@ export const TURKISH_TRANSLATIONS = {
   'Admin sections': 'Yönetim bölümleri',
   'Admin username': 'Admin kullanıcı adı',
   'Admins': 'Adminler',
+  'Author deleted, not in the library': 'Yazarı silinmiş, kütüphanede değil',
+  'Deleted account': 'Silinmiş hesap',
   'Administrator': 'Admin',
   'All accounts': 'Tüm hesaplar',
   'All sites': 'Tüm siteler',
