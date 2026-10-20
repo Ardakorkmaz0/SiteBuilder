@@ -160,8 +160,11 @@ def test_suspending_an_author_closes_every_public_component_door():
 
 
 @pytest.mark.django_db
-def test_deleted_author_does_not_remove_existing_public_components():
+def test_deleted_authors_blocks_leave_the_library():
+    # The owner's decision (round 7): a deleted account's blocks go with it.
+    # The row stays, unattributed, for moderators (test_shared_components.py).
     component = SharedComponent.objects.create(author=None, title='Archived author', html='<div>Content</div>')
     client = APIClient()
-    assert client.get(f'/api/public/components/{component.pk}/').status_code == 200
-    assert len(client.get('/api/public/components/').data['results']) == 1
+    assert client.get(f'/api/public/components/{component.pk}/').status_code == 404
+    assert client.get('/api/public/components/').data['results'] == []
+    assert SharedComponent.objects.filter(pk=component.pk).exists()
