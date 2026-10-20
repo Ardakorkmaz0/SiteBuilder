@@ -67,6 +67,17 @@ describe('the "How should this page start?" dialog', () => {
     expect(pages).toHaveLength(2)
     expect(pages[1].mode).toBe('empty')
   })
+
+  // Focus used to go back to "+ File": nothing told a screen reader user the
+  // page now exists, or which one it is. The new page takes it instead.
+  it('gives focus to the new page once it exists', async () => {
+    const user = open()
+    await user.click(screen.getByRole('button', { name: '+ File' }))
+    screen.getByRole('button', { name: /^Empty canvas/ }).focus()
+    await user.keyboard('{Enter}')
+    const added = useEditorStore.getState().schema.pages[1]
+    expect(document.activeElement).toHaveAttribute('data-page-button', added.id)
+  })
 })
 
 // Renaming happens in a field that replaces the page's button. It had no
