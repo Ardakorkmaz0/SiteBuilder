@@ -331,6 +331,65 @@ describe('a reading of the page is only laid over the document it was taken from
   })
 })
 
+// Edit takes a reading of the page off-screen, and laying it over the edit
+// document reloads that document. Whatever was typed before then was gone: on
+// /code every entry into Edit is read again, and Firefox CI caught the text
+// typed straight after opening Edit coming back as it was.
+describe('the edit surface while the page is being read', () => {
+  beforeEach(() => {
+    globalThis.ResizeObserver = class { observe() {} disconnect() {} }
+  })
+
+  const PAGE = '<html><head><title>T</title></head><body><h1>Title</h1></body></html>'
+  const READ = '<html class="js"><head><title>T</title></head><body><h1>Title</h1></body></html>'
+
+  function openEditReseeded() {
+    const workspaceRef = createRef()
+    render(
+      <LanguageProvider>
+        <HtmlWorkspace ref={workspaceRef} persistKey="edit-ready" html={PAGE} onCommit={vi.fn()} />
+      </LanguageProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    act(() => workspaceRef.current.setDocument(PAGE.replace('Title', 'Title!')))
+    return screen.getByTitle('site')
+  }
+
+  function report(frame, html) {
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: { type: 'pwb-live-state', styles: [], html },
+      }))
+    })
+  }
+
+  it('cannot be typed in until the read document is the one loaded', () => {
+    openEditReseeded()
+    expect(screen.getByTitle('site')).toHaveAttribute('inert')
+    report(screen.getByTitle('Reading the page'), READ.replace('Title', 'Title!'))
+    // The reading changed the edit document: it is reloading.
+    expect(screen.getByTitle('site').getAttribute('srcdoc')).toContain('class="js"')
+    expect(screen.getByTitle('site')).toHaveAttribute('inert')
+    fireEvent.load(screen.getByTitle('site'))
+    expect(screen.getByTitle('site')).not.toHaveAttribute('inert')
+  })
+
+  it('is freed when the reading never comes', () => {
+    vi.useFakeTimers()
+    try {
+      openEditReseeded()
+      fireEvent.load(screen.getByTitle('site'))
+      expect(screen.getByTitle('site')).toHaveAttribute('inert')
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(screen.queryByTitle('Reading the page')).toBeNull()
+      expect(screen.getByTitle('site')).not.toHaveAttribute('inert')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('HTML selection quick actions', () => {
   beforeEach(() => {
     document.body.innerHTML = '<main><p id="selected">Hello</p></main>'
