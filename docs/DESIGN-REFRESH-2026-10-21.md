@@ -25,12 +25,13 @@ Sahibin 36. yanıtı: önce ana sayfa ve gezinmeyi uygulayıp göster, sonra di�
 
 | Adım | Durum |
 | --- | --- |
-| Ana sayfa, ortak üst menü, mobil alt menü ve arama | Uygulandı; bu adım gösterilecek |
-| Sitelerim: kart/liste seçimi | Sonraki adım |
-| Profil ayarları: tek sayfada başlıklarla ayrılan bölümler | Sonraki adım |
-| Herkese açık profil: belirgin avatar/tanıtım, altında siteler | Sonraki adım |
-| Topluluk blokları: dengeli üç sütunlu kartlar | Sonraki adım |
-| Diğer boş ekranlar: çizim, kısa açıklama ve işlem | Sonraki adım |
+| Ana sayfa, ortak üst menü, mobil alt menü ve arama | Uygulandı, sahibi beğendi; 9961ade, CI yeşil |
+| Sitelerim: kart/liste seçimi | Uygulandı; tercih hatırlanır, filtreler solda |
+| Profil ayarları: tek sayfada başlıklarla ayrılan bölümler | Uygulandı |
+| Herkese açık profil: belirgin avatar/tanıtım, altında siteler | Uygulandı |
+| Topluluk ve kişisel bloklar: dengeli üç sütunlu kartlar | Uygulandı; ikincil işlemler menüde |
+| Favoriler, arama ve boş ekranlar | Ortak düzene taşındı |
+| Yönetim ve sistem ayarları | Mevcut işlevler korunarak palet/yüzey uyumu sağlandı |
 | Giriş/kayıt ve editörler | Değiştirilmeyecek |
 
 ## İlk adımın kapsamı
@@ -39,7 +40,7 @@ Ana sayfa kişisel istatistiklerin ağırlığından çıkarıldı; keşif, mevc
 
 Ortak menüde arama simgeden açılır, alan odağı alır ve Esc ile kapatıldığında odak geri döner. Mobil üçlü menünün dışındaki Bloklar, Profil, yönetici bağlantıları, dil/tema ve rehber açılır menülerden erişilebilir. Misafir hesap uyarıları ve çıkış onayı korundu.
 
-Yeni kart görünümü `redesigned` prop'u ile yalnızca ana sayfada kullanılır; diğer sayfalardaki kart düzenleri sonraki adımlara bırakıldı. Feed API'si açıklama göndermediğinden kategori ve etiketler kısa bağlam olarak kullanılır; açıklama uydurulmadı ve API değiştirilmedi.
+İlk adımda yeni kart görünümü `redesigned` prop'u ile yalnızca ana sayfada kullanıldı. İkinci adımda Favoriler, arama ve herkese açık profil de aynı görünüme taşındı. Feed API'si açıklama göndermediğinden kategori ve etiketler kısa bağlam olarak kullanılır; açıklama uydurulmadı ve API değiştirilmedi.
 
 Palet `:root[data-surface="app"]:has(.dashboard-header)` altında tanımlandı. Böylece portallanan diyaloglar aynı paleti alır, DashboardHeader bulunmayan giriş/kayıt ve editör rotaları mevcut renklerini korur. İçerik önizlemeleri korumalı iframe'lerinde kalır.
 
@@ -53,6 +54,10 @@ Palet `:root[data-surface="app"]:has(.dashboard-header)` altında tanımlandı. 
 - İncelemede sabitlenen kategori panelinin kaydırma hedefi olamayacağı görüldü. Yeni test yanlış hedefte 608, doğru sonuç başlığında 776 konumunu ayırarak önce kırıldı, düzeltmeden sonra geçti. Başlık sabit üst menünün altında konumlandırılır.
 - Kart giriş animasyonunun son transform değerini tutarak hover yükselmesini engellemesi düzeltildi. Koyu dolu düğmenin hover rengi beyaz küçük metin için yeterli kontrasta çekildi.
 - Yerel tarayıcıda 320, 390, 1024 ve 1280 piksel kontrol edildi; yatay taşma görülmedi. Açık/koyu tema, arama/Esc, kart menüsü ve mobil bağlantılar denendi. Yalnızca geçici SQLite veritabanı ve altı örnek site kullanıldı.
-- `community-account.spec.js` yeni menü ve arama adımlarına uyarlandı; gerçek tarayıcıda arama odağı/Esc ve mobil gezinmeyi doğrulayan senaryo eklendi. Yerel E2E çalıştırılmadı; push sonrası CI sonucu kontrol edilecek ve konuşmada bildirilecek.
+- `community-account.spec.js` yeni menü ve arama adımlarına uyarlandı; gerçek tarayıcıda arama odağı/Esc ve mobil gezinmeyi doğrulayan senaryo eklendi. Yerel E2E çalıştırılmadı. 9961ade için CI lint/Vitest/build, pytest ve iki tarayıcıda 109'ar E2E testini başarıyla tamamladı: https://github.com/Ardakorkmaz0/SiteBuilder/actions/runs/39510896965.
+
+## İkinci adım
+
+Sahibi ilk görünümü beğenip Sitelerim ve Bloklarım dahil diğer sayfalara uygulanmasını istedi. Kapsam, doğrulama ve Claude için inceleme başlıkları `docs/DESIGN-PHASE-02-2026-10-21.md` dosyasındadır. İkinci adım yerelde 2.712 ön yüz ve 903 arka yüz testiyle doğrulandı. Bağımsız Claude incelemesi henüz yapılmadı.
 
 Bu değişiklik büyük olduğundan AGENTS.md uyarınca Claude'un bağımsız çapraz incelemesine sunulmalıdır. Özellikle yeni kart ve arama testlerini mutasyonla, CSS kapsamını giriş/kayıt ve editör rotalarında kontrol etmesi beklenir. Canlıya alma yetkisi verilmedi; dağıtım yapılmaz.

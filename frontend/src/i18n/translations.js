@@ -1,4 +1,10 @@
 export const TURKISH_TRANSLATIONS = {
+  'Card view': 'Kart görünümü',
+  'List view': 'Liste görünümü',
+  'View mode': 'Görünüm biçimi',
+  'Project filters': 'Proje filtreleri',
+  'Block filters': 'Blok filtreleri',
+  'Favorite options': 'Favori seçenekleri',
   'Close search': 'Aramayı kapat',
   'Quick navigation': 'Hızlı gezinme',
   'Explore options': 'Keşif seçenekleri',

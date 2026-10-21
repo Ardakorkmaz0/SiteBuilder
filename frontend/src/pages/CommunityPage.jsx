@@ -10,13 +10,18 @@
 // not be the place that assumption is tested — a preview should never be able
 // to run something the library was supposed to have refused.
 
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import DashboardHeader from '../components/dashboard/DashboardHeader.jsx'
 import UseComponentDialog from '../components/community/UseComponentDialog.jsx'
 import ReportComponentDialog from '../components/community/ReportComponentDialog.jsx'
 import ComponentPreviewDialog from '../components/community/ComponentPreviewDialog.jsx'
 import DashboardSearch from '../components/dashboard/DashboardSearch.jsx'
-import { ArrowRightIcon, BanIcon, FlagIcon, GlobeIcon, LayersIcon, TrashIcon } from '../components/icons.jsx'
+import WorkspaceLayout from '../components/dashboard/WorkspaceLayout.jsx'
+import DashboardEmptyState from '../components/dashboard/DashboardEmptyState.jsx'
+import { useEscapeToClose } from '../ui/useEscapeToClose.js'
+import '../ui/community-design.css'
+import { ArrowRightIcon, BanIcon, FlagIcon, GlobeIcon, LayersIcon, MoreHorizontalIcon, TrashIcon } from '../components/icons.jsx'
 import {
   listComponents,
   countComponentView,
@@ -45,6 +50,37 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
   const isPrivate = component.visibility === 'private'
   // Every card has the same buttons: each one names its block as well.
   const titleId = useId()
+  const menuId = useId()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRootRef = useRef(null)
+  const menuRef = useRef(null)
+  useEscapeToClose(menuOpen, () => setMenuOpen(false))
+
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    menuRef.current?.querySelector('button')?.focus()
+    const dismissOutside = (event) => {
+      if (!menuRootRef.current?.contains(event.target)) setMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', dismissOutside)
+    return () => document.removeEventListener('pointerdown', dismissOutside)
+  }, [menuOpen])
+
+  function runAction(action) {
+    setMenuOpen(false)
+    action()
+  }
+
+  function onMenuKeyDown(event) {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    const actions = [...menuRef.current.querySelectorAll('button:not(:disabled)')]
+    if (!actions.length) return
+    event.preventDefault()
+    const current = actions.indexOf(document.activeElement)
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? actions.length - 1
+      : (current + (event.key === 'ArrowDown' ? 1 : -1) + actions.length) % actions.length
+    actions[next].focus()
+  }
 
   useEffect(() => {
     // Counted once per card that actually appears, and by POST — a render or a
@@ -56,7 +92,7 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
   // Same card chrome as an Explore site card: this is a library of things to
   // take, and it should read like the rest of the app's libraries.
   return (
-    <article className="dashboard-site-card">
+    <article className="dashboard-site-card community-card" aria-labelledby={titleId}>
       {/* The whole preview is the button — clicking the picture is what people
           try first. The frame itself takes no pointer events, so the click
           lands here instead of disappearing into the iframe. */}
@@ -99,48 +135,43 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
           </div>
         </div>
 
-        <div className="dashboard-site-card-actions">
-          {/* The owner's two management actions are icons: three labelled
-              buttons wrapped the row onto a second line on every card. */}
-          {mine ? (
-            <>
-              <button
-                type="button"
-                onClick={() => onVisibility(component, isPrivate ? 'public' : 'private')}
-                title={isPrivate ? t('Make public') : t('Make private')}
-                aria-label={isPrivate ? t('Make public') : t('Make private')}
-                aria-describedby={titleId}
-                className="dashboard-site-card-remix"
-              >
-                {isPrivate ? <GlobeIcon size={13} /> : <BanIcon size={13} />}
-              </button>
-              <button
-                type="button"
-                onClick={() => onWithdraw(component)}
-                title={t('Withdraw')}
-                aria-label={t('Withdraw')}
-                aria-describedby={titleId}
-                className="dashboard-site-card-remix"
-              >
-                <TrashIcon size={13} />
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onReport(component)}
-              title={t('Report this block')}
-              aria-label={t('Report this block')}
-                aria-describedby={titleId}
-              className="dashboard-site-card-remix"
-            >
-              <FlagIcon size={13} />
-            </button>
-          )}
-          <button type="button" onClick={() => onUse(component)} aria-describedby={titleId} className="dashboard-site-card-open">
-            <span>{t('Use this')}</span>
-            <span className="dashboard-site-card-open-icon"><ArrowRightIcon size={13} /></span>
+        <div className="community-card-actions">
+          <button type="button" onClick={() => onUse(component)} aria-describedby={titleId} className="community-card-use">
+            {t('Use this')} <ArrowRightIcon size={14} />
           </button>
+          <div ref={menuRootRef} className="community-card-menu-root" onBlur={(event) => {
+            if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false)
+          }}>
+            <button type="button" aria-label={t('More actions')} aria-describedby={titleId} aria-haspopup="menu"
+              aria-expanded={menuOpen} aria-controls={menuOpen ? menuId : undefined}
+              onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setMenuOpen(true) } }}
+              onClick={() => setMenuOpen((open) => !open)} className="community-card-more">
+              <MoreHorizontalIcon size={18} />
+            </button>
+            {menuOpen && (
+              <div ref={menuRef} id={menuId} role="menu" aria-label={t('More actions')} aria-describedby={titleId}
+                className="community-card-menu" onKeyDown={onMenuKeyDown}>
+                {mine ? (
+                  <>
+                    <button type="button" role="menuitem" aria-describedby={titleId}
+                      onClick={() => runAction(() => onVisibility(component, isPrivate ? 'public' : 'private'))}>
+                      {isPrivate ? <GlobeIcon size={15} /> : <BanIcon size={15} />}
+                      {isPrivate ? t('Make public') : t('Make private')}
+                    </button>
+                    <button type="button" role="menuitem" aria-describedby={titleId} className="community-card-withdraw"
+                      onClick={() => runAction(() => onWithdraw(component))}>
+                      <TrashIcon size={15} /> {t('Withdraw')}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" role="menuitem" aria-describedby={titleId}
+                    onClick={() => runAction(() => onReport(component))}>
+                    <FlagIcon size={15} /> {t('Report this block')}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </article>
@@ -149,7 +180,6 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
 
 export default function CommunityPage() {
   const { t } = useLanguage()
-  useDocumentTitle(t('Community blocks'))
   const user = useAuthStore((state) => state.user)
   const [category, setCategory] = useState('')
   const [query, setQuery] = useState('')
@@ -165,6 +195,7 @@ export default function CommunityPage() {
   // '' = the community grid, 'mine' = your own shelf, the only place a private
   // block is visible at all.
   const [scope, setScope] = useState('')
+  useDocumentTitle(scope === 'mine' ? t('My blocks') : t('Community blocks'))
 
   useEffect(() => {
     let current = true
@@ -211,122 +242,91 @@ export default function CommunityPage() {
       : rows.filter((row) => row.id !== component.id || visibility === 'public')))
   }
 
+  const sidebar = (
+    <>
+      <div className="workspace-sidebar-section">
+        <h2>{t('Blocks')}</h2>
+        <div role="group" aria-label={t('Block library')} className="community-scope">
+          {[['', 'Community'], ['mine', 'My blocks']].map(([value, label]) => (
+            <button key={value || 'all'} type="button" onClick={() => setScope(value)} aria-pressed={scope === value} className="workspace-filter">
+              <LayersIcon size={16} /> {t(label)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="workspace-sidebar-section">
+        <h2>{t('Categories')}</h2>
+        <div role="group" className="community-categories" aria-label={t('Block categories')}>
+          {CATEGORIES.map(([value, label]) => (
+            <button key={value || 'all'} type="button" onClick={() => setCategory(value)} aria-pressed={category === value} className="workspace-filter">
+              {t(label)}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page workspace-page community-page">
       <a href="#community-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-[var(--studio-panel-raised)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--studio-accent-hover)] focus:shadow-lg">
         {t('Skip to content')}
       </a>
       <DashboardHeader current="community" />
-      <main id="community-main" className="dashboard-container">
+      <WorkspaceLayout id="community-main" sidebar={sidebar} sidebarLabel={t('Block filters')}>
         <section aria-labelledby="blocks-heading">
-          <div className="dashboard-section-heading">
+          <div className="workspace-heading community-heading">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 id="blocks-heading" className="text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">
-                  {t('Community blocks')}
-                </h1>
-                <span className="studio-status-warning rounded-full border px-2 py-0.5 text-[11px] font-semibold">
-                  {t('In development')}
-                </span>
+              <div className="community-title-line">
+                <h1 id="blocks-heading">{scope === 'mine' ? t('My blocks') : t('Community blocks')}</h1>
+                <span className="studio-status-warning community-development">{t('In development')}</span>
               </div>
-              <p className="mt-1 text-sm text-[var(--studio-text-muted)]">
-                {scope === 'mine'
-                  ? t('Everything you shared, public and private.')
-                  : t('Blocks other people made, ready to drop into a site of your own.')}
-              </p>
-            </div>
-            <DashboardSearch
-              value={query}
-              onChange={setQuery}
-              label={t('Search blocks…')}
-              placeholder={t('Search blocks…')}
-              className="w-full lg:w-[22rem]"
-            />
-          </div>
-
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            {/* Two shelves, not a filter: the community grid, and your own —
-                where a private block is the only place it can be seen. */}
-            <div className="studio-segment shrink-0">
-              {[['', 'Community'], ['mine', 'My blocks']].map(([value, label]) => (
-                <button
-                  key={value || 'all'}
-                  type="button"
-                  onClick={() => setScope(value)}
-                  aria-pressed={scope === value}
-                  className={scope === value ? 'studio-segment-btn studio-segment-btn-active' : 'studio-segment-btn'}
-                >
-                  {t(label)}
-                </button>
-              ))}
-            </div>
-            <div className="dashboard-filter-rail flex max-w-full gap-1.5 overflow-x-auto" aria-label={t('Block categories')}>
-              {CATEGORIES.map(([value, label]) => (
-                <button
-                  key={value || 'all'}
-                  type="button"
-                  onClick={() => setCategory(value)}
-                  aria-pressed={category === value}
-                  className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                    category === value
-                      ? 'border-[var(--studio-text)] bg-[var(--studio-text)] text-[var(--studio-panel-raised)]'
-                      : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)] text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]'
-                  }`}
-                >
-                  {t(label)}
-                </button>
-              ))}
+              <p>{scope === 'mine'
+                ? t('Everything you shared, public and private.')
+                : t('Blocks other people made, ready to drop into a site of your own.')}</p>
             </div>
           </div>
 
-        {error && <p role="alert" className="studio-status-danger mb-4 rounded-xl border px-4 py-3 text-sm">{error}</p>}
-        {actionError && <p role="alert" className="studio-status-danger mb-4 rounded-xl border px-4 py-3 text-sm">{actionError}</p>}
+          <div className="workspace-toolbar community-toolbar">
+            <DashboardSearch value={query} onChange={setQuery} label={t('Search blocks…')} placeholder={t('Search blocks…')} className="community-search" />
+            <span className="community-result-context">{t(CATEGORIES.find(([value]) => value === category)?.[1] || 'All')}</span>
+          </div>
 
-        {loading ? (
-          <div role="status" aria-label={t('Loading…')} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="dashboard-site-card">
-                <div className="dashboard-site-card-media"><div className="h-44 rounded-xl bg-[var(--studio-control)]" /></div>
-                <div className="dashboard-site-card-body">
-                  <div className="h-4 w-2/3 rounded bg-[var(--studio-control)]" />
-                  <div className="mt-3 h-3 w-1/2 rounded bg-[var(--studio-control)]" />
+          {error && <p role="alert" className="studio-status-danger mb-4 rounded-lg border px-4 py-3 text-sm">{error}</p>}
+          {actionError && <p role="alert" className="studio-status-danger mb-4 rounded-lg border px-4 py-3 text-sm">{actionError}</p>}
+
+          {loading ? (
+            <div role="status" aria-label={t('Loading…')} className="workspace-grid community-grid">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="dashboard-site-card community-card" aria-hidden="true">
+                  <div className="dashboard-site-card-media"><div className="h-48 bg-[var(--studio-control)]" /></div>
+                  <div className="dashboard-site-card-body">
+                    <div className="h-4 w-2/3 rounded bg-[var(--studio-control)]" />
+                    <div className="mt-3 h-3 w-1/2 rounded bg-[var(--studio-control)]" />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : error ? null : items.length === 0 ? (
-          // Only when the library really is empty. After a failure the alert
-          // above says what happened; "nothing here yet" would be a lie.
-          <div className="dashboard-section-card border-dashed py-16 text-center">
-            <div className="mx-auto mb-3 grid place-items-center text-[var(--studio-text-faint)]">
-              <LayersIcon size={24} />
+              ))}
             </div>
-            <p className="font-medium text-[var(--studio-text)]">{t('Nothing here yet.')}</p>
-            <p className="mt-1 text-sm text-[var(--studio-text-muted)]">
-              {scope === 'mine'
-                ? t('Blocks you share, public or private, land here.')
-                : t('Share a block from one of your own sites to start the library.')}
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {items.map((component) => (
-              <ComponentCard
-                key={component.id}
-                component={component}
-                onUse={setUsing}
-                onWithdraw={withdraw}
-                onReport={setReporting}
-                onPreview={setPreviewing}
-                onVisibility={changeVisibility}
-                mine={!!user && component.author_id === user.id}
-                t={t}
-              />
-            ))}
-          </div>
-        )}
+          ) : error ? null : items.length === 0 ? (
+            <DashboardEmptyState kind="blocks" title={t('Nothing here yet.')}
+              description={scope === 'mine' ? t('Blocks you share, public or private, land here.') : t('Share a block from one of your own sites to start the library.')}>
+              {query || category ? (
+                <button type="button" onClick={() => { setQuery(''); setCategory('') }} className="studio-btn studio-btn-secondary">{t('Clear filters')}</button>
+              ) : (
+                <Link to="/sites" className="studio-btn studio-btn-primary">{t('My sites')} <ArrowRightIcon size={15} /></Link>
+              )}
+            </DashboardEmptyState>
+          ) : (
+            <div className="workspace-grid community-grid">
+              {items.map((component) => (
+                <ComponentCard key={component.id} component={component} onUse={setUsing} onWithdraw={withdraw}
+                  onReport={setReporting} onPreview={setPreviewing} onVisibility={changeVisibility}
+                  mine={!!user && component.author_id === user.id} t={t} />
+              ))}
+            </div>
+          )}
         </section>
-      </main>
+      </WorkspaceLayout>
 
       {previewing && (
         <ComponentPreviewDialog

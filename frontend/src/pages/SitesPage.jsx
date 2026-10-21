@@ -9,12 +9,16 @@ import OwnerSiteCard from '../components/dashboard/OwnerSiteCard.jsx'
 import CreateSiteWizard from '../components/dashboard/CreateSiteWizard.jsx'
 import DashboardHeader from '../components/dashboard/DashboardHeader.jsx'
 import DashboardSearch from '../components/dashboard/DashboardSearch.jsx'
-import { FolderIcon, FolderOpenIcon, PlusIcon } from '../components/icons.jsx'
+import { FolderOpenIcon, PlusIcon } from '../components/icons.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
 import { useDocumentTitle } from '../utils/useDocumentTitle.js'
+import WorkspaceLayout from '../components/dashboard/WorkspaceLayout.jsx'
+import DashboardEmptyState from '../components/dashboard/DashboardEmptyState.jsx'
+import '../ui/sites-design.css'
 
 const PINNED_PROJECTS_KEY = 'pwb_pinned_projects'
 const SORT_KEY = 'pwb_sites_sort'
+const VIEW_KEY = 'pwb_sites_view'
 const SORTS = ['updated', 'name', 'views', 'favorites']
 const FILTERS = [
   ['all', 'All'],
@@ -43,6 +47,14 @@ function initialSort() {
   }
 }
 
+function initialView() {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'
+  } catch {
+    return 'grid'
+  }
+}
+
 function remember(key, value) {
   try {
     localStorage.setItem(key, value)
@@ -62,6 +74,7 @@ export default function SitesPage() {
   const [query, setQuery] = useState('')
   const [siteFilter, setSiteFilter] = useState('all')
   const [siteSort, setSiteSort] = useState(initialSort)
+  const [siteView, setSiteView] = useState(initialView)
   const [pinnedIds, setPinnedIds] = useState(initialPinnedProjects)
   const [busyAction, setBusyAction] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -119,6 +132,11 @@ export default function SitesPage() {
   function chooseSort(value) {
     setSiteSort(value)
     remember(SORT_KEY, value)
+  }
+
+  function chooseView(value) {
+    setSiteView(value)
+    remember(VIEW_KEY, value)
   }
 
   function showAll() {
@@ -193,175 +211,97 @@ export default function SitesPage() {
         : t('Pin a site from its menu to keep it at the top.')
   const showCreateTile = siteFilter === 'all' && !trimmedQuery
 
-  return (
-    <div className="dashboard-page">
-      <a href="#sites-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-[var(--studio-panel-raised)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--studio-accent-hover)] focus:shadow-lg">
-        {t('Skip to content')}
-      </a>
-      <DashboardHeader current="projects" />
-
-      <main id="sites-main" className="dashboard-container">
-        <section aria-labelledby="sites-heading">
-          <div className="dashboard-section-heading">
-            <div className="min-w-0">
-              <h1 id="sites-heading" className="text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">{t('My sites')}</h1>
-              <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('Create, search, and manage every site you own.')}</p>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Link to="/code" className="studio-btn studio-btn-secondary min-h-10 px-4">
-                <FolderOpenIcon size={16} /> {t('Open local project')}
-              </Link>
-              <button type="button" onClick={openCreate} aria-haspopup="dialog" aria-expanded={createOpen} className="studio-btn studio-btn-primary studio-create-trigger min-h-10 px-4">
-                <PlusIcon size={16} /> {t('Create new site')}
+  const sidebar = (
+    <>
+      <section className="workspace-sidebar-section">
+        <h2>{t('Filter projects')}</h2>
+        {allSites.length > 0 && (
+          <div role="group" aria-label={t('Filter projects')} className="sites-filters">
+            {FILTERS.filter(([id]) => id !== 'pinned' || counts.pinned > 0 || siteFilter === 'pinned').map(([id, label]) => (
+              <button key={id} type="button" onClick={() => setSiteFilter(id)} aria-pressed={siteFilter === id} className="workspace-filter">
+                <span>{t(label)}</span>{' '}<span className="tabular-nums">{counts[id]}</span>
               </button>
+            ))}
+          </div>
+        )}
+      </section>
+      <section className="workspace-sidebar-section">
+        <h2>{t('Sort projects')}</h2>
+        <select aria-label={t('Sort projects')} value={siteSort} onChange={(event) => chooseSort(event.target.value)} className="studio-input sites-sort">
+          <option value="updated">{t('Recently updated')}</option>
+          <option value="name">{t('Name')}</option>
+          <option value="views">{t('Most viewed')}</option>
+          <option value="favorites">{t('Most favorited')}</option>
+        </select>
+      </section>
+    </>
+  )
+
+  return (
+    <div className="dashboard-page workspace-page sites-design">
+      <a href="#sites-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-[var(--studio-panel-raised)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--studio-accent-hover)] focus:shadow-lg">{t('Skip to content')}</a>
+      <DashboardHeader current="projects" />
+      <WorkspaceLayout id="sites-main" sidebar={sidebar} sidebarLabel={t('Project filters')}>
+        <section aria-labelledby="sites-heading">
+          <div className="workspace-heading">
+            <div className="min-w-0">
+              <h1 id="sites-heading">{t('My sites')}</h1>
+              <p>{t('Create, search, and manage every site you own.')}</p>
+            </div>
+            <div className="workspace-heading-actions">
+              <Link to="/code" className="studio-btn studio-btn-secondary"><FolderOpenIcon size={16} /> {t('Open local project')}</Link>
+              <button type="button" onClick={openCreate} aria-haspopup="dialog" aria-expanded={createOpen} className="studio-btn studio-btn-primary studio-create-trigger"><PlusIcon size={16} /> {t('Create new site')}</button>
             </div>
           </div>
 
-          {/* The same plain figures as the home page and the profile, so the
-              numbers read as one system wherever they appear. */}
-          <dl className="dashboard-section-card mb-6 grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-4" aria-label={t('Workspace')} aria-busy={sites === null}>
-            {[
-              ['Sites', counts.all],
-              ['Published', counts.published],
-              ['Total views', stats.views],
-              ['Favorites', stats.favorites],
-            ].map(([label, value]) => (
-              <div key={label} className="dashboard-figure">
-                <dt>{t(label)}</dt>
-                <dd>{sites === null ? '…' : Number(value).toLocaleString()}</dd>
-              </div>
+          <dl className="sites-summary" aria-label={t('Workspace')} aria-busy={sites === null}>
+            {[['Sites', counts.all], ['Published', counts.published], ['Total views', stats.views], ['Favorites', stats.favorites]].map(([label, value]) => (
+              <div key={label} className="dashboard-figure"><dt>{t(label)}</dt><dd>{sites === null ? '…' : Number(value).toLocaleString()}</dd></div>
             ))}
           </dl>
 
-          {error && (
-            <div role="alert" className="studio-status-danger mb-5 rounded-xl border px-4 py-3 text-sm">
-              {error}
-            </div>
-          )}
-
+          {error && <div role="alert" className="studio-status-danger mb-5 rounded-lg border px-4 py-3 text-sm">{error}</div>}
           {allSites.length > 0 && (
-            <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div role="group" aria-label={t('Filter projects')} className="dashboard-filter-rail flex max-w-full gap-1.5 overflow-x-auto">
-                {FILTERS.filter(([id]) => id !== 'pinned' || counts.pinned > 0 || siteFilter === 'pinned').map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setSiteFilter(id)}
-                    aria-pressed={siteFilter === id}
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                      siteFilter === id
-                        ? 'border-[var(--studio-text)] bg-[var(--studio-text)] text-[var(--studio-panel-raised)]'
-                        : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)] text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]'
-                    }`}
-                  >
-                    {t(label)}{' '}
-                    <span className="tabular-nums opacity-70">{counts[id]}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="flex min-w-0 gap-2">
-                <DashboardSearch
-                  value={query}
-                  onChange={setQuery}
-                  label={t('Search your sites…')}
-                  placeholder={t('Search your sites…')}
-                  className="min-w-0 flex-1 lg:w-[20rem] lg:flex-none [&_input]:pr-3"
-                />
-                {/* Narrow on a phone, so the search beside it keeps room for
-                    its own words. */}
-                <select
-                  aria-label={t('Sort projects')}
-                  value={siteSort}
-                  onChange={(event) => chooseSort(event.target.value)}
-                  className="studio-input h-[2.65rem] w-[8.75rem] shrink-0 rounded-full px-3 text-xs font-semibold sm:w-auto"
-                >
-                  <option value="updated">{t('Recently updated')}</option>
-                  <option value="name">{t('Name')}</option>
-                  <option value="views">{t('Most viewed')}</option>
-                  <option value="favorites">{t('Most favorited')}</option>
-                </select>
+            <div className="sites-toolbar">
+              <DashboardSearch value={query} onChange={setQuery} label={t('Search your sites…')} placeholder={t('Search your sites…')} className="sites-search" />
+              <div role="group" aria-label={t('View mode')} className="sites-view-toggle">
+                <button type="button" aria-pressed={siteView === 'grid'} onClick={() => chooseView('grid')}>{t('Card view')}</button>
+                <button type="button" aria-pressed={siteView === 'list'} onClick={() => chooseView('list')}>{t('List view')}</button>
               </div>
             </div>
           )}
 
           {loadError ? (
-            <div role="alert" className="dashboard-section-card p-8 text-center">
-              <p className="mb-4 text-sm text-[var(--studio-text-muted)]">{loadError}</p>
-              <button type="button" className="studio-btn studio-btn-secondary px-4" onClick={retryLoad}>{t('Try again')}</button>
-            </div>
+            <div role="alert" className="workspace-panel p-8 text-center"><p className="mb-4 text-sm text-[var(--studio-text-muted)]">{loadError}</p><button type="button" className="studio-btn studio-btn-secondary" onClick={retryLoad}>{t('Try again')}</button></div>
           ) : sites === null ? (
-            <div role="status" aria-label={t('Loading…')} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {[0, 1, 2].map((item) => (
-                <div key={item} className="dashboard-site-card">
-                  <div className="dashboard-site-card-media"><div className="h-40 bg-[var(--studio-control)]" /></div>
-                  <div className="p-4">
-                    <div className="h-4 w-2/3 rounded bg-[var(--studio-control)]" />
-                    <div className="mt-3 h-3 w-1/2 rounded bg-[var(--studio-control)]" />
-                    <div className="mt-6 h-9 rounded-lg bg-[var(--studio-control)]" />
-                  </div>
-                </div>
-              ))}
+            <div role="status" aria-label={t('Loading…')} className="workspace-grid">
+              {[0, 1, 2].map((item) => <div key={item} className="workspace-panel"><div className="h-44 bg-[var(--studio-control)]" /><div className="p-5"><div className="h-4 w-2/3 rounded bg-[var(--studio-control)]" /><div className="mt-3 h-3 w-1/2 rounded bg-[var(--studio-control)]" /></div></div>)}
             </div>
           ) : allSites.length === 0 ? (
-            <div className="dashboard-section-card border-dashed px-6 py-16 text-center">
-              <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]">
-                <FolderIcon size={22} />
-              </div>
-              <h2 className="text-lg font-semibold text-[var(--studio-text)]">{t('No sites yet')}</h2>
-              <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-[var(--studio-text-muted)]">{t('Choose a template, use AI, or bring your own HTML.')}</p>
-              <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
-                <button type="button" onClick={openCreate} aria-haspopup="dialog" aria-expanded={createOpen} className="studio-btn studio-btn-primary studio-create-trigger min-h-10 px-4">
-                  <PlusIcon size={16} /> {t('Create your first project')}
-                </button>
-              </div>
-            </div>
+            <DashboardEmptyState kind="sites" title={t('No sites yet')} description={t('Choose a template, use AI, or bring your own HTML.')}>
+              <button type="button" onClick={openCreate} aria-haspopup="dialog" aria-expanded={createOpen} className="studio-btn studio-btn-primary studio-create-trigger"><PlusIcon size={16} /> {t('Create your first project')}</button>
+            </DashboardEmptyState>
           ) : visibleSites.length === 0 ? (
-            <div className="dashboard-section-card border-dashed px-6 py-12 text-center">
-              <p className="text-sm text-[var(--studio-text-muted)]">{emptyViewText}</p>
-              <button type="button" onClick={showAll} className="studio-btn studio-btn-secondary mt-4 min-h-9 px-4">{t('Show all sites')}</button>
-            </div>
+            <DashboardEmptyState kind="search" title={t('No results found.')} description={emptyViewText}>
+              <button type="button" onClick={showAll} className="studio-btn studio-btn-secondary">{t('Show all sites')}</button>
+            </DashboardEmptyState>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className={siteView === 'list' ? 'sites-list' : 'workspace-grid'}>
               {showCreateTile && (
-                <button
-                  type="button"
-                  onClick={openCreate}
-                  aria-haspopup="dialog"
-                  aria-expanded={createOpen}
-                  aria-labelledby="new-site-tile-name"
-                  aria-describedby="new-site-tile-hint"
-                  className="studio-create-trigger group flex min-h-[18rem] flex-col items-center justify-center gap-3 rounded-[var(--studio-radius-lg)] border border-dashed border-[var(--studio-border-strong)] bg-[color-mix(in_srgb,var(--studio-panel-raised)_55%,transparent)] p-6 text-center transition-colors hover:border-[var(--studio-accent)] hover:bg-[var(--studio-accent-soft)]"
-                >
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] text-[var(--studio-accent-hover)] shadow-[var(--studio-shadow-sm)] transition-colors group-hover:border-[var(--studio-accent)]">
-                    <PlusIcon size={22} />
-                  </span>
-                  <span id="new-site-tile-name" className="text-sm font-semibold text-[var(--studio-text)]">{t('New site')}</span>
-                  <span id="new-site-tile-hint" className="max-w-[16rem] text-xs leading-5 text-[var(--studio-text-muted)]">{t('Choose a template, use AI, or bring your own HTML.')}</span>
+                <button type="button" onClick={openCreate} aria-haspopup="dialog" aria-expanded={createOpen}
+                  aria-labelledby="new-site-tile-name" aria-describedby="new-site-tile-hint" className="studio-create-trigger sites-create-tile">
+                  <span><PlusIcon size={22} /></span>
+                  <span id="new-site-tile-name">{t('New site')}</span>
+                  <span id="new-site-tile-hint">{t('Choose a template, use AI, or bring your own HTML.')}</span>
                 </button>
               )}
-              {visibleSites.map((site) => (
-                <OwnerSiteCard
-                  key={site.id}
-                  site={site}
-                  isPinned={pinnedIds.has(site.id)}
-                  onTogglePin={onTogglePin}
-                  onDelete={({ id }) => onDelete(id)}
-                  onDuplicate={onDuplicate}
-                  onExport={onExport}
-                  busyAction={busyAction}
-                />
-              ))}
+              {visibleSites.map((site) => <OwnerSiteCard key={site.id} site={site} view={siteView} isPinned={pinnedIds.has(site.id)} onTogglePin={onTogglePin}
+                onDelete={({ id }) => onDelete(id)} onDuplicate={onDuplicate} onExport={onExport} busyAction={busyAction} />)}
             </div>
           )}
         </section>
-      </main>
-
-      <CreateSiteWizard
-        open={createOpen}
-        origin={createOrigin}
-        onClose={() => setCreateOpen(false)}
-        onCreated={(site) => navigate(`/editor/${site.id}`)}
-      />
+      </WorkspaceLayout>
+      <CreateSiteWizard open={createOpen} origin={createOrigin} onClose={() => setCreateOpen(false)} onCreated={(site) => navigate(`/editor/${site.id}`)} />
       {guestDialog}
     </div>
   )
