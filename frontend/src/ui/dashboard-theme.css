@@ -21,7 +21,8 @@
   --studio-border-strong: #b7c4d5;
   --studio-text: #1c2533;
   --studio-text-muted: #556276;
-  --studio-text-faint: #616e80;
+  /* 4.5:1 on control grey too, where loading and empty labels sit. */
+  --studio-text-faint: #5b687a;
   --studio-focus-ring: color-mix(in srgb, var(--studio-accent) 28%, transparent);
   --studio-radius-sm: 5px;
   --studio-radius: 7px;
