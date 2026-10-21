@@ -242,6 +242,20 @@ export default function CommunityPage() {
       : rows.filter((row) => row.id !== component.id || visibility === 'public')))
   }
 
+  const heading = (
+    <div className="workspace-heading community-heading">
+      <div className="min-w-0">
+        <div className="community-title-line">
+          <h1 id="blocks-heading">{scope === 'mine' ? t('My blocks') : t('Community blocks')}</h1>
+          <span className="studio-status-warning community-development">{t('In development')}</span>
+        </div>
+        <p>{scope === 'mine'
+          ? t('Everything you shared, public and private.')
+          : t('Blocks other people made, ready to drop into a site of your own.')}</p>
+      </div>
+    </div>
+  )
+
   const sidebar = (
     <>
       <div className="workspace-sidebar-section">
@@ -273,20 +287,8 @@ export default function CommunityPage() {
         {t('Skip to content')}
       </a>
       <DashboardHeader current="community" />
-      <WorkspaceLayout id="community-main" sidebar={sidebar} sidebarLabel={t('Block filters')}>
+      <WorkspaceLayout id="community-main" heading={heading} sidebar={sidebar} sidebarLabel={t('Block filters')}>
         <section aria-labelledby="blocks-heading">
-          <div className="workspace-heading community-heading">
-            <div className="min-w-0">
-              <div className="community-title-line">
-                <h1 id="blocks-heading">{scope === 'mine' ? t('My blocks') : t('Community blocks')}</h1>
-                <span className="studio-status-warning community-development">{t('In development')}</span>
-              </div>
-              <p>{scope === 'mine'
-                ? t('Everything you shared, public and private.')
-                : t('Blocks other people made, ready to drop into a site of your own.')}</p>
-            </div>
-          </div>
-
           <div className="workspace-toolbar community-toolbar">
             <DashboardSearch value={query} onChange={setQuery} label={t('Search blocks…')} placeholder={t('Search blocks…')} className="community-search" />
             <span className="community-result-context">{t(CATEGORIES.find(([value]) => value === category)?.[1] || 'All')}</span>

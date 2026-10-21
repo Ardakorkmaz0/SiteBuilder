@@ -206,3 +206,19 @@ describe('SearchPage', () => {
     expect(screen.getByText('0 favorites')).toBeInTheDocument()
   })
 })
+
+// The title and the query field come before the result filters, which a phone
+// stacks above the results.
+describe('SearchPage reading order', () => {
+  it('puts the title and the search field before the filters', async () => {
+    mockResults(() => Promise.resolve(response()))
+    renderSearch()
+    const filters = await screen.findByRole('group', { name: 'Search filters' })
+    for (const first of [
+      screen.getByRole('heading', { level: 1, name: 'Search results' }),
+      screen.getByRole('searchbox', { name: 'Search query' }),
+    ]) {
+      expect(first.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+  })
+})

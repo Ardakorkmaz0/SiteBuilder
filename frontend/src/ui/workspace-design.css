@@ -48,7 +48,7 @@
 .workspace-page .workspace-result-filters .workspace-filter { width: auto; margin: 0; }
 @keyframes workspace-arrive { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: no-preference) {
-  .workspace-page .workspace-content { animation: workspace-arrive 450ms var(--studio-motion-ease) backwards; }
+  .workspace-page :is(.workspace-heading-slot, .workspace-content) { animation: workspace-arrive 450ms var(--studio-motion-ease) backwards; }
   .workspace-page .workspace-grid > article { animation: workspace-arrive 500ms var(--studio-motion-ease) backwards; }
   .workspace-page .workspace-grid > article:nth-child(3n + 2) { animation-delay: 60ms; }
   .workspace-page .workspace-grid > article:nth-child(3n) { animation-delay: 120ms; }
@@ -81,4 +81,15 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .workspace-page .workspace-filter { transition: none; }
+}
+/* The title comes first in the page (see WorkspaceLayout). Beside a sidebar it
+   still heads the content column, and the sidebar runs the full height. */
+@media (min-width: 768px) {
+  .workspace-page .workspace-has-heading { row-gap: 0; }
+  .workspace-page .workspace-has-heading > .workspace-heading-slot { grid-column: 2; grid-row: 1; min-width: 0; }
+  .workspace-page .workspace-has-heading > .workspace-sidebar { grid-column: 1; grid-row: 1 / span 2; }
+  .workspace-page .workspace-has-heading > .workspace-content { grid-column: 2; grid-row: 2; }
+}
+@media (max-width: 767px) {
+  .workspace-page .workspace-heading-slot .workspace-heading { margin-bottom: 0; }
 }

@@ -74,7 +74,7 @@ function SearchResults({ query, type, onFilter, heading }) {
   const filters = [{ value: 'all', label: t('All') }, { value: 'users', label: t('Users') }, { value: 'sites', label: t('Sites') }]
   const counts = data?.counts
   return (
-    <WorkspaceLayout id="search-main" sidebarLabel={t('Search filters')} sidebar={
+    <WorkspaceLayout id="search-main" heading={heading} sidebarLabel={t('Search filters')} sidebar={
       <div className="workspace-sidebar-section">
       <h2>{t('Search filters')}</h2>
       <div role="group" aria-label={t('Search filters')}>
@@ -91,7 +91,6 @@ function SearchResults({ query, type, onFilter, heading }) {
       </div>
       </div>
     }>
-      {heading}
       {!validQuery ? <DashboardEmptyState kind="search" title={t('Type at least 2 characters to search.')} />
         : failed ? (
           <div role="alert" className="workspace-panel p-8 text-center">

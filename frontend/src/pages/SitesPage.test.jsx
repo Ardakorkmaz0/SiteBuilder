@@ -206,3 +206,19 @@ describe('My sites view preference', () => {
     expect(screen.getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
+
+// The options sit beside the list on a wide screen and above it on a phone.
+// The page's own title and its main action still come first: on a phone, and
+// to a screen reader reading in order.
+describe('My sites reading order', () => {
+  it('puts the title and the create button before the filters', async () => {
+    renderPage()
+    const filters = await screen.findByRole('group', { name: 'Filter projects' })
+    for (const first of [
+      screen.getByRole('heading', { level: 1, name: 'My sites' }),
+      screen.getByRole('button', { name: 'Create new site' }),
+    ]) {
+      expect(first.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+  })
+})
