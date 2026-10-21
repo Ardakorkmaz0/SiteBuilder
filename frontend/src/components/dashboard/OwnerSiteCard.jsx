@@ -9,6 +9,7 @@ import { useLanguage } from '../../i18n/useLanguage.js'
 import { siteAddress } from '../../utils/siteAddress.js'
 import { formatRelativeActivity } from '../../utils/siteSort.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { closeWhenFocusLeaves } from '../../ui/closeWhenFocusLeaves.js'
 import '../../ui/sites-design.css'
 
 function HealthPill({ complete, children }) {
@@ -82,9 +83,7 @@ export default function OwnerSiteCard({
               <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
               {site.published ? t('Published') : t('Draft')}
             </span>
-            <div ref={menuRef} className="owner-site-card-menu-root" onBlur={(event) => {
-              if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false)
-            }}>
+            <div ref={menuRef} className="owner-site-card-menu-root" onBlur={(event) => closeWhenFocusLeaves(event.currentTarget, () => setMenuOpen(false))}>
               <button type="button" className="studio-icon-btn owner-site-card-more"
                 aria-label={`${t('Project actions')}: ${site.title}`} aria-haspopup="menu" aria-expanded={menuOpen}
                 aria-controls={menuOpen ? menuId : undefined}

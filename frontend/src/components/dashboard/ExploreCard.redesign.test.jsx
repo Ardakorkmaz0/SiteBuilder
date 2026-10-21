@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import ExploreCard from './ExploreCard.jsx'
+import { focusoutWithoutRelatedTarget } from '../../test/focusoutWithoutRelatedTarget.js'
 
 vi.mock('./SitePreview.jsx', () => ({ default: () => <div /> }))
 
@@ -64,6 +65,38 @@ describe('redesigned home card', () => {
     expect(pin).toHaveAttribute('aria-checked', 'true')
     await user.click(pin)
     expect(onTogglePin).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 7, pinned: true }))
+  })
+
+  // Chrome gives the focusout no relatedTarget when Tab lands on a button
+  // holding a preview frame, and the menu stayed open over the next card.
+  it('closes when Tab moves on past the menu', async () => {
+    const user = userEvent.setup()
+    renderCard({ onToggleFav: vi.fn() })
+    screen.getByRole('button', { name: 'More actions' }).focus()
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Favorite' })).toHaveFocus()
+    const restore = focusoutWithoutRelatedTarget()
+    try {
+      await user.tab()
+      expect(screen.getByRole('button', { name: 'Outside the card' })).toHaveFocus()
+      await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+    } finally {
+      restore()
+    }
+  })
+
+  // Safari does not focus a button it clicks: focus falls to the page before
+  // the click, and the item clicked must still be there for it.
+  it('stays open when focus only falls to the page', async () => {
+    const user = userEvent.setup()
+    const onToggleFav = vi.fn()
+    renderCard({ onToggleFav })
+    screen.getByRole('button', { name: 'More actions' }).focus()
+    await user.keyboard('{ArrowDown}')
+    act(() => document.activeElement.blur())
+    await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Favorite' }))
+    expect(onToggleFav).toHaveBeenCalledOnce()
   })
 
   it('supports menu keyboard navigation, skips disabled actions and restores focus on Escape', async () => {
