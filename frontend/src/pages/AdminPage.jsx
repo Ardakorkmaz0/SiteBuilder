@@ -1,3 +1,4 @@
+import '../ui/admin-design.css'
 // The admin console. One page, seven sections; where you are lives in the URL
 // (?section=, ?id=, ?queue=, ?days=) so a refresh, the back button and a pasted
 // link all land in the same place.
@@ -71,8 +72,8 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="studio-theme-surface min-h-screen bg-[var(--studio-shell)] text-[var(--studio-text)]">
-      <header className="sticky top-0 z-10 border-b border-[var(--studio-border)] bg-[color-mix(in_srgb,var(--studio-panel-raised)_92%,transparent)] backdrop-blur">
+    <div className="studio-theme-surface workspace-page workspace-admin-page min-h-screen bg-[var(--studio-shell)] text-[var(--studio-text)]">
+      <header className="dashboard-header sticky top-0 z-10 border-b border-[var(--studio-border)] bg-[color-mix(in_srgb,var(--studio-panel-raised)_92%,transparent)] backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-y-2 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2.5">
             <Link to="/" title={t('Sitebuilder home')} aria-label={t('Sitebuilder home')} className="brand-mark">S</Link>
@@ -113,7 +114,7 @@ export default function AdminPage() {
         </nav>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <main className="workspace-admin-main mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <h1 className="sr-only">{t('Admin console')}</h1>
         {body}
       </main>

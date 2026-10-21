@@ -160,3 +160,49 @@ describe('My sites deletion', () => {
     expect(cardTitles()).toEqual(['Atelier', 'Bakery'])
   })
 })
+
+describe('My sites view preference', () => {
+  it('switches the real cards to a remembered list while keeping search and status filters', async () => {
+    const first = renderPage()
+    await screen.findByRole('heading', { name: 'Atelier', exact: true })
+    expect(screen.getByRole('button', { name: 'Card view' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'List view' }))
+    expect(screen.getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('article', { name: 'Atelier' })).toHaveClass('owner-site-card-list')
+    fireEvent.click(screen.getByRole('button', { name: 'Drafts 2' }))
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search your sites…' }), { target: { value: 'Clinic' } })
+    expect(cardTitles()).toEqual(['Clinic'])
+    fireEvent.click(screen.getByRole('button', { name: 'Card view' }))
+    expect(cardTitles()).toEqual(['Clinic'])
+    expect(screen.getByRole('article', { name: 'Clinic' })).not.toHaveClass('owner-site-card-list')
+    fireEvent.click(screen.getByRole('button', { name: 'List view' }))
+    first.unmount()
+
+    renderPage()
+    expect(await screen.findByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('article', { name: 'Atelier' })).toHaveClass('owner-site-card-list')
+    expect(cardTitles()).toEqual(['Atelier', 'Clinic', 'Bakery'])
+  })
+
+  it('discards an unknown saved view and still changes views when storage is blocked', async () => {
+    localStorage.setItem('pwb_sites_view', 'something-else')
+    const first = renderPage()
+    expect(await screen.findByRole('button', { name: 'Card view' })).toHaveAttribute('aria-pressed', 'true')
+    first.unmount()
+    const originalGet = Storage.prototype.getItem
+    const originalSet = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (key) {
+      if (key === 'pwb_sites_view') throw new Error('Storage unavailable')
+      return originalGet.call(this, key)
+    })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      if (key === 'pwb_sites_view') throw new Error('Storage unavailable')
+      return originalSet.call(this, key, value)
+    })
+    renderPage()
+    expect(await screen.findByRole('button', { name: 'Card view' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'List view' }))
+    expect(screen.getByRole('article', { name: 'Bakery' })).toHaveClass('owner-site-card-list')
+    expect(screen.getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true')
+  })
+})

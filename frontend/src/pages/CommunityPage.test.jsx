@@ -56,6 +56,11 @@ function renderPage() {
   )
 }
 
+async function openActions(user) {
+  await user.click(screen.getByRole('button', { name: 'More actions', exact: true }))
+  return screen.getByRole('menu', { name: 'More actions', exact: true })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   useAuthStore.setState({ user: { id: 1, username: 'me' } })
@@ -148,14 +153,16 @@ describe('who may do what to a block', () => {
     renderPage()
     await screen.findByTitle('Pricing card')
     expect(screen.getByRole('button', { name: 'Use this' })).toHaveAccessibleDescription('Pricing card')
-    expect(screen.getByRole('button', { name: 'Report this block' })).toHaveAccessibleDescription('Pricing card')
+    await openActions(userEvent.setup())
+    expect(screen.getByRole('menuitem', { name: 'Report this block' })).toHaveAccessibleDescription('Pricing card')
   })
 
   it('offers a stranger the report action, not the withdraw one', async () => {
     renderPage()
     await screen.findByTitle('Pricing card')
-    expect(screen.getByRole('button', { name: 'Report this block' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Withdraw' })).toBeNull()
+    await openActions(userEvent.setup())
+    expect(screen.getByRole('menuitem', { name: 'Report this block' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Withdraw' })).toBeNull()
   })
 
   it('offers the author withdrawal, and drops the card once it is gone', async () => {
@@ -164,9 +171,10 @@ describe('who may do what to a block', () => {
     renderPage()
     await screen.findByTitle('Pricing card')
 
-    expect(screen.queryByRole('button', { name: 'Report this block' })).toBeNull()
+    await openActions(user)
+    expect(screen.queryByRole('menuitem', { name: 'Report this block' })).toBeNull()
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    await user.click(screen.getByRole('button', { name: 'Withdraw' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Withdraw' }))
 
     expect(confirm).toHaveBeenCalledOnce()
     expect(withdrawComponent).toHaveBeenCalledWith(3)
@@ -182,8 +190,9 @@ describe('who may do what to a block', () => {
     renderPage()
     await screen.findByTitle('Pricing card')
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    await openActions(user)
 
-    await user.click(screen.getByRole('button', { name: 'Withdraw' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Withdraw' }))
 
     expect(withdrawComponent).not.toHaveBeenCalled()
     expect(screen.getByTitle('Pricing card')).toBeInTheDocument()
@@ -197,8 +206,9 @@ describe('who may do what to a block', () => {
     renderPage()
     await screen.findByTitle('Pricing card')
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    await openActions(user)
 
-    await user.click(screen.getByRole('button', { name: 'Withdraw' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Withdraw' }))
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
     expect(screen.getByTitle('Pricing card')).toBeInTheDocument()
@@ -238,7 +248,8 @@ describe('public and private', () => {
     renderPage()
     await screen.findByTitle('Pricing card')
 
-    await user.click(screen.getByRole('button', { name: 'Make private' }))
+    await openActions(user)
+    await user.click(screen.getByRole('menuitem', { name: 'Make private' }))
 
     expect(setComponentVisibility).toHaveBeenCalledWith(3, 'private')
   })
@@ -250,7 +261,8 @@ describe('public and private', () => {
     renderPage()
     await screen.findByTitle('Pricing card')
 
-    await user.click(screen.getByRole('button', { name: 'Make private' }))
+    await openActions(user)
+    await user.click(screen.getByRole('menuitem', { name: 'Make private' }))
 
     // It no longer belongs on the grid it is being hidden from.
     await waitFor(() => expect(screen.queryByTitle('Pricing card')).toBeNull())
@@ -265,10 +277,12 @@ describe('public and private', () => {
     await user.click(screen.getByRole('button', { name: 'My blocks' }))
     await screen.findByTitle('Pricing card')
 
-    await user.click(screen.getByRole('button', { name: 'Make private' }))
+    await openActions(user)
+    await user.click(screen.getByRole('menuitem', { name: 'Make private' }))
 
     expect(await screen.findByText('Private')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Make public' })).toBeInTheDocument()
+    await openActions(user)
+    expect(screen.getByRole('menuitem', { name: 'Make public' })).toBeInTheDocument()
   })
 
   it('never offers a stranger a switch on somebody else’s block', async () => {
@@ -276,8 +290,9 @@ describe('public and private', () => {
     renderPage()
     await screen.findByTitle('Pricing card')
 
-    expect(screen.queryByRole('button', { name: 'Make private' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Make public' })).toBeNull()
+    await openActions(userEvent.setup())
+    expect(screen.queryByRole('menuitem', { name: 'Make private' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Make public' })).toBeNull()
   })
 })
 
@@ -341,4 +356,78 @@ describe('the current community request', () => {
     expect(screen.getByTitle('Portfolio block')).toBeInTheDocument()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
+})
+
+
+describe('block action menus', () => {
+  it('keeps the main action visible and opens secondary actions from the keyboard', async () => {
+    const user = userEvent.setup()
+    useAuthStore.setState({ user: { id: 9, username: 'ada' } })
+    renderPage()
+    await screen.findByTitle('Pricing card')
+    expect(screen.getByRole('button', { name: 'Use this' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument()
+    const trigger = screen.getByRole('button', { name: 'More actions', exact: true })
+    expect(trigger).toHaveAccessibleDescription('Pricing card')
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
+    const visibility = screen.getByRole('menuitem', { name: 'Make private' })
+    const withdraw = screen.getByRole('menuitem', { name: 'Withdraw' })
+    expect(visibility).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(withdraw).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(visibility).toHaveFocus()
+    await user.keyboard('{End}')
+    expect(withdraw).toHaveFocus()
+    await user.keyboard('{Home}')
+    expect(visibility).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('opens the report dialog from the menu and returns focus to the card opener', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByTitle('Pricing card')
+    const trigger = screen.getByRole('button', { name: 'More actions', exact: true })
+    await user.click(trigger)
+    await user.click(screen.getByRole('menuitem', { name: 'Report this block' }))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Report this block' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+  })
+
+  it('dismisses outside without taking focus away from the search field', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByTitle('Pricing card')
+    await openActions(user)
+    const search = screen.getByRole('searchbox', { name: 'Search blocks…' })
+    await user.click(search)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(search).toHaveFocus()
+  })
+})
+
+it('clears an empty filtered shelf without switching away from My blocks', async () => {
+  const user = userEvent.setup()
+  listComponents.mockResolvedValue({ results: [], count: 0 })
+  renderPage()
+  await screen.findByText('Nothing here yet.')
+  await user.click(screen.getByRole('button', { name: 'My blocks', exact: true }))
+  await waitFor(() => expect(listComponents).toHaveBeenLastCalledWith({ category: '', q: '', scope: 'mine' }))
+  await user.click(screen.getByRole('button', { name: 'Portfolio', exact: true }))
+  await waitFor(() => expect(listComponents).toHaveBeenLastCalledWith({ category: 'portfolio', q: '', scope: 'mine' }))
+  await user.type(screen.getByRole('searchbox', { name: 'Search blocks…' }), 'missing')
+  await waitFor(() => expect(listComponents).toHaveBeenLastCalledWith({ category: 'portfolio', q: 'missing', scope: 'mine' }))
+  await user.click(screen.getByRole('button', { name: 'Clear filters', exact: true }))
+  await waitFor(() => expect(listComponents).toHaveBeenLastCalledWith({ category: '', q: '', scope: 'mine' }))
+  expect(screen.getByRole('searchbox', { name: 'Search blocks…' })).toHaveValue('')
+  expect(screen.getByRole('button', { name: 'All', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('heading', { level: 1, name: 'My blocks' })).toBeInTheDocument()
 })

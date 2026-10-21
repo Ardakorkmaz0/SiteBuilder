@@ -1,3 +1,4 @@
+import '../ui/admin-design.css'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getSettings, updateSettings } from '../api/admin.js'
@@ -85,8 +86,8 @@ export default function SettingsPage() {
   const secretPlaceholder = (isSet) => (isSet ? t('•••••••• (configured; type to replace)') : t('Not set'))
 
   return (
-    <div className="studio-theme-surface min-h-screen bg-[var(--studio-shell)] text-[var(--studio-text)]">
-      <header className="sticky top-0 z-10 border-b border-[var(--studio-border)] bg-[color-mix(in_srgb,var(--studio-panel-raised)_92%,transparent)] backdrop-blur">
+    <div className="studio-theme-surface workspace-page workspace-admin-page min-h-screen bg-[var(--studio-shell)] text-[var(--studio-text)]">
+      <header className="dashboard-header sticky top-0 z-10 border-b border-[var(--studio-border)] bg-[color-mix(in_srgb,var(--studio-panel-raised)_92%,transparent)] backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2.5">
             <Link to="/" title={t('Sitebuilder home')} className="brand-mark">S</Link>
@@ -100,7 +101,7 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="workspace-admin-main mx-auto max-w-3xl px-6 py-10">
         <h1 className="text-2xl font-semibold text-[var(--studio-text)]">{t('Server settings')}</h1>
         <p className="mb-6 mt-1 text-sm text-[var(--studio-text-muted)]">
           {t("Configure the AI assistant, Google sign-in, reCAPTCHA and email here instead of editing the server's env file. A blank field falls back to the server environment. Infrastructure (secret key, database, allowed hosts) stays in env by design.")}

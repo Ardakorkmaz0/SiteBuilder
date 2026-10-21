@@ -1,0 +1,12 @@
+@import './workspace-design.css';
+
+/* Keep the admin's existing actions and section navigation; only its chrome
+   joins the approved dashboard palette and page rhythm. */
+.workspace-admin-page > .dashboard-header { background: var(--studio-panel-raised); backdrop-filter: none; }
+.workspace-admin-page > .dashboard-header > div,
+.workspace-admin-page > .dashboard-header > nav { max-width: none; padding-inline: clamp(18px, 3vw, 56px); }
+.workspace-admin-page .workspace-admin-main { max-width: none; padding: 32px clamp(18px, 3vw, 56px) 64px; }
+.workspace-admin-page .workspace-admin-main :is(h1, h2, h3) { font-family: var(--font-display); letter-spacing: -.025em; }
+.workspace-admin-page .workspace-admin-main h1:not(.sr-only) { font-size: clamp(25px, 2.5vw, 32px); font-weight: 650; }
+.workspace-admin-page .ms-card { border-radius: var(--studio-radius-lg); background: var(--studio-panel-raised); box-shadow: var(--studio-shadow-sm); }
+.workspace-admin-page :is(.ms-input, .studio-input) { border-radius: var(--studio-radius); }

@@ -38,41 +38,49 @@ beforeEach(() => {
   removeFavorite.mockReset().mockResolvedValue({})
 })
 
+async function favoriteControl(name = 'Favorite') {
+  if (!screen.queryByRole('menuitemcheckbox', { name, exact: true })) {
+    fireEvent.click(await screen.findByRole('button', { name: /More actions|Diğer işlemler/, exact: true }))
+  }
+  return screen.findByRole('menuitemcheckbox', { name, exact: true })
+}
+
 describe('public profile favorite saves', () => {
   it('keeps confirmed counts, blocks overlapping toggles, reports failures and permits retry', async () => {
     let rejectSave
     addFavorite.mockImplementationOnce(() => new Promise((_, reject) => { rejectSave = reject }))
     renderProfile()
-    const button = await screen.findByRole('button', { name: 'Favorite', exact: true })
-    fireEvent.click(button)
-    fireEvent.click(button)
+    fireEvent.click(await favoriteControl())
+    const pending = await favoriteControl()
+    fireEvent.click(pending)
 
     expect(addFavorite).toHaveBeenCalledTimes(1)
     expect(addFavorite).toHaveBeenCalledWith(7)
     expect(removeFavorite).not.toHaveBeenCalled()
-    expect(button).toBeDisabled()
-    expect(button).toHaveAttribute('aria-busy', 'true')
-    expect(button).toHaveAttribute('aria-pressed', 'false')
+    expect(pending).toBeDisabled()
+    expect(pending).toHaveAttribute('aria-busy', 'true')
+    expect(pending).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByTitle('Favorites')).toHaveTextContent('4')
     await act(async () => rejectSave(new Error('Favorite save unavailable')))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Favorite save unavailable')
-    expect(button).toBeEnabled()
-    expect(button).toHaveAttribute('aria-pressed', 'false')
+    expect(pending).toBeEnabled()
+    expect(pending).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByTitle('Favorites')).toHaveTextContent('4')
-    fireEvent.click(button)
-    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'true'))
+    fireEvent.click(pending)
+    expect(await favoriteControl('Unfavorite')).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTitle('Favorites')).toHaveTextContent('5')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 
     removeFavorite.mockRejectedValueOnce(new Error('Favorite removal unavailable'))
-    fireEvent.click(button)
+    fireEvent.click(await favoriteControl('Unfavorite'))
     expect(await screen.findByRole('alert')).toHaveTextContent('Favorite removal unavailable')
-    expect(button).toBeEnabled()
-    expect(button).toHaveAttribute('aria-pressed', 'true')
+    const retry = await favoriteControl('Unfavorite')
+    expect(retry).toBeEnabled()
+    expect(retry).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTitle('Favorites')).toHaveTextContent('5')
-    fireEvent.click(button)
-    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'false'))
+    fireEvent.click(retry)
+    expect(await favoriteControl()).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByTitle('Favorites')).toHaveTextContent('4')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(addFavorite).toHaveBeenCalledTimes(2)
@@ -83,7 +91,7 @@ describe('public profile favorite saves', () => {
     let resolveSave
     addFavorite.mockImplementationOnce(() => new Promise((resolve) => { resolveSave = resolve }))
     renderProfile()
-    fireEvent.click(await screen.findByRole('button', { name: 'Favorite', exact: true }))
+    fireEvent.click(await favoriteControl())
     getPublicProfile.mockResolvedValueOnce({ ...profile, sites: [{ ...site, is_favorited: true, favorite_count: 5 }] })
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), { target: { value: 'tr' } })
@@ -92,13 +100,13 @@ describe('public profile favorite saves', () => {
     await act(async () => resolveSave({}))
 
     expect(screen.getByTitle('Favoriler')).toHaveTextContent('5')
-    expect(screen.getByRole('button', { name: 'Favorilerden çıkar', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    expect(await favoriteControl('Favorilerden çıkar')).toHaveAttribute('aria-checked', 'true')
   })
 
   it('takes an anonymous visitor to sign in without sending a favorite write', async () => {
     useAuthStore.setState({ user: null, token: null })
     renderProfile()
-    fireEvent.click(await screen.findByRole('button', { name: 'Favorite', exact: true }))
+    fireEvent.click(await favoriteControl())
     expect(screen.getByText('Sign in screen')).toBeInTheDocument()
     expect(addFavorite).not.toHaveBeenCalled()
     expect(removeFavorite).not.toHaveBeenCalled()
@@ -110,14 +118,14 @@ describe('public profile favorite saves', () => {
     addFavorite.mockImplementationOnce(() => new Promise((_, reject) => { rejectOld = reject }))
       .mockImplementationOnce(() => new Promise((_, reject) => { rejectNew = reject }))
     renderProfile()
-    fireEvent.click(await screen.findByRole('button', { name: 'Favorite', exact: true }))
+    fireEvent.click(await favoriteControl())
     getPublicProfile.mockResolvedValueOnce({
       id: 10, username: 'grace', display_name: 'Grace',
       sites: [{ ...site, id: 8, slug: 'grace-site', title: 'Grace site', favorite_count: 2 }],
     })
     fireEvent.click(screen.getByRole('link', { name: 'View Grace' }))
     await screen.findByRole('heading', { name: 'Grace', exact: true })
-    fireEvent.click(screen.getByRole('button', { name: 'Favorite', exact: true }))
+    fireEvent.click(await favoriteControl())
     await act(async () => rejectNew(new Error('Grace favorite failed')))
     expect(screen.getByRole('alert')).toHaveTextContent('Grace favorite failed')
     await act(async () => rejectOld(new Error('Ada favorite failed')))

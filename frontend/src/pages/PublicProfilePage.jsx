@@ -7,6 +7,9 @@ import { apiError } from '../utils/errors.js'
 import { useGoBack } from '../utils/useGoBack.js'
 import { useScrollRestore } from '../utils/useScrollRestore.js'
 import ExploreCard from '../components/dashboard/ExploreCard.jsx'
+import WorkspaceLayout from '../components/dashboard/WorkspaceLayout.jsx'
+import DashboardEmptyState from '../components/dashboard/DashboardEmptyState.jsx'
+import '../ui/profile-design.css'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import { ArrowLeftIcon, GithubIcon, GlobeIcon, InstagramIcon, LinkIcon, MapPinIcon, XSocialIcon } from '../components/icons.jsx'
 import { profileLinks } from '../utils/profileLinks.js'
@@ -18,10 +21,10 @@ const LINK_ICONS = { website: LinkIcon, github: GithubIcon, twitter: XSocialIcon
 function BigAvatar({ url, name }) {
   const letter = (name || '?').trim().charAt(0).toUpperCase()
   if (url) {
-    return <img src={url} alt="" className="h-24 w-24 rounded-full border border-[var(--studio-border)] object-cover sm:h-28 sm:w-28" />
+    return <img src={url} alt="" className="profile-public-avatar" />
   }
   return (
-    <span className="dashboard-avatar h-24 w-24 text-3xl sm:h-28 sm:w-28">
+    <span className="dashboard-avatar profile-public-avatar" aria-hidden="true">
       {letter}
     </span>
   )
@@ -89,9 +92,9 @@ export default function PublicProfilePage() {
   }
 
   return (
-    <div className="dashboard-page studio-theme-surface">
+    <div className="dashboard-page workspace-page public-profile-design">
       <header className="dashboard-header">
-        <div className="dashboard-header-inner !max-w-[1120px]">
+        <div className="dashboard-header-inner profile-public-header">
           <div className="flex min-w-0 items-center gap-2">
             <Link to="/" aria-label={t('Sitebuilder home')} className="dashboard-brand shrink-0">
               <span className="brand-mark">S</span>
@@ -106,19 +109,16 @@ export default function PublicProfilePage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1120px] px-3 py-6 sm:px-6 sm:py-9">
+      <WorkspaceLayout id="public-profile-main">
         {favoriteError.id === id && favoriteError.message && (
           <p role="alert" className="studio-status-danger mb-5 rounded-xl border px-4 py-3 text-sm">{favoriteError.message}</p>
         )}
         {error ? (
-          <div className="dashboard-section-card border-dashed px-5 py-16 text-center">
-            <p className="font-medium text-[var(--studio-text)]">{error}</p>
-            <Link to="/" className="studio-btn studio-btn-accent mt-4">
-              {t('Back to Explore')}
-            </Link>
-          </div>
+          <DashboardEmptyState title={error} kind="sites">
+            <Link to="/" className="studio-btn studio-btn-primary">{t('Back to Explore')}</Link>
+          </DashboardEmptyState>
         ) : !data ? (
-          <div role="status" className="dashboard-welcome p-6 sm:p-8" aria-label={t('Loading…')}>
+          <div role="status" className="workspace-panel profile-loading" aria-label={t('Loading…')}>
             <div className="flex items-center gap-5">
               <div className="h-24 w-24 shrink-0 rounded-full bg-[var(--studio-control)]" />
               <div className="min-w-0 flex-1">
@@ -130,11 +130,11 @@ export default function PublicProfilePage() {
           </div>
         ) : (
           <>
-            <section className="dashboard-welcome mb-8 p-5 sm:p-8" aria-labelledby="public-profile-name">
-              <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-center">
+            <section className="workspace-panel profile-public-hero" aria-labelledby="public-profile-name">
+              <div className="profile-public-identity">
                 <BigAvatar url={data.avatar_url} name={data.display_name} />
                 <div className="min-w-0 flex-1">
-                  <h1 id="public-profile-name" className="truncate text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">{data.display_name}</h1>
+                  <h1 id="public-profile-name" className="profile-public-name">{data.display_name}</h1>
                   <div className="mt-1 text-sm text-[var(--studio-text-faint)]">
                     @{data.username}
                     {data.headline && <span className="font-medium text-[var(--studio-text-muted)]"> · {data.headline}</span>}
@@ -143,7 +143,7 @@ export default function PublicProfilePage() {
                   {(data.location || profileLinks(data).length > 0) && (
                     <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-[var(--studio-text-muted)]">
                       {data.location && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--studio-border)] bg-[var(--studio-control)] px-2.5 py-1.5"><MapPinIcon size={13} /> {data.location}</span>
+                        <span className="profile-public-link"><MapPinIcon size={13} /> {data.location}</span>
                       )}
                       {profileLinks(data).map(({ id, label, href }) => {
                         const ChipIcon = LINK_ICONS[id] || LinkIcon
@@ -153,7 +153,7 @@ export default function PublicProfilePage() {
                             href={href}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex max-w-48 items-center gap-1.5 rounded-full border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] px-2.5 py-1.5 hover:border-[var(--studio-border-strong)] hover:text-[var(--studio-accent-hover)]"
+                            className="profile-public-link"
                           >
                             <ChipIcon size={13} /> <span className="truncate">{label}</span>
                           </a>
@@ -162,41 +162,39 @@ export default function PublicProfilePage() {
                     </div>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-[var(--studio-border)] bg-[color-mix(in_srgb,var(--studio-panel-raised)_78%,transparent)] px-4 py-3 sm:flex-col sm:items-start sm:px-5">
-                  <GlobeIcon size={18} className="text-[var(--studio-accent-hover)]" />
+                <div className="profile-public-stat">
+                  <GlobeIcon size={18} className="text-[var(--studio-text-muted)]" />
                   <div>
                     <div className="text-xl font-bold text-[var(--studio-text)]">{data.sites.length}</div>
                     <div className="text-[11px] font-semibold text-[var(--studio-text-muted)]">{t('Sites')}</div>
-                    {data.date_joined && <div className="mt-1 text-[10px] text-[var(--studio-text-faint)]">{new Date(data.date_joined).toLocaleDateString(language === 'tr' ? 'tr-TR' : 'en-US')}</div>}
+                    {data.date_joined && <div className="mt-2 text-xs text-[var(--studio-text-faint)]">{new Date(data.date_joined).toLocaleDateString(language === 'tr' ? 'tr-TR' : 'en-US')}</div>}
                   </div>
                 </div>
               </div>
             </section>
 
             <section aria-labelledby="public-sites-heading">
-              <div className="mb-4 flex items-end justify-between gap-4">
+              <div className="workspace-heading profile-sites-heading">
                 <div>
                   <h2 id="public-sites-heading" className="text-xl font-semibold text-[var(--studio-text)] sm:text-2xl">{t('Sites')}</h2>
                 </div>
                 <span className="dashboard-status">{data.sites.length}</span>
               </div>
               {data.sites.length === 0 ? (
-                <div className="dashboard-section-card border-dashed px-5 py-16 text-center">
-                  <div className="mx-auto mb-3 grid place-items-center text-[var(--studio-text-faint)]"><GlobeIcon size={23} /></div>
-                  <p className="font-medium text-[var(--studio-text)]">{t('No published sites yet')}</p>
-                  <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('When {name} publishes a site, it shows up here.', { name: data.display_name })}</p>
-                </div>
+                <DashboardEmptyState title={t('No published sites yet')} description={t('When {name} publishes a site, it shows up here.', { name: data.display_name })} kind="sites">
+                  <Link to="/" className="studio-btn studio-btn-secondary">{t('Back to Explore')}</Link>
+                </DashboardEmptyState>
               ) : (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="workspace-grid">
                   {data.sites.map((site) => (
-                    <ExploreCard key={site.id} site={site} onToggleFav={onToggleFav} favoriting={favoritingIds.has(site.id)} />
+                    <ExploreCard key={site.id} redesigned site={site} onToggleFav={onToggleFav} favoriting={favoritingIds.has(site.id)} />
                   ))}
                 </div>
               )}
             </section>
           </>
         )}
-      </main>
+      </WorkspaceLayout>
     </div>
   )
 }
