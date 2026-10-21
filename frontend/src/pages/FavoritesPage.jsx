@@ -99,7 +99,11 @@ export default function FavoritesPage() {
         {t('Skip to content')}
       </a>
       <DashboardHeader current="favorites" />
-      <WorkspaceLayout id="favorites-main" sidebarLabel={t('Favorite options')} sidebar={
+      <WorkspaceLayout id="favorites-main" sidebarLabel={t('Favorite options')} heading={
+        <div className="workspace-heading">
+          <div className="min-w-0"><h1 id="favorites-heading">{t('Favorites')}</h1><p>{t('Sites you starred on Explore.')}</p></div>
+        </div>
+      } sidebar={
         <div className="workspace-sidebar-section">
           <h2>{t('Search favorites')}</h2>
           <DashboardSearch value={searchQuery} onChange={setSearchQuery} label={t('Search favorites')} placeholder={t('Search your favorites…')} className="w-full" />
@@ -108,9 +112,6 @@ export default function FavoritesPage() {
         </div>
       }>
         <section aria-labelledby="favorites-heading">
-          <div className="workspace-heading">
-            <div className="min-w-0"><h1 id="favorites-heading">{t('Favorites')}</h1><p>{t('Sites you starred on Explore.')}</p></div>
-          </div>
           {error && <div role="alert" className="studio-status-danger mb-5 rounded-lg border px-4 py-3 text-sm">{error}</div>}
           {loadError ? (
             <div role="alert" className="workspace-panel p-8 text-center">

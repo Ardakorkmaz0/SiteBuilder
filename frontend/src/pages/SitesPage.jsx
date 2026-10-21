@@ -211,6 +211,19 @@ export default function SitesPage() {
         : t('Pin a site from its menu to keep it at the top.')
   const showCreateTile = siteFilter === 'all' && !trimmedQuery
 
+  const heading = (
+    <div className="workspace-heading">
+      <div className="min-w-0">
+        <h1 id="sites-heading">{t('My sites')}</h1>
+        <p>{t('Create, search, and manage every site you own.')}</p>
+      </div>
+      <div className="workspace-heading-actions">
+        <Link to="/code" className="studio-btn studio-btn-secondary"><FolderOpenIcon size={16} /> {t('Open local project')}</Link>
+        <button type="button" onClick={openCreate} aria-haspopup="dialog" aria-expanded={createOpen} className="studio-btn studio-btn-primary studio-create-trigger"><PlusIcon size={16} /> {t('Create new site')}</button>
+      </div>
+    </div>
+  )
+
   const sidebar = (
     <>
       <section className="workspace-sidebar-section">
@@ -241,19 +254,8 @@ export default function SitesPage() {
     <div className="dashboard-page workspace-page sites-design">
       <a href="#sites-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-[var(--studio-panel-raised)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--studio-accent-hover)] focus:shadow-lg">{t('Skip to content')}</a>
       <DashboardHeader current="projects" />
-      <WorkspaceLayout id="sites-main" sidebar={sidebar} sidebarLabel={t('Project filters')}>
+      <WorkspaceLayout id="sites-main" heading={heading} sidebar={sidebar} sidebarLabel={t('Project filters')}>
         <section aria-labelledby="sites-heading">
-          <div className="workspace-heading">
-            <div className="min-w-0">
-              <h1 id="sites-heading">{t('My sites')}</h1>
-              <p>{t('Create, search, and manage every site you own.')}</p>
-            </div>
-            <div className="workspace-heading-actions">
-              <Link to="/code" className="studio-btn studio-btn-secondary"><FolderOpenIcon size={16} /> {t('Open local project')}</Link>
-              <button type="button" onClick={openCreate} aria-haspopup="dialog" aria-expanded={createOpen} className="studio-btn studio-btn-primary studio-create-trigger"><PlusIcon size={16} /> {t('Create new site')}</button>
-            </div>
-          </div>
-
           <dl className="sites-summary" aria-label={t('Workspace')} aria-busy={sites === null}>
             {[['Sites', counts.all], ['Published', counts.published], ['Total views', stats.views], ['Favorites', stats.favorites]].map(([label, value]) => (
               <div key={label} className="dashboard-figure"><dt>{t(label)}</dt><dd>{sites === null ? '…' : Number(value).toLocaleString()}</dd></div>

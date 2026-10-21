@@ -77,3 +77,14 @@ describe('FavoritesPage request failures', () => {
     expect(addFavorite).not.toHaveBeenCalled()
   })
 })
+
+// The title comes before the sidebar's search, which a phone stacks above the
+// list.
+describe('FavoritesPage reading order', () => {
+  it('puts the title before the search', async () => {
+    renderFavorites()
+    const search = await screen.findByRole('searchbox', { name: 'Search favorites' })
+    const title = screen.getByRole('heading', { level: 1, name: 'Favorites' })
+    expect(title.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})

@@ -431,3 +431,14 @@ it('clears an empty filtered shelf without switching away from My blocks', async
   expect(screen.getByRole('button', { name: 'All', exact: true })).toHaveAttribute('aria-pressed', 'true')
   expect(screen.getByRole('heading', { level: 1, name: 'My blocks' })).toBeInTheDocument()
 })
+
+// The title comes before the shelves and categories, which a phone stacks
+// above the grid.
+describe('reading order', () => {
+  it('puts the title before the block filters', async () => {
+    renderPage()
+    const shelves = await screen.findByRole('group', { name: 'Block library' })
+    const title = screen.getByRole('heading', { level: 1, name: 'Community blocks' })
+    expect(title.compareDocumentPosition(shelves) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
