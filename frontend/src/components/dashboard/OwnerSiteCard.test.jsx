@@ -1,11 +1,12 @@
 // The card's picture links to the editor too, but has no words: a keyboard or
 // screen reader met it as a link called nothing, once per project.
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import OwnerSiteCard from './OwnerSiteCard.jsx'
+import { focusoutWithoutRelatedTarget } from '../../test/focusoutWithoutRelatedTarget.js'
 
 beforeAll(() => {
   // The preview waits to be on screen, and measures its box, before it draws.
@@ -98,4 +99,24 @@ it('moves through list actions with the keyboard and skips a pending duplicate',
   await user.keyboard('{Escape}')
   expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   expect(trigger).toHaveFocus()
+})
+
+// Tab past the last item must close the menu, not leave it over the next card.
+it('closes its menu when Tab moves on past it', async () => {
+  localStorage.setItem('pwb_language', 'en')
+  const user = userEvent.setup()
+  render(<LanguageProvider><MemoryRouter>
+    <OwnerSiteCard site={{ id: 42, title: 'Bakery', slug: 'bakery', published: false }} />
+  </MemoryRouter></LanguageProvider>)
+  screen.getByRole('button', { name: 'Project actions: Bakery' }).focus()
+  await user.keyboard('{ArrowDown}{End}')
+  expect(screen.getByRole('menuitem', { name: 'Delete site' })).toHaveFocus()
+  const restore = focusoutWithoutRelatedTarget()
+  try {
+    await user.tab()
+    expect(screen.getByRole('link', { name: 'Continue editing: Bakery' })).toHaveFocus()
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+  } finally {
+    restore()
+  }
 })

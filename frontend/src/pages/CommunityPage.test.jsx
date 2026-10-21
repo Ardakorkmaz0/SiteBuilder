@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../ui/UiThemeProvider.jsx'
 import CommunityPage from './CommunityPage.jsx'
+import { focusoutWithoutRelatedTarget } from '../test/focusoutWithoutRelatedTarget.js'
 import {
   listComponents,
   countComponentView,
@@ -400,6 +401,24 @@ describe('block action menus', () => {
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(trigger).toHaveFocus()
+  })
+
+  it('closes when Tab moves on to the next card', async () => {
+    const user = userEvent.setup()
+    listComponents.mockResolvedValue({ results: [CARD, { ...CARD, id: 4, title: 'Contact card' }], count: 2 })
+    renderPage()
+    await screen.findByTitle('Contact card')
+    screen.getAllByRole('button', { name: 'More actions', exact: true })[0].focus()
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('menuitem', { name: 'Report this block' })).toHaveFocus()
+    const restore = focusoutWithoutRelatedTarget()
+    try {
+      await user.tab()
+      expect(document.activeElement.closest('article')).toHaveAccessibleName('Contact card')
+      await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+    } finally {
+      restore()
+    }
   })
 
   it('dismisses outside without taking focus away from the search field', async () => {

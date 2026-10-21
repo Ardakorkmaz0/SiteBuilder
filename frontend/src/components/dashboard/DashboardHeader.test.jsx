@@ -133,6 +133,15 @@ describe('DashboardHeader collapsed search', () => {
     expect(outside).toHaveFocus()
   })
 
+  it('closes when the person clicks elsewhere on the page', async () => {
+    const user = userEvent.setup()
+    renderHeader()
+    await user.click(screen.getByRole('button', { name: 'Search', exact: true }))
+    expect(screen.getByRole('searchbox')).toBeInTheDocument()
+    await user.click(screen.getByRole('textbox', { name: 'Outside the header' }))
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+  })
+
   it('omits the header search when the page has its own search', () => {
     renderHeader('', { showSearch: false })
     expect(screen.queryByRole('button', { name: 'Search', exact: true })).not.toBeInTheDocument()

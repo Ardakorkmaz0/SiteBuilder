@@ -4,6 +4,7 @@ import SitePreview from './SitePreview.jsx'
 import { ArrowRightIcon, CopyIcon, StarIcon, EyeIcon, PinIcon, MoreHorizontalIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { closeWhenFocusLeaves } from '../../ui/closeWhenFocusLeaves.js'
 import './explore-card-design.css'
 
 function Avatar({ url, name, size = 20 }) {
@@ -229,9 +230,7 @@ function ExploreDesignCard({ site, titleId, onToggleFav, onRemix, onTogglePin, r
           <div className="explore-card-design-actions">
             <Link to={`/site/${site.slug}`} aria-describedby={titleId} className="explore-card-design-view">{t('View')} <ArrowRightIcon size={14} /></Link>
             {hasActions && (
-              <div ref={menuRef} className="explore-card-design-menu-root" onBlur={(event) => {
-                if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false)
-              }}>
+              <div ref={menuRef} className="explore-card-design-menu-root" onBlur={(event) => closeWhenFocusLeaves(event.currentTarget, () => setMenuOpen(false))}>
                 <button type="button" aria-label={t('More actions')} aria-describedby={titleId} aria-haspopup="menu"
                   aria-expanded={menuOpen} aria-controls={menuOpen ? menuId : undefined}
                   onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setMenuOpen(true) } }}

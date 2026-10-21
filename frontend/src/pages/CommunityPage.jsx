@@ -20,6 +20,7 @@ import DashboardSearch from '../components/dashboard/DashboardSearch.jsx'
 import WorkspaceLayout from '../components/dashboard/WorkspaceLayout.jsx'
 import DashboardEmptyState from '../components/dashboard/DashboardEmptyState.jsx'
 import { useEscapeToClose } from '../ui/useEscapeToClose.js'
+import { closeWhenFocusLeaves } from '../ui/closeWhenFocusLeaves.js'
 import '../ui/community-design.css'
 import { ArrowRightIcon, BanIcon, FlagIcon, GlobeIcon, LayersIcon, MoreHorizontalIcon, TrashIcon } from '../components/icons.jsx'
 import {
@@ -139,9 +140,7 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
           <button type="button" onClick={() => onUse(component)} aria-describedby={titleId} className="community-card-use">
             {t('Use this')} <ArrowRightIcon size={14} />
           </button>
-          <div ref={menuRootRef} className="community-card-menu-root" onBlur={(event) => {
-            if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false)
-          }}>
+          <div ref={menuRootRef} className="community-card-menu-root" onBlur={(event) => closeWhenFocusLeaves(event.currentTarget, () => setMenuOpen(false))}>
             <button type="button" aria-label={t('More actions')} aria-describedby={titleId} aria-haspopup="menu"
               aria-expanded={menuOpen} aria-controls={menuOpen ? menuId : undefined}
               onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setMenuOpen(true) } }}
