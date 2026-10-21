@@ -216,3 +216,38 @@ describe('focus the person let go of on purpose', () => {
   })
 })
 
+
+// A header tab took the person to another page, and went with the page it was
+// on. Focus handed to the new page's first control put "Skip to content" on
+// screen after every click on a tab. A new page starts fresh, as a load does.
+describe('a control that took the person to another page', () => {
+  it('leaves focus to the new page', async () => {
+    const start = window.location.href
+    try {
+      document.getElementById('mark').focus()
+      history.pushState(null, '', '/elsewhere')
+      document.querySelector('[role=dialog]').innerHTML = '<a href="#main">Skip to content</a><button>New page</button>'
+      await settle()
+      expect(document.activeElement).toBe(document.body)
+    } finally {
+      history.replaceState(null, '', start)
+    }
+  })
+})
+
+describe('a control drawn only for screen readers', () => {
+  it('is never where focus is handed', async () => {
+    const dialog = document.querySelector('[role=dialog]')
+    const skip = document.createElement('a')
+    skip.href = '#main'
+    skip.className = 'sr-only focus:not-sr-only'
+    skip.textContent = 'Skip to content'
+    dialog.prepend(skip)
+    const close = replacement('Close')
+    dialog.append(close)
+    document.getElementById('mark').focus()
+    document.getElementById('row').remove()
+    await settle()
+    expect(document.activeElement).toBe(close)
+  })
+})

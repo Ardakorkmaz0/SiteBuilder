@@ -14,6 +14,11 @@
 // meantime ends the rescue, and leaving a control that is still usable (a
 // click on the page background) forgets it, so a later update of that control
 // cannot pull focus back to it.
+//
+// A control that took the person to another page (a header tab) goes with the
+// page it was on. That is not rescued: the new page starts fresh, as a load
+// does. Handing focus to its first control put "Skip to content" on screen
+// after every click on a tab.
 
 const FOCUSABLE = [
   'button:not([disabled])',
@@ -24,10 +29,11 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"]):not([disabled])',
 ].join(', ')
 
-// Drawn and reachable: not hidden by itself or by any part of the page above it.
+// Drawn and reachable: not hidden by itself or by any part of the page above it,
+// and not drawn only for screen readers (a skip link shows itself on focus).
 function shown(element, doc) {
   if (element.disabled) return false
-  if (element.closest('[hidden], [inert], [aria-hidden="true"]')) return false
+  if (element.closest('[hidden], [inert], [aria-hidden="true"], .sr-only')) return false
   if (getComputedStyle(element).visibility === 'hidden') return false
   for (let node = element; node && node !== doc.body; node = node.parentElement) {
     if (getComputedStyle(node).display === 'none') return false
@@ -45,11 +51,14 @@ export function installFocusRescue(doc = document) {
   // The control focus last went to, and the parts of the page it stood in.
   let last = null
   let around = []
+  let page = ''
   let lost = null
+  const pathname = () => doc.location?.pathname ?? ''
 
   const onFocusIn = (event) => {
     last = event.target
     around = ancestorsOf(last, doc)
+    page = pathname()
     lost = null
   }
 
@@ -81,8 +90,14 @@ export function installFocusRescue(doc = document) {
   const observer = new MutationObserver(() => {
     // Noted when the control is disabled or removed, which can be before the
     // browser actually takes focus away (Chrome does that at the next paint).
-    if (!lost && last && (last.disabled || !last.isConnected)) lost = { control: last, around }
+    if (!lost && last && (last.disabled || !last.isConnected)) lost = { control: last, around, page }
     if (!lost) return
+    if (lost.page !== pathname()) {
+      lost = null
+      last = null
+      around = []
+      return
+    }
     const { control } = lost
     if (!focusLost()) {
       // The browser left focus where it was (Firefox): nothing to give back.
