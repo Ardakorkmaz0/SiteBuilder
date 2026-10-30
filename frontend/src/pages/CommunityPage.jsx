@@ -21,6 +21,7 @@ import WorkspaceLayout from '../components/dashboard/WorkspaceLayout.jsx'
 import DashboardEmptyState from '../components/dashboard/DashboardEmptyState.jsx'
 import { useEscapeToClose } from '../ui/useEscapeToClose.js'
 import { closeWhenFocusLeaves } from '../ui/closeWhenFocusLeaves.js'
+import { useCompactDashboard } from '../utils/useCompactDashboard.js'
 import '../ui/community-design.css'
 import { ArrowRightIcon, BanIcon, FlagIcon, GlobeIcon, LayersIcon, MoreHorizontalIcon, TrashIcon } from '../components/icons.jsx'
 import {
@@ -47,7 +48,7 @@ const CATEGORIES = [
 ]
 
 // One card = one real component, rendered in isolation at a readable size.
-function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVisibility, mine, t }) {
+function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVisibility, mine, compact, t }) {
   const isPrivate = component.visibility === 'private'
   // Every card has the same buttons: each one names its block as well.
   const titleId = useId()
@@ -93,7 +94,7 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
   // Same card chrome as an Explore site card: this is a library of things to
   // take, and it should read like the rest of the app's libraries.
   return (
-    <article className="dashboard-site-card community-card" aria-labelledby={titleId}>
+    <article className={compact ? 'dashboard-site-card community-card' : 'dashboard-site-card'} aria-labelledby={titleId}>
       {/* The whole preview is the button — clicking the picture is what people
           try first. The frame itself takes no pointer events, so the click
           lands here instead of disappearing into the iframe. */}
@@ -136,42 +137,90 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
           </div>
         </div>
 
-        <div className="community-card-actions">
-          <button type="button" onClick={() => onUse(component)} aria-describedby={titleId} className="community-card-use">
-            {t('Use this')} <ArrowRightIcon size={14} />
-          </button>
-          <div ref={menuRootRef} className="community-card-menu-root" onBlur={(event) => closeWhenFocusLeaves(event.currentTarget, () => setMenuOpen(false))}>
-            <button type="button" aria-label={t('More actions')} aria-describedby={titleId} aria-haspopup="menu"
-              aria-expanded={menuOpen} aria-controls={menuOpen ? menuId : undefined}
-              onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setMenuOpen(true) } }}
-              onClick={() => setMenuOpen((open) => !open)} className="community-card-more">
-              <MoreHorizontalIcon size={18} />
+        {/* The compact card keeps one action in view and the rest in a menu;
+            the desktop card shows them all as before. */}
+        {compact ? (
+          <div className="community-card-actions">
+            <button type="button" onClick={() => onUse(component)} aria-describedby={titleId} className="community-card-use">
+              {t('Use this')} <ArrowRightIcon size={14} />
             </button>
-            {menuOpen && (
-              <div ref={menuRef} id={menuId} role="menu" aria-label={t('More actions')} aria-describedby={titleId}
-                className="community-card-menu" onKeyDown={onMenuKeyDown}>
-                {mine ? (
-                  <>
+            <div ref={menuRootRef} className="community-card-menu-root" onBlur={(event) => closeWhenFocusLeaves(event.currentTarget, () => setMenuOpen(false))}>
+              <button type="button" aria-label={t('More actions')} aria-describedby={titleId} aria-haspopup="menu"
+                aria-expanded={menuOpen} aria-controls={menuOpen ? menuId : undefined}
+                onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setMenuOpen(true) } }}
+                onClick={() => setMenuOpen((open) => !open)} className="community-card-more">
+                <MoreHorizontalIcon size={18} />
+              </button>
+              {menuOpen && (
+                <div ref={menuRef} id={menuId} role="menu" aria-label={t('More actions')} aria-describedby={titleId}
+                  className="community-card-menu" onKeyDown={onMenuKeyDown}>
+                  {mine ? (
+                    <>
+                      <button type="button" role="menuitem" aria-describedby={titleId}
+                        onClick={() => runAction(() => onVisibility(component, isPrivate ? 'public' : 'private'))}>
+                        {isPrivate ? <GlobeIcon size={15} /> : <BanIcon size={15} />}
+                        {isPrivate ? t('Make public') : t('Make private')}
+                      </button>
+                      <button type="button" role="menuitem" aria-describedby={titleId} className="community-card-withdraw"
+                        onClick={() => runAction(() => onWithdraw(component))}>
+                        <TrashIcon size={15} /> {t('Withdraw')}
+                      </button>
+                    </>
+                  ) : (
                     <button type="button" role="menuitem" aria-describedby={titleId}
-                      onClick={() => runAction(() => onVisibility(component, isPrivate ? 'public' : 'private'))}>
-                      {isPrivate ? <GlobeIcon size={15} /> : <BanIcon size={15} />}
-                      {isPrivate ? t('Make public') : t('Make private')}
+                      onClick={() => runAction(() => onReport(component))}>
+                      <FlagIcon size={15} /> {t('Report this block')}
                     </button>
-                    <button type="button" role="menuitem" aria-describedby={titleId} className="community-card-withdraw"
-                      onClick={() => runAction(() => onWithdraw(component))}>
-                      <TrashIcon size={15} /> {t('Withdraw')}
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" role="menuitem" aria-describedby={titleId}
-                    onClick={() => runAction(() => onReport(component))}>
-                    <FlagIcon size={15} /> {t('Report this block')}
-                  </button>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="dashboard-site-card-actions">
+            {/* The owner's two management actions are icons: three labelled
+                buttons wrapped the row onto a second line on every card. */}
+            {mine ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onVisibility(component, isPrivate ? 'public' : 'private')}
+                  title={isPrivate ? t('Make public') : t('Make private')}
+                  aria-label={isPrivate ? t('Make public') : t('Make private')}
+                  aria-describedby={titleId}
+                  className="dashboard-site-card-remix"
+                >
+                  {isPrivate ? <GlobeIcon size={13} /> : <BanIcon size={13} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onWithdraw(component)}
+                  title={t('Withdraw')}
+                  aria-label={t('Withdraw')}
+                  aria-describedby={titleId}
+                  className="dashboard-site-card-remix"
+                >
+                  <TrashIcon size={13} />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onReport(component)}
+                title={t('Report this block')}
+                aria-label={t('Report this block')}
+                  aria-describedby={titleId}
+                className="dashboard-site-card-remix"
+              >
+                <FlagIcon size={13} />
+              </button>
+            )}
+            <button type="button" onClick={() => onUse(component)} aria-describedby={titleId} className="dashboard-site-card-open">
+              <span>{t('Use this')}</span>
+              <span className="dashboard-site-card-open-icon"><ArrowRightIcon size={13} /></span>
+            </button>
+          </div>
+        )}
       </div>
     </article>
   )
@@ -180,6 +229,7 @@ function ComponentCard({ component, onUse, onWithdraw, onReport, onPreview, onVi
 export default function CommunityPage() {
   const { t } = useLanguage()
   const user = useAuthStore((state) => state.user)
+  const compact = useCompactDashboard()
   const [category, setCategory] = useState('')
   const [query, setQuery] = useState('')
   const [items, setItems] = useState([])
@@ -239,6 +289,144 @@ export default function CommunityPage() {
     setItems((rows) => (scope === 'mine'
       ? rows.map((row) => (row.id === component.id ? { ...row, visibility } : row))
       : rows.filter((row) => row.id !== component.id || visibility === 'public')))
+  }
+
+  // From 1024px up: the desktop page. Phones and tablets get the compact page
+  // below (utils/useCompactDashboard.js).
+  if (!compact) {
+    return (
+      <div className="dashboard-page">
+        <a href="#community-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-[var(--studio-panel-raised)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--studio-accent-hover)] focus:shadow-lg">
+          {t('Skip to content')}
+        </a>
+        <DashboardHeader current="community" />
+        <main id="community-main" className="dashboard-container">
+          <section aria-labelledby="blocks-heading">
+            <div className="dashboard-section-heading">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 id="blocks-heading" className="text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">
+                    {t('Community blocks')}
+                  </h1>
+                  <span className="studio-status-warning rounded-full border px-2 py-0.5 text-[11px] font-semibold">
+                    {t('In development')}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-[var(--studio-text-muted)]">
+                  {scope === 'mine'
+                    ? t('Everything you shared, public and private.')
+                    : t('Blocks other people made, ready to drop into a site of your own.')}
+                </p>
+              </div>
+              <DashboardSearch
+                value={query}
+                onChange={setQuery}
+                label={t('Search blocks…')}
+                placeholder={t('Search blocks…')}
+                className="w-full lg:w-[22rem]"
+              />
+            </div>
+
+            <div className="mb-5 flex flex-wrap items-center gap-2">
+              {/* Two shelves, not a filter: the community grid, and your own —
+                  where a private block is the only place it can be seen. */}
+              <div className="studio-segment shrink-0">
+                {[['', 'Community'], ['mine', 'My blocks']].map(([value, label]) => (
+                  <button
+                    key={value || 'all'}
+                    type="button"
+                    onClick={() => setScope(value)}
+                    aria-pressed={scope === value}
+                    className={scope === value ? 'studio-segment-btn studio-segment-btn-active' : 'studio-segment-btn'}
+                  >
+                    {t(label)}
+                  </button>
+                ))}
+              </div>
+              <div className="dashboard-filter-rail flex max-w-full gap-1.5 overflow-x-auto" aria-label={t('Block categories')}>
+                {CATEGORIES.map(([value, label]) => (
+                  <button
+                    key={value || 'all'}
+                    type="button"
+                    onClick={() => setCategory(value)}
+                    aria-pressed={category === value}
+                    className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                      category === value
+                        ? 'border-[var(--studio-text)] bg-[var(--studio-text)] text-[var(--studio-panel-raised)]'
+                        : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)] text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]'
+                    }`}
+                  >
+                    {t(label)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+          {error && <p role="alert" className="studio-status-danger mb-4 rounded-xl border px-4 py-3 text-sm">{error}</p>}
+          {actionError && <p role="alert" className="studio-status-danger mb-4 rounded-xl border px-4 py-3 text-sm">{actionError}</p>}
+
+          {loading ? (
+            <div role="status" aria-label={t('Loading…')} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {[0, 1, 2, 3].map((item) => (
+                <div key={item} className="dashboard-site-card">
+                  <div className="dashboard-site-card-media"><div className="h-44 rounded-xl bg-[var(--studio-control)]" /></div>
+                  <div className="dashboard-site-card-body">
+                    <div className="h-4 w-2/3 rounded bg-[var(--studio-control)]" />
+                    <div className="mt-3 h-3 w-1/2 rounded bg-[var(--studio-control)]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : error ? null : items.length === 0 ? (
+            // Only when the library really is empty. After a failure the alert
+            // above says what happened; "nothing here yet" would be a lie.
+            <div className="dashboard-section-card border-dashed py-16 text-center">
+              <div className="mx-auto mb-3 grid place-items-center text-[var(--studio-text-faint)]">
+                <LayersIcon size={24} />
+              </div>
+              <p className="font-medium text-[var(--studio-text)]">{t('Nothing here yet.')}</p>
+              <p className="mt-1 text-sm text-[var(--studio-text-muted)]">
+                {scope === 'mine'
+                  ? t('Blocks you share, public or private, land here.')
+                  : t('Share a block from one of your own sites to start the library.')}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {items.map((component) => (
+                <ComponentCard
+                  key={component.id}
+                  component={component}
+                  onUse={setUsing}
+                  onWithdraw={withdraw}
+                  onReport={setReporting}
+                  onPreview={setPreviewing}
+                  onVisibility={changeVisibility}
+                  mine={!!user && component.author_id === user.id}
+                  compact={false}
+                  t={t}
+                />
+              ))}
+            </div>
+          )}
+          </section>
+        </main>
+
+        {previewing && (
+          <ComponentPreviewDialog
+            component={previewing}
+            mine={!!user && previewing.author_id === user.id}
+            onClose={() => setPreviewing(null)}
+            // Deciding from the big preview is the point — the choice carries
+            // straight through instead of sending you back to the card.
+            onUse={(component) => { setPreviewing(null); setUsing(component) }}
+            onReport={(component) => { setPreviewing(null); setReporting(component) }}
+          />
+        )}
+        {using && <UseComponentDialog component={using} onClose={() => setUsing(null)} />}
+        {reporting && <ReportComponentDialog component={reporting} onClose={() => setReporting(null)} />}
+      </div>
+    )
   }
 
   const heading = (
@@ -322,7 +510,7 @@ export default function CommunityPage() {
               {items.map((component) => (
                 <ComponentCard key={component.id} component={component} onUse={setUsing} onWithdraw={withdraw}
                   onReport={setReporting} onPreview={setPreviewing} onVisibility={changeVisibility}
-                  mine={!!user && component.author_id === user.id} t={t} />
+                  mine={!!user && component.author_id === user.id} compact t={t} />
               ))}
             </div>
           )}

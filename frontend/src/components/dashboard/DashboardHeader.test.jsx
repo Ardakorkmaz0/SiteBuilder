@@ -10,6 +10,8 @@ import DashboardHeader from './DashboardHeader.jsx'
 
 vi.mock('./DashboardGlobalSearch.jsx', () => ({ default: () => <input type="search" aria-label="Search sites and creators" /> }))
 vi.mock('./AppInfo.jsx', () => ({ default: () => null }))
+// The header asks whether this is a desktop (utils/useCompactDashboard.js):
+// false is the compact face (phones and tablets), true the desktop one.
 vi.mock('../../utils/useMediaQuery.js', () => ({ useMediaQuery: vi.fn(() => false) }))
 
 beforeEach(() => {
@@ -91,7 +93,6 @@ describe('DashboardHeader tabs', () => {
   })
 
   it('keeps only Explore, My sites and Favorites in the phone bottom navigation', () => {
-    vi.mocked(useMediaQuery).mockReturnValue(true)
     renderHeader('projects')
     const nav = screen.getByRole('navigation', { name: 'Quick navigation' })
     expect(within(nav).getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
@@ -102,8 +103,49 @@ describe('DashboardHeader tabs', () => {
   })
 
   it('does not mount the phone bottom navigation on a desktop', () => {
+    vi.mocked(useMediaQuery).mockReturnValue(true)
     renderHeader('explore')
     expect(screen.queryByRole('navigation', { name: 'Quick navigation' })).not.toBeInTheDocument()
+  })
+})
+
+// From 1024px up the original header stays: the search field in view, the
+// page tabs, no bottom bar.
+describe('the desktop header', () => {
+  beforeEach(() => { vi.mocked(useMediaQuery).mockReturnValue(true) })
+
+  it('keeps the search field in view and the tabs on their own pages', () => {
+    renderHeader('profile')
+    expect(screen.getByRole('searchbox', { name: 'Search sites and creators' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Search', exact: true })).not.toBeInTheDocument()
+    const nav = screen.getByRole('navigation', { name: 'Navigation' })
+    expect(within(nav).getByRole('link', { name: 'My sites' })).toHaveAttribute('href', '/sites')
+    expect(within(nav).getByRole('link', { name: 'Profile' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('closes the account menu on Esc and gives the keyboard back to its button', async () => {
+    const user = userEvent.setup()
+    renderHeader()
+    const trigger = screen.getByRole('button', { name: 'Account menu' })
+    await user.click(trigger)
+    await user.tab()
+    const entry = document.activeElement
+    expect(entry).toHaveAccessibleName('Profile')
+    await user.keyboard('{Escape}')
+    expect(entry).not.toBeInTheDocument()
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(trigger).toHaveFocus()
+  })
+
+  it('closes the page menu on Esc and gives the keyboard back to its button', async () => {
+    const user = userEvent.setup()
+    renderHeader()
+    const trigger = screen.getByRole('button', { name: 'Open menu' })
+    await user.click(trigger)
+    within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('link', { name: 'Favorites' }).focus()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('navigation', { name: 'Mobile navigation' })).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
   })
 })
 
