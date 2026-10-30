@@ -6,6 +6,7 @@ import { addFavorite, removeFavorite } from '../api/explore.js'
 import LanguageProvider from '../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../ui/UiThemeProvider.jsx'
 import SearchPage from './SearchPage.jsx'
+import { setDesktopViewport } from '../test/desktopViewport.js'
 
 vi.mock('../api/search.js', () => ({ searchDashboard: vi.fn() }))
 vi.mock('../api/explore.js', () => ({ addFavorite: vi.fn(), removeFavorite: vi.fn() }))
@@ -219,6 +220,24 @@ describe('SearchPage reading order', () => {
       screen.getByRole('searchbox', { name: 'Search query' }),
     ]) {
       expect(first.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+  })
+})
+
+// From 1024px up the desktop page stays: the filters a row over the results,
+// no sidebar.
+describe('SearchPage on a desktop', () => {
+  it('keeps the filters in a row over the results', async () => {
+    const restore = setDesktopViewport()
+    try {
+      mockResults(() => Promise.resolve(response()))
+      renderSearch()
+      const filters = await screen.findByRole('group', { name: 'Search filters' })
+      expect(await within(filters).findByRole('button', { name: 'Sites 1' })).toBeInTheDocument()
+      expect(screen.queryByRole('complementary')).toBeNull()
+      expect(screen.getByRole('heading', { level: 1, name: 'Search results' })).toBeInTheDocument()
+    } finally {
+      restore()
     }
   })
 })

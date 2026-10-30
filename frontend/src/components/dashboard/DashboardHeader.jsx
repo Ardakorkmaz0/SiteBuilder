@@ -4,7 +4,7 @@ import { useAuthStore, useIsGuest } from '../../store/authStore.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { accountName } from '../../utils/accountName.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
-import { useMediaQuery } from '../../utils/useMediaQuery.js'
+import { useCompactDashboard } from '../../utils/useCompactDashboard.js'
 import LanguageSwitcher from '../LanguageSwitcher.jsx'
 import DashboardGlobalSearch from './DashboardGlobalSearch.jsx'
 import AppInfo from './AppInfo.jsx'
@@ -45,9 +45,16 @@ const NAV_ITEMS = [
 ]
 const PHONE_ITEMS = NAV_ITEMS.filter(({ id }) => ['explore', 'projects', 'favorites'].includes(id))
 
-// Search stays a deliberate action in the chrome; the full search page already
-// has its own field and does not need a second one.
-export default function DashboardHeader({ current = '', showSearch = true }) {
+// The header follows the dashboard's two faces (utils/useCompactDashboard.js):
+// the compact one on phones and tablets, the desktop one from 1024px up.
+// `showSearch` is off on the search page itself, which carries its own search
+// field — two identical fields on one screen only make the user pick one.
+export default function DashboardHeader(props) {
+  return useCompactDashboard() ? <CompactHeader {...props} /> : <DesktopHeader {...props} />
+}
+
+// Search stays a deliberate action in the chrome, opened from its icon.
+function CompactHeader({ current = '', showSearch = true }) {
   const { t } = useLanguage()
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
@@ -66,7 +73,6 @@ export default function DashboardHeader({ current = '', showSearch = true }) {
   const accountId = useId()
   const menuId = useId()
   const displayName = accountName(user, t, t('Account'))
-  const isNarrow = useMediaQuery('(max-width: 1023.98px)')
 
   useEscapeToClose(accountOpen, () => setAccountOpen(false))
   useEscapeToClose(mobileOpen, () => setMobileOpen(false))
@@ -100,7 +106,7 @@ export default function DashboardHeader({ current = '', showSearch = true }) {
 
   return (
     <>
-      <header className="dashboard-header">
+      <header className="dashboard-header dashboard-compact">
         <div data-testid="explore-header-inner" className="dashboard-header-inner">
           <Link to="/" aria-label={t('Sitebuilder home')} className="dashboard-brand" onClick={closeNavigation}>
             <span className="brand-mark" aria-hidden="true">S</span>
@@ -195,14 +201,201 @@ export default function DashboardHeader({ current = '', showSearch = true }) {
           </div>
         )}
       </header>
-      {isNarrow && <nav aria-label={t('Quick navigation')} className="dashboard-bottom-nav">
+      <nav aria-label={t('Quick navigation')} className="dashboard-bottom-nav">
         {PHONE_ITEMS.map(({ id, label, to, icon: NavIcon }) => (
           <Link key={id} to={to} onClick={closeNavigation} aria-current={current === id ? 'page' : undefined}>
             <NavIcon size={20} {...(id === 'favorites' ? { filled: current === id } : {})} />
             <span>{t(label)}</span>
           </Link>
         ))}
-      </nav>}
+      </nav>
     </>
+  )
+}
+
+// The original desktop header: the search field always in view, the page tabs
+// from 1280px, a menu for them below that.
+function DesktopHeader({ current = '', showSearch = true }) {
+  const { t } = useLanguage()
+  const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
+  const isGuest = useIsGuest()
+  const logout = useAuthStore((state) => state.logout)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const accountRef = useRef(null)
+  const accountTriggerRef = useRef(null)
+  const mobileMenuRef = useRef(null)
+  const mobileTriggerRef = useRef(null)
+  const displayName = accountName(user, t, t('Account'))
+
+  useEscapeToClose(accountOpen, () => setAccountOpen(false))
+  useEscapeToClose(mobileOpen, () => setMobileOpen(false))
+
+  useEffect(() => {
+    const closeOutside = (event) => {
+      if (!accountRef.current?.contains(event.target)) setAccountOpen(false)
+      if (!mobileMenuRef.current?.contains(event.target) && !mobileTriggerRef.current?.contains(event.target)) setMobileOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOutside)
+    return () => document.removeEventListener('pointerdown', closeOutside)
+  }, [])
+
+  function onLogout() {
+    // A guest has no password to come back with: signing out throws the
+    // identity away, and every draft on it with no way to reach them again.
+    // So it is a question here, not a button.
+    if (isGuest && !window.confirm(t('Signing out of a guest session cannot be undone: there is no password to come back with, and what you made stays behind. Create an account first?'))) {
+      return
+    }
+    logout()
+    navigate('/login')
+  }
+
+  return (
+    <header className="dashboard-header">
+      <div data-testid="explore-header-inner" className="dashboard-header-inner">
+        <Link to="/" aria-label={t('Sitebuilder home')} className="dashboard-brand">
+          <span className="brand-mark" aria-hidden="true">S</span>
+          <span className="block min-w-0 truncate text-sm font-semibold text-[var(--studio-text)] sm:text-base">Sitebuilder</span>
+        </Link>
+
+        {showSearch ? (
+          <div className="hidden min-w-[14rem] flex-1 items-center gap-2 md:flex">
+            <div className="min-w-0 flex-1"><DashboardGlobalSearch /></div>
+            {/* Beside the search because that is where someone looks when they
+                are still working out what this place is. */}
+            <AppInfo />
+          </div>
+        ) : (
+          <div className="hidden flex-1 items-center justify-end md:flex">
+            <AppInfo />
+          </div>
+        )}
+
+        <nav aria-label={t('Navigation')} className="dashboard-primary-nav hidden items-center gap-1 xl:flex">
+          {NAV_ITEMS.map(({ id, label, to, icon: NavIcon }) => (
+            <Link
+              key={id}
+              to={to}
+              aria-current={current === id ? 'page' : undefined}
+              className={`dashboard-nav-link ${current === id ? 'dashboard-nav-link-active' : ''}`}
+            >
+              <NavIcon size={15} {...(id === 'favorites' ? { filled: current === id } : {})} />
+              {t(label)}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="flex min-w-0 items-center justify-end gap-2">
+          {/* Said once, where the account lives, and only to someone who has
+              not made one: their work is real and it is one step from being
+              safe. Not a banner across the page — a nudge, not a nag. */}
+          {isGuest && (
+            <Link
+              to="/register"
+              className="studio-status-warning hidden shrink-0 items-center gap-1.5 rounded-[var(--studio-radius)] border px-3 py-1.5 text-xs font-semibold sm:inline-flex"
+              title={t('You are browsing as a guest: your work lives in this browser only. Create an account to publish it and to reach it from anywhere.')}
+            >
+              {t('Guest')} · {t('Create my account')}
+            </Link>
+          )}
+          <LanguageSwitcher className="hidden sm:flex" />
+
+          <div ref={accountRef} className="relative hidden md:block">
+            <button
+              ref={accountTriggerRef}
+              type="button"
+              className="dashboard-account-trigger"
+              aria-label={t('Account menu')}
+              aria-expanded={accountOpen}
+              onClick={() => setAccountOpen((open) => !open)}
+            >
+              <DashboardAvatar user={user} />
+              <span className="hidden max-w-28 truncate lg:block">{displayName}</span>
+              <ChevronDownIcon size={14} className={`transition-transform ${accountOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {accountOpen && (
+              <div className="studio-menu absolute right-0 top-[calc(100%+0.55rem)] z-40 w-64 p-2">
+                <div className="flex items-center gap-3 px-2 py-2.5">
+                  <DashboardAvatar user={user} size={40} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[var(--studio-text)]">{displayName}</p>
+                    {!isGuest && <p className="truncate text-xs text-[var(--studio-text-muted)]">@{user?.username}</p>}
+                  </div>
+                </div>
+                <div className="my-1 border-t studio-divider" />
+                <Link to="/profile" onClick={() => setAccountOpen(false)} className="studio-menu-item">
+                  <UserIcon size={16} /> {t('Profile')}
+                </Link>
+                <Link to="/sites" onClick={() => setAccountOpen(false)} className="studio-menu-item">
+                  <FolderIcon size={16} /> {t('My sites')}
+                </Link>
+                {user?.is_staff && (
+                  <Link to="/admin" onClick={() => setAccountOpen(false)} className="studio-menu-item">
+                    <ShieldIcon size={16} /> {t('Admin')}
+                  </Link>
+                )}
+                <div className="my-1 border-t studio-divider" />
+                <button type="button" onClick={onLogout} className="studio-menu-item text-[var(--studio-danger)]">
+                  <LogOutIcon size={16} /> {t('Log out')}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            ref={mobileTriggerRef}
+            type="button"
+            aria-label={t('Open menu')}
+            aria-expanded={mobileOpen}
+            onClick={() => setMobileOpen((open) => !open)}
+            className="studio-icon-btn border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] xl:hidden"
+          >
+            <MoreHorizontalIcon size={18} aria-hidden />
+          </button>
+        </div>
+      </div>
+
+      {mobileOpen && (
+        <div ref={mobileMenuRef} className="dashboard-mobile-menu xl:hidden">
+          {showSearch && (
+            <div className="mb-3 flex items-center gap-2 md:hidden">
+              <div className="min-w-0 flex-1">
+                <DashboardGlobalSearch mobile onNavigate={() => setMobileOpen(false)} />
+              </div>
+              <AppInfo />
+            </div>
+          )}
+          <nav aria-label={t('Mobile navigation')} className="grid gap-1">
+            {NAV_ITEMS.map(({ id, label, to, icon: NavIcon }) => (
+              <Link
+                key={id}
+                to={to}
+                onClick={() => setMobileOpen(false)}
+                aria-current={current === id ? 'page' : undefined}
+                className={`studio-menu-item ${current === id ? 'bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]' : ''}`}
+              >
+                <NavIcon size={16} /> {t(label)}
+              </Link>
+            ))}
+            {user?.is_staff && (
+              <Link to="/admin" onClick={() => setMobileOpen(false)} className="studio-menu-item">
+                <ShieldIcon size={16} /> {t('Admin')}
+              </Link>
+            )}
+            <div className="my-1 border-t studio-divider" />
+            <div className="flex items-center justify-between gap-3 px-2 py-2 sm:hidden">
+              <span className="text-xs font-semibold text-[var(--studio-text-muted)]">{t('Appearance')} · {t('Language')}</span>
+              <LanguageSwitcher />
+            </div>
+            <button type="button" onClick={onLogout} className="studio-menu-item text-[var(--studio-danger)]">
+              <LogOutIcon size={16} /> {t('Log out')}
+            </button>
+          </nav>
+        </div>
+      )}
+    </header>
   )
 }

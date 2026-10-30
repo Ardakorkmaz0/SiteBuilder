@@ -1,6 +1,8 @@
-/* Phase one: the dashboard chrome and its dialogs. Auth and editing routes
-   have no DashboardHeader, so their existing tokens remain unchanged. */
-:root[data-surface="app"]:has(.dashboard-header) {
+/* The compact dashboard's palette (phones and tablets; see
+   utils/useCompactDashboard.js). It applies while a compact header is on the
+   page, dialogs portalled to <body> included. The desktop dashboard, auth and
+   editing routes keep their own tokens. */
+:root[data-surface="app"]:has(.dashboard-compact) {
   --font-display: "Instrument Sans", "Inter", "Segoe UI", system-ui, sans-serif;
   --studio-accent: #1f6feb;
   --studio-accent-hover: #185cce;
@@ -35,7 +37,7 @@
   --studio-shadow-menu: 0 16px 40px rgba(20, 35, 58, 0.18);
 }
 
-:root[data-surface="app"][data-ui-theme="dark"]:has(.dashboard-header) {
+:root[data-surface="app"][data-ui-theme="dark"]:has(.dashboard-compact) {
   --studio-accent: #2879ef;
   --studio-accent-hover: #8cbbff;
   --studio-accent-pressed: #1f62c6;

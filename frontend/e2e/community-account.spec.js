@@ -31,10 +31,10 @@ test('profile edits, explore search, favorites and a site report reach the real 
     await page.getByRole('button', { name: 'Portfolio', exact: true }).click()
     const card = cardFor(page, title)
     await expect(card).toBeVisible()
-    await card.getByRole('button', { name: 'More actions', exact: true }).click()
     const favorited = reply(page, `/sites/${site.id}/favorite/`)
-    await card.getByRole('menuitemcheckbox', { name: 'Favorite', exact: true }).click()
+    await card.getByRole('button', { name: 'Favorite', exact: true }).click()
     expect((await favorited).status()).toBe(201)
+    await expect(card.getByRole('button', { name: 'Unfavorite', exact: true })).toHaveAttribute('aria-pressed', 'true')
     const favorites = await api(request, 'GET', '/favorites/')
     expect(favorites.status).toBe(200)
     expect(rows(favorites.data).map((item) => item.id)).toContain(site.id)
@@ -43,18 +43,15 @@ test('profile edits, explore search, favorites and a site report reach the real 
     await cardFor(page, title).getByRole('link', { name: authorName, exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`/u/${author.user.id}$`))
     const removed = reply(page, `/sites/${site.id}/favorite/`, 'DELETE')
-    await cardFor(page, title).getByRole('button', { name: 'More actions', exact: true }).click()
-    await cardFor(page, title).getByRole('menuitemcheckbox', { name: 'Unfavorite', exact: true }).click()
+    await cardFor(page, title).getByRole('button', { name: 'Unfavorite', exact: true }).click()
     expect((await removed).status()).toBe(200)
-    await cardFor(page, title).getByRole('button', { name: 'More actions', exact: true }).click()
-    await expect(cardFor(page, title).getByRole('menuitemcheckbox', { name: 'Favorite', exact: true })).toHaveAttribute('aria-checked', 'false')
+    await expect(cardFor(page, title).getByRole('button', { name: 'Favorite', exact: true })).toHaveAttribute('aria-pressed', 'false')
     const remaining = await api(request, 'GET', '/favorites/')
     expect(remaining.status).toBe(200)
     expect(rows(remaining.data).map((item) => item.id)).not.toContain(site.id)
     await page.goto('/favorites')
     await expect(page.getByText('No favorites yet', { exact: true })).toBeVisible()
 
-    await page.getByRole('button', { name: 'Search', exact: true }).click()
     const search = page.getByRole('searchbox', { name: 'Search sites and creators', exact: true })
     await search.fill(title)
     await search.press('Enter')
@@ -81,7 +78,11 @@ test('profile edits, explore search, favorites and a site report reach the real 
   }
 })
 
+// Phones and tablets (below 1024px) get the compact dashboard: search behind
+// an icon, three destinations in a bar at the bottom. Desktops keep the
+// original header, which the test above uses.
 test('dashboard search expands on demand and phone navigation keeps three working destinations', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   const search = page.getByRole('searchbox', { name: 'Search sites and creators', exact: true })
   const searchTrigger = page.getByRole('button', { name: 'Search', exact: true })
@@ -93,7 +94,6 @@ test('dashboard search expands on demand and phone navigation keeps three workin
   await expect(search).toHaveCount(0)
   await expect(searchTrigger).toBeFocused()
 
-  await page.setViewportSize({ width: 390, height: 844 })
   const navigation = page.getByRole('navigation', { name: 'Quick navigation', exact: true })
   await expect(navigation).toBeVisible()
   await expect(navigation.getByRole('link')).toHaveCount(3)
@@ -144,8 +144,7 @@ test('a community block can be found, previewed, reported and copied into an own
     await expect(preview.getByRole('heading', { name: title, exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(preview).toHaveCount(0)
-    await card.getByRole('button', { name: 'More actions', exact: true }).click()
-    await card.getByRole('menuitem', { name: 'Report this block', exact: true }).click()
+    await card.getByRole('button', { name: 'Report this block', exact: true }).click()
     const report = page.getByRole('dialog', { name: 'Report this block', exact: true })
     await report.getByRole('combobox', { name: 'Reason', exact: true }).selectOption('spam')
     await report.getByRole('textbox', { name: 'Details (optional)', exact: true }).fill('Local E2E moderation fixture.')

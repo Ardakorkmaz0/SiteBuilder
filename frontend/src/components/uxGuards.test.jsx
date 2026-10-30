@@ -159,7 +159,7 @@ describe('responsive and accessibility guards', () => {
     renderWithShell(<FavoritesPage />)
 
     expect(await screen.findByText('Ada Portfolio')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Favorites' })).toHaveAttribute('aria-current', 'page')
+    expect(within(screen.getByRole('navigation', { name: 'Navigation' })).getByRole('link', { name: 'Favorites' })).toHaveAttribute('aria-current', 'page')
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search favorites' }), {
       target: { value: 'missing' },

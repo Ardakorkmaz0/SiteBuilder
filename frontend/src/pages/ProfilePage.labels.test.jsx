@@ -9,6 +9,7 @@ import UiThemeProvider from '../ui/UiThemeProvider.jsx'
 import ProfilePage from './ProfilePage.jsx'
 import { useAuthStore } from '../store/authStore.js'
 import { updateProfile } from '../api/profile.js'
+import { setDesktopViewport } from '../test/desktopViewport.js'
 
 vi.mock('../api/profile.js', () => ({
   getProfile: vi.fn(() => Promise.resolve({ display_name: 'Ada', bio: '', headline: '', location: '', website: '', github: '', twitter: '', instagram: '' })),
@@ -96,3 +97,27 @@ describe('a refused link', () => {
   })
 })
 
+
+// The desktop page (from 1024px) draws its own form; its fields are named too.
+describe('the profile form on a desktop', () => {
+  it('names every field', async () => {
+    const restore = setDesktopViewport()
+    try {
+      render(
+        <MemoryRouter>
+          <UiThemeProvider>
+            <LanguageProvider>
+              <ProfilePage />
+            </LanguageProvider>
+          </UiThemeProvider>
+        </MemoryRouter>,
+      )
+      for (const name of ['Display name', 'Headline', 'Bio', 'Location', 'Website']) {
+        expect(await screen.findByRole('textbox', { name })).toBeInTheDocument()
+      }
+      expect(document.querySelector('.workspace-page')).toBeNull()
+    } finally {
+      restore()
+    }
+  })
+})

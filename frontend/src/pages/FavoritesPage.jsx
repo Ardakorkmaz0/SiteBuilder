@@ -10,6 +10,8 @@ import DashboardSearch from '../components/dashboard/DashboardSearch.jsx'
 import ExploreCard from '../components/dashboard/ExploreCard.jsx'
 import WorkspaceLayout from '../components/dashboard/WorkspaceLayout.jsx'
 import DashboardEmptyState from '../components/dashboard/DashboardEmptyState.jsx'
+import { StarIcon } from '../components/icons.jsx'
+import { useCompactDashboard } from '../utils/useCompactDashboard.js'
 import { useLanguage } from '../i18n/useLanguage.js'
 import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 
@@ -25,6 +27,7 @@ export default function FavoritesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [remixingId, setRemixingId] = useState(null)
   const navigate = useNavigate()
+  const compact = useCompactDashboard()
   useScrollRestore(items !== null)
 
   const filteredItems = useMemo(() => {
@@ -91,6 +94,92 @@ export default function FavoritesPage() {
       if (e?.response?.data?.code === 'guest_forbidden' && guestGate('limit')) return
       setError(apiError(e))
     }
+  }
+
+  // From 1024px up: the desktop page; phones and tablets get the compact one.
+  if (!compact) {
+    return (
+      <div className="dashboard-page">
+        <a href="#favorites-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-[var(--studio-panel-raised)] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--studio-accent-hover)] focus:shadow-lg">
+          {t('Skip to content')}
+        </a>
+        <DashboardHeader current="favorites" />
+
+        {/* The same section chrome Explore and Blocks use — a library page is a
+            library page, whichever one you are on. */}
+        <main id="favorites-main" className="dashboard-container">
+          <section aria-labelledby="favorites-heading">
+            <div className="dashboard-section-heading">
+              <div className="min-w-0">
+                <h1 id="favorites-heading" className="truncate text-2xl font-semibold text-[var(--studio-text)] sm:text-3xl">
+                  {t('Favorites')}
+                </h1>
+                <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('Sites you starred on Explore.')}</p>
+              </div>
+              <DashboardSearch
+                value={searchQuery}
+                onChange={setSearchQuery}
+                label={t('Search favorites')}
+                placeholder={t('Search your favorites…')}
+                className="w-full lg:w-[22rem]"
+              />
+            </div>
+
+          {error && (
+            <div role="alert" className="studio-status-danger mb-5 rounded-xl border px-4 py-3 text-sm">
+              {error}
+            </div>
+          )}
+
+          {loadError ? (
+            <div role="alert" className="dashboard-section-card p-8 text-center">
+              <p className="mb-4 text-sm text-[var(--studio-text-muted)]">{loadError}</p>
+              <button type="button" className="studio-btn studio-btn-secondary px-4" onClick={() => {
+                setLoadError('')
+                setItems(null)
+                setLoadAttempt((attempt) => attempt + 1)
+              }}>{t('Try again')}</button>
+            </div>
+          ) : items === null ? (
+            <div role="status" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-label={t('Loading…')}>
+              {[0, 1, 2, 3].map((item) => (
+                <div key={item} className="dashboard-site-card">
+                  <div className="dashboard-site-card-media"><div className="h-44 rounded-xl bg-[var(--studio-control)]" /></div>
+                  <div className="dashboard-site-card-body">
+                    <div className="h-4 w-2/3 rounded bg-[var(--studio-control)]" />
+                    <div className="mt-3 h-3 w-1/2 rounded bg-[var(--studio-control)]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : items.length === 0 ? (
+            <div className="dashboard-section-card border-dashed py-16 text-center">
+              <div className="mx-auto mb-3 grid place-items-center text-[var(--studio-text-faint)]"><StarIcon size={24} filled /></div>
+              <p className="font-medium text-[var(--studio-text)]">{t('No favorites yet')}</p>
+              <p className="mt-1 text-sm text-[var(--studio-text-muted)]">
+                {t('Star sites on Explore to keep them here.')}
+              </p>
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="dashboard-section-card border-dashed py-16 text-center">
+              <div className="mx-auto mb-3 grid place-items-center text-[var(--studio-text-faint)]">
+                <StarIcon size={24} />
+              </div>
+              <p className="font-medium text-[var(--studio-text)]">{t('No favorites match your search.')}</p>
+              <p className="mt-1 text-sm text-[var(--studio-text-muted)]">{t('Try a different site or creator name.')}</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filteredItems.map((site) => (
+                <ExploreCard key={site.id} site={site} onToggleFav={onToggleFav} onRemix={onRemix} remixing={remixingId === site.id} favoriting={favoritingIds.has(site.id)} />
+              ))}
+            </div>
+          )}
+          </section>
+        </main>
+        {guestDialog}
+      </div>
+    )
   }
 
   return (
