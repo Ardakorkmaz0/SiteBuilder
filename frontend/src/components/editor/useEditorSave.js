@@ -28,7 +28,9 @@ export function useEditorSave({ lifecycleRef, discardRef, conflict, sessionMessa
   // The refusal reason the error bar shows until a save goes through, or ''.
   const refusalRef = useRef('')
 
-  async function save(nextPublished, { auto = false, versionSource, force = false } = {}) {
+  // `goLive`: also send the saved draft live (the publish button). Any other
+  // save changes the draft only, and visitors keep the live version.
+  async function save(nextPublished, { auto = false, versionSource, force = false, goLive = false } = {}) {
     if (!auto) {
       manualCountRef.current += 1
       setSaving(true)
@@ -40,7 +42,7 @@ export function useEditorSave({ lifecycleRef, discardRef, conflict, sessionMessa
         // This automatic save may have waited behind one in flight, and a
         // "leave without saving" since then cancels it.
         if (auto && discardRef.current) return null
-        return lifecycleRef.current.performSave(nextPublished, { auto, versionSource, force })
+        return lifecycleRef.current.performSave(nextPublished, { auto, versionSource, force, goLive })
       })
       if (saved && refusalRef.current) {
         const refusal = refusalRef.current
@@ -55,7 +57,7 @@ export function useEditorSave({ lifecycleRef, discardRef, conflict, sessionMessa
       setAutoSaveState('error')
       if (isSiteChanged(e)) {
         // Nothing was written; the dialog says why and lets the person choose.
-        conflict.refuse({ publish: nextPublished })
+        conflict.refuse({ publish: nextPublished, goLive })
         return null
       }
       const status = e?.response?.status

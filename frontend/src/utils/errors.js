@@ -12,6 +12,7 @@ const API_CODE_MESSAGES = {
   google_email_missing: 'Your Google account does not provide an email address.',
   email_required: 'Email is required.',
   version_not_found: 'This saved version could not be found.',
+  no_live_version: 'This site has no live version yet.',
   local_ai_invalid_url: 'The local AI address is invalid or blocked for security.',
   user_not_found: 'User not found.',
   site_not_found: 'Site not found.',

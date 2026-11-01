@@ -24,6 +24,9 @@ export default function HistoryPanel({
   onClose,
   onRestored,
   onRestore,
+  // Present while the site is published: sends one version live and leaves
+  // the draft as it is.
+  onSendLive,
   onSave,
   // Work on screen that the server does not have yet.
   hasUnsavedChanges = false,
@@ -86,6 +89,11 @@ export default function HistoryPanel({
     const fresh = await restoreVersion(siteId, versionId)
     onRestored?.(fresh)
     await refresh()
+  })
+
+  const sendLive = (versionId) => run(async () => {
+    const sent = await onSendLive(versionId)
+    if (sent) await refresh()
   })
 
   const newCheckpoint = () => run(async () => {
@@ -240,6 +248,7 @@ export default function HistoryPanel({
                     </div>
                     <div className="mt-2.5 flex flex-wrap justify-end gap-1.5 border-t border-[var(--studio-border)] pt-2">
                       <SlotBtn disabled={busy} onClick={() => restore(v.id)}>{t('Load')}</SlotBtn>
+                      {onSendLive && <SlotBtn disabled={busy} onClick={() => sendLive(v.id)}>{t('Send live')}</SlotBtn>}
                       {v.pinned && <SlotBtn disabled={busy} onClick={() => overwrite(v)}>{t('Save over')}</SlotBtn>}
                       <SlotBtn disabled={busy} onClick={() => togglePin(v)}>{v.pinned ? t('Unpin') : t('Pin')}</SlotBtn>
                       <SlotBtn disabled={busy} danger onClick={() => remove(v)}>{t('Delete')}</SlotBtn>
@@ -269,6 +278,7 @@ export default function HistoryPanel({
                     </div>
                     <SlotBtn disabled={busy} onClick={() => togglePin(v)}>{v.pinned ? t('Unpin') : t('Pin')}</SlotBtn>
                     <SlotBtn disabled={busy} onClick={() => restore(v.id)}>{t('Load')}</SlotBtn>
+                    {onSendLive && <SlotBtn disabled={busy} onClick={() => sendLive(v.id)}>{t('Send live')}</SlotBtn>}
                   </li>
                 ))}
               </ul>
@@ -288,6 +298,7 @@ export default function HistoryPanel({
                         <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}</p>
                       </div>
                       <SlotBtn disabled={busy} onClick={() => restore(v.id)}>{t('Load')}</SlotBtn>
+                      {onSendLive && <SlotBtn disabled={busy} onClick={() => sendLive(v.id)}>{t('Send live')}</SlotBtn>}
                     </li>
                   ))}
                 </ul>
@@ -364,13 +375,17 @@ function SourceBadge({ source, pinned = false }) {
 // so they are shown in the person's language. A save's own name is shown as
 // it was written.
 function rowTitle(row, translate) {
-  if (row.source === 'save' || row.source === 'restore') return labelForSource(row.source, translate, row.label)
+  if (row.source === 'save' || row.source === 'restore' || row.source === 'publish') return labelForSource(row.source, translate, row.label)
   return row.label || labelForSource(row.source, translate)
 }
 
 function labelForSource(source, translate, label = '') {
   if (source === 'restore') return translate('Restored from history')
+  if (source === 'publish') {
+    return /^Sent live from v\d+$/.test(label || '') ? translate('Sent live from an older save') : translate('Sent live')
+  }
   if (source === 'save' && label === 'before restore') return translate('Your work before a load')
+  if (source === 'save' && label === 'before copying live') return translate('Your draft before copying live')
   if (source === 'save') return translate('Older saved snapshot')
   return translate('Auto-saved snapshot')
 }

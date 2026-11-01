@@ -69,7 +69,13 @@ describe('the save queue', () => {
   it('passes what the save is for', async () => {
     const ctx = setup()
     await act(() => ctx.result.current.save(true, { auto: true, versionSource: 'checkpoint', force: true }))
-    expect(ctx.lifecycleRef.current.performSave).toHaveBeenCalledWith(true, { auto: true, versionSource: 'checkpoint', force: true })
+    expect(ctx.lifecycleRef.current.performSave).toHaveBeenCalledWith(true, { auto: true, versionSource: 'checkpoint', force: true, goLive: false })
+  })
+
+  it('sends the draft live only when asked to', async () => {
+    const ctx = setup()
+    await act(() => ctx.result.current.save(true, { goLive: true }))
+    expect(ctx.lifecycleRef.current.performSave).toHaveBeenLastCalledWith(true, { auto: false, versionSource: undefined, force: false, goLive: true })
   })
 
   it('lets a history load wait its turn in the same queue', async () => {
@@ -138,13 +144,20 @@ describe('"Saving…"', () => {
 })
 
 describe('a save that fails', () => {
+  it('keeps a refused send-live as part of the conflict choice', async () => {
+    const ctx = setup()
+    ctx.lifecycleRef.current.performSave = vi.fn(async () => { throw failure(409, { code: 'site_changed' }) })
+    await act(async () => { await ctx.result.current.save(true, { goLive: true }) })
+    expect(ctx.conflict.refuse).toHaveBeenCalledWith({ publish: true, goLive: true })
+  })
+
   it('opens the conflict dialog for a save made from an older revision, with its publish choice', async () => {
     const ctx = setup()
     ctx.lifecycleRef.current.performSave = vi.fn(async () => { throw failure(409, { code: 'site_changed' }) })
     let result
     await act(async () => { result = await ctx.result.current.save(false) })
     expect(result).toBe(null)
-    expect(ctx.conflict.refuse).toHaveBeenCalledWith({ publish: false })
+    expect(ctx.conflict.refuse).toHaveBeenCalledWith({ publish: false, goLive: false })
     expect(ctx.result.current.autoSaveState).toBe('error')
     expect(ctx.onError).toHaveBeenCalledTimes(1)
     expect(ctx.onError).toHaveBeenLastCalledWith('')

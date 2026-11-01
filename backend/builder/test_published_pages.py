@@ -135,6 +135,19 @@ class TestServing:
         assert 'allow-scripts' in csp
         assert response['X-Content-Type-Options'] == 'nosniff'
 
+    # The editor's "Live" view frames the page. Only the app may, and the
+    # page keeps its sandbox there.
+    def test_only_the_app_may_frame_the_document(self, client, site, settings):
+        settings.FRONTEND_URL = 'http://localhost:5173/'
+        publish(client, site)
+
+        response = APIClient().get(f'/s/{site.slug}/')
+
+        csp = response['Content-Security-Policy']
+        assert "frame-ancestors 'self' http://localhost:5173" in csp
+        assert csp.startswith('sandbox ')
+        assert 'X-Frame-Options' not in response
+
     def test_noindex_applies_even_when_the_authored_html_has_no_robots_tag(self, client, site):
         publish(client, site, payload=[
             {'path': '', 'title': 'Ada', 'html': HOME},

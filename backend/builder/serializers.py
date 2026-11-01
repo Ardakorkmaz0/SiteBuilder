@@ -649,12 +649,18 @@ class SiteSerializer(serializers.ModelSerializer):
     # The revision the sender loaded or last saved. Omitted, the save goes
     # through as before (older clients, scripts, "save mine anyway").
     base_revision = serializers.IntegerField(write_only=True, required=False, allow_null=True, min_value=0)
+    # Sends an older version live instead of the draft, with the pages the
+    # editor rendered from it. The draft is left as it is.
+    live_from_version = serializers.IntegerField(write_only=True, required=False, allow_null=True, min_value=1)
+    # Whether the draft has changes visitors do not see yet.
+    live_differs = serializers.SerializerMethodField()
     _CONTENT_FIELDS = {'title', 'schema', 'html', 'published', 'published_pages', 'category', 'tags'}
 
     class Meta:
         model = Site
         fields = ('id', 'title', 'slug', 'schema', 'html', 'published',
                   'published_pages', 'revision', 'base_revision',
+                  'live_from_version', 'live_at', 'live_differs',
                   'category', 'tags', 'site_options', 'review_token',
                   'custom_domain', 'domain_status', 'domain_verification_token',
                   'moderation_blocked', 'view_count', 'created_at', 'updated_at')
@@ -665,8 +671,11 @@ class SiteSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'id', 'slug', 'review_token', 'custom_domain', 'domain_status',
             'domain_verification_token', 'moderation_blocked', 'view_count',
-            'created_at', 'updated_at', 'revision',
+            'created_at', 'updated_at', 'revision', 'live_at',
         )
+
+    def get_live_differs(self, obj):
+        return obj.draft_differs_from_live()
 
     # `published` stays the owner's own switch and is saved as sent, even
     # while a moderator's block is on: every public way in (access.py) checks
@@ -739,6 +748,14 @@ class SiteSerializer(serializers.ModelSerializer):
         except serializers.ValidationError as exc:
             raise serializers.ValidationError({'published': exc.detail}) from exc
         pages = validated_data.pop('published_pages', None)
+        version_id = validated_data.pop('live_from_version', None)
+        version = None
+        if version_id is not None:
+            version = SiteVersion.objects.filter(site=instance, pk=version_id).first()
+            if version is None or pages is None:
+                raise serializers.ValidationError({
+                    'live_from_version': 'Send an existing version of this site live with its pages.',
+                })
         # Read before the update: afterwards `instance` already carries the new
         # value, and the stamp has to mark the crossing, not the state.
         was_published = instance.published
@@ -750,8 +767,30 @@ class SiteSerializer(serializers.ModelSerializer):
         if not site.published:
             site.published_pages.all().delete()
         elif pages is not None:
+            # Rendered pages are what "send live" sends: a save of the draft
+            # sends none, and leaves visitors on the live version.
             replace_published_pages(site, pages)
+            self._go_live(site, version)
+        elif site.live_schema is None:
+            # Public with no live version yet (an older client, a settings
+            # switch): what is saved is what visitors see.
+            self._go_live(site, None)
         return site
+
+    @staticmethod
+    def _go_live(site, version):
+        """Make the draft (or `version`) the live version, and keep a copy of
+        it in the history, so any live version can be sent live again."""
+        schema, html = (version.schema, version.html) if version else (site.schema, site.html)
+        site.live_schema = schema
+        site.live_html = html
+        site.live_at = timezone.now()
+        site.save(update_fields=['live_schema', 'live_html', 'live_at'])
+        SiteVersion.objects.create(
+            site=site, schema=schema, html=html, source='publish',
+            label=f'Sent live from v{version.pk}' if version else 'Sent live',
+        )
+        SiteVersion._prune(site)
 
     @transaction.atomic
     def create(self, validated_data):
@@ -762,11 +801,14 @@ class SiteSerializer(serializers.ModelSerializer):
         except serializers.ValidationError as exc:
             raise serializers.ValidationError({'published': exc.detail}) from exc
         pages = validated_data.pop('published_pages', None)
+        validated_data.pop('live_from_version', None)
         site = super().create(validated_data)
         if site.published:
             self._stamp_published(site)
         if site.published and pages:
             replace_published_pages(site, pages)
+        if site.published:
+            self._go_live(site, None)
         return site
 
     @staticmethod
@@ -795,6 +837,14 @@ class PublicSiteSerializer(serializers.ModelSerializer):
         fields = ('id', 'title', 'slug', 'schema', 'html', 'published', 'updated_at',
                   'site_options', 'owner_id', 'owner_username',
                   'owner_display_name', 'owner_avatar_url')
+
+    def to_representation(self, instance):
+        # Visitors see the live version. A review link (context `draft`) is the
+        # owner asking for comments on the draft, so it shows the draft.
+        data = super().to_representation(instance)
+        if not self.context.get('draft'):
+            data['schema'], data['html'] = instance.live_content()
+        return data
 
     def _profile(self, obj):
         return getattr(obj.owner, 'profile', None)
