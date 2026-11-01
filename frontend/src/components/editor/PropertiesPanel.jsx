@@ -531,7 +531,7 @@ function PropControl({ field, value, onChange, extras, pages = [], sections = nu
     return <LabeledColor label={label} value={value} onChange={onChange} fallback={field.fallback} />
   }
   if (field.control === 'px') {
-    return <LabeledPx label={label} value={value} onChange={onChange} />
+    return <LabeledPx label={label} value={value} onChange={onChange} placeholder={field.placeholder ? t(field.placeholder) : undefined} />
   }
   if (field.control === 'align') {
     return <LabeledAlign label={label} value={value} onChange={onChange} options={options} />

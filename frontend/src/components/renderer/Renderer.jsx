@@ -29,7 +29,7 @@ import { fitsBox, nativeFit } from '../../utils/boxFit.js'
 import FitBox from './FitBox.jsx'
 import ContainerCanvas from './ContainerCanvas.jsx'
 import { containerDesignWidth } from '../../utils/containerFit.js'
-import { bleedContentWidth, stretchesToViewport } from '../../utils/bleedLayout.js'
+import { bleedContentWidth, ownContentWidth, stretchesToViewport } from '../../utils/bleedLayout.js'
 
 function RegionRender({ component, style, viewport, editorPreview, canvasDesignWidth }) {
   const kids = Array.isArray(component.children) ? component.children : []
@@ -331,7 +331,7 @@ export function RenderComponent({
   const contentWidth = !FULL_BLEED_TYPES.includes(component.type)
     ? undefined
     : flowMode
-      ? Math.round(Number(component.props?.contentWidth) || component.layout?.w || 0) || undefined
+      ? ownContentWidth(component) || Math.round(Number(component.layout?.w) || 0) || undefined
       : bleedContentWidth(component, stylesFor(component, viewport), canvasDesignWidth || component.layout?.w || 0) || undefined
   const boxFit = fit && !flowMode
   const native = boxFit ? nativeFit(component) : null

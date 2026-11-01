@@ -742,3 +742,17 @@ describe('schemaToSingleHtml full-width bands on a wider screen', () => {
     expect(rule(mobileBlock(html), '.c-nav > .nav-inner')).toMatch(/max-width:334px/)
   })
 })
+
+// The px field writes its unit; a flow page's navbar used to ignore "1200px"
+// and fall back to its own width.
+describe('schemaToSingleHtml navbar width from the px field', () => {
+  it('keeps a typed content width on a flow page', () => {
+    const html = schemaToSingleHtml({
+      theme: {},
+      pages: [{ id: 'home', name: 'Home', flowMode: true, canvasWidth: 1920, components: [
+        { id: 'nav', type: 'navbar', props: { brand: 'B', links: [], contentWidth: '1200px' }, styles: {}, layout: { x: 0, y: 0, w: 1920, h: 64 } },
+      ] }],
+    }, 'Flow')
+    expect(html).toMatch(/\.c-nav > \.nav-inner, \.c-nav > \.section-inner \{ max-width:1200px/)
+  })
+})

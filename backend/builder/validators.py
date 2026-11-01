@@ -237,7 +237,9 @@ def sanitize_props(ctype, props):
             'linkGap': _num(props.get('linkGap'), 20, 0, 120),
             'mobileNavMode': mobile_nav if mobile_nav in ('menu', 'stack') else 'menu',
             'widthMode': width_mode if width_mode in ('full', 'boxed') else 'full',
-            'contentWidth': _num(props.get('contentWidth'), 980, 320, 2000),
+            # Empty runs the brand and links across the whole design column,
+            # whatever the artboard width; a number holds them to a strip.
+            'contentWidth': _optional_width(props.get('contentWidth')),
         }
     if ctype == 'text':
         return {'text': _str(props.get('text')), 'href': sanitize_url(props.get('href'))}
@@ -456,7 +458,18 @@ def sanitize_props(ctype, props):
     return {}
 
 
+def _optional_width(value):
+    """A width the user may leave empty: '' stays '' (no limit)."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return ''
+    return _num(value, 980, 320, 2000)
+
+
 def _num(value, default, lo, hi):
+    # The editor's px field writes its unit ("1200px"); float() refused it, and
+    # every save put the default back in place of what the user typed.
+    if isinstance(value, str) and value.strip().lower().endswith('px'):
+        value = value.strip()[:-2]
     try:
         n = float(value)
     except (TypeError, ValueError):

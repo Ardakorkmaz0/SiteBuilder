@@ -68,7 +68,6 @@ export const registry = {
       linkGap: 20,
       mobileNavMode: 'menu',
       widthMode: 'full',
-      contentWidth: 980,
     },
     defaultStyles: {
       backgroundColor: '#1d1d1f',
@@ -114,7 +113,9 @@ export const registry = {
         control: 'select',
         options: [['menu', 'Hamburger menu'], ['stack', 'Stacked links']],
       },
-      { key: 'contentWidth', label: 'Content width', control: 'px' },
+      // Empty runs the brand and links across the design column, whatever the
+      // artboard width; a number holds them to a centred strip that wide.
+      { key: 'contentWidth', label: 'Content width', control: 'px', placeholder: 'Full width' },
     ],
     editableStyles: [
       'backgroundColor', 'backgroundImage', 'color', 'fontSize', 'fontWeight',

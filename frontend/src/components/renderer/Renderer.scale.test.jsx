@@ -110,3 +110,21 @@ describe('Renderer on a stage wider than the design', () => {
     expect(html).toMatch(/max-width:920px/)
   })
 })
+
+// A navbar dropped on a wide artboard (Full HD, 1920) runs its brand and links
+// across the bar. It used to come with a 980px content width (960 for the
+// Bootstrap preset), numbers made for the 1000px artboard, and sat as a narrow
+// strip in the middle of the bar.
+describe('a new navbar on a wide artboard', () => {
+  it('runs across the design column, not a 1000px-era strip', () => {
+    const nav = { ...componentAt('navbar'), layout: { x: 0, y: 0, w: 1920, h: 64 } }
+    const html = renderToStaticMarkup(<RenderComponent component={nav} canvasDesignWidth={1920} />)
+    expect(html).toMatch(/max-width:1864px/)
+  })
+
+  it('keeps a typed content width, written with its unit', () => {
+    const nav = { ...componentAt('navbar'), props: { ...componentAt('navbar').props, contentWidth: '1200px' }, layout: { x: 0, y: 0, w: 1920, h: 64 } }
+    const html = renderToStaticMarkup(<RenderComponent component={nav} canvasDesignWidth={1920} />)
+    expect(html).toMatch(/max-width:1200px/)
+  })
+})

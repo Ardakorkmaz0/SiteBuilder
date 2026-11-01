@@ -13,10 +13,11 @@
 // One source of truth for the published page (schemaToFiles) and the in-app
 // viewer (Renderer), so the two cannot drift apart.
 
+import { pxNumber } from './pxNumber.js'
+
 function px(value) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
-  const match = String(value ?? '').trim().match(/^(-?\d*\.?\d+)(px)?$/i)
-  return match ? Number(match[1]) : 0
+  const n = pxNumber(value)
+  return Number.isFinite(n) ? n : 0
 }
 
 const given = (value) => value !== undefined && value !== null && value !== ''
@@ -59,6 +60,13 @@ export function stretchesToViewport(component, layout, designWidth) {
   return false
 }
 
+// A block's own content width, or 0 for "none set" (an empty field means the
+// full width). Read with its unit: the px field writes "1200px".
+export function ownContentWidth(component) {
+  const n = pxNumber(component?.props?.contentWidth)
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0
+}
+
 // How wide the content row of a stretched navbar or section runs: its own
 // content width when it has one, never wider than the design column inside
 // the block's padding. At the design width this is the box the editor draws;
@@ -66,6 +74,6 @@ export function stretchesToViewport(component, layout, designWidth) {
 export function bleedContentWidth(component, styles, designWidth) {
   const { left, right } = horizontalPadding(styles)
   const column = Math.max(0, Math.round((Number(designWidth) || 0) - left - right))
-  const own = Math.round(Number(component?.props?.contentWidth) || 0)
+  const own = ownContentWidth(component)
   return own > 0 ? Math.min(own, column) : column
 }

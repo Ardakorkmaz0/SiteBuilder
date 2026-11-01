@@ -7,6 +7,8 @@
 // page did not do. These functions return plain style objects; the React
 // renderer spreads them and the two exporters serialize them.
 
+import { pxNumber } from './pxNumber.js'
+
 const ALIGNMENTS = new Set(['left', 'center', 'right'])
 
 function align(value, fallback) {
@@ -24,7 +26,7 @@ export function navbarLinksAlign(props) {
 // Space between the individual links. 0 is a real choice, so only fall back
 // when the value is missing or not a number.
 export function navbarLinkGap(props, fallback = 20) {
-  const n = Number(props?.linkGap)
+  const n = pxNumber(props?.linkGap)
   return Number.isFinite(n) && n >= 0 ? Math.min(120, Math.round(n)) : fallback
 }
 

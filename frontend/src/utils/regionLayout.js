@@ -1,3 +1,5 @@
+import { pxNumber } from './pxNumber.js'
+
 const MIN_SIZE = 8
 
 const number = (value, fallback = 0) => {
@@ -7,7 +9,7 @@ const number = (value, fallback = 0) => {
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
 
 export function regionContentWidth(region, fallback = 980) {
-  return Math.max(320, Math.round(number(region?.props?.contentWidth, fallback)))
+  return Math.max(320, Math.round(number(pxNumber(region?.props?.contentWidth), fallback)))
 }
 
 export function resolveRegionDock(child, designWidth) {

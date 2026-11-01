@@ -439,6 +439,35 @@ class TestValidateAndCleanSchema:
         assert region['children'][0]['props']['dockX'] == 'right'
 
 
+    def test_px_field_values_survive_a_save(self):
+        """The editor's px field writes its unit ("1200px"). float() refused it,
+        so every save reset a navbar's content width to 980 and its link gap to
+        20, and an emptied content width (full width) came back as 980 too."""
+        nav = lambda cid, props: {
+            'id': cid, 'type': 'navbar', 'props': {'brand': 'Site', 'links': [], **props},
+            'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 1920, 'h': 64},
+        }
+        clean = validate_and_clean_schema({
+            'pages': [{
+                'id': 'home', 'name': 'Home',
+                'components': [
+                    nav('typed', {'contentWidth': '1200px', 'linkGap': '30px'}),
+                    nav('emptied', {'contentWidth': ''}),
+                    nav('unset', {}),
+                    {
+                        'id': 'region1', 'type': 'region', 'props': {'contentWidth': '1100px'},
+                        'styles': {}, 'layout': {'x': 0, 'y': 80, 'w': 1100, 'h': 360}, 'children': [],
+                    },
+                ],
+            }],
+        })
+        typed, emptied, unset, region = clean['pages'][0]['components']
+        assert typed['props']['contentWidth'] == 1200
+        assert typed['props']['linkGap'] == 30
+        assert emptied['props']['contentWidth'] == ''
+        assert unset['props']['contentWidth'] == ''
+        assert region['props']['contentWidth'] == 1100
+
 def test_page_seo_fields_survive_a_save():
     """Page metadata is on the page allowlist, so it is not dropped on save."""
     clean = validate_and_clean_schema({'pages': [{
