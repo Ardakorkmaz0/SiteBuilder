@@ -400,7 +400,7 @@ const CSS_LENGTH_RE = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|em|rem|%|vw|vh)?\s*$/i
 // 2.5px, 50% became 51px, and "10px 24px" lost its horizontal padding. The unit
 // is now kept and shown; a value that is not a single length (several values,
 // calc(), clamp()) is edited as text so nothing is thrown away.
-export function LabeledPx({ label, value, onChange }) {
+export function LabeledPx({ label, value, onChange, placeholder }) {
   const raw = String(value ?? '')
   const match = CSS_LENGTH_RE.exec(raw)
   if (raw.trim() && !match) {
@@ -418,6 +418,7 @@ export function LabeledPx({ label, value, onChange }) {
           step={fine ? 0.01 : 1}
           className={inputCls}
           value={num}
+          placeholder={placeholder}
           onChange={(e) =>
             onChange(e.target.value === '' ? '' : `${e.target.value}${unit}`)
           }

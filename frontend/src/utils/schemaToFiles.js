@@ -54,7 +54,7 @@ import {
 import { motionClassSuffix, motionCssVars, motionHeadTags, motionRevealAttr } from './motion.js'
 import { pageBehaviourStyleTag, pageDirAttr, pageLanguage, pageSeoTitle, seoHeadTags } from './seoTags.js'
 import { elementIdFor } from './anchors.js'
-import { bleedContentWidth, stretchesToViewport } from './bleedLayout.js'
+import { bleedContentWidth, ownContentWidth, stretchesToViewport } from './bleedLayout.js'
 
 // Widths at or below this get the phone layout on the published site.
 export const MOBILE_BREAKPOINT = 768
@@ -760,7 +760,7 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
         const fixed = FLOW_FIXED_HEIGHT_TYPES.has(c.type)
         css += `.c-${c.id} { ${styleObjectBlock(wrapperStyle(c, 'pc', w, true))} overflow:${fixed ? 'hidden' : 'visible'}; ${own}${motion}${hide} }\n`
         if (FLOW_FULL_WIDTH_TYPES.has(c.type) && !isVerticalNavbar(c)) {
-          css += `.c-${c.id} > .nav-inner, .c-${c.id} > .section-inner { max-width:${Math.round(Number(c.props?.contentWidth) || c.layout?.w || w)}px; }\n`
+          css += `.c-${c.id} > .nav-inner, .c-${c.id} > .section-inner { max-width:${ownContentWidth(c) || Math.round(c.layout?.w || w)}px; }\n`
         }
         if (placed) {
           if (placed.row) css += `.c-${c.id} > .nav-inner { ${placed.row} }\n`
@@ -773,7 +773,7 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
         // design column (utils/bleedLayout.js); a boxed bar keeps its own width.
         const bleeds = stretchesToViewport(c, c.layout, w)
         if (c.type === 'navbar' && !isVerticalNavbar(c)) {
-          const row = bleeds ? bleedContentWidth(c, c.styles, w) : Math.round(Number(c.props?.contentWidth) || c.layout?.w || w)
+          const row = bleeds ? bleedContentWidth(c, c.styles, w) : ownContentWidth(c) || Math.round(c.layout?.w || w)
           css += `.c-${c.id} > .nav-inner { max-width:${row}px; }\n`
         } else if (c.type === 'section' && bleeds) {
           css += `.c-${c.id} > .section-inner { max-width:${bleedContentWidth(c, c.styles, w)}px; }\n`

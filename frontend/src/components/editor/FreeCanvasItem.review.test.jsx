@@ -137,3 +137,29 @@ describe('a tabs block growing onto its content', () => {
     expect(top('tabs').mobileLayout.h).toBe(500)
   })
 })
+
+// A navbar keeps the 1000px width it was dropped with in its layout, but the
+// canvas draws it across the whole artboard. On a Full HD artboard its brand
+// and links sat in a 960px strip in the middle of the bar: the row was sized
+// on the stored width, not on the artboard the bar is drawn across.
+describe('a full-width navbar on a wide artboard', () => {
+  it('runs its row across the artboard, not across its stored width', () => {
+    s().loadSchema({
+      theme: {},
+      pages: [{
+        id: 'p1',
+        name: 'Home',
+        canvasWidth: 1920,
+        components: [{
+          id: 'nav', type: 'navbar',
+          props: { brand: 'Navbar', links: [{ label: 'Home', href: '#' }], navLayout: 'horizontal', widthMode: 'full' },
+          styles: { padding: '12px 20px' },
+          layout: { x: 0, y: 0, w: 1000, h: 64 },
+        }],
+      }],
+    })
+    const { container } = renderItem('nav')
+    const row = container.querySelector('nav > div')
+    expect(row.style.maxWidth).toBe('1880px')
+  })
+})

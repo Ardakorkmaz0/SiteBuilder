@@ -82,3 +82,12 @@ describe('navLinkLabel', () => {
     expect(navLinkLabel(undefined)).toBe('')
   })
 })
+
+// The editor's px field writes its unit: "30px" is 30, not "missing".
+describe('navbarLinkGap from the px field', () => {
+  it('reads a value written with its unit', () => {
+    expect(navbarLinkGap({ linkGap: '30px' })).toBe(30)
+    expect(navbarLinkGap({ linkGap: 30 })).toBe(30)
+    expect(navbarLinkGap({ linkGap: '' })).toBe(20)
+  })
+})

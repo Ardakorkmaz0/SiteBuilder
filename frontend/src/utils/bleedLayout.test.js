@@ -52,3 +52,12 @@ describe('bleedContentWidth', () => {
     expect(bleedContentWidth({ props: { contentWidth: 980 } }, { padding: '18px 28px' }, 390)).toBe(334)
   })
 })
+
+// The editor's px field writes its unit, and an emptied field means "full
+// width": both used to be read as no number at all.
+describe('bleedContentWidth from the px field', () => {
+  it('reads a typed width with its unit and an empty one as the whole column', () => {
+    expect(bleedContentWidth({ props: { contentWidth: '1200px' } }, { padding: '12px 20px' }, 1920)).toBe(1200)
+    expect(bleedContentWidth({ props: { contentWidth: '' } }, { padding: '12px 20px' }, 1920)).toBe(1880)
+  })
+})

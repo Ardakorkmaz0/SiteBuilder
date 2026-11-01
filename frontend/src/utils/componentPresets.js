@@ -145,7 +145,6 @@ export const COMPONENT_PRESET_PROPS = {
       navLayout: 'horizontal',
       mobileNavMode: 'menu',
       widthMode: 'full',
-      contentWidth: 960,
     },
     dark: {
       brand: 'Brand',

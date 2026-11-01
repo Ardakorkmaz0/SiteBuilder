@@ -505,7 +505,10 @@ export default function FreeCanvasItem({
         </div>
       ) : (
         <div className="pointer-events-none h-full w-full select-none overflow-visible">
-          <RenderComponent component={component} viewport={viewport} editorPreview fit />
+          {/* The artboard width, so a bar drawn across it (a full-width navbar
+              keeps the 1000px it was dropped with in its layout) lays its row
+              out on the artboard, as the published page does. */}
+          <RenderComponent component={component} viewport={viewport} canvasDesignWidth={canvasWidth} editorPreview fit />
         </div>
       )}
 

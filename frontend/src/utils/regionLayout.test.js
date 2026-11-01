@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  regionContentWidth,
   regionDisplayPatchToDesign,
   responsiveRegionChildLayout,
   resolveRegionDock,
@@ -35,5 +36,14 @@ describe('responsive region docking', () => {
     expect(resolveRegionDock(right, 1000)).toBe('right')
     expect(regionDisplayPatchToDesign(right, { x: 900 }, { x: 900, w: 200 }, 1000, 1200))
       .toEqual({ x: 700 })
+  })
+})
+
+// The editor's px field writes its unit: "1100px" is 1100, not the default.
+describe('regionContentWidth from the px field', () => {
+  it('reads a value written with its unit', () => {
+    expect(regionContentWidth({ props: { contentWidth: '1100px' } })).toBe(1100)
+    expect(regionContentWidth({ props: { contentWidth: 1100 } })).toBe(1100)
+    expect(regionContentWidth({ props: {} })).toBe(980)
   })
 })
