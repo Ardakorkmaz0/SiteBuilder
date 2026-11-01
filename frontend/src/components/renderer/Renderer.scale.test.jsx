@@ -10,7 +10,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { registry } from '../registry.jsx'
-import { RenderComponent } from './Renderer.jsx'
+import { RenderComponent, Renderer } from './Renderer.jsx'
 
 function componentAt(type, scale = 1) {
   const def = registry[type]
@@ -84,5 +84,29 @@ describe('RenderComponent box sizing', () => {
     // that the scale is never switched on for this document.
     expect(html).not.toContain('--pwb-embed-scale:')
     expect(html).not.toMatch(/data-pwb-embed-scaled=(&quot;|")true/)
+  })
+})
+
+// The in-app viewer draws a free-placed page on a stage wider than the design
+// and must match the published page: a band laid across the whole design runs
+// edge to edge, a narrower one stays on the design column.
+describe('Renderer on a stage wider than the design', () => {
+  it('stretches a full-width band and keeps the navbar row on the column', () => {
+    const html = renderToStaticMarkup(
+      <Renderer
+        width={1920}
+        designWidth={1000}
+        components={[
+          { id: 'nav', type: 'navbar', props: { brand: 'Bakery', links: [], contentWidth: 980 }, styles: { padding: '18px 28px' }, layout: { x: 0, y: 0, w: 1000, h: 64 } },
+          { id: 'hero', type: 'section', props: { heading: 'Fresh bread' }, styles: { padding: '40px' }, layout: { x: 0, y: 64, w: 1000, h: 380 } },
+          { id: 'box', type: 'section', props: { heading: 'A card' }, styles: { padding: '40px' }, layout: { x: 100, y: 500, w: 800, h: 200 } },
+        ]}
+      />,
+    )
+    const wrapper = (id) => html.match(new RegExp(`id="${id}" style="([^"]*)"`))?.[1] || ''
+    expect(wrapper('hero')).toMatch(/left:0;[^"]*width:1920px/)
+    expect(wrapper('box')).toMatch(/left:560px;[^"]*width:800px/)
+    expect(html).toMatch(/max-width:944px/)
+    expect(html).toMatch(/max-width:920px/)
   })
 })

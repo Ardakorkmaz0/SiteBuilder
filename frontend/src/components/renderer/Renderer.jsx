@@ -29,14 +29,7 @@ import { fitsBox, nativeFit } from '../../utils/boxFit.js'
 import FitBox from './FitBox.jsx'
 import ContainerCanvas from './ContainerCanvas.jsx'
 import { containerDesignWidth } from '../../utils/containerFit.js'
-
-function isViewportStretch(component) {
-  return component?.type === 'region' || (
-    component?.type === 'navbar' &&
-    component.props?.navLayout !== 'vertical' &&
-    component.props?.widthMode !== 'boxed'
-  )
-}
+import { bleedContentWidth, stretchesToViewport } from '../../utils/bleedLayout.js'
 
 function RegionRender({ component, style, viewport, editorPreview, canvasDesignWidth }) {
   const kids = Array.isArray(component.children) ? component.children : []
@@ -330,13 +323,16 @@ export function RenderComponent({
     )
   }
 
-  // In flow, full-bleed bands (navbar/section/divider) keep an edge-to-edge
-  // background but center their CONTENT at the component's Max width (layout.w),
-  // so "Max width" actually does something on these blocks.
-  const contentWidth =
-    FULL_BLEED_TYPES.includes(component.type)
+  // Full-bleed bands (navbar/section/divider) keep an edge-to-edge background
+  // but center their CONTENT. In flow at the component's Max width (layout.w),
+  // so "Max width" actually does something on these blocks; on a free page on
+  // the design column inside the padding (utils/bleedLayout.js), so a stretched
+  // bar on a wide screen keeps its brand and links where the editor shows them.
+  const contentWidth = !FULL_BLEED_TYPES.includes(component.type)
+    ? undefined
+    : flowMode
       ? Math.round(Number(component.props?.contentWidth) || component.layout?.w || 0) || undefined
-      : undefined
+      : bleedContentWidth(component, stylesFor(component, viewport), canvasDesignWidth || component.layout?.w || 0) || undefined
   const boxFit = fit && !flowMode
   const native = boxFit ? nativeFit(component) : null
   const drawn = (
@@ -437,7 +433,7 @@ export function Renderer({
       {list.map((c) => {
         if (isHidden(c, viewport)) return null
         const l = layoutFor(c, viewport) || {}
-        const stretch = isViewportStretch(c)
+        const stretch = stretchesToViewport(c, l, baseDesignW)
         const baseStyle = {
           position: 'absolute',
           left: stretch ? 0 : designOffset + (l.x || 0),

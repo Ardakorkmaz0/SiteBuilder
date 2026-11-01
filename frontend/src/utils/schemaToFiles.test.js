@@ -706,3 +706,39 @@ describe('a block inside a tab that is hidden on one screen size', () => {
     expect(doc.getElementById('deskless').classList.contains('n-deskless')).toBe(true)
   })
 })
+
+// A free-placed page is drawn at its design width and centred. On a wider
+// screen a bar or band laid across the whole design runs edge to edge, like the
+// header and hero of any site, while its content stays on the design column the
+// rest of the page sits on. Only the navbar used to stretch: a full-width hero
+// stood as a box under it, and the bar's brand and links ran past the column.
+describe('schemaToSingleHtml full-width bands on a wider screen', () => {
+  const page = (components) => schemaToSingleHtml({
+    theme: {},
+    pages: [{ id: 'home', name: 'Home', flowMode: false, canvasWidth: 1000, mobileWidth: 390, components }],
+  }, 'Bands')
+  const rule = (html, selector) => html.match(new RegExp(`${selector.replace(/[.>]/g, (c) => `\\${c}`)} \\{([^}]*)\\}`))?.[1] || ''
+  const mobileBlock = (html) => html.slice(html.indexOf('@media (max-width: 768px)'))
+
+  it('stretches a band laid across the whole design and keeps its content on the column', () => {
+    const html = page([
+      { id: 'hero', type: 'section', props: { heading: 'Fresh bread' }, styles: { backgroundColor: '#f5efe6', padding: '40px' },
+        layout: { x: 0, y: 64, w: 1000, h: 380 }, mobileLayout: { x: 0, y: 64, w: 390, h: 420 } },
+      { id: 'box', type: 'section', props: { heading: 'A card' }, styles: { padding: '40px' },
+        layout: { x: 100, y: 500, w: 800, h: 200 }, mobileLayout: { x: 16, y: 500, w: 358, h: 200 } },
+    ])
+    expect(rule(html, '.c-hero')).toMatch(/width: 100%/)
+    expect(rule(html, '.c-hero > .section-inner')).toMatch(/max-width:920px/)
+    expect(rule(html, '.c-box')).not.toMatch(/width: 100%/)
+    expect(rule(html, '.c-box')).toMatch(/var\(--design-offset/)
+  })
+
+  it('keeps the navbar row on the design column on a PC and on a phone design', () => {
+    const html = page([
+      { id: 'nav', type: 'navbar', props: { brand: 'Bakery', contentWidth: 980, links: [] }, styles: { padding: '18px 28px' },
+        layout: { x: 0, y: 0, w: 1000, h: 64 }, mobileLayout: { x: 0, y: 0, w: 390, h: 64 } },
+    ])
+    expect(rule(html, '.c-nav > .nav-inner')).toMatch(/max-width:944px/)
+    expect(rule(mobileBlock(html), '.c-nav > .nav-inner')).toMatch(/max-width:334px/)
+  })
+})
