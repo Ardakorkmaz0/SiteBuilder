@@ -38,6 +38,7 @@ import {
   flowItemStyle,
   flowSidePad,
   pinnedLayoutStyle,
+  stylesFor,
 } from '../components/renderer/layout.js'
 import { regionContentWidth, resolveRegionDock } from './regionLayout.js'
 import { autoLayoutChildCss, autoLayoutContainerCss } from './autoLayout.js'
@@ -53,6 +54,7 @@ import {
 import { motionClassSuffix, motionCssVars, motionHeadTags, motionRevealAttr } from './motion.js'
 import { pageBehaviourStyleTag, pageDirAttr, pageLanguage, pageSeoTitle, seoHeadTags } from './seoTags.js'
 import { elementIdFor } from './anchors.js'
+import { bleedContentWidth, stretchesToViewport } from './bleedLayout.js'
 
 // Widths at or below this get the phone layout on the published site.
 export const MOBILE_BREAKPOINT = 768
@@ -74,12 +76,6 @@ function navbarPlacementCss(c) {
     brand: styleObjectBlock(placed.brand),
     links: styleObjectBlock({ ...placed.links, columnGap: navbarLinkGap(c.props), rowGap: 6 }),
   }
-}
-
-function isViewportStretch(c) {
-  return c?.type === 'region' || (
-    c?.type === 'navbar' && !isVerticalNavbar(c) && c.props?.widthMode !== 'boxed'
-  )
 }
 
 function isFixedComponent(c) {
@@ -109,7 +105,7 @@ function wrapperStyle(c, viewport, canvasWidth, flowMode, layoutKey = 'layout', 
     margin: 0,
     ...(flowMode ? flowItemStyle(c, viewport, canvasWidth) : absoluteWrapperStyle(c, layoutKey)),
   }
-  if (!flowMode && isViewportStretch(c)) {
+  if (!flowMode && stretchesToViewport(c, c?.[layoutKey] || c?.layout, canvasWidth)) {
     base = { ...base, left: 0, width: '100%' }
   } else if (!flowMode) {
     base = { ...base, left: `calc(var(--design-offset, 0px) + ${Math.round(Number(base.left) || 0)}px)` }
@@ -773,8 +769,14 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
         }
       } else {
         css += `.c-${c.id} { ${styleObjectBlock(wrapperStyle(c, 'pc', w, false, 'layout', railInset))} ${own}${motion}${hide} }\n`
+        // A bar or band that reaches the screen edges keeps its content on the
+        // design column (utils/bleedLayout.js); a boxed bar keeps its own width.
+        const bleeds = stretchesToViewport(c, c.layout, w)
         if (c.type === 'navbar' && !isVerticalNavbar(c)) {
-          css += `.c-${c.id} > .nav-inner { max-width:${Math.round(Number(c.props?.contentWidth) || c.layout?.w || w)}px; }\n`
+          const row = bleeds ? bleedContentWidth(c, c.styles, w) : Math.round(Number(c.props?.contentWidth) || c.layout?.w || w)
+          css += `.c-${c.id} > .nav-inner { max-width:${row}px; }\n`
+        } else if (c.type === 'section' && bleeds) {
+          css += `.c-${c.id} > .section-inner { max-width:${bleedContentWidth(c, c.styles, w)}px; }\n`
         }
         if (placed) {
           if (placed.row) css += `.c-${c.id} > .nav-inner { ${placed.row} }\n`
@@ -837,6 +839,14 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
         css += `  .c-${c.id} { ${styleObjectBlock(wrapperStyle(c, 'mobile', mw, true))} overflow:${fixed ? 'hidden' : 'visible'};${mobileStyles}${hide} }\n`
       } else {
         css += `  .c-${c.id} { ${styleObjectBlock(wrapperStyle(c, 'mobile', mw, false, 'mobileLayout'))}${mobileStyles}${hide} }\n`
+        // The phone design is centred on a wider phone or tablet the same way:
+        // a stretched bar or band keeps its content on the phone column.
+        if ((c.type === 'navbar' && !isVerticalNavbar(c)) || c.type === 'section') {
+          if (stretchesToViewport(c, c.mobileLayout || c.layout, mw)) {
+            const inner = c.type === 'navbar' ? 'nav-inner' : 'section-inner'
+            css += `  .c-${c.id} > .${inner} { max-width:${bleedContentWidth(c, stylesFor(c, 'mobile'), mw)}px; }\n`
+          }
+        }
         // An embed's iframe is written with the desktop height baked in (flow
         // pages have no fixed box to fill, so it can't just be 100%). On an
         // absolute page the phone box has its own height — resize the iframe to
