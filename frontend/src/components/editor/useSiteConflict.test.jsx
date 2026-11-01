@@ -38,8 +38,27 @@ describe('"Save mine anyway"', () => {
     act(() => result.current.refuse({ publish: true }))
     const save = vi.fn(async () => ({ revision: 6 }))
     await act(() => result.current.overwrite(save))
-    expect(save).toHaveBeenCalledWith(true)
+    expect(save).toHaveBeenCalledWith(true, false)
     expect(result.current.open).toBe(false)
+  })
+
+  it('sends a refused send-live live again, even after an auto-save was refused too', async () => {
+    const { result } = renderHook(() => useSiteConflict())
+    act(() => result.current.refuse({ publish: true, goLive: true }))
+    act(() => result.current.refuse({ publish: undefined }))
+    const save = vi.fn(async () => ({}))
+    await act(() => result.current.overwrite(save))
+    expect(save).toHaveBeenCalledWith(true, true)
+  })
+
+  it('forgets a send-live once a save went through', async () => {
+    const { result } = renderHook(() => useSiteConflict())
+    act(() => result.current.refuse({ publish: true, goLive: true }))
+    act(() => result.current.resolve())
+    act(() => result.current.refuse())
+    const save = vi.fn(async () => ({}))
+    await act(() => result.current.overwrite(save))
+    expect(save).toHaveBeenCalledWith(undefined, false)
   })
 
   it('does not let a later ordinary refusal forget the publish choice', async () => {
@@ -48,7 +67,7 @@ describe('"Save mine anyway"', () => {
     act(() => result.current.refuse({ publish: undefined }))
     const save = vi.fn(async () => ({}))
     await act(() => result.current.overwrite(save))
-    expect(save).toHaveBeenCalledWith(false)
+    expect(save).toHaveBeenCalledWith(false, false)
   })
 
   it('sends no publish choice after a save went through', async () => {
@@ -58,7 +77,7 @@ describe('"Save mine anyway"', () => {
     act(() => result.current.refuse())
     const save = vi.fn(async () => ({}))
     await act(() => result.current.overwrite(save))
-    expect(save).toHaveBeenCalledWith(undefined)
+    expect(save).toHaveBeenCalledWith(undefined, false)
   })
 })
 

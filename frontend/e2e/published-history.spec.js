@@ -2,7 +2,7 @@ import { test, expect, api, createHtmlSite, openEditor, BACKEND } from './suppor
 
 const document = (text) => `<!doctype html><html><head><title>${text}</title></head><body><h1>${text}</h1></body></html>`
 
-test('loading a published checkpoint also restores the documents and addresses visitors receive', async ({ page, request }) => {
+test('a loaded checkpoint stays in the draft until it is sent live, and the Live switch shows what visitors get', async ({ page, request }) => {
   const savedHome = document('Saved home content')
   const savedAbout = document('Saved about content')
   const newHome = document('New home content')
@@ -55,6 +55,25 @@ test('loading a published checkpoint also restores the documents and addresses v
     expect((await restored).status()).toBe(200)
     await expect(load).toBeEnabled()
 
+    // Loaded into the draft only: visitors still get the live pages.
+    const loaded = await api(request, 'GET', `/sites/${siteId}/`)
+    expect(loaded.data.schema.pages.map((item) => item.name)).toEqual(['Home', 'About'])
+    expect(loaded.data.schema.pages[0].html).toContain('Saved home content')
+    expect(loaded.data.live_differs).toBe(true)
+    expect(await (await request.get(`${BACKEND}/s/${slug}/`)).text()).toContain('New home content')
+    expect((await request.get(`${BACKEND}/s/${slug}/contact/`)).status()).toBe(200)
+
+    const versions = page.getByRole('radiogroup', { name: 'Version shown', exact: true })
+    await versions.getByRole('radio', { name: 'Live', exact: true }).click()
+    const live = page.getByRole('region', { name: 'Live version', exact: true })
+    await expect(live.getByTitle('Live version').contentFrame().getByRole('heading', { name: 'New home content' })).toBeVisible()
+    await live.getByRole('button', { name: 'Back to draft', exact: true }).click()
+    await expect(live).toHaveCount(0)
+
+    const sent = page.waitForResponse((response) => new URL(response.url()).pathname === `/api/sites/${siteId}/` && response.request().method() === 'PATCH')
+    await page.getByRole('button', { name: 'Send draft live', exact: true }).click()
+    expect((await sent).status()).toBe(200)
+
     const home = await request.get(`${BACKEND}/s/${slug}/`)
     expect(home.status()).toBe(200)
     expect(await home.text()).toContain('Saved home content')
@@ -62,9 +81,7 @@ test('loading a published checkpoint also restores the documents and addresses v
     expect(about.status()).toBe(200)
     expect(await about.text()).toContain('Saved about content')
     expect((await request.get(`${BACKEND}/s/${slug}/contact/`)).status()).toBe(404)
-    const loaded = await api(request, 'GET', `/sites/${siteId}/`)
-    expect(loaded.data.schema.pages.map((item) => item.name)).toEqual(['Home', 'About'])
-    expect(loaded.data.schema.pages[0].html).toContain('Saved home content')
+    expect((await api(request, 'GET', `/sites/${siteId}/`)).data.live_differs).toBe(false)
   } finally {
     expect((await api(request, 'DELETE', `/sites/${siteId}/`)).status).toBe(204)
   }

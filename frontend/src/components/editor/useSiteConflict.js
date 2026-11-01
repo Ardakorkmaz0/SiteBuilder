@@ -16,6 +16,9 @@ export function useSiteConflict() {
   // An explicit publish or unpublish that was refused. "Save mine anyway"
   // sends it again; a queued ordinary save must not replace it.
   const publicationRef = useRef(undefined)
+  // A refused "send live": "Save mine anyway" sends it live again, not only
+  // saves the draft.
+  const goLiveRef = useRef(false)
   // Counts refusals, so a save that failed can tell a conflict from any other
   // failure.
   const countRef = useRef(0)
@@ -23,8 +26,9 @@ export function useSiteConflict() {
   // finishes it, instead of asking all over again.
   const afterOverwriteRef = useRef(null)
 
-  function refuse({ publish } = {}) {
+  function refuse({ publish, goLive = false } = {}) {
     if (typeof publish === 'boolean') publicationRef.current = publish
+    if (goLive) goLiveRef.current = true
     countRef.current += 1
     setOpen(true)
   }
@@ -33,6 +37,7 @@ export function useSiteConflict() {
   function resolve() {
     setOpen(false)
     publicationRef.current = undefined
+    goLiveRef.current = false
   }
 
   async function saveThen(saveFn, then) {
@@ -47,7 +52,7 @@ export function useSiteConflict() {
     setOpen(false)
     const then = afterOverwriteRef.current
     afterOverwriteRef.current = null
-    const saved = await saveFn(publicationRef.current)
+    const saved = await saveFn(publicationRef.current, goLiveRef.current)
     if (saved && then) then()
   }
 

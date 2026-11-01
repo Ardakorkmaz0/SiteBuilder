@@ -56,6 +56,18 @@ def _published_site(slug):
     return site
 
 
+def _frame_ancestors():
+    # Only the app may frame a published page: the editor's "Live" view shows
+    # it there. The app is this origin in production and the Vite server in
+    # development. The frame is still sandboxed; framing gives the page no
+    # access to the app.
+    origins = ["'self'"]
+    app = urlsplit(settings.FRONTEND_URL)
+    if app.scheme in ('http', 'https') and app.netloc:
+        origins.append(f'{app.scheme}://{app.netloc}')
+    return ' '.join(origins)
+
+
 def _harden(response, sandbox=True):
     # The sandbox exists because /s/<slug>/ shares THIS origin with the app: it
     # gives the owner's HTML an opaque origin so it cannot reach the admin
@@ -63,7 +75,10 @@ def _harden(response, sandbox=True):
     # of ours to protect, and sandboxing there would only break their site —
     # no localStorage, no cookies, no analytics on a page they own outright.
     if sandbox:
-        response['Content-Security-Policy'] = PUBLISHED_CSP
+        response['Content-Security-Policy'] = f'{PUBLISHED_CSP}; frame-ancestors {_frame_ancestors()}'
+        # frame-ancestors decides who may frame the page; the site-wide
+        # X-Frame-Options: DENY would refuse the app as well.
+        response.xframe_options_exempt = True
     response['X-Content-Type-Options'] = 'nosniff'
     response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     # Short: a republish should show up quickly, but a burst of visitors to the

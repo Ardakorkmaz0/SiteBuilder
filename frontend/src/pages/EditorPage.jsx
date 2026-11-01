@@ -12,8 +12,9 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { getSite, updateSite } from '../api/sites.js'
-import { restoreVersion } from '../api/versions.js'
+import { getSite, liveToDraft, sendVersionLive, updateSite } from '../api/sites.js'
+import { getVersionContent, restoreVersion } from '../api/versions.js'
+import LiveVersionView from '../components/editor/LiveVersionView.jsx'
 import { useEditorStore, selectCurrentPage, nextHistoryStamp } from '../store/editorStore.js'
 import { useAuthStore } from '../store/authStore.js'
 import { useGuestGate } from '../utils/useGuestGate.jsx'
@@ -473,6 +474,13 @@ function SiteEditor() {
   // publish switch says (the server enforces it), so say so rather than let
   // Publish look like it worked.
   const [moderationBlocked, setModerationBlocked] = useState(false)
+  // Draft and live are apart (the server's live version): when it was last
+  // sent live, whether the saved draft differs from it, and whether the editor
+  // shows the live pages instead of the draft.
+  const [liveAt, setLiveAt] = useState(null)
+  const [liveDiffers, setLiveDiffers] = useState(false)
+  const [viewLive, setViewLive] = useState(false)
+  const [liveBusy, setLiveBusy] = useState(false)
   const [siteOptions, setSiteOptions] = useState({})
   const [reviewToken, setReviewToken] = useState('')
   const [customDomain, setCustomDomain] = useState('')
@@ -641,6 +649,9 @@ function SiteEditor() {
     [componentSourceDrafts, editorSchema, pageHtmlMap],
   )
   const workspaceDirty = htmlWorkspaceDirty || Object.keys(pendingComponentDrafts).length > 0
+  // Visitors see something other than the editor: unsaved work, or a saved
+  // draft that has not been sent live.
+  const draftAhead = liveDiffers || dirty || htmlDirty || metaDirty || workspaceDirty
   const [workspaceSession, setWorkspaceSession] = useState(0)
   const htmlRevisionRef = useRef(0)
 
@@ -969,6 +980,8 @@ function SiteEditor() {
         setSlug(data.slug)
         setPublished(data.published)
         publishedRef.current = !!data.published
+        setLiveAt(data.live_at || null)
+        setLiveDiffers(!!data.live_differs)
         setModerationBlocked(!!data.moderation_blocked)
         setSiteOptions(data.site_options || {})
         setReviewToken(data.review_token || '')
@@ -1684,7 +1697,7 @@ function SiteEditor() {
   // that queued behind a publish request still held "not published" and took
   // the site down again the moment the publish finished (and put a site that
   // was just unpublished back up).
-  async function performSave(wantPublished, { auto = false, versionSource, force = false } = {}) {
+  async function performSave(wantPublished, { auto = false, versionSource, force = false, goLive = false } = {}) {
       const nextPublished = typeof wantPublished === 'boolean' ? wantPublished : publishedRef.current
       setAutoSaveState('saving')
       // While an AI proposal is drawn on the canvas, the design is the one it
@@ -1732,9 +1745,10 @@ function SiteEditor() {
       }
       // A published site ships its pages as documents: what a visitor, a
       // crawler and a link-preview scraper receive is the page itself, not the
-      // app shell with the title written in afterwards. Only while published —
-      // rendering every page on a draft's auto-save would be work nobody reads.
-      const publishedPages = nextPublished
+      // app shell with the title written in afterwards. Sent only when the
+      // draft goes live (`goLive`): any other save, automatic ones included,
+      // changes the draft and leaves visitors on the live version.
+      const publishedPages = nextPublished && goLive
         ? publishedPagesFor(schema, map, safeTitle, slug)
         : undefined
       let data
@@ -1772,6 +1786,8 @@ function SiteEditor() {
       setAutoSaveRefused(false)
       publishedRef.current = !!data.published
       setPublished(data.published)
+      if (data.live_at !== undefined) setLiveAt(data.live_at || null)
+      if (data.live_differs !== undefined) setLiveDiffers(!!data.live_differs)
       setModerationBlocked(!!data.moderation_blocked)
       setSlug(data.slug)
       if (htmlRevisionRef.current === htmlRevisionAtSave) setHtmlDirty(false)
@@ -1850,10 +1866,57 @@ function SiteEditor() {
       publishedRef.current = !!fresh.published
       setPublished(fresh.published)
     }
+    if (fresh?.live_at !== undefined) setLiveAt(fresh.live_at || null)
+    if (fresh?.live_differs !== undefined) setLiveDiffers(!!fresh.live_differs)
     markSaved()
   }
 
-  async function restoreHistoryVersion(versionId) {
+  function restoreHistoryVersion(versionId) {
+    return loadIntoDraft(() => restoreVersion(id, versionId))
+  }
+
+  // "Copy live to draft": the live version back in the draft, through the
+  // same path as loading a saved version (unsaved work is saved first).
+  async function copyLiveToDraft() {
+    setLiveBusy(true)
+    try {
+      const fresh = await loadIntoDraft(() => liveToDraft(id))
+      if (fresh) setViewLive(false)
+    } finally {
+      setLiveBusy(false)
+    }
+  }
+
+  // An older version sent live, rendered here as the draft is on a publish.
+  // The draft is left as it is; only visitors see the change.
+  async function sendHistoryVersionLive(versionId) {
+    if (!window.confirm(t('Send this version live? Visitors will see it. Your draft stays as it is.'))) return null
+    try {
+      return await editorSave.run(async () => {
+        const content = await getVersionContent(id, versionId)
+        const map = {}
+        ;(content?.schema?.pages || []).forEach((page, index) => {
+          if (page?.mode !== 'html') return
+          const own = typeof page.html === 'string' ? page.html : ''
+          map[page.id] = own.trim() ? own : index === 0 ? content.html || '' : ''
+        })
+        const pages = publishedPagesFor(content.schema, map, title, slug)
+        const data = await sendVersionLive(id, versionId, pages, conflict.baseRevisionRef.current)
+        if (Number.isInteger(data.revision)) conflict.baseRevisionRef.current = data.revision
+        publishedRef.current = !!data.published
+        setPublished(data.published)
+        setLiveAt(data.live_at || null)
+        setLiveDiffers(!!data.live_differs)
+        return data
+      })
+    } catch (e) {
+      if (isSiteChanged(e)) conflict.refuse()
+      else setError(apiError(e))
+      return null
+    }
+  }
+
+  async function loadIntoDraft(request) {
     const sameDraft = (before, after) => before.schema === after.schema &&
       before.html === after.html && before.metadata === after.metadata && before.codeDrafts === after.codeDrafts
     const flushDrafts = () => {
@@ -1874,7 +1937,7 @@ function SiteEditor() {
             if (!sameDraft(beforeSave, flushDrafts())) continue
           }
           const beforeRestore = saveLifecycleRef.current.historyDraftSnapshot()
-          const fresh = await restoreVersion(id, versionId)
+          const fresh = await request()
           if (leftEditorRef.current) return null
           // The server has moved to this revision even when newer local work
           // prevents us from applying the response. Its next save must use it.
@@ -1886,17 +1949,8 @@ function SiteEditor() {
             continue
           }
           // Render the loaded document before the next queued save captures it.
+          // It is the draft now; what visitors see changes when it is sent live.
           flushSync(() => saveLifecycleRef.current.applyHistoryRestore(fresh))
-          if (fresh.published) {
-            // Versions contain the design, while public URLs serve rendered
-            // documents. Rebuild those documents through the same save queue.
-            // Keep a failed synchronization dirty so Save can safely retry it.
-            flushSync(() => {
-              useEditorStore.setState({ dirty: true })
-              markHtmlDirty()
-            })
-            return await saveLifecycleRef.current.performSave(undefined, { auto: true, versionSource: 'checkpoint' })
-          }
           return fresh
         }
         throw new Error(t('Your work kept changing while the save was loading. Nothing on screen was replaced. Try loading again when you finish editing.'))
@@ -2198,7 +2252,7 @@ function SiteEditor() {
           leaveGuard.allowUnload()
           window.location.reload()
         }}
-        onOverwrite={() => conflict.overwrite((publish) => save(publish, { force: true }))}
+        onOverwrite={() => conflict.overwrite((publish, goLive) => save(publish, { force: true, goLive }))}
       />
       <UnsavedLeaveDialog
       open={leaveGuard.promptOpen}
@@ -2459,11 +2513,40 @@ function SiteEditor() {
             <span className="hidden xl:inline">{t('Auto-save')}</span>
             <span className="sr-only xl:hidden">{t('Auto-save')}</span>
           </button>
+          {/* Draft and live are apart: saves change the draft, and visitors see
+              the live version until the draft is sent live. */}
+          {published && (
+            <div role="radiogroup" aria-label={t('Version shown')} className="studio-segment">
+              {[[false, t('Draft')], [true, t('Live')]].map(([live, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="radio"
+                  aria-checked={viewLive === live}
+                  onClick={() => setViewLive(live)}
+                  className={`studio-segment-btn ${viewLive === live ? 'studio-segment-btn-active' : ''}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {published && (
+            <button
+              type="button"
+              onClick={() => save(true, { goLive: true })}
+              disabled={saving}
+              className={draftAhead ? 'studio-btn studio-btn-primary' : 'studio-btn studio-btn-secondary'}
+              title={draftAhead ? t('The draft has changes that are not live yet.') : t('The live site shows the draft.')}
+            >
+              {t('Send draft live')}
+            </button>
+          )}
           <button type="button" data-tour="publish" onClick={() => {
             if (!published && guestGate('publish')) return
             // Taking a site down breaks its address for everyone who has it.
             if (published && !window.confirm(t('Take this site offline? Its address will stop working for visitors until you publish it again.'))) return
-            save(!published)
+            save(!published, { goLive: !published })
           }} disabled={saving} className={published ? 'studio-btn studio-btn-secondary' : 'studio-btn studio-btn-primary'} title={published ? t('Unpublish') : t('Publish')}>
             {published ? t('Published') : t('Publish')}
           </button>
@@ -2660,6 +2743,16 @@ function SiteEditor() {
           }}
           onDrop={onDropFiles}
         >
+          {viewLive && published && (
+            <LiveVersionView
+              slug={slug}
+              liveAt={liveAt}
+              draftAhead={draftAhead}
+              busy={liveBusy || saving}
+              onCopyToDraft={copyLiveToDraft}
+              onBackToDraft={() => setViewLive(false)}
+            />
+          )}
           {currentPageIsHtml ? (
             <>
               {/* Left rail: VS Code-style Files tab (pages as .html files) +
@@ -3329,6 +3422,7 @@ function SiteEditor() {
             autoSaveEnabled={autoSaveEnabled}
             onAutoSaveEnabled={setAutoSaveEnabled}
             onRestore={restoreHistoryVersion}
+            onSendLive={published ? sendHistoryVersionLive : undefined}
           />
         </Suspense>
       )}

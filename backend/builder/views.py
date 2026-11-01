@@ -660,6 +660,16 @@ class SiteViewSet(viewsets.ModelViewSet):
         data = SiteVersionSerializer(rows, many=True, context={'request': request}).data
         return Response(data)
 
+    # One version's content, for the editor to render its pages when the owner
+    # sends that version live. The list leaves the content out (it is large).
+    @action(detail=True, methods=['get'], url_path=r'versions/(?P<version_id>[0-9]+)/content')
+    def version_content(self, request, pk=None, version_id=None):
+        site = self.get_object()
+        version = SiteVersion.objects.filter(pk=version_id, site=site).first()
+        if version is None:
+            return error_response('version_not_found', 'Version not found for this site.', status.HTTP_404_NOT_FOUND)
+        return Response({'id': version.pk, 'schema': version.schema, 'html': version.html})
+
     @action(detail=True, methods=['post'], url_path=r'versions/(?P<version_id>[0-9]+)/restore')
     def restore_version(self, request, pk=None, version_id=None):
         site = self.get_object()
@@ -686,6 +696,25 @@ class SiteViewSet(viewsets.ModelViewSet):
             site.revision += 1
             site.save(update_fields=['schema', 'html', 'revision', 'updated_at'])
             SiteVersion.snapshot(site, source='restore', label=f'restored from v{version.pk}')
+        return Response(SiteSerializer(site).data)
+
+    # --- Live → draft ---------------------------------------------------------
+    # The editor's "Copy live to draft": the draft becomes the live version
+    # again. The draft it replaces is kept in the history first, so nothing is
+    # lost. Visitors see no change.
+
+    @action(detail=True, methods=['post'], url_path='live-to-draft')
+    def live_to_draft(self, request, pk=None):
+        site = self.get_object()
+        with transaction.atomic():
+            site = get_object_or_404(Site.objects.select_for_update(), pk=site.pk, owner=request.user)
+            if site.live_schema is None:
+                return error_response('no_live_version', 'This site has no live version yet.', status.HTTP_400_BAD_REQUEST)
+            SiteVersion.snapshot(site, source='save', label='before copying live', force=True)
+            site.schema = site.live_schema
+            site.html = site.live_html
+            site.revision += 1
+            site.save(update_fields=['schema', 'html', 'revision', 'updated_at'])
         return Response(SiteSerializer(site).data)
 
     # --- Named "checkpoints" (Resident-Evil-style save slots) ---------------
@@ -1354,7 +1383,8 @@ class PublicReviewView(APIView):
             return refused
         comments = PublicReviewCommentSerializer(site.review_comments.all()[:200], many=True).data
         return Response({
-            'site': PublicSiteSerializer(site, context={'request': request}).data,
+            # A review link asks for comments on the draft, not on the live site.
+            'site': PublicSiteSerializer(site, context={'request': request, 'draft': True}).data,
             'comments': comments,
         })
 
@@ -1634,12 +1664,15 @@ class CloneSiteView(APIView):
         # ("Kafe (kopya)"); it always said "(copy)".
         language = request.data.get('language') if isinstance(request.data, dict) else None
         suffix = 'kopya' if language == 'tr' else 'copy'
+        # Someone else's site is copied as visitors see it; your own as you
+        # left it in the editor.
+        schema, html = (src.schema, src.html) if own else src.live_content()
         with site_creation(request.user) as owner:
             copy = Site.objects.create(
                 owner=owner,
                 title=f'{src.title} ({suffix})'[:100],
-                schema=src.schema,
-                html=src.html,
+                schema=schema,
+                html=html,
                 category=src.category,
                 tags=src.tags,
                 site_options=src.site_options,

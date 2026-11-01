@@ -38,3 +38,7 @@ export const deleteVersion = (siteId, versionId) =>
   client
     .delete(`/sites/${siteId}/versions/${versionId}/`)
     .then((r) => r.data)
+
+// One version's content, to render its pages when it is sent live.
+export const getVersionContent = (siteId, versionId) =>
+  client.get(`/sites/${siteId}/versions/${versionId}/content/`).then((r) => r.data)

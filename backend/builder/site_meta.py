@@ -65,7 +65,9 @@ def share_image(site, base=''):
     image = public_url(site_seo(site).get('socialImage'), base)
     if image:
         return image
-    schema = site.schema if isinstance(site.schema, dict) else {}
+    # What a link preview shows is the live site, not the draft being edited.
+    live = site.live_content()[0]
+    schema = live if isinstance(live, dict) else {}
     pages = schema.get('pages') if isinstance(schema.get('pages'), list) else []
     home = pages[0] if pages and isinstance(pages[0], dict) else {}
     return public_url(home.get('seoImage'), base)

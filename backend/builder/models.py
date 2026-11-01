@@ -100,6 +100,14 @@ class Site(models.Model):
     # iframe so their JavaScript runs isolated from the app/visitor session).
     html = models.TextField(blank=True, default='')
     published = models.BooleanField(default=False)
+    # The LIVE version: what visitors see. `schema` / `html` above are the
+    # draft the editor saves into, all day long, automatic saves included; the
+    # live version changes only when the owner sends the draft (or an older
+    # version) live. None on a site that was never published: nothing public
+    # reads it then. See Site.live_content().
+    live_schema = models.JSONField(null=True, blank=True, default=None)
+    live_html = models.TextField(blank=True, default='')
+    live_at = models.DateTimeField(null=True, blank=True)
     # Latest transition from draft to public. SitePublication keeps daily slots
     # after deletion; this stamp remains a legacy fallback for cap accounting.
     last_published_at = models.DateTimeField(null=True, blank=True, db_index=True)
@@ -179,6 +187,18 @@ class Site(models.Model):
 
     def __str__(self):
         return f'{self.title} ({self.slug})'
+
+    def live_content(self):
+        """(schema, html) visitors see: the live version, else (a site
+        published before drafts and live were apart) the saved one."""
+        if self.live_schema is not None:
+            return self.live_schema, self.live_html
+        return self.schema, self.html
+
+    def draft_differs_from_live(self):
+        return self.live_schema is not None and (
+            self.live_schema != self.schema or self.live_html != self.html
+        )
 
     def recompute_hot_score(self, save=False):
         """Reddit/HN-style hot score that's ABSOLUTE-time (no "now" at query
@@ -431,6 +451,7 @@ class SiteVersion(models.Model):
         ('auto', 'Auto save'),
         ('restore', 'Restore'),
         ('manual', 'Manual'),
+        ('publish', 'Sent live'),
     )
 
     site = models.ForeignKey(

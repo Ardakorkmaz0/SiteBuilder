@@ -16,6 +16,22 @@ export const updateSite = (id, payload, { saveSource = 'manual' } = {}) =>
 export const patchSite = (id, payload) =>
   client.patch(`/sites/${id}/`, payload).then((r) => r.data)
 
+// Draft and live are apart: a save changes the draft; these change what
+// visitors see. "Copy live to draft" puts the live version back in the draft
+// (the draft it replaces is kept in the history).
+export const liveToDraft = (id) =>
+  client.post(`/sites/${id}/live-to-draft/`).then((r) => r.data)
+
+// Send an older version live with the pages rendered from it; the draft is
+// left as it is.
+export const sendVersionLive = (id, versionId, pages, baseRevision) =>
+  client.patch(`/sites/${id}/`, {
+    published: true,
+    published_pages: pages,
+    live_from_version: versionId,
+    ...(baseRevision != null ? { base_revision: baseRevision } : {}),
+  }).then((r) => r.data)
+
 export const deleteSite = (id) => client.delete(`/sites/${id}/`)
 
 // "Use this": clone a public site into your account as a fresh draft.
