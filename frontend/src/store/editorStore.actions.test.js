@@ -862,6 +862,38 @@ describe('embed box manual flag', () => {
 })
 
 describe('mobile auto arrange', () => {
+  // A page that opens with an edge-to-edge bar or band keeps it at the top
+  // edge on a phone too. It used to start 16px down, with a white strip above
+  // the bar.
+  it('keeps a top bar or band at the top edge, and pads a page that opens with content', () => {
+    const withBar = autoMobileLayout([
+      { id: 'nav', type: 'navbar', props: { brand: 'B', links: [] }, layout: { x: 0, y: 0, w: 1000, h: 64 } },
+      { id: 'title', type: 'heading', props: { text: 'Title' }, layout: { x: 80, y: 120, w: 600, h: 60 } },
+    ], 390)
+    expect(withBar.nav.y).toBe(0)
+    const withBand = autoMobileLayout([
+      { id: 'hero', type: 'section', props: { heading: 'Hero' }, layout: { x: 0, y: 0, w: 1000, h: 300 } },
+    ], 390)
+    expect(withBand.hero.y).toBe(0)
+    const withText = autoMobileLayout([
+      { id: 'title', type: 'heading', props: { text: 'Title' }, layout: { x: 80, y: 0, w: 600, h: 60 } },
+    ], 390)
+    expect(withText.title.y).toBe(16)
+  })
+
+  // Bands that touch on the PC (a navbar on top of a hero) touch on the phone
+  // too; a 16px white strip used to open between them. Bands apart on the PC
+  // keep the gap.
+  it('keeps bands that touch on the PC touching on the phone', () => {
+    const layout = autoMobileLayout([
+      { id: 'nav', type: 'navbar', props: { brand: 'B', links: [] }, layout: { x: 0, y: 0, w: 1000, h: 64 } },
+      { id: 'hero', type: 'section', props: { heading: 'Hero' }, layout: { x: 0, y: 64, w: 1000, h: 300 } },
+      { id: 'apart', type: 'section', props: { heading: 'Later' }, layout: { x: 0, y: 500, w: 1000, h: 200 } },
+    ], 390)
+    expect(layout.hero.y).toBe(layout.nav.y + layout.nav.h)
+    expect(layout.apart.y).toBe(layout.hero.y + layout.hero.h + 16)
+  })
+
   it('does not reserve flow gaps for hidden or fixed mobile elements', () => {
     const layout = autoMobileLayout([
       { id: 'first', type: 'text', props: { text: 'First' }, layout: { x: 0, y: 0, w: 300, h: 40 } },

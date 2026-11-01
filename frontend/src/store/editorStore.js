@@ -903,11 +903,27 @@ export function autoMobileLayout(components, mobileWidth = MOBILE_CANVAS_WIDTH) 
   const out = {}
   const byId = new Map(components.map((c) => [c.id, c]))
   const readingOrder = byReading(topLevel)
-  let y = readingOrder.length && byId.get(readingOrder[0])?.type === 'region' ? 0 : MOBILE_PAD
+  // A page that opens with an edge-to-edge bar or band (a navbar, a hero
+  // section at the top) keeps it on the top edge of the phone too; it used to
+  // start 16px down, under a white strip. A page that opens with content gets
+  // the padding above it.
+  const first = readingOrder.length ? byId.get(readingOrder[0]) : null
+  const opensWithBand = !!first && (
+    first.type === 'region' || (FULL_WIDTH_TYPES.has(first.type) && (first.layout?.y || 0) < MOBILE_PAD)
+  )
+  let y = opensWithBand ? 0 : MOBILE_PAD
+  // Bands that touch on the PC (a navbar on top of a hero) touch on the phone
+  // too, instead of opening a white strip between them. Regions never get a
+  // gap after them, so there is none to take back.
+  let previousBand = null
 
   for (const id of readingOrder) {
     const c = byId.get(id)
     const kids = childrenOf.get(id)
+    const isBand = FULL_WIDTH_TYPES.has(c.type)
+    const top = c.layout?.y || 0
+    if (isBand && previousBand?.gapAfter && top <= previousBand.bottom + 1) y -= MOBILE_GAP
+    previousBand = isBand ? { bottom: top + (c.layout?.h || 0), gapAfter: c.type !== 'region' } : null
     if (c.type === 'section' && kids && kids.length) {
       // Full-width band; stack its content inside.
       const innerLeft = BAND_PAD
