@@ -50,6 +50,7 @@ import FieldPartsEditor from './FieldPartsEditor.jsx'
 import ColorModePanel from './ColorModePanel.jsx'
 import { FIT_TYPES } from '../../utils/boxFit.js'
 import { anchorOf, anchorProblem, slugifyAnchor } from '../../utils/anchors.js'
+import HtmlPageColors from './HtmlPageColors.jsx'
 
 // How far below the top edge a bar can be drawn and still be read as "meant
 // to sit at the top". Above this the Y is a design position, not a gap.
@@ -616,6 +617,7 @@ const LAYOUT_STYLE_GROUP = 'Spacing'
 export default function PropertiesPanel({
   htmlMode = false,
   onApplyThemeToHtml,
+  onReplaceHtmlColor,
   simpleMode = false,
   htmlPageSettings = null,
   onHtmlPageSettings,
@@ -1070,6 +1072,21 @@ export default function PropertiesPanel({
 
           {activePageTab === 'theme' && (
             <>
+        {/* An uploaded page rarely uses the variable names the theme knows,
+            so its own colours come first: the way to recolour any page. */}
+        {htmlMode && (
+          <PanelGroup id="html-page-colors" title={t('Colors on this page')} defaultOpen>
+            <HtmlPageColors
+              html={pageHtmlMap?.[page.id] || ''}
+              onReplace={(from, to) => onReplaceHtmlColor?.(from, to, { pageOnly: ownTheme })}
+              scopeHint={ownTheme
+                ? t('Only on this page: it keeps its own theme.')
+                : ownThemeElsewhere
+                  ? t('On every page, except {count} that keep their own theme.', { count: ownThemeElsewhere })
+                  : t('On every page of the site.')}
+            />
+          </PanelGroup>
+        )}
         <PanelGroup
           id="theme-presets"
           title={
