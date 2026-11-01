@@ -87,6 +87,7 @@ import PageFilesPanel from '../components/editor/PageFilesPanel.jsx'
 import { pageFileName } from '../utils/pageFiles.js'
 import { DEVICES, devicesFor, isMobileDevice } from '../utils/htmlDevices.js'
 import { applyThemeToDocument } from '../utils/htmlTheme.js'
+import { replacePageColor } from '../utils/htmlPageColors.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
 import { schemaToFiles, schemaToSingleHtml } from '../utils/schemaToFiles.js'
@@ -1604,9 +1605,18 @@ function SiteEditor() {
     if (data?.domain_status !== undefined) setDomainStatus(data.domain_status || 'not_connected')
   }
 
-  // A theme is one document operation across the pages that follow it. Take
-  // pending typing as its own step first, then snapshot every changed page.
-  function applyThemeToAllHtmlPages(theme, { pageOnly = false } = {}) {
+  // A theme, or one colour swapped, is one document operation across the pages
+  // that follow the site theme (or the open page alone when it keeps its own).
+  // Take pending typing as its own step first, then snapshot every changed page.
+  function applyThemeToAllHtmlPages(theme, options) {
+    transformHtmlPages((html) => applyThemeToDocument(html, theme), options)
+  }
+
+  function replaceHtmlColor(from, to, options) {
+    transformHtmlPages((html) => replacePageColor(html, from, to), options)
+  }
+
+  function transformHtmlPages(transform, { pageOnly = false } = {}) {
     const before = liveHtmlMap({ commit: true })
     const pages = useEditorStore.getState().schema.pages
     const next = { ...before }
@@ -1615,7 +1625,7 @@ function SiteEditor() {
       if (pageOnly ? page.id !== currentPageId : hasOwnTheme(page)) continue
       const previous = before[page.id] || ''
       if (!previous.trim()) continue
-      const applied = applyThemeToDocument(previous, theme)
+      const applied = transform(previous)
       if (applied == null || applied === previous) continue
       documents[page.id] = previous
       next[page.id] = applied
@@ -2825,6 +2835,7 @@ function SiteEditor() {
                       <PropertiesPanel
                         htmlMode
                         onApplyThemeToHtml={applyThemeToAllHtmlPages}
+                        onReplaceHtmlColor={replaceHtmlColor}
                         htmlPageSettings={htmlPageSettings}
                         onHtmlPageSettings={changeHtmlPageSettings}
                         pageHtmlMap={pageHtmlMap}
