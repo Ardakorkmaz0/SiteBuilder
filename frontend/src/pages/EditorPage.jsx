@@ -1776,7 +1776,11 @@ function SiteEditor() {
         data = await updateSite(
           id,
           {
-            title: safeTitle, schema, html, published: nextPublished, category, tags,
+            title: safeTitle, schema, html, category, tags,
+            // "Save mine anyway" overrides the draft, not what another tab did
+            // to the site: what this tab knows of `published` is out of date by
+            // definition, so only an explicit choice is sent.
+            ...(force && typeof wantPublished !== 'boolean' ? {} : { published: nextPublished }),
             ...(publishedPages ? { published_pages: publishedPages } : {}),
             // "Save mine anyway" leaves it out, and the server takes the save.
             ...(!force && baseRevisionAtSave != null ? { base_revision: baseRevisionAtSave } : {}),
@@ -1804,6 +1808,11 @@ function SiteEditor() {
       if (Number.isInteger(data.revision)) conflict.baseRevisionRef.current = data.revision
       conflict.resolve()
       setAutoSaveRefused(false)
+      // Taken offline: the server dropped every step that could be taken back.
+      if (publishedRef.current && !data.published) {
+        setLivePast([])
+        setLiveFuture([])
+      }
       publishedRef.current = !!data.published
       setPublished(data.published)
       applyLiveState(data)
@@ -2008,7 +2017,9 @@ function SiteEditor() {
     if (liveStepBusyRef.current) return
     liveStepBusyRef.current = true
     try {
-      const data = await editorSave.run(() => swapLiveChange(id, entry.snapshot))
+      // Sends the revision: a step from before another tab's change could undo
+      // the wrong thing, so that tab's change has to be seen first.
+      const data = await editorSave.run(() => swapLiveChange(id, entry.snapshot, conflict.baseRevisionRef.current))
       followLiveRevision(data)
       // The response carries the snapshot for the opposite direction.
       applyLiveState({ ...data, live_undo: null })
@@ -2022,6 +2033,10 @@ function SiteEditor() {
       }
       setLiveNote(undoing ? t('The change to the live site was taken back.') : t('The change to the live site is back.'))
     } catch (e) {
+      if (isSiteChanged(e)) {
+        conflict.refuse()
+        return
+      }
       // Gone for good (a newer change pushed it out): it stops being offered.
       if (e?.response?.data?.code === 'live_undo_gone') {
         setLivePast((past) => past.filter((item) => item !== entry))

@@ -250,12 +250,28 @@ def set_page_hidden(site, page_id, hidden):
     site._live_snapshot_id = snapshot.pk
 
 
+def forget_live_version(site):
+    """A site taken offline has no live version: whatever goes live next starts
+    from nothing, and an older undo step cannot bring anything back. What went
+    live stays in the history."""
+    site.published_pages.all().delete()
+    LiveSnapshot.objects.filter(site=site).delete()
+    site.live_schema = None
+    site.live_html = ''
+    site.live_at = None
+    site.save(update_fields=['live_schema', 'live_html', 'live_at'])
+
+
 def _restore_rows(site, snapshot):
     scope = site.published_pages.filter(page_id=snapshot.page_id) if snapshot.page_id else site.published_pages.all()
     scope.delete()
     taken = set(site.published_pages.values_list('path', flat=True))
+    # Only a whole-site restore can bring back a page that was hidden since.
+    hidden = set() if snapshot.page_id else set(site.private_pages or [])
     rows = []
     for data in snapshot.rows:
+        if data['page_id'] in hidden:
+            continue
         # The address may have been given to another page since.
         path = _published_path(data['path'], taken)
         taken.add(path)
@@ -273,20 +289,36 @@ def _restore_live_schema(site, snapshot):
         else:
             site_level = _site_level(snapshot.live_schema) if snapshot.live_schema else _site_level(current)
             site.live_schema = {**site_level, 'pages': pages}
+    elif snapshot.had_live:
+        hidden = set(site.private_pages or [])
+        site.live_schema = {
+            **_site_level(snapshot.live_schema),
+            'pages': [page for page in _pages(snapshot.live_schema) if page.get('id') not in hidden],
+        }
     else:
-        site.live_schema = snapshot.live_schema if snapshot.had_live else None
+        site.live_schema = None
+
+
+def _private_pages_after_restore(site, snapshot):
+    """A change to one page moves only that page's mark, whatever other tabs have
+    hidden since. Sending the whole site moves no mark at all."""
+    current = list(site.private_pages or [])
+    if not snapshot.page_id:
+        return current
+    others = [item for item in current if item != snapshot.page_id]
+    return [*others, snapshot.page_id] if snapshot.page_id in (snapshot.private_pages or []) else others
 
 
 def restore_snapshot(site, snapshot):
     """Put back what a snapshot holds, leaving a snapshot of what it replaced
     for the opposite direction."""
     reverse = take_snapshot(site, site.published, snapshot.page_id)
+    site.private_pages = _private_pages_after_restore(site, snapshot)
     _restore_rows(site, snapshot)
     _restore_live_schema(site, snapshot)
     if snapshot.touches_home:
         site.live_html = snapshot.live_html
     site.live_at = snapshot.live_at
-    site.private_pages = list(snapshot.private_pages or [])
     # A site stays public while something is still live on it.
     site.published = snapshot.published or site.published_pages.exists()
     site.revision += 1

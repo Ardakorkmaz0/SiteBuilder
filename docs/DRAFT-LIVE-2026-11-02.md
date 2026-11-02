@@ -102,6 +102,19 @@ Known corners, left as they are:
   in-app viewer shows it on pages whose `/s/` document is older. Those show blue.
 - Unpublishing from the header is not an undo step.
 
+## Later fix: taking a site offline ends its live version
+
+The browser sweep (`docs/QA-SWEEP-2026-11-03.md`) found hidden or offline pages coming back. Now:
+
+- `forget_live_version` runs when a site goes offline, by the owner or a moderator (and on reinstating
+  a blocked site): rows, `live_schema`, `live_html`, `live_at` and every `LiveSnapshot` go. History keeps
+  the copies. Migration 0030 does the same for sites already offline. A save of a site that is already
+  offline does not run it, so undoing the first send can still be redone.
+- `restore_snapshot` no longer restores `private_pages` wholesale: a page-scoped snapshot moves only its
+  own page's mark, and a whole-site one moves none and leaves out pages hidden since.
+- The editor's `live-undo` sends `base_revision`, so a tab that is behind gets the 409 dialog.
+- "Save mine anyway" leaves `published` out unless the refused save was an explicit choice.
+
 ## Worth a hard look
 
 - `sendHistoryVersionLive` rebuilds an html page's document from `page.html`,
