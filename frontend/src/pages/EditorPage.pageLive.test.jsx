@@ -159,7 +159,7 @@ describe('a file in the list', () => {
     api.swapLiveChange.mockImplementationOnce(async () => answer({ private_pages: [], page_live: { home: 'live', about: 'older' }, live_undo: 22 }))
     ctrlZ()
 
-    await waitFor(() => expect(api.swapLiveChange).toHaveBeenCalledWith('1', 21), SLOW)
+    await waitFor(() => expect(api.swapLiveChange).toHaveBeenCalledWith('1', 21, 5), SLOW)
     await waitFor(() => expect(state('about.html')).toBe('older'), SLOW)
     expect(within(fileRow('about.html')).queryByText('hidden')).not.toBeInTheDocument()
   }, 30000)
@@ -176,16 +176,16 @@ describe('Ctrl+Z after going live', () => {
     await sent()
 
     ctrlZ()
-    await waitFor(() => expect(api.swapLiveChange).toHaveBeenLastCalledWith('1', 11), SLOW)
+    await waitFor(() => expect(api.swapLiveChange).toHaveBeenLastCalledWith('1', 11, 5), SLOW)
     await waitFor(() => expect(state('about.html')).toBe('older'), SLOW)
 
     ctrlZ(true)
-    await waitFor(() => expect(api.swapLiveChange).toHaveBeenLastCalledWith('1', 12), SLOW)
+    await waitFor(() => expect(api.swapLiveChange).toHaveBeenLastCalledWith('1', 12, 6), SLOW)
     await waitFor(() => expect(state('about.html')).toBe('live'), SLOW)
 
     // And the step can be undone again, with the newest snapshot.
     ctrlZ()
-    await waitFor(() => expect(api.swapLiveChange).toHaveBeenLastCalledWith('1', 13), SLOW)
+    await waitFor(() => expect(api.swapLiveChange).toHaveBeenLastCalledWith('1', 13, 7), SLOW)
   }, 30000)
 
   it('does not touch the draft', async () => {
@@ -227,6 +227,58 @@ describe('Ctrl+Z after going live', () => {
     expect(api.updateSite.mock.calls[0][1].base_revision).toBe(5)
   }, 30000)
 
+  it('asks the existing question when another tab changed the site since, and takes nothing back', async () => {
+    await sent()
+    api.swapLiveChange.mockRejectedValueOnce({ response: { status: 409, data: { code: 'site_changed' } } })
+
+    ctrlZ()
+
+    expect(await screen.findByRole('alertdialog', { name: 'This site changed somewhere else' }, SLOW)).toBeInTheDocument()
+    expect(api.swapLiveChange).toHaveBeenCalledWith('1', 11, 5)
+    expect(state('about.html')).toBe('live')
+  }, 30000)
+
+  it('ends with taking the site offline: nothing older can bring it back', async () => {
+    await sent()
+    api.updateSite.mockImplementationOnce(async (id, payload) => answer({
+      schema: payload.schema, html: payload.html, title: payload.title,
+      published: false, page_live: {}, live_at: null, live_undo: null,
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Published', exact: true }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Publish', exact: true })).toBeInTheDocument(), SLOW)
+    expect(api.updateSite.mock.calls[0][1].published).toBe(false)
+
+    ctrlZ()
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Publish', exact: true })).toBeInTheDocument(), SLOW)
+    expect(api.swapLiveChange).not.toHaveBeenCalled()
+  }, 30000)
+
+  it('keeps a redo when undoing the first send is what took the site offline', async () => {
+    server = { ...server, published: false, page_live: {} }
+    api.sendPageLive.mockImplementationOnce(async (id, page) => answer({ published: true, page_live: { [page.pageId]: 'live' }, live_undo: 11 }))
+    await openEditor()
+    pick('index.html', 'Go live')
+    await waitFor(() => expect(state('index.html')).toBe('live'), SLOW)
+
+    api.swapLiveChange.mockImplementationOnce(async () => answer({ published: false, page_live: {}, live_undo: 12 }))
+    ctrlZ()
+    await waitFor(() => expect(state('index.html')).toBe('none'), SLOW)
+
+    // A save of the draft in between: the site was already offline.
+    useEditorStore.setState({ dirty: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }))
+    await waitFor(() => expect(api.updateSite).toHaveBeenCalledTimes(1), SLOW)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save', exact: true })).toBeEnabled(), SLOW)
+
+    api.swapLiveChange.mockImplementationOnce(async () => answer({ published: true, page_live: { home: 'live' }, live_undo: 13 }))
+    ctrlZ(true)
+
+    await waitFor(() => expect(api.swapLiveChange).toHaveBeenLastCalledWith('1', 12, 7), SLOW)
+    await waitFor(() => expect(state('index.html')).toBe('live'), SLOW)
+  }, 30000)
+
   it('undoes a page edit made after it first, and the send after that', async () => {
     await sent()
     useEditorStore.getState().renamePage('team', 'Crew')
@@ -237,7 +289,7 @@ describe('Ctrl+Z after going live', () => {
     expect(api.swapLiveChange).not.toHaveBeenCalled()
 
     ctrlZ()
-    await waitFor(() => expect(api.swapLiveChange).toHaveBeenCalledWith('1', 11), SLOW)
+    await waitFor(() => expect(api.swapLiveChange).toHaveBeenCalledWith('1', 11, 5), SLOW)
   }, 30000)
 
   it('undoes the send before a page edit made earlier', async () => {
@@ -249,7 +301,7 @@ describe('Ctrl+Z after going live', () => {
 
     ctrlZ()
 
-    await waitFor(() => expect(api.swapLiveChange).toHaveBeenCalledWith('1', 11), SLOW)
+    await waitFor(() => expect(api.swapLiveChange).toHaveBeenCalledWith('1', 11, 6), SLOW)
     expect(screen.getByRole('button', { name: 'crew.html' })).toBeInTheDocument()
   }, 30000)
 
@@ -290,7 +342,7 @@ describe('Ctrl+Z after going live', () => {
 
     ctrlZ()
 
-    await waitFor(() => expect(api.swapLiveChange).toHaveBeenCalledWith('1', 31), SLOW)
+    await waitFor(() => expect(api.swapLiveChange).toHaveBeenCalledWith('1', 31, 5), SLOW)
   }, 30000)
 
   it('is offered by the Undo button too', async () => {
@@ -298,6 +350,6 @@ describe('Ctrl+Z after going live', () => {
 
     fireEvent.click(screen.getByTitle('Undo (Ctrl+Z)'))
 
-    await waitFor(() => expect(api.swapLiveChange).toHaveBeenCalledWith('1', 11), SLOW)
+    await waitFor(() => expect(api.swapLiveChange).toHaveBeenCalledWith('1', 11, 5), SLOW)
   }, 30000)
 })

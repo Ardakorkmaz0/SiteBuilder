@@ -110,8 +110,11 @@ export const setPageHidden = (id, pageId, hidden, baseRevision) =>
 
 // Take a change to the live site back (or bring it back): `snapshot` is the
 // `live_undo` of the response that made the change.
-export const swapLiveChange = (id, snapshot) =>
-  client.post(`/sites/${id}/live-undo/`, { snapshot }).then((r) => r.data)
+export const swapLiveChange = (id, snapshot, baseRevision) =>
+  client.post(`/sites/${id}/live-undo/`, {
+    snapshot,
+    ...(baseRevision != null ? { base_revision: baseRevision } : {}),
+  }).then((r) => r.data)
 
 export const getReviewSite = (token) =>
   client.get(`/public/reviews/${token}/`).then((r) => r.data)

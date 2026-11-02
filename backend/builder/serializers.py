@@ -29,7 +29,9 @@ from .models import (
 )
 from .site_meta import share_image
 from .svg_images import check_svg, is_svg_upload
-from .live_pages import draft_is_ahead, send_draft_live_without_pages, send_site_live, statuses
+from .live_pages import (
+    draft_is_ahead, forget_live_version, send_draft_live_without_pages, send_site_live, statuses,
+)
 from .validators import clean_published_pages, validate_and_clean_schema
 
 
@@ -764,7 +766,8 @@ class SiteSerializer(serializers.ModelSerializer):
         # Unpublishing takes the documents down with the switch: nothing should
         # keep answering at a URL the owner has turned off.
         if not site.published:
-            site.published_pages.all().delete()
+            if was_published:
+                forget_live_version(site)
         elif pages is not None:
             # Rendered pages are what "send live" sends: a save of the draft
             # sends none, and leaves visitors on the live version. Wholesale

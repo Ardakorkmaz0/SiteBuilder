@@ -40,7 +40,9 @@ from django.db.models.functions import TruncDate
 
 from . import runtime_config
 from .api_errors import error_response
-from .live_pages import adopt_live_pages_into_draft, restore_snapshot, send_page_live, set_page_hidden
+from .live_pages import (
+    adopt_live_pages_into_draft, forget_live_version, restore_snapshot, send_page_live, set_page_hidden,
+)
 from .ai_policy import local_ai_available, provider_refusal, public_ai_policy
 from .shared_marks import insert_before_body_end, strip_marked, wrap_marked
 from .access import SHARE_OPEN, SHARE_PRIVATE, is_public, is_reachable, public_sites, share_access
@@ -1985,17 +1987,21 @@ class AdminSiteModerateView(APIView):
             # The owner may have saved a still-open editor's publish switch
             # while blocked. Lifting the block hands back a draft, rather
             # than publishing that saved state on the moderator's behalf.
-            if site.moderation_blocked:
-                site.published = False
-            site.moderation_blocked = False
-            site.moderated_at = None
-            site.save(update_fields=['published', 'moderation_blocked', 'moderated_at'])
+            with transaction.atomic():
+                if site.moderation_blocked:
+                    site.published = False
+                    forget_live_version(site)
+                site.moderation_blocked = False
+                site.moderated_at = None
+                site.save(update_fields=['published', 'moderation_blocked', 'moderated_at'])
             _log_admin(request, site, 'site.reinstate')
             return Response({'detail': 'Site reinstated.', 'published': site.published, 'moderation_blocked': False})
-        site.published = False
-        site.moderation_blocked = True
-        site.moderated_at = timezone.now()
-        site.save(update_fields=['published', 'moderation_blocked', 'moderated_at'])
+        with transaction.atomic():
+            site.published = False
+            site.moderation_blocked = True
+            site.moderated_at = timezone.now()
+            site.save(update_fields=['published', 'moderation_blocked', 'moderated_at'])
+            forget_live_version(site)
         # Resolve any open reports on a taken-down site.
         Report.objects.filter(site=site, status='open').update(status='resolved', resolved_at=timezone.now())
         _log_admin(request, site, 'site.unpublish')

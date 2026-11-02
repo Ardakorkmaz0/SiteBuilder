@@ -9,6 +9,7 @@ from importlib import import_module
 import pytest
 from django.apps import apps
 from django.contrib.auth.models import User
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .models import LiveSnapshot, PublishedPage, Site, SiteVersion
@@ -425,6 +426,198 @@ class TestUndo:
         newest = SiteVersion.objects.filter(site=site, source='publish').first()
         assert newest.label == 'Sending live undone'
         assert [page['id'] for page in newest.schema['pages']] == ['home']
+
+
+class TestTakingASiteOffline:
+    @staticmethod
+    def offline(client, site):
+        response = client.patch(f'/api/sites/{site.pk}/', {'published': False}, format='json')
+        assert response.status_code == 200, response.data
+
+    def test_a_step_from_before_cannot_bring_it_back(self, client, site):
+        send(client, site, 'home', 'Home v1')
+        send(client, site, 'about', 'About v1')
+        hidden = hide(client, site, 'about')
+        self.offline(client, site)
+
+        back = undo(client, site, hidden.data['live_undo'])
+
+        assert back.status_code == 404
+        assert back.data['code'] == 'live_undo_gone'
+        site.refresh_from_db()
+        assert site.published is False
+        assert site.private_pages == ['about']
+        assert served(site) == {}
+        assert visitor_pages(site)[0] == 404
+
+    def test_a_page_sent_afterwards_comes_back_alone(self, client, owner, site):
+        send(client, site, 'home', 'Home v1')
+        send(client, site, 'about', 'About v1')
+        self.offline(client, site)
+
+        send(client, site, 'home', 'Home v2')
+
+        assert visitor_pages(site) == (200, ['home'])
+        other = APIClient()
+        other.force_authenticate(User.objects.create_user('bob', 'bob@example.com', 'secret123'))
+        copy = other.post(f'/api/sites/clone/{site.slug}/', format='json')
+        assert [page['id'] for page in Site.objects.get(pk=copy.data['id']).schema['pages']] == ['home']
+
+    def test_nothing_of_the_old_version_stays_behind(self, client, site):
+        send(client, site, 'home', 'Home v1')
+        self.offline(client, site)
+
+        site.refresh_from_db()
+        assert site.live_schema is None
+        assert site.live_html == ''
+        assert site.live_at is None
+        assert not LiveSnapshot.objects.filter(site=site).exists()
+        # What went live before is still in History.
+        assert SiteVersion.objects.filter(site=site, source='publish').exists()
+
+    def test_a_page_hidden_while_offline_stays_out_when_it_returns(self, client, site):
+        send(client, site, 'home', 'Home v1')
+        send(client, site, 'about', 'About v1')
+        self.offline(client, site)
+        hide(client, site, 'about')
+
+        client.patch(f'/api/sites/{site.pk}/', {'published': True}, format='json')
+
+        status_code, pages = visitor_pages(site)
+        assert status_code == 200
+        assert 'about' not in pages
+
+    def test_a_save_of_a_draft_does_not_end_a_redo(self, client, site):
+        sent = send(client, site, 'home', 'Home v1')
+        back = undo(client, site, sent.data['live_undo'])
+        assert back.data['published'] is False
+
+        save_draft(client, site, about='About v2')
+
+        again = undo(client, site, back.data['live_undo'])
+        assert again.status_code == 200
+        assert served(site) == {'': document('Home v1')}
+
+    def test_a_save_that_does_not_mention_it_leaves_the_site_as_it_is(self, client, site):
+        send(client, site, 'home', 'Home v1')
+        site.refresh_from_db()
+
+        saved = client.put(f'/api/sites/{site.pk}/', {'title': 'Ada', 'schema': schema(about='About v2'), 'html': document('Home v1')}, format='json')
+
+        assert saved.status_code == 200, saved.data
+        assert saved.data['published'] is True
+        assert served(site) == {'': document('Home v1')}
+
+    def test_a_moderators_take_down_leaves_nothing_to_return_to(self, client, owner, site):
+        send(client, site, 'home', 'Home v1')
+        about = send(client, site, 'about', 'About v1')
+        moderator = APIClient()
+        moderator.force_authenticate(User.objects.create_superuser('mod', 'mod@example.com', 'secret123'))
+
+        taken = moderator.post(f'/api/admin/sites/{site.pk}/moderate/', {'action': 'unpublish'}, format='json')
+
+        assert taken.status_code == 200, taken.data
+        assert served(site) == {}
+        assert undo(client, site, about.data['live_undo']).status_code == 404
+        assert moderator.post(f'/api/admin/sites/{site.pk}/moderate/', {'action': 'reinstate'}, format='json').status_code == 200
+        site.refresh_from_db()
+        assert site.published is False
+
+        send(client, site, 'contact', 'Contact v1')
+
+        assert list(served(site)) == ['contact']
+        assert visitor_pages(site) == (200, ['contact'])
+
+    def test_what_the_owner_sent_while_blocked_does_not_outlast_the_block(self, client, site):
+        moderator = APIClient()
+        moderator.force_authenticate(User.objects.create_superuser('mod', 'mod@example.com', 'secret123'))
+        moderator.post(f'/api/admin/sites/{site.pk}/moderate/', {'action': 'unpublish'}, format='json')
+        saved = client.patch(f'/api/sites/{site.pk}/', {'published': True, 'published_pages': [row('home', 'Home v1')]}, format='json')
+        assert saved.status_code == 200, saved.data
+        assert served(site) == {'': document('Home v1')}
+
+        moderator.post(f'/api/admin/sites/{site.pk}/moderate/', {'action': 'reinstate'}, format='json')
+
+        site.refresh_from_db()
+        assert site.published is False
+        assert served(site) == {}
+        assert site.live_schema is None
+
+    def test_the_migration_clears_what_sites_already_offline_kept(self, owner):
+        migration = import_module('builder.migrations.0030_offline_sites_have_no_live_version')
+        offline = Site.objects.create(
+            owner=owner, title='Offline', published=False, schema=schema(), html='',
+            live_schema=schema(), live_html=document('Old'), live_at=timezone.now(),
+        )
+        LiveSnapshot.objects.create(site=offline, rows=[], had_live=True)
+        PublishedPage.objects.create(site=offline, path='', html=document('Old'), position=0)
+        public = Site.objects.create(
+            owner=owner, title='Public', published=True, schema=schema(), html='',
+            live_schema=schema(), live_html=document('Now'), live_at=timezone.now(),
+        )
+        kept = LiveSnapshot.objects.create(site=public, rows=[], had_live=True)
+        PublishedPage.objects.create(site=public, path='', html=document('Now'), position=0)
+
+        migration.offline_sites_forget_their_live_version(apps, None)
+
+        offline.refresh_from_db()
+        assert offline.live_schema is None
+        assert offline.live_html == ''
+        assert offline.live_at is None
+        assert not LiveSnapshot.objects.filter(site=offline).exists()
+        assert not PublishedPage.objects.filter(site=offline).exists()
+        public.refresh_from_db()
+        assert public.live_schema == schema()
+        assert public.live_html == document('Now')
+        assert LiveSnapshot.objects.filter(pk=kept.pk).exists()
+        assert PublishedPage.objects.filter(site=public).exists()
+
+
+class TestUndoFromAnotherTab:
+    def test_undoing_one_page_leaves_another_pages_hide_alone(self, client, site):
+        send(client, site, 'home', 'Home v1')
+        contact = send(client, site, 'contact', 'Contact v1')
+        hide(client, site, 'about')
+
+        back = undo(client, site, contact.data['live_undo'])
+
+        assert back.status_code == 200, back.data
+        assert back.data['private_pages'] == ['about']
+        assert list(served(site)) == ['']
+
+    def test_undoing_a_hide_still_brings_that_page_back(self, client, site):
+        send(client, site, 'home', 'Home v1')
+        hide(client, site, 'contact')
+        about = hide(client, site, 'about')
+
+        back = undo(client, site, about.data['live_undo'])
+
+        assert back.data['private_pages'] == ['contact']
+
+    def test_undoing_a_whole_send_does_not_return_a_page_hidden_since(self, client, site):
+        client.patch(f'/api/sites/{site.pk}/', {'published': True, 'published_pages': [row('home', 'Home v1'), row('about', 'About v1')]}, format='json')
+        second = client.patch(f'/api/sites/{site.pk}/', {'published_pages': [row('home', 'Home v2'), row('about', 'About v2')]}, format='json')
+        hide(client, site, 'about')
+
+        back = undo(client, site, second.data['live_undo'])
+
+        assert back.status_code == 200, back.data
+        assert back.data['private_pages'] == ['about']
+        assert served(site) == {'': document('Home v1')}
+        assert visitor_pages(site) == (200, ['home'])
+
+    def test_a_tab_that_is_behind_is_refused_and_changes_nothing(self, client, site):
+        send(client, site, 'home', 'Home v1')
+        contact = send(client, site, 'contact', 'Contact v1')
+        behind = contact.data['revision']
+        hide(client, site, 'about')
+
+        refused = client.post(f'/api/sites/{site.pk}/live-undo/', {'snapshot': contact.data['live_undo'], 'base_revision': behind}, format='json')
+
+        assert refused.status_code == 409
+        assert refused.data['code'] == 'site_changed'
+        assert sorted(served(site)) == ['', 'contact']
+        assert LiveSnapshot.objects.filter(pk=contact.data['live_undo']).exists()
 
 
 class TestCopyLiveToDraft:

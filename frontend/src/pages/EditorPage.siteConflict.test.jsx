@@ -128,6 +128,39 @@ describe('a save made from an older revision', () => {
     expect(screen.getByRole('button', { name: after, exact: true })).toBeEnabled()
   }, 30000)
 
+  it.each([
+    ['published', true, 'Published'],
+    ['unpublished', false, 'Publish'],
+  ])('"Save mine anyway" on a %s site says nothing about publication, whatever this tab last knew', async (_state, wasPublished, label) => {
+    initiallyPublished = wasPublished
+    updateSite
+      .mockRejectedValueOnce({ response: { status: 409, data: { code: 'site_changed', detail: 'This site was saved somewhere else after it was opened here.' } } })
+      // Another tab changed it the other way round: the server's answer is what holds.
+      .mockImplementation(async (id, payload) => ({ ...payload, published: !wasPublished, slug: 'two-tabs', revision: 6 }))
+    render(
+      <UiThemeProvider>
+        <LanguageProvider>
+          <MemoryRouter initialEntries={['/editor/1']}>
+            <Routes><Route path="/editor/:id" element={<EditorPage />} /></Routes>
+          </MemoryRouter>
+        </LanguageProvider>
+      </UiThemeProvider>,
+    )
+    await waitFor(() => expect(document.querySelector('[data-cid="h1"]')).toBeTruthy(), SLOW)
+    expect(screen.getByRole('button', { name: label, exact: true })).toBeInTheDocument()
+    await act(async () => useEditorStore.getState().updateProps('h1', { text: 'Mine' }))
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save' })[0])
+    await screen.findByRole('alertdialog', { name: 'This site changed somewhere else' }, SLOW)
+    expect(updateSite.mock.calls[0][1].published).toBe(wasPublished)
+    fireEvent.click(screen.getByRole('button', { name: 'Save mine anyway', exact: true }))
+
+    await waitFor(() => expect(updateSite).toHaveBeenCalledTimes(2), SLOW)
+    expect(updateSite.mock.calls[1][1]).not.toHaveProperty('published')
+    expect(updateSite.mock.calls[1][1]).not.toHaveProperty('base_revision')
+    await waitFor(() => expect(screen.getByRole('button', { name: wasPublished ? 'Publish' : 'Published', exact: true })).toBeInTheDocument(), SLOW)
+  }, 30000)
+
   it('writes nothing until the person chooses, and "Save mine anyway" sends it without the revision', async () => {
     updateSite
       .mockRejectedValueOnce({ response: { status: 409, data: { code: 'site_changed', detail: 'This site was saved somewhere else after it was opened here.' } } })
