@@ -3423,6 +3423,7 @@ function SiteEditor() {
             onAutoSaveEnabled={setAutoSaveEnabled}
             onRestore={restoreHistoryVersion}
             onSendLive={published ? sendHistoryVersionLive : undefined}
+            liveAt={liveAt}
           />
         </Suspense>
       )}

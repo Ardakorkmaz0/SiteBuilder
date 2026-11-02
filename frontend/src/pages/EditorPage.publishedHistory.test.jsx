@@ -194,6 +194,15 @@ describe('the history of a published site, with draft and live apart', () => {
     expect(await screen.findByRole('radiogroup', { name: 'Version shown' }, SLOW)).toBeInTheDocument()
   }, 30000)
 
+  it('refreshes an open History when the header sends the draft live', async () => {
+    await openEditor()
+    const before = api.listVersions.mock.calls.length
+
+    fireEvent.click(sendDraftLiveButton())
+
+    await waitFor(() => expect(api.listVersions.mock.calls.length).toBe(before + 1), SLOW)
+  }, 30000)
+
   it('sends one version live from History and keeps the draft on screen', async () => {
     await openEditor()
 
