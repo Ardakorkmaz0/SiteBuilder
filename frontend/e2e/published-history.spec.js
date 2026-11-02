@@ -54,6 +54,8 @@ test('a loaded checkpoint stays in the draft until it is sent live, and the Live
     await load.click()
     expect((await restored).status()).toBe(200)
     await expect(load).toBeEnabled()
+    await history.getByRole('button', { name: 'Close history panel', exact: true }).click()
+    await expect(history).toHaveCount(0)
 
     // Loaded into the draft only: visitors still get the live pages.
     const loaded = await api(request, 'GET', `/sites/${siteId}/`)
