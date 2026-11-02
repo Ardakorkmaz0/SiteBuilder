@@ -1,16 +1,17 @@
 // Each file goes live on its own from the file list, through the real page, and
 // Ctrl+Z takes it back in the running order of every other undo step.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 const api = vi.hoisted(() => ({
   getSite: vi.fn(), updateSite: vi.fn(), patchSite: vi.fn(), sendPageLive: vi.fn(), setPageHidden: vi.fn(), swapLiveChange: vi.fn(),
+  liveToDraft: vi.fn(),
   loadLocalFileHandle: vi.fn(),
 }))
 vi.mock('../api/sites.js', () => ({
   getSite: api.getSite, updateSite: api.updateSite, patchSite: api.patchSite,
-  liveToDraft: vi.fn(), sendVersionLive: vi.fn(),
+  liveToDraft: api.liveToDraft, sendVersionLive: vi.fn(),
   sendPageLive: api.sendPageLive, setPageHidden: api.setPageHidden, swapLiveChange: api.swapLiveChange,
 }))
 vi.mock('../api/versions.js', () => ({
@@ -165,6 +166,16 @@ describe('a file in the list', () => {
   }, 30000)
 })
 
+describe('a block the server would drop', () => {
+  it('is refused out loud, in the status line', async () => {
+    await openEditor()
+
+    act(() => useEditorStore.setState((state) => ({ insertRefusals: state.insertRefusals + 1 })))
+
+    expect(await screen.findByText('This place is full or nested too deeply, so the block was not added.', {}, SLOW)).toBeInTheDocument()
+  }, 30000)
+})
+
 describe('Ctrl+Z after going live', () => {
   async function sent() {
     await openEditor()
@@ -277,6 +288,21 @@ describe('Ctrl+Z after going live', () => {
 
     await waitFor(() => expect(api.swapLiveChange).toHaveBeenLastCalledWith('1', 12, 7), SLOW)
     await waitFor(() => expect(state('index.html')).toBe('live'), SLOW)
+  }, 30000)
+
+  it('does not reach past copying live to draft: the last thing done was not the send', async () => {
+    await sent()
+    api.liveToDraft.mockImplementationOnce(async () => answer({ live_undo: null }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Live' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy live to draft' }, SLOW))
+    await waitFor(() => expect(api.liveToDraft).toHaveBeenCalledTimes(1), SLOW)
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Draft' })).toHaveAttribute('aria-checked', 'true'), SLOW)
+
+    ctrlZ()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(api.swapLiveChange).not.toHaveBeenCalled()
+    expect(state('about.html')).toBe('live')
   }, 30000)
 
   it('undoes a page edit made after it first, and the send after that', async () => {

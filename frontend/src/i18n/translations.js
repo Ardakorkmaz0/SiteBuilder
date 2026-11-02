@@ -1631,6 +1631,7 @@ export const TURKISH_TRANSLATIONS = {
   'publish': 'canlı',
   'Version shown': 'Gösterilen sürüm',
   'Send draft live': 'Canlıya aktar',
+  'This place is full or nested too deeply, so the block was not added.': 'Burası dolu veya çok iç içe olduğu için blok eklenmedi.',
   'The live site shows the draft.': 'Canlı site taslağı gösteriyor.',
   'Live version': 'Canlı sürüm',
   'What visitors see now. Sent live on {date}.': 'Ziyaretçilerin şu an gördüğü. {date} tarihinde canlıya aktarıldı.',

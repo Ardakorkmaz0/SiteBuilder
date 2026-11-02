@@ -100,6 +100,12 @@ const MAX_NESTING_DEPTH = 4
 const MAX_CHILDREN = 60
 const MIN_MOVED_SIZE = 8
 
+// Nothing was added, and nothing should look added: the editor says so.
+function refuseInsert(set) {
+  set((state) => ({ insertRefusals: state.insertRefusals + 1 }))
+  return false
+}
+
 // How many levels below the page `id` sits: 0 for a top-level block, -1 if absent.
 function depthOf(components, id, depth = 0) {
   for (const c of components) {
@@ -118,6 +124,12 @@ function subtreeHeight(node) {
     : 0
 }
 const hasKids = (c) => PARENT_TYPES.has(c.type) && Array.isArray(c.children)
+
+// Whether a parent keeps one more child this many levels tall when saved.
+function parentHasRoom(components, parent, height = 0) {
+  return (parent.children || []).length < MAX_CHILDREN
+    && depthOf(components, parent.id) + 1 + height <= MAX_NESTING_DEPTH
+}
 const TEXT_BRUSH_TYPES = new Set(['heading', 'text', 'list', 'quote', 'icon', 'linkbutton'])
 const FIELD_BRUSH_TYPES = new Set(['input', 'select'])
 
@@ -1279,6 +1291,9 @@ export const useEditorStore = create((set, get) => ({
   selectedIds: [],
   // Snap-to-grid step in design px (0 = off). Applied during free-canvas drag.
   gridStep: 0,
+  // Counts blocks refused because the server would drop them (see parentHasRoom).
+  insertRefusals: 0,
+
   // In-app clipboard for component copy/cut/paste (holds detached snapshots;
   // each paste re-clones them with fresh ids).
   clipboard: [],
@@ -1596,6 +1611,11 @@ export const useEditorStore = create((set, get) => ({
   addComponent: (type, x = 24, y = 24, parentId = null, presetId = null, initialSize = null, initialProps = null) => {
     const def = registry[type]
     if (!def) return
+    if (parentId) {
+      const { components = [] } = selectCurrentPage(get())
+      const parent = findInTree(components, parentId)
+      if (parent && !parentHasRoom(components, parent)) return refuseInsert(set)
+    }
     get().record('add')
     set((state) => {
       const page = selectCurrentPage(state)
@@ -1990,14 +2010,25 @@ export const useEditorStore = create((set, get) => ({
       if (ids[0]) get().duplicateComponent(ids[0])
       return
     }
+    // A selected parent already carries every descendant in its copy.
+    // Duplicating a selected child again would also change the ORIGINAL tree.
+    const selected = selectedTreeRoots(selectCurrentPage(get()).components, ids)
+    const taken = new Map()
+    const sources = selected.filter((src) => {
+      const parent = findParentInTree(selectCurrentPage(get()).components, src.id)
+      if (!parent) return true
+      const count = taken.get(parent.id) ?? (parent.children || []).length
+      if (count >= MAX_CHILDREN) return false
+      taken.set(parent.id, count + 1)
+      return true
+    })
+    if (sources.length < selected.length) refuseInsert(set)
+    if (!sources.length) return
     get().record('dup-sel')
     set((state) => {
       const page = selectCurrentPage(state)
       let components = page.components
       const newIds = []
-      // A selected parent already carries every descendant in its copy.
-      // Duplicating a selected child again would also change the ORIGINAL tree.
-      const sources = selectedTreeRoots(page.components, ids)
       const copies = cloneTrees(sources)
       for (const [index, src] of sources.entries()) {
         const copy = copies[index]
@@ -2865,6 +2896,8 @@ export const useEditorStore = create((set, get) => ({
   },
 
   duplicateComponent: (id) => {
+    const parent = findParentInTree(selectCurrentPage(get()).components, id)
+    if (parent && (parent.children || []).length >= MAX_CHILDREN) return refuseInsert(set)
     get().record('dup')
     set((state) => {
       const page = selectCurrentPage(state)
@@ -3008,8 +3041,7 @@ export const useEditorStore = create((set, get) => ({
       // would shrink to its box.
       if (['fixed', 'sticky'].includes(node.props?.scrollBehavior)) return false
       if (node.type === 'navbar' && node.props?.navLayout !== 'vertical' && node.props?.widthMode !== 'boxed') return false
-      if ((target.children || []).length >= MAX_CHILDREN) return false
-      if (depthOf(comps, targetId) + 1 + subtreeHeight(node) > MAX_NESTING_DEPTH) return false
+      if (!parentHasRoom(comps, target, subtreeHeight(node))) return false
     }
     get().record('move-into')
     set((current) => {
