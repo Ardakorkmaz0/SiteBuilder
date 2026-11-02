@@ -72,9 +72,13 @@ test('a loaded checkpoint stays in the draft until it is sent live, and the Live
     await live.getByRole('button', { name: 'Back to draft', exact: true }).click()
     await expect(live).toHaveCount(0)
 
-    const sent = page.waitForResponse((response) => new URL(response.url()).pathname === `/api/sites/${siteId}/` && response.request().method() === 'PATCH')
+    // The editor writes the site with PUT; a go-live write carries the pages.
+    const sent = page.waitForResponse((response) => new URL(response.url()).pathname === `/api/sites/${siteId}/`
+      && ['PUT', 'PATCH'].includes(response.request().method()))
     await page.getByRole('button', { name: 'Send draft live', exact: true }).click()
-    expect((await sent).status()).toBe(200)
+    const write = await sent
+    expect(write.status()).toBe(200)
+    expect(write.request().postDataJSON().published_pages.map((item) => item.path)).toEqual(['', 'about'])
 
     const home = await request.get(`${BACKEND}/s/${slug}/`)
     expect(home.status()).toBe(200)
