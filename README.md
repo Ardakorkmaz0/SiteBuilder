@@ -267,3 +267,14 @@ cd backend
 
 (or create a full superuser with `python manage.py createsuperuser`, which can also
 use Django's own admin at `/admin/` on the backend.)
+
+## License
+
+Copyright (C) 2026 ArdaKorkmaz0
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU Affero General Public License as published by the Free Software Foundation, version 3.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See [LICENSE](LICENSE)
+for the full text.
