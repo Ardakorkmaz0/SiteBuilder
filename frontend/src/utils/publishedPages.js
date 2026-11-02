@@ -122,6 +122,7 @@ export function publishedPagesFor(schema, htmlMap = {}, siteTitle = '', slug = '
 
   return pages
     .map((page, index) => ({
+      pageId: page.id,
       path: paths[index],
       title: pageSeoTitle(page, page?.name || siteTitle || 'My Site').slice(0, 200),
       html: pageDocument(linked.pages[index], linked, siteTitle, htmlMap, links),

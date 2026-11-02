@@ -959,5 +959,6 @@ def clean_published_pages(value):
             'html': html,
             'no_index': bool(page.get('noIndex') or page.get('no_index')),
             'position': position,
+            'page_id': _str(page.get('pageId') or page.get('page_id'))[:200],
         })
     return cleaned

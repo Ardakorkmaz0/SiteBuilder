@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useEditorStore } from '../../store/editorStore.js'
 import { pageFileName } from '../../utils/pageFiles.js'
 import { countLinksToPage } from '../../utils/pageLinks.js'
@@ -13,6 +14,8 @@ import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 //  - click the ACTIVE file → toggle its source/code view (like re-clicking a
 //    tab in VS Code) via onActiveClick
 //  - hover actions        → rename, per-file HTML import (HTML mode), delete
+//  - right click          → those, plus going live and staying off the public site
+//  - the file's colour    → green live, blue an older version live, red not live
 // `mode`: 'html' shows has-document dots + import; 'pages' is the component
 // editor variant (every page always "has" content).
 
@@ -30,6 +33,11 @@ export default function PageFilesPanel({
   onActiveClick,
   onImportInto,
   onBeforePageChange,
+  // { [page id]: 'live' | 'older' | 'none' }. Without it files have no colour.
+  liveStates,
+  privatePages = [],
+  onSendLive,
+  onSetHidden,
 }) {
   const { t } = useLanguage()
   const pages = useEditorStore((s) => s.schema.pages)
@@ -48,6 +56,8 @@ export default function PageFilesPanel({
   const [addPrompt, setAddPrompt] = useState(null)
   const importRef = useRef(null)
   const importTarget = useRef(null)
+  // The open file menu: { pageId, x, y }.
+  const [menu, setMenu] = useState(null)
 
   const createPage = (mode) => {
     if (!addPrompt) return
@@ -108,20 +118,87 @@ export default function PageFilesPanel({
 
   const folderCount = groups.filter(Boolean).length
 
+  const startRename = (page) => {
+    setEditingId(page.id)
+    setDraft(page.name || '')
+  }
+  const startImport = (page) => {
+    importTarget.current = page.id
+    importRef.current?.click()
+  }
+  const confirmDelete = (page, fname) => {
+    // Links to it from the other pages stop working: say how many.
+    const links = countLinksToPage(pages, page.id, htmlMap)
+    const question = links
+      ? t('Delete "{name}" ({file})? {count} link(s) on other pages lead to it and will stop working until you point them elsewhere.', { name: page.name, file: fname, count: links })
+      : t('Delete "{name}" ({file})?', { name: page.name, file: fname })
+    if (window.confirm(question)) {
+      onBeforePageChange?.()
+      deletePage(page.id)
+    }
+  }
+
+  const menuPage = menu ? pages.find((item) => item.id === menu.pageId) : null
+  const closeMenu = () => {
+    const pageId = menu?.pageId
+    setMenu(null)
+    if (pageId) rootRef.current?.querySelector(`[data-page-button="${CSS.escape(pageId)}"]`)?.focus()
+  }
+  const menuItems = (page) => {
+    const isHome = page.id === pages[0]?.id
+    const hiddenFromPublic = privatePages.includes(page.id)
+    return [
+      ...(onSendLive ? [{
+        label: t('Go live'),
+        // Nothing to send when what is live is this file as it stands.
+        disabled: liveStates?.[page.id] === 'live',
+        action: 'live',
+      }] : []),
+      ...(onSetHidden ? [{
+        label: t('Do not show in public'),
+        checked: hiddenFromPublic,
+        // The home page answers at the site's own address.
+        disabled: isHome,
+        hint: isHome ? t('The home page cannot be hidden.') : undefined,
+        action: 'hide',
+      }] : []),
+      ...((onSendLive || onSetHidden) ? [{ divider: true }] : []),
+      { label: t('Rename page'), action: 'rename' },
+      ...(mode === 'html' ? [{ label: t('Import an HTML file into this page'), action: 'import' }] : []),
+      ...(pages.length > 1 ? [{ label: t('Delete page'), danger: true, action: 'delete' }] : []),
+    ]
+  }
+  const pickMenuItem = (action, page) => {
+    if (action === 'live') onSendLive(page.id)
+    if (action === 'hide') onSetHidden(page.id, !privatePages.includes(page.id))
+    if (action === 'rename') startRename(page)
+    if (action === 'import') startImport(page)
+    if (action === 'delete') confirmDelete(page, pageFileName(page, page.id === pages[0]?.id))
+  }
+
   const renderFile = (page, indented) => {
     const isHome = page.id === pages[0]?.id
     const fname = pageFileName(page, isHome)
     const hasHtml = mode === 'pages' || !!(htmlMap[page.id] || '').trim()
     const active = page.id === currentPageId
+    const liveState = liveStates?.[page.id]
+    const hiddenFromPublic = privatePages.includes(page.id)
     return (
       <div
         key={page.id}
+        data-live-state={liveState}
+        onContextMenu={(event) => {
+          event.preventDefault()
+          // From the keyboard (the menu key) there is no pointer to open at.
+          const box = event.currentTarget.getBoundingClientRect()
+          setMenu({ pageId: page.id, x: event.clientX || box.left + 24, y: event.clientY || box.bottom })
+        }}
         className={`group relative flex items-center gap-1.5 rounded-md py-1 pr-1 text-sm transition ${
           indented ? 'pl-5' : 'pl-2'
         } ${active ? 'bg-[#eef2ff]' : 'hover:bg-[#f3f4f6]'}`}
       >
         {active && <span className="absolute bottom-1 left-0 top-1 w-0.5 rounded-full bg-[#4f46e5]" />}
-        <span className="shrink-0 text-[var(--studio-text-muted)]">
+        <span className={`shrink-0 ${LIVE_STATE_COLOR[liveState] || 'text-[var(--studio-text-muted)]'}`}>
           {hasHtml ? <FileCodeIcon size={14} /> : <FileIcon size={14} />}
         </span>
         {editingId === page.id ? (
@@ -169,11 +246,17 @@ export default function PageFilesPanel({
             className={`min-w-0 flex-1 truncate text-left font-mono text-[12.5px] ${
               linkArmed
                 ? 'rounded bg-[#eef2ff] px-1 text-[#4f46e5] ring-1 ring-[#c7d2fe]'
-                : active ? 'font-semibold text-[#4f46e5]' : 'text-[#374151]'
+                : `${active ? 'font-semibold' : ''} ${LIVE_STATE_COLOR[liveState] || (active ? 'text-[#4f46e5]' : 'text-[#374151]')}`
             }`}
           >
             {fname}
           </button>
+        )}
+        {liveState && <span className="sr-only">{t(LIVE_STATE_LABEL[liveState])}</span>}
+        {hiddenFromPublic && (
+          <span title={t('Hidden from the public')} className="shrink-0 rounded bg-[var(--studio-control)] px-1 text-[9px] font-bold uppercase text-[var(--studio-text-muted)]">
+            {t('hidden')}
+          </span>
         )}
         {mode === 'html' && !(htmlMap[page.id] || '').trim() && (
           <span className="shrink-0 rounded bg-[#f3f4f6] px-1 text-[9px] font-bold uppercase text-[var(--studio-text-faint)]">
@@ -187,10 +270,7 @@ export default function PageFilesPanel({
             type="button"
             title={t('Rename page')}
             aria-label={`${t('Rename page')}: ${page.name}`}
-            onClick={() => {
-              setEditingId(page.id)
-              setDraft(page.name || '')
-            }}
+            onClick={() => startRename(page)}
             className="rounded px-1 text-xs text-[var(--studio-text-faint)] hover:bg-white hover:text-[#374151]"
           >
             ✎
@@ -200,10 +280,7 @@ export default function PageFilesPanel({
               type="button"
               title={t('Import an HTML file into this page')}
               aria-label={`${t('Import an HTML file into this page')}: ${page.name}`}
-              onClick={() => {
-                importTarget.current = page.id
-                importRef.current?.click()
-              }}
+              onClick={() => startImport(page)}
               className="rounded px-1 text-xs text-[var(--studio-text-faint)] hover:bg-white hover:text-[#374151]"
             >
               ⬆
@@ -214,17 +291,7 @@ export default function PageFilesPanel({
               type="button"
               title={t('Delete page')}
               aria-label={`${t('Delete page')}: ${page.name}`}
-              onClick={() => {
-                // Links to it from the other pages stop working: say how many.
-                const links = countLinksToPage(pages, page.id, htmlMap)
-                const question = links
-                  ? t('Delete "{name}" ({file})? {count} link(s) on other pages lead to it and will stop working until you point them elsewhere.', { name: page.name, file: fname, count: links })
-                  : t('Delete "{name}" ({file})?', { name: page.name, file: fname })
-                if (window.confirm(question)) {
-                  onBeforePageChange?.()
-                  deletePage(page.id)
-                }
-              }}
+              onClick={() => confirmDelete(page, fname)}
               className="rounded px-1 text-xs text-[var(--studio-text-faint)] hover:bg-white hover:text-red-600"
             >
               ✕
@@ -309,8 +376,100 @@ export default function PageFilesPanel({
           : t('Pages of your design. Click the open page again to toggle the code panel.')}
       </p>
 
+      {liveStates && (
+        <p className="mt-2 text-xs leading-relaxed text-[var(--studio-text-faint)]">
+          {t('Green: live as it stands. Blue: an older version is live. Red: not live. Right-click a file for options.')}
+        </p>
+      )}
+
       {addPrompt && <NewPageModePrompt onPick={createPage} onCancel={() => setAddPrompt(null)} />}
+      {menuPage && (
+        <FileMenu
+          x={menu.x}
+          y={menu.y}
+          label={t('Options for {name}', { name: pageFileName(menuPage, menuPage.id === pages[0]?.id) })}
+          onClose={closeMenu}
+          items={menuItems(menuPage)}
+          onPick={(action) => pickMenuItem(action, menuPage)}
+        />
+      )}
     </div>
+  )
+}
+
+const LIVE_STATE_COLOR = {
+  live: 'text-[var(--studio-success)]',
+  older: 'text-[var(--studio-info)]',
+  none: 'text-[var(--studio-danger)]',
+}
+const LIVE_STATE_LABEL = { live: 'Live', older: 'Older version live', none: 'Not live' }
+
+// A file's right-click menu, at the pointer, drawn over everything: the list
+// sits in a scrolling rail that would cut it off. Arrow keys move, Esc or a
+// click elsewhere closes it, and focus goes back to the file.
+function FileMenu({ x, y, label, items, onPick, onClose }) {
+  const ref = useRef(null)
+  const [position, setPosition] = useState({ left: x, top: y })
+  useEscapeToClose(true, onClose)
+
+  useLayoutEffect(() => {
+    const box = ref.current.getBoundingClientRect()
+    setPosition({
+      left: Math.max(8, Math.min(x, window.innerWidth - box.width - 8)),
+      top: Math.max(8, Math.min(y, window.innerHeight - box.height - 8)),
+    })
+    ref.current.querySelector('button:not(:disabled)')?.focus()
+  }, [x, y])
+
+  useEffect(() => {
+    const closeOutside = (event) => {
+      if (!ref.current?.contains(event.target)) onClose()
+    }
+    document.addEventListener('pointerdown', closeOutside)
+    return () => document.removeEventListener('pointerdown', closeOutside)
+  }, [onClose])
+
+  const moveFocus = (event) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    event.preventDefault()
+    const buttons = [...ref.current.querySelectorAll('button:not(:disabled)')]
+    const index = buttons.indexOf(document.activeElement)
+    const step = event.key === 'ArrowDown' ? 1 : -1
+    buttons[(index + step + buttons.length) % buttons.length]?.focus()
+  }
+
+  return createPortal(
+    <div
+      ref={ref}
+      role="menu"
+      aria-label={label}
+      onKeyDown={moveFocus}
+      onContextMenu={(event) => event.preventDefault()}
+      style={position}
+      className="studio-theme-surface fixed z-[130] w-56 rounded-[var(--studio-radius-lg)] border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-1.5 text-xs text-[var(--studio-text)] shadow-[var(--studio-shadow-lg)]"
+    >
+      {items.map((item) => (item.divider ? (
+        <div key="divider" className="my-1 border-t border-[var(--studio-border)]" />
+      ) : (
+        <button
+          key={item.label}
+          type="button"
+          role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+          aria-checked={item.checked}
+          disabled={item.disabled}
+          title={item.hint}
+          onClick={() => {
+            onClose()
+            onPick(item.action)
+          }}
+          className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--studio-control-hover)] disabled:cursor-not-allowed disabled:opacity-50 ${item.danger ? 'text-[var(--studio-danger)]' : ''}`}
+        >
+          <span aria-hidden className="w-3 shrink-0">{item.checked ? '✓' : ''}</span>
+          <span className="min-w-0 flex-1">{item.label}</span>
+        </button>
+      )))}
+    </div>,
+    document.body,
   )
 }
 

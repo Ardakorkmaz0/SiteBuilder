@@ -108,6 +108,10 @@ class Site(models.Model):
     live_schema = models.JSONField(null=True, blank=True, default=None)
     live_html = models.TextField(blank=True, default='')
     live_at = models.DateTimeField(null=True, blank=True)
+    # Ids of the draft's pages kept off the public site ("do not show in
+    # public"): sending the whole site live leaves them out. Not in the schema,
+    # so neither undoing an edit nor loading a saved version can undo the choice.
+    private_pages = models.JSONField(default=list, blank=True)
     # Latest transition from draft to public. SitePublication keeps daily slots
     # after deletion; this stamp remains a legacy fallback for cap accounting.
     last_published_at = models.DateTimeField(null=True, blank=True, db_index=True)
@@ -300,6 +304,10 @@ class PublishedPage(models.Model):
     no_index = models.BooleanField(default=False)
     position = models.PositiveIntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)
+    # The draft's page this document came from, and that page's fingerprint when
+    # it was sent (live_pages.py): green, blue or red in the editor's file list.
+    page_id = models.CharField(max_length=200, blank=True, default='')
+    fingerprint = models.CharField(max_length=64, blank=True, default='')
 
     class Meta:
         unique_together = ('site', 'path')
@@ -307,6 +315,28 @@ class PublishedPage(models.Model):
 
     def __str__(self):
         return f'{self.site.slug}/{self.path}'
+
+
+class LiveSnapshot(models.Model):
+    """What one change to the live site replaced, so Ctrl+Z can put it back.
+
+    `page_id` empty: everything that was live. Otherwise only that page's part,
+    so undoing it cannot disturb a page sent live since (from another tab).
+    """
+
+    MAX_PER_SITE = 10
+
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name='live_snapshots')
+    page_id = models.CharField(max_length=200, blank=True, default='')
+    rows = models.JSONField(default=list)
+    live_schema = models.JSONField(null=True, blank=True, default=None)
+    had_live = models.BooleanField(default=False)
+    live_html = models.TextField(blank=True, default='')
+    touches_home = models.BooleanField(default=False)
+    live_at = models.DateTimeField(null=True, blank=True)
+    published = models.BooleanField(default=False)
+    private_pages = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 
 class FormSubmission(models.Model):
