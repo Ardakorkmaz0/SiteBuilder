@@ -842,7 +842,9 @@ export function executeTool(rawName, args) {
     case 'removeComponent':
       return checkId(a.id) || (store.removeComponent(a.id), { ok: true })
     case 'duplicateComponent':
-      return checkId(a.id) || (store.duplicateComponent(a.id), { ok: true })
+      return checkId(a.id) || (store.duplicateComponent(a.id) === false
+        ? { ok: false, error: `The parent of "${a.id}" already holds as many components as it can.` }
+        : { ok: true })
     // Store names are bringToFront / sendToBack but those are confusing in a
     // flow-mode (vertical document) context — expose them to the model as
     // moveToEnd / moveToStart instead.

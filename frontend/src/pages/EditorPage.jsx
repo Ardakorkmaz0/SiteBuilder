@@ -51,6 +51,7 @@ import {
   SparklesIcon,
   SunIcon,
   UndoIcon,
+  UploadIcon,
 } from '../components/icons.jsx'
 import Canvas from '../components/editor/Canvas.jsx'
 import CodeActivityOverlay from '../components/editor/CodeActivityOverlay.jsx'
@@ -490,6 +491,13 @@ function SiteEditor() {
   const [livePast, setLivePast] = useState([])
   const [liveFuture, setLiveFuture] = useState([])
   const [liveNote, setLiveNote] = useState('')
+  // A block the server would drop is refused in the store, out of sight of
+  // whichever button or shortcut asked for it: said here, in one place.
+  useEffect(() => useEditorStore.subscribe((state, previous) => {
+    if (state.insertRefusals !== previous.insertRefusals) {
+      setLiveNote(t('This place is full or nested too deeply, so the block was not added.'))
+    }
+  }), [t])
   const liveStepBusyRef = useRef(false)
   const [siteOptions, setSiteOptions] = useState({})
   const [reviewToken, setReviewToken] = useState('')
@@ -1872,6 +1880,10 @@ function SiteEditor() {
       setPageHtmlMap(fresh?.schema ? loadSchema(fresh.schema, { legacySiteHtml: fresh.html }) : {})
       setHtmlPast([])
       setHtmlFuture([])
+      // The draft's own steps end here, and so do the live site's: with nothing
+      // newer on the list, Ctrl+Z after a load would change what visitors see.
+      setLivePast([])
+      setLiveFuture([])
       htmlRevisionRef.current = 0
       setHtmlDirty(false)
       setWorkspaceDirty(false)
@@ -2616,7 +2628,7 @@ function SiteEditor() {
         >S</Link>
         <div className="min-w-0">
           <input
-            className="block w-[150px] truncate border-0 bg-transparent p-0 text-sm font-semibold text-[var(--studio-text)] outline-none hover:text-[var(--studio-accent-hover)]"
+            className={`block truncate border-0 bg-transparent p-0 text-sm font-semibold text-[var(--studio-text)] outline-none hover:text-[var(--studio-accent-hover)] ${published ? 'w-20 min-[1100px]:w-[150px]' : 'w-[150px]'}`}
             value={title}
             onChange={(event) => changeTitle(event.target.value)}
             aria-label={t('Site title')}
@@ -2651,7 +2663,8 @@ function SiteEditor() {
             type="button"
             onClick={() => { if (guestGate('share_link')) return; openSiteControlCenter('feedback') }}
             title={t('Share this project')}
-            className="studio-btn studio-btn-secondary"
+            // A published site has more in this header; More actions has Share too.
+            className={`studio-btn studio-btn-secondary ${published ? 'hidden min-[1100px]:inline-flex' : ''}`}
           >
             <LinkIcon size={14} /> <span className="hidden xl:inline">{t('Share')}</span>
           </button>
@@ -2706,8 +2719,10 @@ function SiteEditor() {
               disabled={saving}
               className={`shrink-0 whitespace-nowrap ${draftAhead ? 'studio-btn studio-btn-primary' : 'studio-btn studio-btn-secondary'}`}
               title={draftAhead ? t('The draft has changes that are not live yet.') : t('The live site shows the draft.')}
+              aria-label={t('Send draft live')}
             >
-              {t('Send draft live')}
+              <UploadIcon size={15} className="min-[1100px]:hidden" />
+              <span className="hidden min-[1100px]:inline">{t('Send draft live')}</span>
             </button>
           )}
           <button type="button" data-tour="publish" onClick={() => {

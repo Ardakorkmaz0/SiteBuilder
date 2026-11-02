@@ -27,6 +27,30 @@ beforeEach(() => {
   })
 })
 
+describe('a parent that is full', () => {
+  const full = {
+    id: 'box', type: 'container', props: {}, styles: {}, layout: { x: 0, y: 0, w: 500, h: 500 },
+    children: Array.from({ length: 60 }, (_, index) => ({ id: `kid${index}`, type: 'heading', props: {}, styles: {}, layout: { x: 0, y: 0, w: 100, h: 40 } })),
+  }
+  beforeEach(() => {
+    useEditorStore.getState().loadSchema({ theme: {}, pages: [{ id: 'page_home', name: 'Home', components: [full] }] })
+  })
+
+  it('reports a copy that was refused instead of success', () => {
+    const result = executeTool('duplicateComponent', { id: 'kid3' })
+
+    expect(result.ok).toBe(false)
+    expect(page().components[0].children.length).toBe(60)
+  })
+
+  it('reports a block that was refused instead of success', () => {
+    const result = executeTool('addComponent', { type: 'heading', parentId: 'box' })
+
+    expect(result.ok).toBe(false)
+    expect(page().components[0].children.length).toBe(60)
+  })
+})
+
 describe('id validation', () => {
   it('rejects a made-up id instead of reporting success', () => {
     const res = executeTool('updateProps', { id: 'nope_123', patch: { text: 'x' } })
