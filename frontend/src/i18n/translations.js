@@ -2797,6 +2797,7 @@ export const TURKISH_TRANSLATIONS = {
   'Automatic': 'Otomatik',
   'Recovery': 'Kurtarma',
   'Live versions': 'Canlı sürümler',
+  'Now live': 'Şu an canlı',
   'Live versions appear here each time you send the site live.': 'Siteyi her canlıya aktarışınızda canlı sürümler burada görünür.',
   'Recovery points appear here when you restore an older save.': 'Eski bir kaydı geri yüklediğinizde kurtarma noktaları burada görünür.',
   'Changes save automatically': 'Değişiklikler otomatik kaydedilir',

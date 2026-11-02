@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import HistoryPanel from './HistoryPanel.jsx'
 import { listVersions, restoreVersion, setVersionPinned } from '../../api/versions.js'
@@ -83,6 +83,52 @@ describe('HistoryPanel save sources and pins', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Recovery 1', exact: true }))
     expect(screen.getByText('Your work before a load')).toBeInTheDocument()
     expect(screen.queryByText('Sent live')).not.toBeInTheDocument()
+  })
+
+  describe('the version that is live now', () => {
+    const liveRows = [
+      { id: 3, source: 'publish', pinned: false, label: 'Sent live from v1', created_at: '2026-07-15T11:00:00Z' },
+      { id: 2, source: 'publish', pinned: false, label: 'Sent live', created_at: '2026-07-15T10:00:00Z' },
+    ]
+    const rowOf = (text) => screen.getByText(text).closest('li')
+
+    beforeEach(() => listVersions.mockResolvedValue(liveRows))
+
+    it('marks only the newest live row, and offers to send only the others', async () => {
+      renderPanel({ onSendLive: vi.fn() })
+      await screen.findByText('Sent live')
+
+      expect(screen.getAllByText('Now live')).toHaveLength(1)
+      expect(within(rowOf('Sent live from an older save')).getByText('Now live')).toBeInTheDocument()
+      expect(within(rowOf('Sent live from an older save')).queryByRole('button', { name: 'Send live', exact: true })).not.toBeInTheDocument()
+      expect(within(rowOf('Sent live')).queryByText('Now live')).not.toBeInTheDocument()
+      expect(within(rowOf('Sent live')).getByRole('button', { name: 'Send live', exact: true })).toBeInTheDocument()
+    })
+
+    it('marks nothing while the site is offline', async () => {
+      renderPanel()
+      await screen.findByText('Sent live')
+
+      expect(screen.queryByText('Now live')).not.toBeInTheDocument()
+    })
+
+    it('moves the mark when the header sends the draft live with the panel open', async () => {
+      const onSendLive = vi.fn()
+      const panel = (liveAt) => (
+        <LanguageProvider><HistoryPanel open siteId="7" onClose={vi.fn()} onSendLive={onSendLive} liveAt={liveAt} /></LanguageProvider>
+      )
+      const { rerender } = render(panel('2026-07-15T11:00:00Z'))
+      await screen.findByText('Sent live')
+
+      listVersions.mockResolvedValue([
+        { id: 4, source: 'publish', pinned: false, label: 'Sent live', created_at: '2026-07-15T12:00:00Z' },
+        { ...liveRows[0] },
+      ])
+      rerender(panel('2026-07-15T12:00:00Z'))
+
+      await waitFor(() => expect(within(rowOf('Sent live')).getByText('Now live')).toBeInTheDocument())
+      expect(within(rowOf('Sent live from an older save')).queryByText('Now live')).not.toBeInTheDocument()
+    })
   })
 
   it('says when nothing has been sent live yet', async () => {

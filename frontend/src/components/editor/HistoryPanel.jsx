@@ -28,6 +28,9 @@ export default function HistoryPanel({
   // Present while the site is published: sends one version live and leaves
   // the draft as it is.
   onSendLive,
+  // When the site was last sent live. It changes when the header sends the
+  // draft live while this panel is open, and the list follows.
+  liveAt,
   onSave,
   // Work on screen that the server does not have yet.
   hasUnsavedChanges = false,
@@ -56,7 +59,7 @@ export default function HistoryPanel({
         setRows([])
       })
     return () => { cancelled = true }
-  }, [open, siteId, t])
+  }, [open, siteId, t, liveAt])
 
   const run = async (fn) => {
     if (busy) return
@@ -130,6 +133,10 @@ export default function HistoryPanel({
 
   const { manualSaves, autosaves, liveSaves, recoverySaves } = groupSiteVersions(rows)
 
+  // Every send adds a row and only the oldest are pruned, so the newest row is
+  // what visitors see, for as long as the site is published.
+  const nowLiveId = onSendLive ? liveSaves[0]?.id : undefined
+
   const timelineRow = (v) => (
     <li key={v.id} className="flex items-center gap-2 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 transition hover:border-[var(--studio-border-strong)]">
       <SourceBadge source={v.source} pinned={v.pinned} />
@@ -137,8 +144,13 @@ export default function HistoryPanel({
         <p className="truncate text-[12px] font-medium text-[var(--studio-text)]">{rowTitle(v, t)}</p>
         <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}</p>
       </div>
+      {v.id === nowLiveId && (
+        <span className="shrink-0 rounded-full border border-[var(--studio-success)] bg-[var(--studio-success-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--studio-success)]">
+          {t('Now live')}
+        </span>
+      )}
       <SlotBtn disabled={busy} onClick={() => restore(v.id)}>{t('Load')}</SlotBtn>
-      {onSendLive && <SlotBtn disabled={busy} onClick={() => sendLive(v.id)}>{t('Send live')}</SlotBtn>}
+      {onSendLive && v.id !== nowLiveId && <SlotBtn disabled={busy} onClick={() => sendLive(v.id)}>{t('Send live')}</SlotBtn>}
     </li>
   )
 
