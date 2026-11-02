@@ -57,6 +57,13 @@ Now:
   `goLive`, first publish without `goLive`, the frame header — each turned a test
   red.
 
+## Later addition: a Live tab in History
+
+`groupSiteVersions` returns `liveSaves` (source `publish`), shown on their own tab
+and no longer among the recovery points. `SiteVersion._prune` caps them apart
+(`MAX_LIVE_VERSIONS_PER_SITE`, 30), since they used to share the manual cap and a
+run of saves could evict them. The five tabs sit on two rows.
+
 ## Worth a hard look
 
 - `sendHistoryVersionLive` rebuilds an html page's document from `page.html`,

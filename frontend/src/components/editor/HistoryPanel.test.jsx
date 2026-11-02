@@ -64,6 +64,34 @@ describe('HistoryPanel save sources and pins', () => {
     expect(screen.queryByText('Manual save')).not.toBeInTheDocument()
     expect(screen.getByText('Auto-saved snapshot')).toBeInTheDocument()
   })
+
+  it('keeps what was sent live on its own tab, apart from the recovery points', async () => {
+    listVersions.mockResolvedValue([
+      { id: 3, source: 'publish', pinned: false, label: 'Sent live', created_at: '2026-07-15T11:00:00Z' },
+      { id: 2, source: 'save', pinned: false, label: 'before restore', created_at: '2026-07-15T10:00:00Z' },
+      { id: 1, source: 'manual', pinned: false, label: 'My save', created_at: '2026-07-15T09:00:00Z' },
+    ])
+    renderPanel()
+    await screen.findByText('Sent live')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Live 1', exact: true }))
+    expect(screen.getByRole('button', { name: 'Live 1', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Sent live')).toBeInTheDocument()
+    expect(screen.queryByText('My save')).not.toBeInTheDocument()
+    expect(screen.queryByText('Your work before a load')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recovery 1', exact: true }))
+    expect(screen.getByText('Your work before a load')).toBeInTheDocument()
+    expect(screen.queryByText('Sent live')).not.toBeInTheDocument()
+  })
+
+  it('says when nothing has been sent live yet', async () => {
+    renderPanel()
+    await screen.findByText('Manual save')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Live 0', exact: true }))
+    expect(screen.getByText('Live versions appear here each time you send the site live.')).toBeInTheDocument()
+  })
 })
 
 // The server's snapshot before a load is of the SAVED site, so work still on

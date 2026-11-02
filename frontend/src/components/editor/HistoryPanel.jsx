@@ -16,6 +16,7 @@ import { ClockIcon, PlusIcon } from '../icons.jsx'
 //   • Checkpoints — pinned, named saves the auto-save FIFO never evicts. You
 //     create them, restore them, save OVER them, or delete them.
 //   • Auto-saves — the rolling background snapshots (restore only).
+//   • Live versions — what was sent live, each time it was.
 // Creating/overwriting a checkpoint saves the editor first (via onSave) so the
 // slot captures the latest edits, then snapshots the now-saved site.
 export default function HistoryPanel({
@@ -127,7 +128,19 @@ export default function HistoryPanel({
 
   if (!open) return null
 
-  const { manualSaves, autosaves, recoverySaves } = groupSiteVersions(rows)
+  const { manualSaves, autosaves, liveSaves, recoverySaves } = groupSiteVersions(rows)
+
+  const timelineRow = (v) => (
+    <li key={v.id} className="flex items-center gap-2 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 transition hover:border-[var(--studio-border-strong)]">
+      <SourceBadge source={v.source} pinned={v.pinned} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[12px] font-medium text-[var(--studio-text)]">{rowTitle(v, t)}</p>
+        <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}</p>
+      </div>
+      <SlotBtn disabled={busy} onClick={() => restore(v.id)}>{t('Load')}</SlotBtn>
+      {onSendLive && <SlotBtn disabled={busy} onClick={() => sendLive(v.id)}>{t('Send live')}</SlotBtn>}
+    </li>
+  )
 
   return (
     <aside
@@ -199,19 +212,23 @@ export default function HistoryPanel({
         </div>
       </div>
 
-      <div className="flex gap-1 border-b border-[var(--studio-border)] bg-[var(--studio-panel)] px-3 py-2">
+      {/* Five tabs do not fit one row of the panel without cutting their names:
+          three on the first row, two on the second, both filling the width. */}
+      <div className="grid grid-cols-6 gap-1 border-b border-[var(--studio-border)] bg-[var(--studio-panel)] px-3 py-2">
         {[
           ['all', 'All', (rows || []).length],
           ['manual', 'Manual', manualSaves.length],
           ['auto', 'Automatic', autosaves.length],
+          ['live', 'Live', liveSaves.length],
           ['recovery', 'Recovery', recoverySaves.length],
-        ].map(([value, label, count]) => (
+        ].map(([value, label, count], index) => (
           <button
             key={value}
             type="button"
             onClick={() => setFilter(value)}
             aria-label={`${t(label)} ${count}`}
-            className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1.5 py-1.5 text-[10px] font-semibold transition ${
+            aria-pressed={filter === value}
+            className={`${index < 3 ? 'col-span-2' : 'col-span-3'} flex min-w-0 items-center justify-center gap-1 rounded-lg border px-1.5 py-1.5 text-[10px] font-semibold transition ${
               filter === value
                 ? 'border-[var(--studio-border-strong)] bg-[var(--studio-panel-raised)] text-[var(--studio-text)] shadow-sm'
                 : 'border-transparent text-[var(--studio-text-muted)] hover:border-[var(--studio-border)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]'
@@ -286,21 +303,25 @@ export default function HistoryPanel({
             </>
             )}
 
+            {(filter === 'all' || filter === 'live') && liveSaves.length > 0 && (
+              <>
+                <SectionTitle>{t('Live versions')} ({liveSaves.length})</SectionTitle>
+                <ul className="mb-4 space-y-2">
+                  {liveSaves.map(timelineRow)}
+                </ul>
+              </>
+            )}
+            {filter === 'live' && liveSaves.length === 0 && (
+              <p className="rounded-xl border border-dashed border-[var(--studio-border)] bg-[var(--studio-panel)] p-4 text-xs leading-relaxed text-[var(--studio-text-muted)]">
+                {t('Live versions appear here each time you send the site live.')}
+              </p>
+            )}
+
             {(filter === 'all' || filter === 'recovery') && recoverySaves.length > 0 && (
               <>
                 <SectionTitle>{t('Recovery points')} ({recoverySaves.length})</SectionTitle>
                 <ul className="space-y-2">
-                  {recoverySaves.map((v) => (
-                    <li key={v.id} className="flex items-center gap-2 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 transition hover:border-[var(--studio-border-strong)]">
-                      <SourceBadge source={v.source} pinned={v.pinned} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[12px] font-medium text-[var(--studio-text)]">{rowTitle(v, t)}</p>
-                        <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}</p>
-                      </div>
-                      <SlotBtn disabled={busy} onClick={() => restore(v.id)}>{t('Load')}</SlotBtn>
-                      {onSendLive && <SlotBtn disabled={busy} onClick={() => sendLive(v.id)}>{t('Send live')}</SlotBtn>}
-                    </li>
-                  ))}
+                  {recoverySaves.map(timelineRow)}
                 </ul>
               </>
             )}
