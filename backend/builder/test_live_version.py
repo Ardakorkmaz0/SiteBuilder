@@ -181,3 +181,33 @@ class TestReadingAVersion:
         assert says(mine.data['schema']) == '<h1>Live</h1>'
         assert as_user(stranger).get(url).status_code == 404
         assert as_user(None).get(url).status_code in (401, 403)
+
+
+# History has a tab of live versions, so a run of saves must not empty it.
+@pytest.mark.django_db
+class TestLiveVersionsInHistory:
+    def site(self):
+        owner = User.objects.create_user('keeper', 'keeper@example.com', 'secret123')
+        return Site.objects.create(owner=owner, title='Kept', published=True)
+
+    def test_many_manual_saves_leave_the_live_versions_alone(self):
+        site = self.site()
+        site.schema = schema('Draft')
+        site.save(update_fields=['schema'])
+        live = SiteVersion.objects.create(site=site, schema=schema('Live'), source='publish', label='Sent live')
+        for number in range(52):
+            SiteVersion.snapshot(site, source='manual', label=f'save {number}', force=True)
+
+        assert SiteVersion.objects.filter(pk=live.pk).exists()
+        assert SiteVersion.objects.filter(site=site, source='manual').count() == 50
+
+    def test_live_versions_have_their_own_cap_and_the_newest_stay(self):
+        site = self.site()
+        for number in range(32):
+            SiteVersion.objects.create(site=site, schema=schema('Live'), source='publish', label=f'Sent live {number}')
+        SiteVersion._prune(site)
+
+        kept = set(SiteVersion.objects.filter(site=site, source='publish').values_list('label', flat=True))
+        assert len(kept) == 30
+        assert 'Sent live 31' in kept
+        assert 'Sent live 0' not in kept

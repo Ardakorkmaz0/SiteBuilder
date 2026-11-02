@@ -445,6 +445,7 @@ class SiteVersion(models.Model):
 
     MAX_VERSIONS_PER_SITE = 30        # auto-save snapshots (FIFO)
     MAX_MANUAL_VERSIONS_PER_SITE = 50 # unpinned manual/recovery snapshots
+    MAX_LIVE_VERSIONS_PER_SITE = 30   # unpinned copies of what was sent live
     MAX_CHECKPOINTS_PER_SITE = 25     # pinned, named "save slots" the user keeps
     SOURCE_CHOICES = (
         ('save', 'Legacy save'),
@@ -477,12 +478,14 @@ class SiteVersion(models.Model):
 
     @classmethod
     def _prune(cls, site):
-        """Cap autos, ordinary manual/recovery rows, and checkpoints
-        independently. A background-save burst must never evict a manual save
-        merely because both rows happen to be unpinned."""
+        """Cap autos, ordinary manual/recovery rows, live versions and
+        checkpoints independently. A background-save burst must never evict a
+        manual save merely because both rows happen to be unpinned, and a run
+        of saves must never evict what was sent live."""
         groups = (
             (cls.objects.filter(site=site, pinned=False, source='auto'), cls.MAX_VERSIONS_PER_SITE),
-            (cls.objects.filter(site=site, pinned=False).exclude(source='auto'), cls.MAX_MANUAL_VERSIONS_PER_SITE),
+            (cls.objects.filter(site=site, pinned=False).exclude(source__in=['auto', 'publish']), cls.MAX_MANUAL_VERSIONS_PER_SITE),
+            (cls.objects.filter(site=site, pinned=False, source='publish'), cls.MAX_LIVE_VERSIONS_PER_SITE),
             (cls.objects.filter(site=site, pinned=True), cls.MAX_CHECKPOINTS_PER_SITE),
         )
         for rows, cap in groups:

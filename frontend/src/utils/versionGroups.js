@@ -3,6 +3,7 @@ export function groupSiteVersions(rows = []) {
   return {
     manualSaves: list.filter((row) => row.source === 'manual'),
     autosaves: list.filter((row) => row.source === 'auto'),
-    recoverySaves: list.filter((row) => !['manual', 'auto'].includes(row.source)),
+    liveSaves: list.filter((row) => row.source === 'publish'),
+    recoverySaves: list.filter((row) => !['manual', 'auto', 'publish'].includes(row.source)),
   }
 }

@@ -38,7 +38,7 @@ describe('the rows a load leaves behind', () => {
 
   it('name what was sent live, and the draft kept before copying live', async () => {
     render(<LanguageProvider><HistoryPanel open siteId={1} onClose={() => {}} /></LanguageProvider>)
-    await waitFor(() => expect(screen.getByText('Eski bir kayıttan canlıya aktarıldı')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Eski kayıttan aktarıldı')).toBeTruthy())
     expect(screen.getByText('Canlıya aktarıldı')).toBeTruthy()
     expect(screen.getByText('Canlı alınmadan önceki taslağınız')).toBeTruthy()
     expect(screen.queryByText('Sent live from v12')).toBeNull()
