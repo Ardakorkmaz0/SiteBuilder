@@ -415,7 +415,12 @@ function rowTitle(row, translate) {
 function labelForSource(source, translate, label = '') {
   if (source === 'restore') return translate('Restored from history')
   if (source === 'publish') {
-    return /^Sent live from v\d+$/.test(label || '') ? translate('Sent live from an older save') : translate('Sent live')
+    const text = label || ''
+    if (/^Sent live from v\d+$/.test(text)) return translate('Sent live from an older save')
+    if (text === 'Sending live undone') return translate('Sending live undone')
+    if (text.startsWith('Sent live: ')) return translate('Sent live: {name}', { name: text.slice(11) })
+    if (text.startsWith('Taken off live: ')) return translate('Taken off live: {name}', { name: text.slice(16) })
+    return translate('Sent live')
   }
   if (source === 'save' && label === 'before restore') return translate('Your work before a load')
   if (source === 'save' && label === 'before copying live') return translate('Your draft before copying live')

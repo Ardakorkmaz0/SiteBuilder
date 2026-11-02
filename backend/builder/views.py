@@ -40,6 +40,7 @@ from django.db.models.functions import TruncDate
 
 from . import runtime_config
 from .api_errors import error_response
+from .live_pages import adopt_live_pages_into_draft, restore_snapshot, send_page_live, set_page_hidden
 from .ai_policy import local_ai_available, provider_refusal, public_ai_policy
 from .shared_marks import insert_before_body_end, strip_marked, wrap_marked
 from .access import SHARE_OPEN, SHARE_PRIVATE, is_public, is_reachable, public_sites, share_access
@@ -50,6 +51,7 @@ from .models import (
     Favorite,
     FormSubmission,
     Profile,
+    LiveSnapshot,
     PublishedPage,
     Report,
     ReviewComment,
@@ -79,6 +81,7 @@ from .guests import (
     upgrade_guest,
 )
 from .serializers import (
+    SiteChanged,
     AdminComponentReportSerializer,
     AdminReportSerializer,
     AdminUserSerializer,
@@ -711,10 +714,85 @@ class SiteViewSet(viewsets.ModelViewSet):
             if site.live_schema is None:
                 return error_response('no_live_version', 'This site has no live version yet.', status.HTTP_400_BAD_REQUEST)
             SiteVersion.snapshot(site, source='save', label='before copying live', force=True)
-            site.schema = site.live_schema
-            site.html = site.live_html
+            adopt_live_pages_into_draft(site)
             site.revision += 1
             site.save(update_fields=['schema', 'html', 'revision', 'updated_at'])
+        return Response(SiteSerializer(site).data)
+
+    # --- One page at a time on the live site (live_pages.py) -----------------
+    # Each answers with the site, whose `live_undo` is the snapshot to pass to
+    # live-undo to take the change back. The draft is not touched, but the
+    # revision moves: another open tab must not save its stale `published` over
+    # this.
+
+    def _locked_for_live_change(self, request):
+        """The site locked for the change, and whether it was public. Publication
+        decisions serialise per owner, as SiteSerializer.update does."""
+        site = self.get_object()
+        owner = User.objects.select_for_update().get(pk=request.user.pk)
+        site = get_object_or_404(Site.objects.select_for_update(), pk=site.pk, owner=owner)
+        base_revision = request.data.get('base_revision')
+        if base_revision is not None and base_revision != site.revision:
+            raise SiteChanged({
+                'detail': 'This site was saved somewhere else after it was opened here.',
+                'code': 'site_changed',
+                'revision': site.revision,
+            })
+        return site, owner
+
+    @staticmethod
+    def _draft_has_page(site, page_id):
+        pages = site.schema.get('pages') if isinstance(site.schema, dict) else None
+        return bool(page_id) and isinstance(pages, list) and any(
+            isinstance(page, dict) and page.get('id') == page_id for page in pages
+        )
+
+    @action(detail=True, methods=['post'], url_path='page-live')
+    def page_live(self, request, pk=None):
+        page = request.data.get('page')
+        page_id = page.get('pageId') if isinstance(page, dict) else None
+        with transaction.atomic():
+            site, owner = self._locked_for_live_change(request)
+            if not self._draft_has_page(site, page_id):
+                return error_response('page_not_found', 'This page is not in the saved site.', status.HTTP_404_NOT_FOUND)
+            was_published = site.published
+            SiteSerializer._validate_publish_state(True, owner, site)
+            send_page_live(site, {**page, 'page_id': page_id}, was_published)
+            if not was_published:
+                SiteSerializer._stamp_published(site)
+        return Response(SiteSerializer(site).data)
+
+    @action(detail=True, methods=['post'], url_path='page-visibility')
+    def page_visibility(self, request, pk=None):
+        page_id = request.data.get('page_id')
+        hidden = request.data.get('hidden') is True
+        with transaction.atomic():
+            site, _owner = self._locked_for_live_change(request)
+            if not self._draft_has_page(site, page_id):
+                return error_response('page_not_found', 'This page is not in the saved site.', status.HTTP_404_NOT_FOUND)
+            if hidden and site.schema['pages'][0].get('id') == page_id:
+                return error_response(
+                    'home_page_required',
+                    'The home page cannot be hidden. To take the whole site down, unpublish it.',
+                    status.HTTP_400_BAD_REQUEST,
+                )
+            set_page_hidden(site, page_id, hidden)
+        return Response(SiteSerializer(site).data)
+
+    @action(detail=True, methods=['post'], url_path='live-undo')
+    def live_undo(self, request, pk=None):
+        with transaction.atomic():
+            site, owner = self._locked_for_live_change(request)
+            snapshot_id = request.data.get('snapshot')
+            snapshot = LiveSnapshot.objects.filter(site=site, pk=snapshot_id).first() if isinstance(snapshot_id, int) else None
+            if snapshot is None:
+                return error_response('live_undo_gone', 'This change can no longer be taken back.', status.HTTP_404_NOT_FOUND)
+            going_public = snapshot.published and not site.published
+            if going_public:
+                SiteSerializer._validate_publish_state(True, owner, site)
+            restore_snapshot(site, snapshot)
+            if going_public:
+                SiteSerializer._stamp_published(site)
         return Response(SiteSerializer(site).data)
 
     # --- Named "checkpoints" (Resident-Evil-style save slots) ---------------
@@ -1676,6 +1754,7 @@ class CloneSiteView(APIView):
                 category=src.category,
                 tags=src.tags,
                 site_options=src.site_options,
+                private_pages=src.private_pages if own else [],
                 published=False,
             )
         data = SiteSerializer(copy).data

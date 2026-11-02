@@ -7,6 +7,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 
 vi.mock('../../api/versions.js', () => ({
   listVersions: vi.fn(async () => [
+    { id: 9, source: 'publish', label: 'Sending live undone', pinned: false, created_at: '2026-10-14T10:08:00Z' },
+    { id: 8, source: 'publish', label: 'Taken off live: Ekip', pinned: false, created_at: '2026-10-14T10:07:00Z' },
+    { id: 7, source: 'publish', label: 'Sent live: Hakkımızda', pinned: false, created_at: '2026-10-14T10:06:00Z' },
     { id: 6, source: 'publish', label: 'Sent live from v12', pinned: false, created_at: '2026-10-14T10:05:00Z' },
     { id: 5, source: 'publish', label: 'Sent live', pinned: false, created_at: '2026-10-14T10:04:00Z' },
     { id: 4, source: 'save', label: 'before copying live', pinned: false, created_at: '2026-10-14T10:03:00Z' },
@@ -43,6 +46,9 @@ describe('the rows a load leaves behind', () => {
     expect(screen.getByText('Canlı alınmadan önceki taslağınız')).toBeTruthy()
     expect(screen.queryByText('Sent live from v12')).toBeNull()
     expect(screen.queryByText('before copying live')).toBeNull()
+    expect(screen.getByText('Canlıya alındı: Hakkımızda')).toBeTruthy()
+    expect(screen.getByText('Canlıdan kaldırıldı: Ekip')).toBeTruthy()
+    expect(screen.getByText('Canlıya alma geri alındı')).toBeTruthy()
     // Without a published site there is nothing to send live.
     expect(screen.queryByRole('button', { name: 'Canlıya gönder' })).toBeNull()
   })

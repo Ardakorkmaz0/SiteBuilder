@@ -29,6 +29,7 @@ from .models import (
 )
 from .site_meta import share_image
 from .svg_images import check_svg, is_svg_upload
+from .live_pages import draft_is_ahead, send_draft_live_without_pages, send_site_live, statuses
 from .validators import clean_published_pages, validate_and_clean_schema
 
 
@@ -43,19 +44,6 @@ def password_errors(error):
         for item in error.error_list
         for message in item.messages
     ]
-
-
-def replace_published_pages(site, pages):
-    """Swap in the documents this publish rendered.
-
-    Wholesale rather than a merge: the set of pages IS the site, so a page the
-    owner deleted has to stop answering, and a stale row would keep serving
-    content the editor no longer shows.
-    """
-    site.published_pages.all().delete()
-    PublishedPage.objects.bulk_create([
-        PublishedPage(site=site, **page) for page in pages
-    ])
 
 
 def _absolute_image_url(image_field, context):
@@ -654,6 +642,9 @@ class SiteSerializer(serializers.ModelSerializer):
     live_from_version = serializers.IntegerField(write_only=True, required=False, allow_null=True, min_value=1)
     # Whether the draft has changes visitors do not see yet.
     live_differs = serializers.SerializerMethodField()
+    # Per page of the draft: {id: 'live' | 'older'}, nothing for one not live.
+    page_live = serializers.SerializerMethodField()
+    live_undo = serializers.SerializerMethodField()
     _CONTENT_FIELDS = {'title', 'schema', 'html', 'published', 'published_pages', 'category', 'tags'}
 
     class Meta:
@@ -661,6 +652,7 @@ class SiteSerializer(serializers.ModelSerializer):
         fields = ('id', 'title', 'slug', 'schema', 'html', 'published',
                   'published_pages', 'revision', 'base_revision',
                   'live_from_version', 'live_at', 'live_differs',
+                  'page_live', 'private_pages', 'live_undo',
                   'category', 'tags', 'site_options', 'review_token',
                   'custom_domain', 'domain_status', 'domain_verification_token',
                   'moderation_blocked', 'view_count', 'created_at', 'updated_at')
@@ -671,11 +663,18 @@ class SiteSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'id', 'slug', 'review_token', 'custom_domain', 'domain_status',
             'domain_verification_token', 'moderation_blocked', 'view_count',
-            'created_at', 'updated_at', 'revision', 'live_at',
+            'created_at', 'updated_at', 'revision', 'live_at', 'private_pages',
         )
 
     def get_live_differs(self, obj):
-        return obj.draft_differs_from_live()
+        return draft_is_ahead(obj)
+
+    def get_page_live(self, obj):
+        return statuses(obj)
+
+    # The snapshot of what this very request replaced, for Ctrl+Z.
+    def get_live_undo(self, obj):
+        return getattr(obj, '_live_snapshot_id', None)
 
     # `published` stays the owner's own switch and is saved as sent, even
     # while a moderator's block is on: every public way in (access.py) checks
@@ -768,29 +767,14 @@ class SiteSerializer(serializers.ModelSerializer):
             site.published_pages.all().delete()
         elif pages is not None:
             # Rendered pages are what "send live" sends: a save of the draft
-            # sends none, and leaves visitors on the live version.
-            replace_published_pages(site, pages)
-            self._go_live(site, version)
+            # sends none, and leaves visitors on the live version. Wholesale
+            # rather than a merge: a page the owner deleted has to stop answering.
+            send_site_live(site, pages, version, was_published)
         elif site.live_schema is None:
             # Public with no live version yet (an older client, a settings
             # switch): what is saved is what visitors see.
-            self._go_live(site, None)
+            send_draft_live_without_pages(site)
         return site
-
-    @staticmethod
-    def _go_live(site, version):
-        """Make the draft (or `version`) the live version, and keep a copy of
-        it in the history, so any live version can be sent live again."""
-        schema, html = (version.schema, version.html) if version else (site.schema, site.html)
-        site.live_schema = schema
-        site.live_html = html
-        site.live_at = timezone.now()
-        site.save(update_fields=['live_schema', 'live_html', 'live_at'])
-        SiteVersion.objects.create(
-            site=site, schema=schema, html=html, source='publish',
-            label=f'Sent live from v{version.pk}' if version else 'Sent live',
-        )
-        SiteVersion._prune(site)
 
     @transaction.atomic
     def create(self, validated_data):
@@ -806,9 +790,9 @@ class SiteSerializer(serializers.ModelSerializer):
         if site.published:
             self._stamp_published(site)
         if site.published and pages:
-            replace_published_pages(site, pages)
-        if site.published:
-            self._go_live(site, None)
+            send_site_live(site, pages, None, False)
+        elif site.published:
+            send_draft_live_without_pages(site)
         return site
 
     @staticmethod

@@ -64,6 +64,44 @@ and no longer among the recovery points. `SiteVersion._prune` caps them apart
 (`MAX_LIVE_VERSIONS_PER_SITE`, 30), since they used to share the manual cap and a
 run of saves could evict them. The five tabs sit on two rows.
 
+## Later addition: each file goes live on its own
+
+The owner asked for per-file publishing, Ctrl+Z on it, coloured files and a
+right-click menu. All of the server logic is in `backend/builder/live_pages.py`.
+
+- `PublishedPage.page_id` and `fingerprint` say which draft page a row came from
+  and how it looked. `statuses()` compares fingerprints: `page_live` is
+  `{id: 'live' | 'older'}`, no entry means not live. The fingerprint covers the
+  page, everything in the schema but `pages` (a theme change turns every file
+  blue) and, for the home page, `site.html`.
+- `live_schema` now holds only pages that are live. The public API and clones read
+  it, so a page never sent or hidden cannot be read from outside. This is the part
+  most worth attacking.
+- `Site.private_pages` ("Do not show in public"): a whole-site send leaves them
+  out, older clients included. Not in the schema on purpose: undoing an edit or
+  loading a version must not undo the choice. The home page cannot be hidden.
+- `LiveSnapshot` holds what each live change replaced (last 10 per site). Restoring
+  one stores the reverse, so `POST live-undo` is both undo and redo. A page-scoped
+  restore merges, so it cannot disturb a page sent since from another tab.
+- `POST page-live`, `page-visibility`, `live-undo`. They bump `revision`: another
+  tab must not save a stale `published` over them. The editor follows the bump only
+  when it is exactly +1, so a save by someone else still gives a 409.
+- Editor: `undoStep` / `redoStep` in `EditorPage.jsx` pick the newest step across
+  the store, the HTML stack and the live stack by stamp.
+  `utils/pageLiveStates.js` turns unsaved edits blue. Menu: `PageFilesPanel.jsx`.
+- Migration 0029 names existing rows (`align_rows`): same page order, skipping
+  pages that did not render. When the counts disagree only the home row is named,
+  and the site falls back to the old whole-version comparison.
+
+Known corners, left as they are:
+
+- Moving another page into first place and sending only it: the old home row keeps
+  the address `''`, so the new one gets a suffix until the whole site is sent.
+- A link to a page that is not live gives visitors a 404.
+- A theme change sent with one page reaches `live_schema` for all pages, so the
+  in-app viewer shows it on pages whose `/s/` document is older. Those show blue.
+- Unpublishing from the header is not an undo step.
+
 ## Worth a hard look
 
 - `sendHistoryVersionLive` rebuilds an html page's document from `page.html`,

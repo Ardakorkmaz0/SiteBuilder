@@ -12,7 +12,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { getSite, liveToDraft, sendVersionLive, updateSite } from '../api/sites.js'
+import { getSite, liveToDraft, sendPageLive, sendVersionLive, setPageHidden, swapLiveChange, updateSite } from '../api/sites.js'
 import { getVersionContent, restoreVersion } from '../api/versions.js'
 import LiveVersionView from '../components/editor/LiveVersionView.jsx'
 import { useEditorStore, selectCurrentPage, nextHistoryStamp } from '../store/editorStore.js'
@@ -58,6 +58,7 @@ import EditorTour from '../components/editor/EditorTour.jsx'
 import { tourWasSeen } from '../utils/editorTour.js'
 import { applyHtmlPageSettings, readHtmlPageSettings } from '../utils/htmlPageSettings.js'
 import { publishedPagesFor } from '../utils/publishedPages.js'
+import { pageLiveStates } from '../utils/pageLiveStates.js'
 import { isPreviewMessageSource, previewPageId } from '../utils/previewMessages.js'
 import CanvasZoomControl from '../components/editor/CanvasZoomControl.jsx'
 import FullscreenStage from '../components/editor/FullscreenStage.jsx'
@@ -481,6 +482,15 @@ function SiteEditor() {
   const [liveDiffers, setLiveDiffers] = useState(false)
   const [viewLive, setViewLive] = useState(false)
   const [liveBusy, setLiveBusy] = useState(false)
+  // Each page on its own: how it compares with what is live, the pages kept off
+  // the public site, and the changes to the live site that Ctrl+Z can take
+  // back, stamped into the running order of every other undo step.
+  const [pageLive, setPageLive] = useState({})
+  const [privatePages, setPrivatePages] = useState([])
+  const [livePast, setLivePast] = useState([])
+  const [liveFuture, setLiveFuture] = useState([])
+  const [liveNote, setLiveNote] = useState('')
+  const liveStepBusyRef = useRef(false)
   const [siteOptions, setSiteOptions] = useState({})
   const [reviewToken, setReviewToken] = useState('')
   const [customDomain, setCustomDomain] = useState('')
@@ -652,6 +662,18 @@ function SiteEditor() {
   // Visitors see something other than the editor: unsaved work, or a saved
   // draft that has not been sent live.
   const draftAhead = liveDiffers || dirty || htmlDirty || metaDirty || workspaceDirty
+  // The content last known to match the server: what "edited since saved" is
+  // measured against. Set during render so the colours never lag a save by a frame.
+  const [savedContent, setSavedContent] = useState(null)
+  if (!dirty && !htmlDirty && (savedContent?.pages !== storePages || savedContent?.html !== pageHtmlMap)) {
+    setSavedContent({ pages: storePages, html: pageHtmlMap })
+  }
+  const liveStates = pageLiveStates(storePages, pageLive, savedContent, pageHtmlMap, workspaceDirty || htmlTyping ? currentPageId : null)
+  useEffect(() => {
+    if (!liveNote) return undefined
+    const timer = setTimeout(() => setLiveNote(''), 6000)
+    return () => clearTimeout(timer)
+  }, [liveNote])
   const [workspaceSession, setWorkspaceSession] = useState(0)
   const htmlRevisionRef = useRef(0)
 
@@ -872,8 +894,10 @@ function SiteEditor() {
 
   // Keep the global Ctrl+Z listener pointed at the right history (html
   // snapshot stacks vs canvas store) without re-binding it every render.
-  useEffect(() => {
-    htmlHistoryRef.current = { currentPageIsHtml, undoHtml: undoOnHtmlPage, redoHtml: redoOnHtmlPage }
+  // In a layout effect: Ctrl+Z right after a change must reach the handlers of
+  // the screen it was pressed on, not the ones from the render before.
+  useLayoutEffect(() => {
+    htmlHistoryRef.current = { undoStep, redoStep }
   })
 
   const leaveGuard = useLeaveGuard({ dirty, htmlDirty, metaDirty, workspaceDirty })
@@ -980,8 +1004,7 @@ function SiteEditor() {
         setSlug(data.slug)
         setPublished(data.published)
         publishedRef.current = !!data.published
-        setLiveAt(data.live_at || null)
-        setLiveDiffers(!!data.live_differs)
+        applyLiveState(data)
         setModerationBlocked(!!data.moderation_blocked)
         setSiteOptions(data.site_options || {})
         setReviewToken(data.review_token || '')
@@ -1076,15 +1099,12 @@ function SiteEditor() {
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         const h = htmlHistoryRef.current
-        if (h.currentPageIsHtml) (e.shiftKey ? h.redoHtml : h.undoHtml)?.()
-        else e.shiftKey ? redo() : undo()
+        ;(e.shiftKey ? h.redoStep : h.undoStep)?.()
         return
       }
       if (mod && e.key.toLowerCase() === 'y') {
         e.preventDefault()
-        const h = htmlHistoryRef.current
-        if (h.currentPageIsHtml) h.redoHtml?.()
-        else redo()
+        htmlHistoryRef.current.redoStep?.()
         return
       }
 
@@ -1786,8 +1806,7 @@ function SiteEditor() {
       setAutoSaveRefused(false)
       publishedRef.current = !!data.published
       setPublished(data.published)
-      if (data.live_at !== undefined) setLiveAt(data.live_at || null)
-      if (data.live_differs !== undefined) setLiveDiffers(!!data.live_differs)
+      applyLiveState(data)
       setModerationBlocked(!!data.moderation_blocked)
       setSlug(data.slug)
       if (htmlRevisionRef.current === htmlRevisionAtSave) setHtmlDirty(false)
@@ -1866,8 +1885,7 @@ function SiteEditor() {
       publishedRef.current = !!fresh.published
       setPublished(fresh.published)
     }
-    if (fresh?.live_at !== undefined) setLiveAt(fresh.live_at || null)
-    if (fresh?.live_differs !== undefined) setLiveDiffers(!!fresh.live_differs)
+    applyLiveState(fresh)
     markSaved()
   }
 
@@ -1905,8 +1923,7 @@ function SiteEditor() {
         if (Number.isInteger(data.revision)) conflict.baseRevisionRef.current = data.revision
         publishedRef.current = !!data.published
         setPublished(data.published)
-        setLiveAt(data.live_at || null)
-        setLiveDiffers(!!data.live_differs)
+        applyLiveState(data)
         return data
       })
     } catch (e) {
@@ -1914,6 +1931,142 @@ function SiteEditor() {
       else setError(apiError(e))
       return null
     }
+  }
+
+  // What a response says about the live site. A `live_undo` means this response
+  // changed it, which makes one undo step.
+  function applyLiveState(data) {
+    if (!data) return
+    if (data.live_at !== undefined) setLiveAt(data.live_at || null)
+    if (data.live_differs !== undefined) setLiveDiffers(!!data.live_differs)
+    if (data.page_live !== undefined) setPageLive(data.page_live || {})
+    if (data.private_pages !== undefined) setPrivatePages(data.private_pages || [])
+    if (data.live_undo) {
+      setLivePast((past) => [...past.slice(-9), { snapshot: data.live_undo, at: nextHistoryStamp() }])
+      setLiveFuture([])
+    }
+  }
+
+  // A change to the live site moves the revision by one and leaves the draft
+  // alone. Any other number means someone else saved: the next save has to be
+  // told so, not be handed the new revision.
+  function followLiveRevision(data) {
+    if (data?.revision === conflict.baseRevisionRef.current + 1) conflict.baseRevisionRef.current = data.revision
+    publishedRef.current = !!data.published
+    setPublished(data.published)
+  }
+
+  // A file's menu acts on the saved page: work on screen is saved first, in the
+  // one queue every write goes through.
+  async function withSavedDraft(change) {
+    try {
+      return await editorSave.run(async () => {
+        if (leftEditorRef.current) return null
+        const lifecycle = saveLifecycleRef.current
+        flushSync(() => lifecycle.flushWorkspaceDrafts())
+        if (lifecycle.historyDraftSnapshot().unsaved) await lifecycle.performSave()
+        if (leftEditorRef.current) return null
+        const data = await change()
+        followLiveRevision(data)
+        applyLiveState(data)
+        return data
+      })
+    } catch (e) {
+      if (isSiteChanged(e)) conflict.refuse()
+      else setError(apiError(e))
+      return null
+    }
+  }
+
+  async function sendFileLive(pageId) {
+    if (guestGate('publish')) return
+    const page = storePages.find((item) => item.id === pageId)
+    if (!page) return
+    // Allowed, since each file goes live on its own, but /s/<slug>/ answers with
+    // the home page: without it the site's own address does not open.
+    if (page.id !== storePages[0]?.id && liveStates[storePages[0]?.id] === 'none'
+      && !window.confirm(t('The home page is not live yet, so the site address will not open until it is. Send {name} live anyway?', { name: page.name }))) return
+    const data = await withSavedDraft(() => {
+      const store = useEditorStore.getState()
+      const map = liveHtmlMap({ commit: true })
+      const { schema } = projectSnapshot(store.previewBase || store.schema, map)
+      const rendered = publishedPagesFor(schema, map, title, slug).find((item) => item.pageId === pageId)
+      if (!rendered) throw new Error(t('This page is empty, so there is nothing to send live.'))
+      return sendPageLive(id, rendered, conflict.baseRevisionRef.current)
+    })
+    if (data) setLiveNote(t('{name} is live. Ctrl+Z takes it back.', { name: page.name }))
+  }
+
+  async function setFileHidden(pageId, hidden) {
+    const page = storePages.find((item) => item.id === pageId)
+    if (!page) return
+    const data = await withSavedDraft(() => setPageHidden(id, pageId, hidden, conflict.baseRevisionRef.current))
+    if (data) setLiveNote(hidden ? t('{name} is hidden from the public. Ctrl+Z takes it back.', { name: page.name }) : t('{name} can go live again.', { name: page.name }))
+  }
+
+  async function swapLiveStep(entry, { undoing }) {
+    if (liveStepBusyRef.current) return
+    liveStepBusyRef.current = true
+    try {
+      const data = await editorSave.run(() => swapLiveChange(id, entry.snapshot))
+      followLiveRevision(data)
+      // The response carries the snapshot for the opposite direction.
+      applyLiveState({ ...data, live_undo: null })
+      const opposite = { snapshot: data.live_undo, at: entry.at }
+      if (undoing) {
+        setLivePast((past) => past.filter((item) => item !== entry))
+        setLiveFuture((future) => [...future, { ...opposite, undoneAt: nextHistoryStamp() }])
+      } else {
+        setLiveFuture((future) => future.filter((item) => item !== entry))
+        setLivePast((past) => [...past, opposite])
+      }
+      setLiveNote(undoing ? t('The change to the live site was taken back.') : t('The change to the live site is back.'))
+    } catch (e) {
+      // Gone for good (a newer change pushed it out): it stops being offered.
+      if (e?.response?.data?.code === 'live_undo_gone') {
+        setLivePast((past) => past.filter((item) => item !== entry))
+        setLiveFuture((future) => future.filter((item) => item !== entry))
+      }
+      setError(apiError(e))
+    } finally {
+      liveStepBusyRef.current = false
+    }
+  }
+
+  // Undo takes the newest step of any kind. Text typed into a page and not
+  // committed yet is newer than anything with a stamp.
+  function undoStep() {
+    const store = useEditorStore.getState()
+    const entry = livePast[livePast.length - 1]
+    const typed = workspaceRef.current?.getHtml?.()
+    const typing = currentPageIsHtml && (workspaceDirty || htmlTyping) && typed != null && typed !== siteHtml
+    const siteAt = store.past.length ? (store.pastAt[store.pastAt.length - 1] ?? 0) : -1
+    const htmlAt = currentPageIsHtml && htmlPast.length ? stampOf(htmlPast[htmlPast.length - 1]) : -1
+    if (entry && !typing && entry.at > Math.max(siteAt, htmlAt)) {
+      swapLiveStep(entry, { undoing: true })
+      return
+    }
+    if (currentPageIsHtml) undoOnHtmlPage()
+    else undo()
+  }
+  function redoStep() {
+    const store = useEditorStore.getState()
+    const entry = liveFuture[liveFuture.length - 1]
+    const siteAt = store.past.length ? (store.pastAt[store.pastAt.length - 1] ?? 0) : -1
+    const htmlAt = htmlPast.length ? stampOf(htmlPast[htmlPast.length - 1]) : -1
+    // A new edit ends what could be redone, here as in the other lists.
+    if (entry && Math.max(siteAt, htmlAt) > entry.undoneAt) {
+      setLiveFuture([])
+    } else if (entry) {
+      const siteNext = store.future.length ? (store.futureAt[0] ?? 0) : Infinity
+      const htmlNext = currentPageIsHtml && htmlFuture.length ? stampOf(htmlFuture[htmlFuture.length - 1]) : Infinity
+      if (entry.at < Math.min(siteNext, htmlNext)) {
+        swapLiveStep(entry, { undoing: false })
+        return
+      }
+    }
+    if (currentPageIsHtml) redoOnHtmlPage()
+    else redo()
   }
 
   async function loadIntoDraft(request) {
@@ -2460,7 +2613,7 @@ function SiteEditor() {
             className="flex items-center gap-1.5 text-[10px] text-[var(--studio-text-muted)]"
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: saveStatus.tone }} />
-            {saveStatus.label}
+            <span className="truncate">{liveNote || saveStatus.label}</span>
             {currentPageIsHtml && localFile ? <span className="hidden xl:inline">· {localFile.name}</span> : null}
           </div>
         </div>
@@ -2468,10 +2621,10 @@ function SiteEditor() {
         <div className="ml-auto flex min-w-0 items-center gap-1">
           {aiOn && <AiBar open={aiOpen} onOpenChange={setAiOpen} />}
           <span className="mx-1 hidden h-5 w-px bg-[var(--studio-border)] lg:block" aria-hidden />
-          <button type="button" onClick={() => (currentPageIsHtml ? undoOnHtmlPage() : undo())} disabled={currentPageIsHtml ? !htmlPast.length && !canUndo && !htmlTyping && !workspaceDirty : !canUndo} title={t('Undo (Ctrl+Z)')} className="studio-icon-btn hidden md:inline-flex">
+          <button type="button" onClick={undoStep} disabled={!livePast.length && (currentPageIsHtml ? !htmlPast.length && !canUndo && !htmlTyping && !workspaceDirty : !canUndo)} title={t('Undo (Ctrl+Z)')} className="studio-icon-btn hidden md:inline-flex">
             <UndoIcon size={16} />
           </button>
-          <button type="button" onClick={() => (currentPageIsHtml ? redoOnHtmlPage() : redo())} disabled={currentPageIsHtml ? workspaceDirty || (!htmlFuture.length && !canRedo) : !canRedo} title={t('Redo (Ctrl+Shift+Z)')} className="studio-icon-btn hidden md:inline-flex">
+          <button type="button" onClick={redoStep} disabled={!liveFuture.length && (currentPageIsHtml ? workspaceDirty || (!htmlFuture.length && !canRedo) : !canRedo)} title={t('Redo (Ctrl+Shift+Z)')} className="studio-icon-btn hidden md:inline-flex">
             <RedoIcon size={16} />
           </button>
           <button type="button" onClick={previewCurrentSite} disabled={saving} className="studio-btn hidden lg:inline-flex">
@@ -2787,6 +2940,10 @@ function SiteEditor() {
                       onBeforePageChange={flushWorkspaceDrafts}
                       onActiveClick={() => workspaceRef.current?.toggleSource?.()}
                       onImportInto={importHtmlIntoPage}
+                      liveStates={liveStates}
+                      privatePages={privatePages}
+                      onSendLive={sendFileLive}
+                      onSetHidden={setFileHidden}
                     />
                   }
                 />
@@ -2993,6 +3150,10 @@ function SiteEditor() {
                       onSelect={switchToPage}
                       onBeforePageChange={flushWorkspaceDrafts}
                       onActiveClick={() => switchCanvasMode((m) => (m === 'source' ? 'edit' : 'source'))}
+                      liveStates={liveStates}
+                      privatePages={privatePages}
+                      onSendLive={sendFileLive}
+                      onSetHidden={setFileHidden}
                     />
                   }
                 />

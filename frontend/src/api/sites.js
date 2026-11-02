@@ -93,6 +93,26 @@ export const verifyDomain = (siteId) =>
 export const configureDomain = (siteId, domain) =>
   client.post(`/sites/${siteId}/domain/`, { domain }).then((r) => r.data)
 
+// One page goes live: `page` is its entry from publishedPagesFor.
+export const sendPageLive = (id, page, baseRevision) =>
+  client.post(`/sites/${id}/page-live/`, {
+    page,
+    ...(baseRevision != null ? { base_revision: baseRevision } : {}),
+  }).then((r) => r.data)
+
+// Keep a page off the public site, or stop keeping it off.
+export const setPageHidden = (id, pageId, hidden, baseRevision) =>
+  client.post(`/sites/${id}/page-visibility/`, {
+    page_id: pageId,
+    hidden,
+    ...(baseRevision != null ? { base_revision: baseRevision } : {}),
+  }).then((r) => r.data)
+
+// Take a change to the live site back (or bring it back): `snapshot` is the
+// `live_undo` of the response that made the change.
+export const swapLiveChange = (id, snapshot) =>
+  client.post(`/sites/${id}/live-undo/`, { snapshot }).then((r) => r.data)
+
 export const getReviewSite = (token) =>
   client.get(`/public/reviews/${token}/`).then((r) => r.data)
 
