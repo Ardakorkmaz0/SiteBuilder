@@ -25,7 +25,7 @@ const devicePalette = () => (deviceQuery()?.matches ? 'dark' : 'light')
 
 // `forced` shows one palette and leaves the switch inert: the editor's canvas
 // preview, where a click selects the block rather than pressing it.
-export function ColorModeRoot({ mode, forced = null, children }) {
+export function ColorModeRoot({ mode, forced = null, onChoose = null, children }) {
   // What the visitor chose here. Until then the page follows what it is told,
   // which can change while it is open: the owner changing what the site opens
   // in, or the site gaining its second palette.
@@ -40,16 +40,22 @@ export function ColorModeRoot({ mode, forced = null, children }) {
     return () => query.removeEventListener('change', onChange)
   }, [])
   const current = forced || (pick === 'system' ? device : pick)
-  const value = useMemo(() => (mode
-    ? {
+  const value = useMemo(() => {
+    if (!mode) return null
+    // `onChoose`: the page around it hands the choice on to the site's next page.
+    const choose = (next) => {
+      setChosen(next)
+      onChoose?.(next)
+    }
+    return {
       current,
       pick: forced || pick,
       base: mode.base,
       alt: mode.alt,
-      toggle: forced ? null : () => setChosen(current === mode.alt ? mode.base : mode.alt),
-      choose: forced ? null : setChosen,
+      toggle: forced ? null : () => choose(current === mode.alt ? mode.base : mode.alt),
+      choose: forced ? null : choose,
     }
-    : null), [mode, current, pick, forced])
+  }, [mode, current, pick, forced, onChoose])
   if (!mode) return children
   return (
     <ColorModeContext.Provider value={value}>

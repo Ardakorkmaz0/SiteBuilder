@@ -273,9 +273,17 @@ test('review: a real published HTML block corner shows the dark page through its
 
 test('review: a real published page follows a dark device from its first request in both browsers', async ({ request, browser, browserName }, testInfo) => {
   const owned = [], contexts = [], namedPages = [], history = []
+  let realDevice = null
   try {
     const site = await publishFixture(request, owned, 'Review first real device')
-    const context = await browser.newContext({ storageState: { cookies: [], origins: [] }, colorScheme: 'dark' })
+    // Firefox gets a real dark device, not Playwright's emulated one: the server's
+    // Cross-Origin-Opener-Policy moves the page to a new browsing context, and
+    // the emulation does not follow it there (see the browser probe).
+    const firefox = browserName === 'firefox'
+      ? await browser.browserType().launch({ firefoxUserPrefs: { 'ui.systemUsesDarkTheme': 1, 'layout.css.prefers-color-scheme.content-override': 2 } })
+      : null
+    realDevice = firefox
+    const context = await (firefox || browser).newContext({ storageState: { cookies: [], origins: [] }, colorScheme: firefox ? null : 'dark' })
     contexts.push(context)
     const page = await context.newPage()
     namedPages.push({ page, name: 'real-first-device' })
@@ -289,6 +297,9 @@ test('review: a real published page follows a dark device from its first request
     expect((await context.cookies()).find((cookie) => cookie.name === 'pwb-theme' && cookie.path === `/s/${site.slug}/`)?.value).toBe('system')
   } finally {
     try { await attachEvidence(testInfo, browserName, history, contexts, namedPages) }
-    finally { await cleanUp(request, contexts, owned) }
+    finally {
+      await cleanUp(request, contexts, owned)
+      await realDevice?.close()
+    }
   }
 })

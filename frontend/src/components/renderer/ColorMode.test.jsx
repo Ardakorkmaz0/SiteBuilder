@@ -128,6 +128,18 @@ describe('the three-way switch', () => {
     expect(radio('Device')).toHaveAttribute('aria-checked', 'true')
   })
 
+  it('tells the page around it, which hands the choice on', () => {
+    const onChoose = vi.fn()
+    render(<ColorModeRoot mode={light} onChoose={onChoose}><ThemeToggle props={three} style={{}} /></ColorModeRoot>)
+    fireEvent.click(radio('Device'))
+    expect(onChoose.mock.calls).toEqual([['system']])
+    cleanup()
+    onChoose.mockClear()
+    render(<ColorModeRoot mode={light} onChoose={onChoose}><ThemeToggle props={{ label: 'Theme' }} style={{}} /></ColorModeRoot>)
+    fireEvent.click(screen.getByRole('button', { name: 'Theme' }))
+    expect(onChoose.mock.calls).toEqual([['dark']])
+  })
+
   it('does nothing on the canvas, where a click selects it', () => {
     const { rerender } = show(light, three, { forced: 'dark' })
     fireEvent.click(radio('Device'))
