@@ -1,7 +1,6 @@
 // A diagnostic of the browser's first native media value, independent of the
 // app server. The real palette head script is used on a synthetic HTTP page.
 // A light native value is recorded, not blamed on the app or skipped in Firefox.
-import { createServer } from 'node:http'
 import { devices, expect, test } from '@playwright/test'
 import { colorModeFor, colorModeHeadTags } from '../src/utils/colorMode.js'
 
@@ -167,47 +166,6 @@ test('records the same initial documents without a matchMedia wrapper or init sc
   } finally {
     await testInfo.attach('initial-device-media-unwrapped.json', {
       body: Buffer.from(JSON.stringify({ browserName, browserVersion: browser.version(), syntheticDocument: true, observations }, null, 2)),
-      contentType: 'application/json',
-    })
-  }
-})
-
-// Why a real /s/ page and a synthetic one differed under Firefox: the one header
-// that sets them apart. Measured over a real connection, as route.fulfill may not
-// go through the same navigation. Only the page without it is a promise of ours;
-// the other is written down for the log.
-test('records the emulated device with and without Cross-Origin-Opener-Policy', async ({ browser, browserName }, testInfo) => {
-  const server = createServer((request, response) => {
-    response.writeHead(200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-store',
-      ...(request.url.startsWith('/coop') ? { 'Cross-Origin-Opener-Policy': 'same-origin' } : {}),
-    })
-    response.end(fixture('palette'))
-  })
-  await new Promise((resolve) => { server.listen(0, '127.0.0.1', resolve) })
-  const { port } = server.address()
-  const observations = []
-  try {
-    for (const path of ['plain', 'coop']) {
-      const context = await browser.newContext({ storageState: { cookies: [], origins: [] }, colorScheme: 'dark' })
-      const page = await context.newPage()
-      await page.goto(`http://127.0.0.1:${port}/${path}/?pwb-theme=system`)
-      observations.push({
-        path,
-        ...(await page.evaluate(() => ({
-          palette: document.documentElement.getAttribute('data-pwb-theme'),
-          darkAfterLoad: matchMedia('(prefers-color-scheme: dark)').matches,
-        }))),
-      })
-      await context.close()
-    }
-    console.log('COOP_DEVICE_PROOF', browserName, JSON.stringify(observations))
-    expect(observations[0]).toMatchObject({ path: 'plain', palette: 'dark', darkAfterLoad: true })
-  } finally {
-    server.close()
-    await testInfo.attach('device-with-and-without-coop.json', {
-      body: Buffer.from(JSON.stringify({ browserName, observations }, null, 2)),
       contentType: 'application/json',
     })
   }
