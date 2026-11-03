@@ -113,9 +113,17 @@ const INTERACTIVE_SCRIPT = `
     // The site's light/dark switch. The head script (colorMode.js) has put
     // the palette, and which one the site was designed in, on the root.
     function syncThemeToggles() {
-      var dark = document.documentElement.getAttribute('data-pwb-theme') === 'dark';
-      var toggles = document.querySelectorAll('[data-pwb-theme-toggle]');
+      var root = document.documentElement;
+      var dark = root.getAttribute('data-pwb-theme') === 'dark';
+      var toggles = document.querySelectorAll('[data-pwb-theme-toggle]:not([data-pwb-theme-toggle="choices"])');
       for (var i = 0; i < toggles.length; i++) toggles[i].setAttribute('aria-pressed', dark ? 'true' : 'false');
+      var pick = root.getAttribute('data-pwb-theme-pick');
+      var choices = document.querySelectorAll('[data-pwb-theme-choose]');
+      for (var j = 0; j < choices.length; j++) {
+        var on = choices[j].getAttribute('data-pwb-theme-choose') === pick;
+        choices[j].setAttribute('aria-checked', on ? 'true' : 'false');
+        choices[j].setAttribute('tabindex', on ? '0' : '-1');
+      }
     }
     // A sandboxed page (the builder's own /s/ address) has no storage: there
     // the palette rides in the address, ?pwb-theme=dark, on this page and on
@@ -140,7 +148,7 @@ const INTERACTIVE_SCRIPT = `
     // the next page opens the way the owner said.
     function addressPalette() {
       var mode = new URLSearchParams(location.search).get('pwb-theme');
-      return mode === 'light' || mode === 'dark' ? mode : null;
+      return mode === 'light' || mode === 'dark' || mode === 'system' ? mode : null;
     }
     function setAddressPalette(mode) {
       try {
@@ -167,6 +175,24 @@ const INTERACTIVE_SCRIPT = `
         frames[i].addEventListener('load', function () { sendPalette(this, root.getAttribute('data-pwb-theme')); });
       }
       broadcastPalette(root.getAttribute('data-pwb-theme'));
+      // A page following the device follows it while it is open too.
+      if (!window.matchMedia) return;
+      var device = matchMedia('(prefers-color-scheme: dark)');
+      var onDeviceChange = function () {
+        if (!root.hasAttribute('data-pwb-theme-follow')) return;
+        var next = devicePalette();
+        if (next === root.getAttribute('data-pwb-theme')) return;
+        root.setAttribute('data-pwb-theme', next);
+        broadcastPalette(next);
+        syncThemeToggles();
+      };
+      if (device.addEventListener) device.addEventListener('change', onDeviceChange);
+      else if (device.addListener) device.addListener(onDeviceChange);
+    }
+    function devicePalette() {
+      var root = document.documentElement;
+      var alt = root.getAttribute('data-pwb-theme-alt');
+      return window.matchMedia && matchMedia('(prefers-color-scheme: ' + alt + ')').matches ? alt : root.getAttribute('data-pwb-theme-base');
     }
     // Inside an HTML block: the page around it says which palette is on.
     window.addEventListener('message', function (event) {
@@ -182,23 +208,37 @@ const INTERACTIVE_SCRIPT = `
       var base = root.getAttribute('data-pwb-theme-base');
       var alt = root.getAttribute('data-pwb-theme-alt');
       if (!base || !alt) return;
-      var next = root.getAttribute('data-pwb-theme') === alt ? base : alt;
+      choosePalette(root.getAttribute('data-pwb-theme') === alt ? base : alt);
+    }
+    function choosePalette(pick) {
+      var root = document.documentElement;
+      if (!root.hasAttribute('data-pwb-theme-base')) return;
+      var next = pick === 'system' ? devicePalette() : pick;
       root.setAttribute('data-pwb-theme', next);
+      root.setAttribute('data-pwb-theme-pick', pick);
+      if (pick === 'system') root.setAttribute('data-pwb-theme-follow', '');
+      else root.removeAttribute('data-pwb-theme-follow');
       if (paletteStorage) {
-        try { localStorage.setItem('pwb-color-mode', next); } catch (e) {}
+        try { localStorage.setItem('pwb-color-mode', pick); } catch (e) {}
         // The address outranks storage, so an old choice must not stay in it.
         if (addressPalette()) setAddressPalette(null);
       } else {
-        setAddressPalette(next);
+        setAddressPalette(pick);
       }
       broadcastPalette(next);
       // Inside the app's viewer each page is a new frame: the viewer keeps
       // the choice and hands it to the next page.
-      try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'pwb-color-mode', mode: next }, '*'); } catch (e) {}
+      try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'pwb-color-mode', mode: pick }, '*'); } catch (e) {}
       syncThemeToggles();
     }
     function onClick(event) {
-      var themeToggle = event.target && event.target.closest && event.target.closest('[data-pwb-theme-toggle]');
+      var themeChoice = event.target && event.target.closest && event.target.closest('[data-pwb-theme-choose]');
+      if (themeChoice) {
+        event.preventDefault();
+        choosePalette(themeChoice.getAttribute('data-pwb-theme-choose'));
+        return;
+      }
+      var themeToggle = event.target && event.target.closest && event.target.closest('[data-pwb-theme-toggle]:not([data-pwb-theme-toggle="choices"])');
       if (themeToggle) {
         event.preventDefault();
         switchPalette();
@@ -508,6 +548,18 @@ const INTERACTIVE_SCRIPT = `
       document.addEventListener('click', carryPalette, true);
       document.addEventListener('auxclick', carryPalette, true);
       document.addEventListener('contextmenu', carryPalette, true);
+      // The three-way switch is a radio group: the arrows move and choose.
+      document.addEventListener('keydown', function (event) {
+        var step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+        var choice = step && event.target && event.target.closest && event.target.closest('[data-pwb-theme-choose]');
+        if (!choice) return;
+        var row = choice.parentNode.querySelectorAll('[data-pwb-theme-choose]');
+        var at = Array.prototype.indexOf.call(row, choice);
+        var next = row[(at + step + row.length) % row.length];
+        event.preventDefault();
+        choosePalette(next.getAttribute('data-pwb-theme-choose'));
+        next.focus();
+      });
       document.addEventListener('submit', onSubmit);
       window.addEventListener('message', function (event) {
         if (!standalone() && event.source === window.parent && event.data && event.data.type === 'pwb-form-result') {

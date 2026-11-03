@@ -1,0 +1,121 @@
+// The switch inside the app: the in-app viewer draws it through this root.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { ColorModeRoot } from './ColorMode.jsx'
+import { ThemeToggle } from './components.jsx'
+
+const light = { base: 'light', alt: 'dark', followDevice: false, light: {}, other: {} }
+const root = () => document.querySelector('[data-pwb-color-root]')
+const palette = () => root().getAttribute('data-pwb-theme')
+const radio = (name) => screen.getByRole('radio', { name })
+const three = { label: 'Color theme', states: 'three', lightLabel: 'Light', darkLabel: 'Dark', deviceLabel: 'Device' }
+
+let listeners
+let deviceDark
+
+function setDevice(dark) {
+  deviceDark = dark
+  act(() => listeners.forEach((listener) => listener()))
+}
+
+beforeEach(() => {
+  listeners = new Set()
+  deviceDark = false
+  window.matchMedia = vi.fn(() => ({
+    get matches() { return deviceDark },
+    addEventListener: (type, listener) => listeners.add(listener),
+    removeEventListener: (type, listener) => listeners.delete(listener),
+  }))
+})
+
+afterEach(() => {
+  cleanup()
+  delete window.matchMedia
+})
+
+function show(mode, props = three, extra = {}) {
+  return render(<ColorModeRoot mode={mode} {...extra}><ThemeToggle props={props} style={{}} /></ColorModeRoot>)
+}
+
+describe('where a page opens', () => {
+  it('in the palette it is designed in, or what the owner chose, or the device', () => {
+    show(light)
+    expect(palette()).toBe('light')
+    cleanup()
+    show({ ...light, initial: 'dark' })
+    expect(palette()).toBe('dark')
+    cleanup()
+    deviceDark = true
+    show({ ...light, followDevice: true })
+    expect(palette()).toBe('dark')
+    expect(radio('Device')).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('in the device when the visitor chose it on the page before', () => {
+    deviceDark = true
+    show({ ...light, initial: 'system' })
+    expect(palette()).toBe('dark')
+    expect(radio('Device')).toHaveAttribute('aria-checked', 'true')
+  })
+})
+
+describe('the two-way switch', () => {
+  it('flips the palette on screen, also from the device', () => {
+    deviceDark = true
+    show({ ...light, followDevice: true }, { label: 'Theme' })
+    const button = screen.getByRole('button', { name: 'Theme' })
+    expect(button).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(button)
+    expect(palette()).toBe('light')
+    // It is a choice now: the device no longer decides.
+    setDevice(true)
+    expect(palette()).toBe('light')
+  })
+})
+
+describe('the three-way switch', () => {
+  it('chooses, and marks the choice as the one Tab stop', () => {
+    show(light)
+    expect(radio('Light')).toHaveAttribute('tabindex', '0')
+    expect(radio('Dark')).toHaveAttribute('tabindex', '-1')
+    fireEvent.click(radio('Dark'))
+    expect(palette()).toBe('dark')
+    expect(radio('Dark')).toHaveAttribute('aria-checked', 'true')
+    expect(radio('Dark')).toHaveAttribute('tabindex', '0')
+    expect(root()).toHaveAttribute('data-pwb-theme-pick', 'dark')
+  })
+
+  it('follows the device while the device is the choice', () => {
+    show(light)
+    fireEvent.click(radio('Device'))
+    expect(palette()).toBe('light')
+    setDevice(true)
+    expect(palette()).toBe('dark')
+    fireEvent.click(radio('Light'))
+    setDevice(true)
+    expect(palette()).toBe('light')
+  })
+
+  it('moves and chooses with the arrow keys', () => {
+    show(light)
+    fireEvent.keyDown(radio('Light'), { key: 'ArrowLeft' })
+    expect(radio('Device')).toHaveFocus()
+    expect(radio('Device')).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('does nothing on the canvas, where a click selects it', () => {
+    const { rerender } = show(light, three, { forced: 'dark' })
+    fireEvent.click(radio('Device'))
+    expect(palette()).toBe('dark')
+    // Nothing was chosen behind the preview either.
+    rerender(<ColorModeRoot mode={light}><ThemeToggle props={three} style={{}} /></ColorModeRoot>)
+    expect(radio('Light')).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('stops listening to the device when it leaves the page', () => {
+    const { unmount } = show(light)
+    expect(listeners.size).toBe(1)
+    unmount()
+    expect(listeners.size).toBe(0)
+  })
+})

@@ -10,7 +10,7 @@ import { pageSlug } from './pageSlug.js'
 import { sanitizeStyles, sanitizeUrl, sanitizeImageSrc } from './sanitize.js'
 import { ICONS, iconSvg } from './icons.js'
 import { fieldHtml } from './formField.js'
-import { themeToggleAttrs, themeToggleInner } from './themeToggle.js'
+import { themeToggleAttrs, themeToggleClass, themeToggleInner, themeToggleTag } from './themeToggle.js'
 import { colorModeFor, colorModeHeadTags, withColorModePage } from './colorMode.js'
 import { fitsBox, nativeFit } from './boxFit.js'
 import { ALERT_VARIANTS } from '../components/renderer/constants.js'
@@ -484,7 +484,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
     const shared = Number.isInteger(p._sharedFrom) && p._sharedFrom > 0 ? ` data-pwb-shared-from="${p._sharedFrom}"` : ''
     return `<iframe${shared} srcdoc="${safe}" scrolling="no" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" style="display:block;width:100%;border:0;background:transparent;${styleStr};overflow:hidden;height:var(--pwb-embed-height,${h}px)"></iframe>`
   }
-  const tag = tagFor(c.type)
+  const tag = tagFor(c.type, p)
   const base = baseRules(c.type)
   if (tag === 'img') {
     const src = sanitizeImageSrc(p.src)
@@ -495,7 +495,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
   return `${openTag(c, ` style="${base} ${styleStr}"`, true)}${innerHtml(c)}</${tag}>`
 }
 
-function tagFor(type) {
+function tagFor(type, props) {
   if (type === 'button' || type === 'linkbutton') return 'a'
   if (type === 'image') return 'img'
   if (type === 'navbar') return 'nav'
@@ -503,7 +503,7 @@ function tagFor(type) {
   if (type === 'region') return 'section'
   if (type === 'quote') return 'blockquote'
   if (type === 'badge' || type === 'icon') return 'span'
-  if (type === 'themeToggle') return 'button'
+  if (type === 'themeToggle') return themeToggleTag(props)
   return 'div'
 }
 
@@ -570,7 +570,7 @@ function innerHtml(c) {
 }
 
 function openTag(c, extraAttrs = '', inner = false) {
-  const tag = tagFor(c.type)
+  const tag = tagFor(c.type, c.props)
   // Motion: hover classes ride the class attribute, the reveal type rides a data
   // attribute the injected observer watches. Both come from the single motion
   // source, so the published bar animates exactly as the editor's Motion panel
@@ -594,7 +594,7 @@ function openTag(c, extraAttrs = '', inner = false) {
     return `<${tag}${idAttr} class="${cls}"${iconA11yAttrs(c.props || {})}>`
   }
   if (c.type === 'themeToggle') {
-    return `<button${idAttr} class="${cls} pwb-theme-toggle"${themeToggleAttrs(c.props || {})}>`
+    return `<${tag}${idAttr} class="${cls} ${themeToggleClass(c.props)}"${themeToggleAttrs(c.props || {})}>`
   }
   return `<${tag}${idAttr} class="${cls}">`
 }
@@ -683,7 +683,7 @@ function pageBodyHtml(page, fixed) {
           : inlineNode(c, c.type === 'region', { fit: !page.flowMode })
         return `      <div id="${esc(elementIdFor(c))}" class="c-${esc(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}>${linkWrap(c, node)}</div>`
       }
-      const tag = tagFor(c.type)
+      const tag = tagFor(c.type, c.props)
       const fit = pageFit(c, page)
       if (fit) {
         const node = `${openTag(c, '', true)}${innerHtml(c)}</${tag}>`

@@ -62,6 +62,7 @@ PROBES = {
     'tweakZoom': '1.15',
     'tweakAlign': 'center',
     'shape': 'square',
+    'states': 'three',
     'src': 'https://example.com/a.png',
     'href': 'https://example.com',
     'buttonHref': 'https://example.com',

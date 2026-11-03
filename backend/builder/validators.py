@@ -325,10 +325,16 @@ def sanitize_props(ctype, props):
             **_field_part_props(props),
         }
     if ctype == 'themeToggle':
-        # The site's light/dark switch: its text is also its spoken name.
+        # The site's light/dark switch: its text is also its spoken name. The
+        # three-way one is absent until chosen, so what a switch already stores
+        # does not change, and the page stays live as it was sent.
+        three = {'states': 'three'} if props.get('states') == 'three' else {}
+        names = {key: _str(props.get(key))[:80] for key in ('lightLabel', 'darkLabel', 'deviceLabel') if props.get(key)}
         return {
             'label': _str(props.get('label'))[:80],
             'showLabel': 'on' if props.get('showLabel') == 'on' else '',
+            **three,
+            **names,
         }
     if ctype == 'alert':
         variant = props.get('variant')

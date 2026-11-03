@@ -650,6 +650,25 @@ class TestLightAndDark:
         assert props['label'] == 'Dark mode'
         assert props['showLabel'] == 'on'
 
+    def _switch(self, **props):
+        comp = {'id': 't1', 'type': 'themeToggle', 'props': {'label': 'Theme', **props}}
+        return validate_and_clean_schema({'pages': [{'id': 'p', 'components': [comp]}]})['pages'][0]['components'][0]['props']
+
+    def test_a_two_way_switch_stores_what_it_did_before(self):
+        assert self._switch() == {'label': 'Theme', 'showLabel': ''}
+
+    def test_the_three_way_switch_survives_a_save_with_its_names(self):
+        assert self._switch(states='three', lightLabel='Açık', darkLabel='Koyu', deviceLabel='Cihaz') == {
+            'label': 'Theme', 'showLabel': '', 'states': 'three',
+            'lightLabel': 'Açık', 'darkLabel': 'Koyu', 'deviceLabel': 'Cihaz',
+        }
+
+    def test_an_unknown_kind_of_switch_is_a_two_way_one(self):
+        assert self._switch(states='<b>') == {'label': 'Theme', 'showLabel': ''}
+
+    def test_a_choice_name_is_cut_like_the_label(self):
+        assert self._switch(states='three', lightLabel='x' * 200)['lightLabel'] == 'x' * 80
+
     def test_a_site_without_the_other_palette_stores_nothing_for_it(self):
         assert 'colorMode' not in self._schema()
 

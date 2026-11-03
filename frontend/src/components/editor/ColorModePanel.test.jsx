@@ -11,9 +11,9 @@ import { useEditorStore } from '../../store/editorStore.js'
 const LIGHT = { backgroundColor: '#ffffff' }
 const DARK = { backgroundColor: '#0b0c0f' }
 
-function open({ theme = LIGHT, colorMode } = {}) {
+function open({ theme = LIGHT, colorMode, pages = [{ id: 'home', name: 'Home', components: [] }] } = {}) {
   localStorage.setItem('pwb_language', 'en')
-  useEditorStore.getState().loadSchema({ theme, ...(colorMode ? { colorMode } : {}), pages: [{ id: 'home', name: 'Home', components: [] }] })
+  useEditorStore.getState().loadSchema({ theme, ...(colorMode ? { colorMode } : {}), pages })
   render(
     <UiThemeProvider>
       <LanguageProvider>
@@ -94,5 +94,59 @@ describe('the site opens in', () => {
     fireEvent.click(choice('Dark'))
     useEditorStore.getState().undo()
     expect(saved()).toBeUndefined()
+  })
+})
+
+describe('adding the switch to the pages', () => {
+  const page = (id, components = []) => ({ id, name: id, components })
+  const aSwitch = { id: 'sw', type: 'themeToggle', props: {}, styles: {}, layout: { x: 0, y: 0, w: 44, h: 44 } }
+  const switches = (id) => useEditorStore.getState().schema.pages.find((p) => p.id === id).components.filter((c) => c.type === 'themeToggle')
+
+  it('offers nothing beyond this page on a site of one page', () => {
+    open()
+    expect(screen.getByRole('button', { name: 'Add a theme switch to this page' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add one to every page' })).not.toBeInTheDocument()
+  })
+
+  it('adds one to every canvas page as one step, leaving the page on screen and the selection', () => {
+    const bar = { id: 'bar', type: 'navbar', props: {}, styles: {}, layout: { x: 0, y: 0, w: 1200, h: 64 } }
+    open({ pages: [page('home', [bar]), page('about'), { id: 'doc', name: 'doc', mode: 'html', html: '<p>Hi</p>', components: [] }] })
+    useEditorStore.getState().selectComponent('bar')
+    const before = useEditorStore.getState().currentPageId
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add one to every page' }))
+
+    expect(switches('home')).toHaveLength(1)
+    expect(switches('about')).toHaveLength(1)
+    expect(switches('doc')).toHaveLength(0)
+    // Under the bar on the page that has one, and the corner on the other.
+    expect(switches('home')[0].layout).toMatchObject({ y: 80, w: 44, h: 44 })
+    expect(switches('about')[0].layout).toMatchObject({ y: 24, w: 44, h: 44 })
+    const state = useEditorStore.getState()
+    expect(state.currentPageId).toBe(before)
+    expect(state.selectedIds).toEqual(['bar'])
+    expect(state.dirty).toBe(true)
+
+    state.undo()
+    expect(switches('home')).toHaveLength(0)
+    expect(switches('about')).toHaveLength(0)
+  })
+
+  it('says which pages are left, adds to those only, and points an HTML page to Components', () => {
+    open({ pages: [page('home', [aSwitch]), page('about'), { id: 'doc', name: 'doc', mode: 'html', html: '<p>Hi</p>', components: [] }] })
+    expect(screen.getByText('2 pages have no theme switch: they follow the choice, but visitors cannot change it there.')).toBeInTheDocument()
+    expect(screen.getByText('An HTML page gets its own from Components, under Theme switch.')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add one to those pages' }))
+
+    expect(switches('home')).toHaveLength(1)
+    expect(switches('about')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Add one to those pages' })).not.toBeInTheDocument()
+  })
+
+  it('says nothing once every page has one', () => {
+    open({ pages: [page('home', [aSwitch])] })
+    expect(screen.queryByText(/have no theme switch/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add a theme switch to this page' })).not.toBeInTheDocument()
   })
 })

@@ -122,6 +122,7 @@ export const COMPONENT_PRESETS = {
     { id: 'icon', label: 'Icon button' },
     { id: 'labelled', label: 'Icon and text' },
     { id: 'soft', label: 'Soft' },
+    { id: 'choices', label: 'Light, dark or device' },
   ],
   divider: [
     { id: 'subtle', label: 'Subtle' },
@@ -254,6 +255,7 @@ export const COMPONENT_PRESET_PROPS = {
     icon: { label: 'Dark mode', showLabel: '' },
     labelled: { label: 'Dark mode', showLabel: 'on' },
     soft: { label: 'Dark mode', showLabel: '' },
+    choices: { label: 'Color theme', showLabel: '', states: 'three', lightLabel: 'Light', darkLabel: 'Dark', deviceLabel: 'Device' },
   },
   input: {
     name: { label: 'Your name', placeholder: 'Jane Doe', inputType: 'text' },
@@ -363,6 +365,7 @@ const COMPONENT_PRESET_PROPS_TR = {
     icon: { label: 'Koyu mod' },
     labelled: { label: 'Koyu mod' },
     soft: { label: 'Koyu mod' },
+    choices: { label: 'Renk teması', lightLabel: 'Açık', darkLabel: 'Koyu', deviceLabel: 'Cihaz' },
   },
   input: {
     name: { label: 'Adınız', placeholder: 'Ayşe Yılmaz' },
@@ -756,6 +759,7 @@ export function componentPresetStyles(type, presetId, theme) {
       icon: { color: t.textColor, backgroundColor: transparent, borderWidth: border, borderStyle: 'solid', borderColor: t.borderColor, borderRadius: '999px', padding: '0px 12px', fontSize: '16px' },
       labelled: { color: t.textColor, backgroundColor: transparent, borderWidth: border, borderStyle: 'solid', borderColor: t.borderColor, borderRadius: '999px', padding: '0px 16px', fontSize: '15px', fontWeight: '500', fontFamily: t.fontFamily },
       soft: { color: t.textColor, backgroundColor: t.softColor, borderWidth: '0px', borderStyle: none, borderRadius: '12px', padding: '0px 12px', fontSize: '16px' },
+      choices: { color: t.textColor, backgroundColor: transparent, borderWidth: border, borderStyle: 'solid', borderColor: t.borderColor, borderRadius: '999px', padding: '3px', fontSize: '16px' },
     },
     input: Object.fromEntries(
       // Outer styles only; the field's look and type come from componentPresetProps.

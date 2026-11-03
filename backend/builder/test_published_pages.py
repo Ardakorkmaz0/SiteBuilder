@@ -206,11 +206,15 @@ class TestRememberingAVisitorsPalette:
 
         assert response.cookies['pwb-theme']['secure'] is True
 
+    def test_choosing_the_device_is_a_choice_too(self, site, page):
+        assert self.visit(site, '?pwb-theme=system', cookie='dark').cookies['pwb-theme'].value == 'system'
+        assert 'data-pwb-chosen="system"' in self.visit(site, cookie='system').content.decode()
+
     def test_going_back_to_light_is_remembered_too(self, site, page):
         assert self.visit(site, '?pwb-theme=light', cookie='dark').cookies['pwb-theme'].value == 'light'
 
     def test_anything_else_in_the_address_is_not_a_choice(self, site, page):
-        for value in ('blue', 'system', '', '<script>'):
+        for value in ('blue', 'SYSTEM', '', '<script>'):
             response = self.visit(site, f'?pwb-theme={value}')
             assert 'pwb-theme' not in response.cookies
             assert 'data-pwb-chosen' not in response.content.decode()

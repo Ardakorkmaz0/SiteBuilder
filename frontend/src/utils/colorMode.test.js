@@ -8,6 +8,7 @@ import {
   colorModeHeadTags,
   colorModeScript,
   hasThemeToggle,
+  pagesWithoutThemeToggle,
   suggestedAltTheme,
   withColorModeComponents,
   withColorModeHtml,
@@ -21,6 +22,7 @@ import { schemaToResponsiveHtml } from './responsiveHtml.js'
 import { publishedPagesFor } from './publishedPages.js'
 import { htmlEmbedDocument } from './htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from './htmlSnippetSizing.js'
+import { themeSwitchSpot, themeToggleHtml } from './themeToggle.js'
 
 const toggle = { id: 'tt', type: 'themeToggle', props: { label: 'Dark mode' }, styles: themedStyles('themeToggle', {}, DEFAULT_THEME), layout: { x: 0, y: 0, w: 44, h: 44 } }
 const block = (type, styles, extra = {}) => ({ id: `${type}-${Math.random().toString(36).slice(2, 6)}`, type, props: {}, styles, layout: { x: 0, y: 0, w: 200, h: 80 }, ...extra })
@@ -72,6 +74,71 @@ describe('when a site has the other palette', () => {
     expect(colorModeCss(mode)).toMatch(/^\[data-pwb-theme="dark"\]\{/)
     // The page's own CSS reads --site-*: it follows too.
     expect(colorModeCss(mode)).toContain('--site-bg:#000000')
+  })
+})
+
+describe('which pages have no switch', () => {
+  it('tells the canvas pages from the HTML pages', () => {
+    const schema = {
+      theme: {},
+      pages: [
+        { id: 'with', components: [{ id: 'box', type: 'container', children: [toggle] }] },
+        { id: 'bare', mode: 'empty', components: [] },
+        { id: 'doc', mode: 'html', html: '<p>Hi</p>', components: [] },
+        { id: 'doc-switch', mode: 'html', html: '<button data-pwb-theme-toggle>x</button>', components: [] },
+        { id: 'mapped', components: [] },
+      ],
+    }
+    const without = pagesWithoutThemeToggle(schema, { mapped: '<p>Authored</p>' })
+    expect(without.canvas.map((page) => page.id)).toEqual(['bare'])
+    expect(without.html.map((page) => page.id)).toEqual(['doc', 'mapped'])
+  })
+})
+
+describe('where a switch is added for the owner', () => {
+  it('goes in the top right corner, under a bar across the top', () => {
+    expect(themeSwitchSpot({ components: [] }, 1200)).toEqual({ x: 1132, y: 24 })
+    const barred = { components: [{ type: 'navbar', layout: { y: 0, h: 64 } }] }
+    expect(themeSwitchSpot(barred, 1200)).toEqual({ x: 1132, y: 80 })
+    // A bar further down the page is not in the way.
+    const lower = { components: [{ type: 'navbar', layout: { y: 300, h: 64 } }] }
+    expect(themeSwitchSpot(lower, 1200)).toEqual({ x: 1132, y: 24 })
+  })
+})
+
+describe('the switch with three choices', () => {
+  const three = { ...toggle, props: { label: 'Color theme', states: 'three', lightLabel: 'Açık', darkLabel: 'Koyu', deviceLabel: 'Cihaz "x"' } }
+  const check = (html) => {
+    const doc = new JSDOM(html).window.document
+    const group = doc.querySelector('[role=radiogroup]')
+    expect(group.tagName).toBe('DIV')
+    expect(group.getAttribute('aria-label')).toBe('Color theme')
+    expect(group.getAttribute('data-pwb-theme-toggle')).toBe('choices')
+    expect(group.classList.contains('pwb-theme-choices')).toBe(true)
+    const radios = [...group.querySelectorAll('button[role=radio]')]
+    expect(radios.map((radio) => [radio.getAttribute('data-pwb-theme-choose'), radio.getAttribute('aria-label')]))
+      .toEqual([['light', 'Açık'], ['dark', 'Koyu'], ['system', 'Cihaz "x"']])
+    expect(doc.querySelector('.pwb-theme-toggle')).toBeNull()
+  }
+
+  it('is written as a radio group by every writer', () => {
+    const schema = site([three])
+    check(publishedPagesFor(schema)[0].html)
+    check(schemaToFiles(schema).find((file) => file.name === 'index.html').content)
+    check(schemaToResponsiveHtml(schema, 'x', { colorMode: modeOf(schema) }))
+    check(themeToggleHtml(three.props))
+  })
+
+  it('counts as the site\'s switch, in an HTML page too', () => {
+    expect(hasThemeToggle(site([three]))).toBe(true)
+    expect(hasThemeToggle(site([]), { home: themeToggleHtml(three.props) })).toBe(true)
+  })
+
+  it('keeps the two-way switch a pressed button', () => {
+    const button = new JSDOM(themeToggleHtml({ label: 'Theme' })).window.document.querySelector('button')
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+    expect(button.getAttribute('data-pwb-theme-toggle')).toBe('')
+    expect(button.classList.contains('pwb-theme-toggle')).toBe(true)
   })
 })
 
@@ -232,7 +299,7 @@ describe('in the visitor\'s browser', () => {
     const page = new JSDOM(
       '<!DOCTYPE html><html><head></head><body><button data-pwb-theme-toggle aria-pressed="false">x</button>'
         + '<a id="about" href="/about/">About</a><a id="jump" href="#top">Top</a><a id="away" href="https://elsewhere.test/">Away</a>'
-        + '<a id="sibling" href="/s/site-a/about/">Same site</a><a id="neighbour" href="/s/site-b/">Another site</a><a id="neighbour-prefix" href="/s/site-a-2/">Similar name</a></body></html>',
+        + `${themeToggleHtml({ states: 'three' })}<a id="sibling" href="/s/site-a/about/">Same site</a><a id="neighbour" href="/s/site-b/">Another site</a><a id="neighbour-prefix" href="/s/site-a-2/">Similar name</a></body></html>`,
       { url, runScripts: 'outside-only' },
     )
     pages.push(page)
@@ -241,7 +308,16 @@ describe('in the visitor\'s browser', () => {
     // The builder's own /s/ pages are sandboxed: storage throws there.
     if (sandboxed) Object.defineProperty(window, 'localStorage', { get() { throw new window.DOMException('sandboxed', 'SecurityError') } })
     // A device with no preference answers "light", as browsers do.
-    window.matchMedia = (query) => ({ matches: query.includes(prefersDark ? 'dark' : 'light') })
+    let deviceDark = prefersDark
+    const listeners = []
+    window.matchMedia = (query) => ({
+      get matches() { return query.includes(deviceDark ? 'dark' : 'light') },
+      addEventListener: (type, listener) => listeners.push(listener),
+    })
+    window.setDevice = (dark) => {
+      deviceDark = dark
+      listeners.forEach((listener) => listener())
+    }
     window.eval(colorModeScript(mode))
     window.eval(builderInteractiveJs())
     window.document.dispatchEvent(new window.Event('DOMContentLoaded'))
@@ -256,6 +332,88 @@ describe('in the visitor\'s browser', () => {
     // The device's preference counts only when the owner said so.
     expect(theme(visit({ prefersDark: true }))).toBe('light')
     expect(theme(visit({ prefersDark: true, follow: true }))).toBe('dark')
+  })
+
+  describe('the visitor choosing the device', () => {
+    const picked = (window, value) => window.document.querySelector(`[data-pwb-theme-choose="${value}"]`)
+    const choose = (window, value) => picked(window, value).dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+    const root = (window) => window.document.documentElement
+    const startDark = () => site([toggle], { colorMode: { start: 'dark' } })
+
+    it('outranks what the owner chose, from the address, from storage and from the server', () => {
+      expect(theme(visit({ schema: startDark(), url: 'https://example.test/?pwb-theme=system', sandboxed: true }))).toBe('light')
+      expect(theme(visit({ schema: startDark(), stored: 'system' }))).toBe('light')
+      expect(theme(visit({ schema: startDark(), stored: 'system', prefersDark: true }))).toBe('dark')
+    })
+
+    it('is shown as the choice whichever palette the device gives', () => {
+      expect(root(visit({ stored: 'system', prefersDark: true })).getAttribute('data-pwb-theme-pick')).toBe('system')
+      expect(root(visit({ schema: startDark() })).getAttribute('data-pwb-theme-pick')).toBe('dark')
+      expect(root(visit({ schema: site([toggle], { colorMode: { start: 'system' } }) })).getAttribute('data-pwb-theme-pick')).toBe('system')
+      expect(root(visit()).getAttribute('data-pwb-theme-pick')).toBe('light')
+    })
+
+    it('marks the choice on the radio group and makes it the one Tab stop', () => {
+      const window = visit({ prefersDark: true })
+      choose(window, 'system')
+      expect(theme(window)).toBe('dark')
+      expect(picked(window, 'system').getAttribute('aria-checked')).toBe('true')
+      expect(picked(window, 'system').getAttribute('tabindex')).toBe('0')
+      expect(picked(window, 'light').getAttribute('aria-checked')).toBe('false')
+      expect(picked(window, 'light').getAttribute('tabindex')).toBe('-1')
+      expect(window.localStorage.getItem('pwb-color-mode')).toBe('system')
+    })
+
+    it('without storage, rides in the address like the others', () => {
+      const window = visit({ sandboxed: true })
+      choose(window, 'system')
+      expect(window.location.search).toBe('?pwb-theme=system')
+      const about = window.document.getElementById('about')
+      about.addEventListener('click', (event) => event.preventDefault())
+      about.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+      expect(about.getAttribute('href')).toBe('https://example.test/about/?pwb-theme=system')
+    })
+
+    it('moves and chooses with the arrow keys, wrapping at the ends', () => {
+      const window = visit()
+      const press = (value, key) => picked(window, value).dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+      press('light', 'ArrowRight')
+      expect(theme(window)).toBe('dark')
+      expect(window.document.activeElement).toBe(picked(window, 'dark'))
+      press('dark', 'ArrowRight')
+      expect(root(window).getAttribute('data-pwb-theme-pick')).toBe('system')
+      press('system', 'ArrowRight')
+      expect(root(window).getAttribute('data-pwb-theme-pick')).toBe('light')
+      press('light', 'ArrowLeft')
+      expect(root(window).getAttribute('data-pwb-theme-pick')).toBe('system')
+    })
+  })
+
+  describe('when the device changes while the page is open', () => {
+    const pressed = (window) => window.document.querySelector('button[data-pwb-theme-toggle]').getAttribute('aria-pressed')
+
+    it('a page on the device follows it, and the switch says so', () => {
+      const window = visit({ schema: site([toggle], { colorMode: { start: 'system' } }) })
+      expect(theme(window)).toBe('light')
+      window.setDevice(true)
+      expect([theme(window), pressed(window)]).toEqual(['dark', 'true'])
+      window.setDevice(false)
+      expect([theme(window), pressed(window)]).toEqual(['light', 'false'])
+    })
+
+    it('a choice of the visitor stays', () => {
+      const window = visit({ schema: site([toggle], { colorMode: { start: 'system' } }) })
+      press(window)
+      expect(theme(window)).toBe('dark')
+      window.setDevice(false)
+      expect(theme(window)).toBe('dark')
+    })
+
+    it('a site opening in the owner\'s palette stays', () => {
+      const window = visit({ schema: site([toggle], { colorMode: { start: 'dark' } }) })
+      window.setDevice(false)
+      expect(theme(window)).toBe('dark')
+    })
   })
 
   it('on the device means the device, for a site designed dark too', () => {
@@ -372,6 +530,10 @@ describe('in the visitor\'s browser', () => {
       pages.push(page)
       return page.window
     }
+
+    it('takes the device as a choice', () => {
+      expect(theme(served({ chosen: 'system', schema: site([toggle], { colorMode: { start: 'dark' } }) }))).toBe('light')
+    })
 
     it('opens in it, over what the owner chose', () => {
       expect(theme(served({ chosen: 'dark' }))).toBe('dark')

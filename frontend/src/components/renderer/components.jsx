@@ -13,7 +13,8 @@ import { htmlEmbedDocument } from '../../utils/htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from '../../utils/htmlSnippetSizing.js'
 import { scaleCssValue, scaledPx } from './scale.js'
 import { EYE_ICONS, FORM_FIELD_CSS, choiceList, fieldClassName, fieldStyles, radioChoices, rangeAttrs } from '../../utils/formField.js'
-import { THEME_TOGGLE_CSS, THEME_TOGGLE_ICONS, showsLabel, themeToggleLabel } from '../../utils/themeToggle.js'
+import { THEME_CHOICES, THEME_TOGGLE_CSS, THEME_TOGGLE_ICONS, hasThreeStates, showsLabel, themeChoiceName, themeToggleLabel } from '../../utils/themeToggle.js'
+import { moveInRadioGroup } from '../../ui/radioGroupKeys.js'
 import { useColorMode } from './colorModeContext.js'
 import {
   navLinkLabel,
@@ -422,6 +423,39 @@ export function ThemeToggle({ props, style }) {
   const colorMode = useColorMode()
   const dark = colorMode?.current === 'dark'
   const label = themeToggleLabel(props)
+  if (hasThreeStates(props)) {
+    return (
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className="pwb-theme-choices"
+        data-pwb-theme-toggle="choices"
+        onKeyDown={moveInRadioGroup}
+        style={{ display: 'inline-flex', alignItems: 'stretch', gap: '2px', ...style }}
+      >
+        {THEME_CHOICES.map((choice) => {
+          const name = themeChoiceName(choice, props)
+          const on = colorMode?.pick === choice.value
+          return (
+            <button
+              key={choice.value}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-label={name}
+              title={name}
+              tabIndex={on ? 0 : -1}
+              data-pwb-theme-choose={choice.value}
+              onClick={colorMode?.choose ? () => colorMode.choose(choice.value) : undefined}
+            >
+              <span aria-hidden="true" style={{ display: 'inline-flex', width: '1.2em', height: '1.2em' }} dangerouslySetInnerHTML={{ __html: THEME_TOGGLE_ICONS[choice.icon] }} />
+              {showsLabel(props) && <span>{name}</span>}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
   return (
     <button
       type="button"
