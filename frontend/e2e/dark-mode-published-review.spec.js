@@ -276,9 +276,9 @@ test('review: a real published page follows a dark device from its first request
   let realDevice = null
   try {
     const site = await publishFixture(request, owned, 'Review first real device')
-    // Firefox gets a real dark device, not Playwright's emulated one: the server's
-    // Cross-Origin-Opener-Policy moves the page to a new browsing context, and
-    // the emulation does not follow it there (see the browser probe).
+    // Firefox gets a real dark device, not Playwright's emulated one, which is
+    // lost on a page with the server's Cross-Origin-Opener-Policy (measured in
+    // the browser probe).
     const firefox = browserName === 'firefox'
       ? await browser.browserType().launch({ firefoxUserPrefs: { 'ui.systemUsesDarkTheme': 1, 'layout.css.prefers-color-scheme.content-override': 2 } })
       : null
