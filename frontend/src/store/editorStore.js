@@ -2755,7 +2755,7 @@ export const useEditorStore = create((set, get) => ({
 
   // The palette visitors can switch to (utils/colorMode.js). A colour in
   // `theme` replaces the suggested one; `theme: null` goes back to the
-  // suggestion for all of them.
+  // suggestion for all of them. `start` is what the site opens in.
   updateColorMode: (patch = {}) => {
     get().record('color-mode')
     set((state) => {
@@ -2763,8 +2763,10 @@ export const useEditorStore = create((set, get) => ({
       const theme = !('theme' in patch)
         ? before.theme || {}
         : patch.theme === null ? {} : { ...(before.theme || {}), ...patch.theme }
-      const followDevice = 'followDevice' in patch ? !!patch.followDevice : !!before.followDevice
-      return { schema: { ...state.schema, colorMode: { theme, followDevice } }, dirty: true }
+      const start = patch.start || before.start
+      // Still written for a tab running the previous version.
+      const followDevice = start ? start === 'system' : !!before.followDevice
+      return { schema: { ...state.schema, colorMode: { theme, followDevice, ...(start ? { start } : {}) } }, dirty: true }
     })
   },
 

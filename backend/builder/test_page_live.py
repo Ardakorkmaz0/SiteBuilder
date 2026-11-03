@@ -4,6 +4,8 @@ Sending live used to replace every page at once. The file list now says of
 each page whether it is live as it stands, live in an older form or not live,
 a page can be kept off the public site, and any of it can be undone.
 """
+import hashlib
+import json
 from importlib import import_module
 
 import pytest
@@ -12,6 +14,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from .live_pages import page_fingerprint
 from .models import LiveSnapshot, PublishedPage, Site, SiteVersion
 
 
@@ -210,6 +213,38 @@ class TestStatusOfEachPage:
         changed['theme'] = {'primaryColor': '#112233'}
 
         assert client.patch(f'/api/sites/{site.pk}/', {'schema': changed}, format='json').data['page_live'] == {'home': 'older'}
+
+    def test_a_switch_on_one_page_makes_the_other_pages_older(self, client, site):
+        # A switch anywhere gives every page both palettes, so the live document
+        # of a page with no switch no longer matches what it would be sent as.
+        send(client, site, 'home', 'Home v1')
+        send(client, site, 'about', 'About v1')
+        with_switch = schema()
+        with_switch['pages'][1]['html'] = document('About v1') + '<button data-pwb-theme-toggle>x</button>'
+
+        response = client.patch(f'/api/sites/{site.pk}/', {'schema': with_switch}, format='json')
+
+        assert response.data['page_live'] == {'home': 'older', 'about': 'older'}
+
+    def test_removing_the_only_switch_makes_the_other_pages_older(self, client, site):
+        with_switch = schema()
+        with_switch['pages'][1]['components'] = [
+            {'id': 'box', 'type': 'container', 'children': [{'id': 'sw', 'type': 'themeToggle', 'props': {}}]},
+        ]
+        client.patch(f'/api/sites/{site.pk}/', {'schema': with_switch}, format='json')
+        send(client, site, 'home', 'Home v1')
+        assert client.get(f'/api/sites/{site.pk}/').data['page_live'] == {'home': 'live'}
+
+        assert save_draft(client, site).data['page_live'] == {'home': 'older'}
+
+    def test_a_site_with_no_switch_keeps_the_fingerprints_its_pages_went_live_with(self):
+        page = {'id': 'home', 'components': [{'id': 'a', 'type': 'text', 'children': []}]}
+        draft = {'theme': {}, 'pages': [page]}
+        before = hashlib.sha256(
+            json.dumps([{'theme': {}}, page, '<p>Hi</p>'], sort_keys=True).encode(),
+        ).hexdigest()
+
+        assert page_fingerprint(draft, '<p>Hi</p>', page) == before
 
     def test_an_unpublished_site_has_nothing_live(self, client, site):
         send(client, site, 'home', 'Home v1')

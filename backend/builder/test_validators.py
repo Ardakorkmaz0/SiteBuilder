@@ -668,6 +668,25 @@ class TestLightAndDark:
     def test_following_the_device_is_a_real_yes_only(self):
         assert self._schema(colorMode={'followDevice': 'yes'})['colorMode']['followDevice'] is False
 
+    def test_what_the_site_opens_in_is_kept_and_decides_following_the_device(self):
+        assert self._schema(colorMode={'start': 'dark', 'followDevice': True})['colorMode'] == {
+            'theme': {}, 'followDevice': False, 'start': 'dark',
+        }
+        assert self._schema(colorMode={'start': 'system'})['colorMode'] == {
+            'theme': {}, 'followDevice': True, 'start': 'system',
+        }
+
+    def test_an_unknown_opening_is_left_out(self):
+        assert self._schema(colorMode={'start': 'blue', 'followDevice': True})['colorMode'] == {
+            'theme': {}, 'followDevice': True,
+        }
+        assert self._schema(colorMode={'start': ['dark']})['colorMode'] == {'theme': {}, 'followDevice': False}
+
+    def test_a_site_that_never_chose_stores_what_it_did_before(self):
+        assert self._schema(colorMode={'theme': {}, 'followDevice': False})['colorMode'] == {
+            'theme': {}, 'followDevice': False,
+        }
+
 
 def test_a_block_that_fits_its_box_keeps_it_after_a_save():
     clean = validate_and_clean_schema({'pages': [{'id': 'p', 'components': [

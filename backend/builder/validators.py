@@ -700,21 +700,25 @@ COLOR_MODE_ROLES = (
     'backgroundColor', 'surfaceColor', 'softColor', 'headerColor', 'headerTextColor',
     'textColor', 'mutedColor', 'borderColor', 'primaryColor', 'buttonTextColor', 'accentColor',
 )
+COLOR_MODE_STARTS = ('light', 'dark', 'system')
 
 
 def sanitize_color_mode(value):
-    """The other palette as hex colours, and whether to follow the device.
+    """The other palette as hex colours, and what the site opens in.
 
     A colour that is not a plain hex value is left out rather than defaulted:
-    the editor fills a missing one from its own suggestion.
+    the editor fills a missing one from its own suggestion. `start` stays absent
+    until the owner chooses, so what a site already stores does not change.
     """
     if not isinstance(value, dict):
         return None
     theme = value.get('theme') if isinstance(value.get('theme'), dict) else {}
     colors = {role: sanitize_hex_color(theme.get(role)) for role in COLOR_MODE_ROLES}
+    start = value.get('start') if value.get('start') in COLOR_MODE_STARTS else None
     return {
         'theme': {role: color for role, color in colors.items() if color},
-        'followDevice': value.get('followDevice') is True,
+        'followDevice': start == 'system' if start else value.get('followDevice') is True,
+        **({'start': start} if start else {}),
     }
 
 
