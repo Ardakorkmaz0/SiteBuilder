@@ -1,0 +1,48 @@
+[
+  {
+    "name": "E-no-escape",
+    "file": "src/utils/syntaxHighlight.js",
+    "old": "const esc = (text) => text.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))",
+    "new": "const esc = (text) => text",
+    "command": [
+      "src/utils/syntaxHighlight.test.js",
+      "src/components/editor/CodeField.test.jsx"
+    ],
+    "exit": 1,
+    "summary": [
+      "Test Files  1 failed | 1 passed (2)",
+      "Tests  6 failed | 19 passed (25)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 6 \u23af\u23af\u23af\u23af\u23af\u23af\u23af"
+    ]
+  },
+  {
+    "name": "E-no-scroll-sync",
+    "file": "src/components/editor/CodeField.jsx",
+    "old": "behind.current.scrollTop = event.target.scrollTop",
+    "new": "void event.target.scrollTop",
+    "command": [
+      "src/components/editor/CodeField.test.jsx"
+    ],
+    "exit": 1,
+    "summary": [
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 8 passed (9)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af"
+    ]
+  },
+  {
+    "name": "E-no-pages-escape",
+    "file": "src/components/preview/PublicToolbar.jsx",
+    "old": "useEscapeToClose(pagesOpen, () => setPagesOpen(false))",
+    "new": "useEscapeToClose(false, () => setPagesOpen(false))",
+    "command": [
+      "src/components/preview/PublicToolbar.pages.test.jsx"
+    ],
+    "exit": 1,
+    "summary": [
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 6 passed (7)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af"
+    ]
+  }
+]

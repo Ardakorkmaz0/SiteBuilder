@@ -1,0 +1,47 @@
+[
+  {
+    "name": "D-remove-faint-threshold",
+    "file": "src/utils/colorMode.js",
+    "old": "const FAINT = 0.5",
+    "new": "const FAINT = 0",
+    "command": [
+      "src/utils/colorMode.test.js"
+    ],
+    "exit": 1,
+    "summary": [
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 140 passed (141)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af"
+    ]
+  },
+  {
+    "name": "D-unsafe-textOn",
+    "file": "src/utils/colorMode.js",
+    "old": "return ['#ffffff', '#111111', '#000000'].find((text) => contrast(text, color) >= 4.5) || '#000000'",
+    "new": "return '#ffffff'",
+    "command": [
+      "src/utils/colorMode.test.js"
+    ],
+    "exit": 1,
+    "summary": [
+      "Test Files  1 failed (1)",
+      "Tests  11 failed | 130 passed (141)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 11 \u23af\u23af\u23af\u23af\u23af\u23af\u23af"
+    ]
+  },
+  {
+    "name": "D-drop-contrast-warning",
+    "file": "src/utils/colorMode.js",
+    "old": "return ratio < min ?",
+    "new": "return false ?",
+    "command": [
+      "src/utils/colorMode.test.js"
+    ],
+    "exit": 1,
+    "summary": [
+      "Test Files  1 failed (1)",
+      "Tests  3 failed | 138 passed (141)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 3 \u23af\u23af\u23af\u23af\u23af\u23af\u23af"
+    ]
+  }
+]

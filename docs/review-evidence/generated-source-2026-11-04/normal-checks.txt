@@ -1,0 +1,12 @@
+Vitest
+ Test Files  317 passed (317)
+      Tests  3114 passed (3114)
+   Duration  80.21s (transform 36.88s, setup 61.99s, import 136.36s, tests 481.23s, environment 407.74s)
+
+pytest
+998 passed, 766 warnings in 205.85s (0:03:25)
+
+restore
+ Test Files  8 passed (8)
+      Tests  262 passed (262)
+   Duration  2.77s (transform 2.87s, setup 771ms, import 4.23s, tests 4.31s, environment 4.84s)

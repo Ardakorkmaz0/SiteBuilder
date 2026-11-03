@@ -1,0 +1,33 @@
+npm notice run frontend@0.0.0 test:run
+npm notice run vitest run src/test/generatedReviewE.test.jsx
+
+ RUN  v4.1.11 /tmp/generated-review-own/frontend
+
+ ❯ src/test/generatedReviewE.test.jsx (2 tests | 1 failed) 175ms
+   × can turn off colors when storage becomes unavailable 99ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/test/generatedReviewE.test.jsx > can turn off colors when storage becomes unavailable
+Error: expect(element).toHaveAttribute("aria-pressed", "false") // element.getAttribute("aria-pressed") === "false"
+
+Expected the element to have attribute:
+  aria-pressed="false"
+Received:
+  aria-pressed="true"
+ ❯ src/test/generatedReviewE.test.jsx:18:58
+     16|  vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw n…
+     17|  fireEvent.click(screen.getByRole('button',{name:'Code colors'}))
+     18|  expect(screen.getByRole('button',{name:'Code colors'})).toHaveAttribu…
+       |                                                          ^
+     19| })
+     20|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  02:32:02
+   Duration  811ms (transform 107ms, setup 67ms, import 112ms, tests 175ms, environment 359ms)
+

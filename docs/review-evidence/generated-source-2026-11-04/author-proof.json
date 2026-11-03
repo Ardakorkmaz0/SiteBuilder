@@ -1,0 +1,37 @@
+[
+  {
+    "title": "ab",
+    "needs": {
+      "palette": true,
+      "nav": true,
+      "reveal": true,
+      "tabs": true,
+      "forms": true,
+      "sticky": true,
+      "fit": true,
+      "fields": true,
+      "motion": true
+    },
+    "createdForm": true,
+    "submitPrevented": true
+  },
+  {
+    "title": "a>b",
+    "needs": {
+      "palette": false,
+      "nav": false,
+      "reveal": false,
+      "tabs": false,
+      "forms": false,
+      "sticky": false,
+      "fit": false,
+      "fields": false,
+      "motion": false
+    },
+    "createdForm": true,
+    "submitPrevented": false
+  },
+  {
+    "cssProbe": ".a:is(.b,.c) {color:red;}"
+  }
+]

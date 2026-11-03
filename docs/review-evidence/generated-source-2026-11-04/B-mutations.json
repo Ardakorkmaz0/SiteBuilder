@@ -1,0 +1,32 @@
+[
+  {
+    "name": "B-drop-choice-notification",
+    "file": "src/components/renderer/ColorMode.jsx",
+    "old": "onChoose?.(next)",
+    "new": "void next",
+    "command": [
+      "src/pages/PreviewPage.palette.test.jsx",
+      "src/components/renderer/ColorMode.test.jsx"
+    ],
+    "exit": 1,
+    "summary": [
+      "Test Files  2 failed (2)",
+      "Tests  3 failed | 16 passed (19)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 3 \u23af\u23af\u23af\u23af\u23af\u23af\u23af"
+    ]
+  },
+  {
+    "name": "B-vertical-is-topbar",
+    "file": "src/utils/themeToggle.js",
+    "old": " && c.props?.navLayout !== 'vertical'",
+    "new": "",
+    "command": [
+      "src/components/editor/ColorModePanel.test.jsx"
+    ],
+    "exit": 0,
+    "summary": [
+      "Test Files  1 passed (1)",
+      "Tests  19 passed (19)"
+    ]
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "ignoredFirstClickWasHiddenByToPass": true,
+  "clicks": 2,
+  "auxCanceled": true,
+  "rewrittenHref": "https://review.test/s/a/about/?pwb-theme=dark",
+  "manualGotoWouldUse": "https://review.test/s/a/about/?pwb-theme=dark"
+}

@@ -1,0 +1,62 @@
+[
+  {
+    "name": "A-all-needs",
+    "file": "src/utils/htmlRuntime.js",
+    "old": "if (typeof source !== 'string' || AUTHOR_SCRIPT.test(source)) return ALL_NEEDS",
+    "new": "if (true) return ALL_NEEDS",
+    "command": [
+      "src/utils/generatedSize.test.js"
+    ],
+    "exit": 1,
+    "summary": [
+      "Test Files  1 failed (1)",
+      "Tests  20 failed | 31 passed (51)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 20 \u23af\u23af\u23af\u23af\u23af\u23af\u23af"
+    ]
+  },
+  {
+    "name": "A-no-forms",
+    "file": "src/utils/htmlRuntime.js",
+    "old": "forms: /<form\\b|<iframe\\b/i,",
+    "new": "forms: /NEVER_REVIEW/,",
+    "command": [
+      "src/utils/generatedSize.test.js"
+    ],
+    "exit": 1,
+    "summary": [
+      "Test Files  1 failed (1)",
+      "Tests  4 failed | 47 passed (51)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 4 \u23af\u23af\u23af\u23af\u23af\u23af\u23af"
+    ]
+  },
+  {
+    "name": "A-no-reinject",
+    "file": "src/utils/htmlRuntime.js",
+    "old": "if (parts !== null && neededParts(runtimeNeeds(page())) !== parts) out = out.replace(SHIM_TAGS, '')",
+    "new": "if (false) out = out.replace(SHIM_TAGS, \"\")",
+    "command": [
+      "src/utils/generatedSize.test.js"
+    ],
+    "exit": 1,
+    "summary": [
+      "Test Files  1 failed (1)",
+      "Tests  3 failed | 48 passed (51)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 3 \u23af\u23af\u23af\u23af\u23af\u23af\u23af"
+    ]
+  },
+  {
+    "name": "A-author-gt",
+    "file": "src/utils/htmlRuntime.js",
+    "old": "|<[^<>]*\\son[a-z]+\\s*=/i",
+    "new": "|<NEVER_REVIEW/i",
+    "command": [
+      "src/utils/generatedSize.test.js"
+    ],
+    "exit": 1,
+    "summary": [
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 50 passed (51)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af"
+    ]
+  }
+]
