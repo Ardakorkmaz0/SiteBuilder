@@ -95,7 +95,7 @@ import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
 import { schemaToFiles, schemaToSingleHtml } from '../utils/schemaToFiles.js'
 import { componentHtmlFiles, componentSourceHtml, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
-import { colorModeFor, viewColorMode } from '../utils/colorMode.js'
+import { viewColorMode } from '../utils/colorMode.js'
 import { emptyHtmlDocument } from '../utils/htmlTemplates.js'
 import { apiError } from '../utils/errors.js'
 import { googleFontHrefForTheme } from '../utils/googleFonts.js'
@@ -2993,7 +2993,7 @@ function SiteEditor() {
                   onTypingChange={setHtmlTyping}
                   persistKey={id}
                   html={siteHtml}
-                  colorMode={currentPage ? colorModeFor({ theme, colorMode: colorModeSetting, pages: storePages }, currentPage, pageHtmlMap) : null}
+                  colorMode={currentPage ? viewColorMode({ theme, colorMode: colorModeSetting, pages: storePages }, currentPage, colorModePreview, pageHtmlMap) : null}
                   liveCode={liveCodeEnabled}
                   liveCodeHold={liveCodeHold}
                   liveCodeControls={liveCodeControls}

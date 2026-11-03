@@ -1,7 +1,7 @@
 // What the site opens in: the owner's choice, shown for a site that never made
 // one, and written as the store keeps it.
 import { beforeEach, describe, expect, it } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../../ui/UiThemeProvider.jsx'
@@ -11,13 +11,13 @@ import { useEditorStore } from '../../store/editorStore.js'
 const LIGHT = { backgroundColor: '#ffffff' }
 const DARK = { backgroundColor: '#0b0c0f' }
 
-function open({ theme = LIGHT, colorMode, pages = [{ id: 'home', name: 'Home', components: [] }] } = {}) {
+function open({ theme = LIGHT, colorMode, pages = [{ id: 'home', name: 'Home', components: [] }], htmlMode = false } = {}) {
   localStorage.setItem('pwb_language', 'en')
   useEditorStore.getState().loadSchema({ theme, ...(colorMode ? { colorMode } : {}), pages })
   render(
     <UiThemeProvider>
       <LanguageProvider>
-        <ColorModePanel />
+        <ColorModePanel htmlMode={htmlMode} />
       </LanguageProvider>
     </UiThemeProvider>,
   )
@@ -187,5 +187,34 @@ describe('adding the switch to the pages', () => {
     open({ pages: [page('home', [aSwitch])] })
     expect(screen.queryByText(/have no theme switch/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add a theme switch to this page' })).not.toBeInTheDocument()
+  })
+})
+
+describe('showing the other palette', () => {
+  it('says the canvas on a canvas page, and View on an HTML page', () => {
+    open()
+    expect(screen.getByRole('checkbox', { name: 'Show dark mode on the canvas' })).toBeInTheDocument()
+    cleanup()
+    open({ htmlMode: true })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show dark mode in View' }))
+    expect(useEditorStore.getState().colorModePreview).toBe(true)
+    useEditorStore.getState().setColorModePreview(false)
+  })
+})
+
+describe('colors that are hard to read', () => {
+  it('says nothing about what it suggests', () => {
+    open()
+    expect(screen.queryByText(/Hard to read/)).not.toBeInTheDocument()
+  })
+
+  it('warns under the color at fault, and stops when it is fixed', () => {
+    open({ colorMode: { theme: { textColor: '#333333' }, followDevice: false } })
+    expect(screen.getByText('Hard to read on Page background: 1.4:1, needs 4.5:1.')).toBeInTheDocument()
+    expect(screen.getByText('Hard to read on Cards and fields: 1.3:1, needs 4.5:1.')).toBeInTheDocument()
+
+    act(() => useEditorStore.getState().updateColorMode({ theme: { textColor: '#eeeeee' } }))
+
+    expect(screen.queryByText(/Hard to read/)).not.toBeInTheDocument()
   })
 })
