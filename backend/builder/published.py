@@ -133,8 +133,10 @@ def _with_visitor_palette(html, request):
     (?pwb-theme=dark) and only as far as the visitor's next click. An address
     that holds one is a request the server can answer with a cookie, which a
     second visit then brings back. The address comes first: it is the newer of
-    the two, and the page reads it by itself."""
-    chosen = request.GET.get(_PALETTE_PARAM)
+    the two, and the page reads it by itself: decoded, and its first value when
+    it is there twice, so read the same way here or the page shows one palette
+    and the cookie keeps the other."""
+    chosen = next(iter(request.GET.getlist(_PALETTE_PARAM)), None)
     if chosen in _PALETTES:
         return html, chosen
     kept = request.COOKIES.get(_PALETTE_COOKIE)

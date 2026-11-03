@@ -1124,6 +1124,10 @@ function SiteEditor() {
         return
       }
 
+      // A control already took this key (a radio group's or a tab row's arrow):
+      // it must not move the selected block as well.
+      if (e.defaultPrevented) return
+
       // Everything below is the component-canvas arrange layer — not HTML pages.
       if (htmlHistoryRef.current.currentPageIsHtml) return
       const state = useEditorStore.getState()

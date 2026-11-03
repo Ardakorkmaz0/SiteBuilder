@@ -215,6 +215,19 @@ class TestRememberingAVisitorsPalette:
             assert 'pwb-theme' not in response.cookies
             assert 'data-pwb-chosen' not in response.content.decode()
 
+    def test_the_address_is_read_as_the_page_reads_it(self, site, page):
+        # Decoded, and the first value: the page's head script does the same, so
+        # what is kept is what the visitor saw.
+        assert self.visit(site, '?pwb-theme=%64ark').cookies['pwb-theme'].value == 'dark'
+        assert self.visit(site, '?pwb-theme=dark&pwb-theme=light').cookies['pwb-theme'].value == 'dark'
+        assert self.visit(site, '?pwb-theme=light&pwb-theme=dark').cookies['pwb-theme'].value == 'light'
+
+    def test_a_first_value_that_is_no_palette_leaves_the_cookie_in_charge(self, site, page):
+        response = self.visit(site, '?pwb-theme=blue&pwb-theme=light', cookie='dark')
+
+        assert 'pwb-theme' not in response.cookies
+        assert 'data-pwb-chosen="dark"' in response.content.decode()
+
     def test_a_later_visit_is_told_what_the_cookie_holds(self, site, page):
         response = self.visit(site, cookie='dark')
 
