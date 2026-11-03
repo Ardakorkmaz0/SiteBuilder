@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>Dark mode stage 3 review harness</title>
+    <script>
+      // Test accounts only. Disable autosave and onboarding before the real
+      // editor mounts; the review measures one unsaved batch and its undo.
+      const reviewParams = new URLSearchParams(location.search)
+      if (reviewParams.get('mode') === 'bulk') {
+        const reviewSiteId = reviewParams.get('siteId') || reviewParams.get('site')
+        if (reviewSiteId) localStorage.setItem(`pwb_autosave_on_${reviewSiteId}`, '0')
+        localStorage.setItem('pwb_editor_tour_v1', '1')
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./dark-mode-stage3-review-entry.jsx"></script>
+  </body>
+</html>
