@@ -8,7 +8,7 @@ import { themeToggleAttrs, themeToggleClass, themeToggleInner, themeToggleTag } 
 import { ICONS, iconSvg } from './icons.js'
 import { ALERT_VARIANTS } from '../components/renderer/constants.js'
 import { customCssBlock, customJsBlock, pageTheme, themeVariablesCss } from './theme.js'
-import { builderInteractiveTags, withBuilderInteractiveHtml } from './htmlRuntime.js'
+import { builderInteractiveTags, runtimeNeeds, withBuilderInteractiveHtml, withoutUnusedRules } from './htmlRuntime.js'
 import { htmlEmbedDocument, srcdocAttrValue, withEmbedFont } from './htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from './htmlSnippetSizing.js'
 import { googleFontLinkTag } from './googleFonts.js'
@@ -466,6 +466,7 @@ export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = 
     flush()
   })
 
+  const runtimeSource = `${body}${customJsBlock(schema?.customJs)}${colorMode ? ' data-pwb-color-mode' : ''}`
   return `<!DOCTYPE html>
 <html lang="${pageLanguage(page)}"${pageDirAttr(page)}>
   <head>
@@ -474,9 +475,9 @@ export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = 
     <title>${esc(pageSeoTitle(page, title))}</title>
     ${seoHeadTags(page, title)}${pageBehaviourStyleTag(page)}
     ${googleFontLinkTag(pageTheme(schema, page))}
-    ${motionHeadTags()}
+    ${runtimeNeeds(runtimeSource).motion ? motionHeadTags() : ''}
     <style>
-      ${themeVariablesCss(pageTheme(schema, page))}
+${withoutUnusedRules(`      ${themeVariablesCss(pageTheme(schema, page))}
       *{ box-sizing: border-box; }
       html, body { overflow-x: hidden; }
       body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif); color: var(--site-text, #1d1d1f); background: ${bg}; line-height: 1.5; }
@@ -525,12 +526,12 @@ export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = 
         .rh-nav-mobile-menu:not(.rh-nav-vertical) .rh-links a { display: block; width: 100%; padding: 10px 12px; border-radius: 8px; }
         .rh-section { padding: 40px 0; }
         .rh-wrap { gap: 24px; padding: 28px 0; }
-      }
+      }`, `${runtimeSource}${schema?.customCss || ''}`)}
       ${customCssBlock(schema?.customCss)}
     </style>${colorMode ? `\n    ${colorModeHeadTags(colorMode)}` : ''}
   </head>
   <body>${body}
-  ${builderInteractiveTags()}
+  ${builderInteractiveTags(runtimeSource)}
   ${customJsBlock(schema?.customJs)}
   </body>
 </html>`

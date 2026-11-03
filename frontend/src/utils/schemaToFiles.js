@@ -26,6 +26,8 @@ import {
   builderInteractiveCss,
   builderInteractiveJs,
   builderInteractiveTags,
+  runtimeNeeds,
+  withoutUnusedRules,
   withBuilderInteractiveHtml,
 } from './htmlRuntime.js'
 import { htmlEmbedDocument, srcdocAttrValue, withEmbedFont } from './htmlEmbedDocument.js'
@@ -633,13 +635,15 @@ function pageHtml(
   theme = null,
   { externalRuntime = false, colorMode = null } = {},
 ) {
+  const body = pageBody(page, { font: theme?.fontFamily })
+  const source = `${body}${customJsBlock(customJs)}${colorMode ? PALETTE_ON_PAGE : ''}`
   const runtimeHead = externalRuntime
     ? '<script src="runtime.js"></script>'
-    : motionHeadTags()
+    : (runtimeNeeds(source).motion ? motionHeadTags() : '')
   const customStyleLink = externalRuntime ? '\n    <link rel="stylesheet" href="custom.css" />' : ''
   const runtimeBody = externalRuntime
     ? '<script src="custom.js"></script>'
-    : `${builderInteractiveTags()}\n    ${customJsBlock(customJs)}`
+    : `${builderInteractiveTags(source)}\n    ${customJsBlock(customJs)}`
   return `<!DOCTYPE html>
 <html lang="${pageLanguage(page)}"${pageDirAttr(page)}>
   <head>
@@ -653,7 +657,7 @@ function pageHtml(
   </head>
   <body>
     <div class="page p-${page.id}">
-${pageBody(page, { font: theme?.fontFamily })}
+${body}
     </div>
     ${runtimeBody}
   </body>
@@ -893,6 +897,16 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
   return css
 }
 
+// The writers add the palette to a page after it is written; what the page's
+// runtime needs is decided before that.
+const PALETTE_ON_PAGE = ' data-pwb-color-mode'
+
+// What a project's shared runtime has to do: all its pages' needs together.
+function projectSource(files, schema) {
+  const pages = files.map((file) => file.content).join('').replace(/<script src="(?:runtime|custom)\.js"><\/script>/g, '')
+  return `${pages}${customJsBlock(schema?.customJs)}`
+}
+
 // Make unique, friendly file names from page names (first page -> index.html).
 function slug(name) {
   return pageSlug(name) || 'page'
@@ -908,12 +922,12 @@ export function schemaToSingleHtml(schema, title = 'My Site', options = {}) {
   const mode = options.colorMode || null
   const page = withColorModePage((schema?.pages || [])[0] || {}, mode)
   const html = page.flowMode
-    ? schemaToFlowHtml(page, title, schema)
+    ? schemaToFlowHtml(page, title, schema, options)
     : schemaToScaledHtml(page, title, schema, options)
   return mode ? html.replace('</head>', `${colorModeHeadTags(mode)}\n  </head>`) : html
 }
 
-function schemaToFlowHtml(page, title, schema) {
+function schemaToFlowHtml(page, title, schema, { colorMode = null } = {}) {
   const css = schemaToCss(
     {
       pages: [page],
@@ -922,10 +936,10 @@ function schemaToFlowHtml(page, title, schema) {
     },
     { includeCustomCss: false },
   )
-  const html = pageHtml(page, title, 'styles.css', schema?.customJs, pageTheme(schema, page))
+  const html = pageHtml(page, title, 'styles.css', schema?.customJs, pageTheme(schema, page), { colorMode })
   return html.replace(
     '<link rel="stylesheet" href="styles.css" />',
-    `<style>\n${css}${customCssBlock(schema?.customCss)}\n    </style>`,
+    `<style>\n${withoutUnusedRules(css, `${html}${schema?.customCss || ''}`)}${customCssBlock(schema?.customCss)}\n    </style>`,
   )
 }
 
@@ -963,6 +977,8 @@ function schemaToScaledHtml(page, title = 'My Site', schema = {}, options = {}) 
   )
   const font = pageTheme(schema, page).fontFamily
   const fixedBody = pageBody(page, { fixed: 'only', font })
+  const mainBody = pageBody(page, { fixed: 'exclude', font })
+  const source = `${mainBody}${fixedBody}${customJsBlock(schema?.customJs)}${options.colorMode ? PALETTE_ON_PAGE : ''}`
 
   return `<!DOCTYPE html>
 <html lang="${pageLanguage(page)}"${pageDirAttr(page)}>
@@ -972,9 +988,9 @@ function schemaToScaledHtml(page, title = 'My Site', schema = {}, options = {}) 
     <title>${esc(pageSeoTitle(page, title))}</title>
     ${seoHeadTags(page, title)}${pageBehaviourStyleTag(page)}
     ${googleFontLinkTag(pageTheme(schema, page))}
-    ${motionHeadTags()}
+    ${runtimeNeeds(source).motion ? motionHeadTags() : ''}
     <style>
-${css}
+${withoutUnusedRules(css, `<div class="page p-${page.id}"></div>${source}${schema?.customCss || ''}`)}
       html, body { width: 100%; min-height: 100%; overflow-x: hidden; }
       body { background: ${desktopBg}; }
       .export-viewport { width: 100%; min-height: 100vh; overflow: hidden; background: ${desktopBg}; }
@@ -989,12 +1005,12 @@ ${overlayScrollbarCss(options)}${customCssBlock(schema?.customCss)}
     <div class="export-viewport">
       <div class="export-stage">
         <div class="page p-${page.id}">
-${pageBody(page, { fixed: 'exclude', font })}
+${mainBody}
         </div>
       </div>
 ${fixedBody ? `      <div class="export-fixed">\n${fixedBody}\n      </div>` : ''}
     </div>
-    <script>
+    <script data-builder-layout>
       (function () {
         var cfg = ${cfg};
         var viewport = document.querySelector('.export-viewport');
@@ -1026,7 +1042,7 @@ ${fixedBody ? `      <div class="export-fixed">\n${fixedBody}\n      </div>` : '
         applyLayout();
       })();
     </script>
-    ${builderInteractiveTags()}
+    ${builderInteractiveTags(source)}
     ${customJsBlock(schema?.customJs)}
   </body>
 </html>`
@@ -1062,7 +1078,7 @@ export function schemaToFiles(input) {
   files.push({
     name: 'styles.css',
     lang: 'css',
-    content: `${schemaToCss(schema, { includeCustomCss: false })}\n${builderInteractiveCss()}`,
+    content: `${withoutUnusedRules(schemaToCss(schema, { includeCustomCss: false }), `${projectSource(files, schema)}${schema?.customCss || ''}`, { keepVariables: true })}\n${builderInteractiveCss(projectSource(files, schema))}`,
   })
   files.push({
     name: 'custom.css',
@@ -1072,7 +1088,7 @@ export function schemaToFiles(input) {
   files.push({
     name: 'runtime.js',
     lang: 'js',
-    content: builderInteractiveJs(),
+    content: builderInteractiveJs(projectSource(files, schema)),
   })
   files.push({
     name: 'custom.js',

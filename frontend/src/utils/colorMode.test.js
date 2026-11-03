@@ -509,8 +509,8 @@ describe('the downloaded site', () => {
     const schema = site([toggle, text])
     const html = schemaToResponsiveHtml(schema, 'x', { colorMode: modeOf(schema) })
     // Both rules weigh the same, so the later one is the one that holds.
-    expect(html.indexOf('--site-bg: #ffffff')).toBeGreaterThan(-1)
-    expect(html.indexOf('--site-bg:#111317')).toBeGreaterThan(html.indexOf('--site-bg: #ffffff'))
+    expect(html.indexOf('--site-text: #1d1d1f')).toBeGreaterThan(-1)
+    expect(html.indexOf('--site-text:#eceef1')).toBeGreaterThan(html.indexOf('--site-text: #1d1d1f'))
   })
 })
 
