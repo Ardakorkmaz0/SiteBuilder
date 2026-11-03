@@ -96,7 +96,8 @@ describe('every writer emits the settings', () => {
     const html = schemaToResponsiveHtml(schemaOf(), 'My Site')
     expect(html).toContain('<html lang="en">')
     expect(html).not.toContain('scroll-behavior')
-    expect(html).not.toContain('theme-color')
+    // The tag: the runtime in every document knows the selector for one.
+    expect(html).not.toContain('<meta name="theme-color"')
   })
 })
 
