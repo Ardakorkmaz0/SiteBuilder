@@ -852,7 +852,8 @@ const MOTION_OBSERVER_TAG = `<script data-builder-motion>${MOTION_OBSERVER_JS}${
 // What a page needs of the shim, read from its own markup. A script of the
 // author's can make anything at any time, so with one on the page it gets it all.
 // No source means nothing is known about the page: it gets it all as well.
-const AUTHOR_SCRIPT = /<script\b(?![^>]*\bdata-(?:builder-(?:interactive|layout|motion|motion-arm|runtime-script)|pwb-color-mode)\b)/i
+// The same for an inline handler (onclick="...").
+const AUTHOR_SCRIPT = /<script\b(?![^>]*\bdata-(?:builder-(?:interactive|layout|motion|motion-arm|runtime-script)|pwb-(?:color-mode|state-reporter))\b)|<[^<>]*\son[a-z]+\s*=/i
 const NEEDS = {
   palette: /data-pwb-(?:color-mode|theme)/,
   nav: /data-builder-mobile-nav/,
@@ -916,9 +917,29 @@ function interactiveCss(needs) {
   ].join('')
 }
 
+// A script for some needs says which: a page edited later can come to need more.
+const neededParts = (needs) => Object.keys(NEEDS).filter((need) => need !== 'motion' && needs[need]).join(' ')
+
 const interactiveTags = (needs) => {
   const css = interactiveCss(needs)
-  return `${css ? `<style data-builder-interactive-style>${css}</style>` : ''}<script data-builder-interactive>${interactiveJs(needs)}${SCRIPT_END}`
+  const parts = needs === ALL_NEEDS ? '' : ` data-builder-needs="${neededParts(needs)}"`
+  return `${css ? `<style data-builder-interactive-style>${css}</style>` : ''}<script data-builder-interactive${parts}>${interactiveJs(needs)}${SCRIPT_END}`
+}
+
+const SHIM_TAGS = /<style data-builder-interactive-style>[\s\S]*?<\/style>|<script data-builder-interactive\b[^>]*>[\s\S]*?<\/script>/gi
+const MOTION_TAGS = /<style data-builder-motion-style>[\s\S]*?<\/style>|<script data-builder-motion(?:-arm)?>[\s\S]*?<\/script>/gi
+
+// A page's document as an author would keep it: what the builder adds is added
+// again when the page is shown or published, for what the page then uses.
+export function withoutBuilderShim(html) {
+  return String(html || '').replace(SHIM_TAGS, '').replace(MOTION_TAGS, '')
+}
+
+// What the script a document carries was written for: null for one that does not
+// say, written whole by an earlier version, and nothing it could lack.
+function shimParts(html) {
+  const match = /<script data-builder-interactive\b[^>]*\bdata-builder-needs="([^"]*)"/i.exec(html)
+  return match ? match[1] : null
 }
 
 // The interactive shim (style + script) for static HTML exports that do not need
@@ -960,12 +981,17 @@ function hasMotionRuntime(html) {
 }
 
 export function withBuilderInteractiveHtml(html) {
-  const out = String(html || '')
+  let out = String(html || '')
+  // Written for less than the page uses now: it is replaced, not joined, since
+  // only the first copy in a document runs.
+  const parts = shimParts(out)
+  const page = () => withoutBuilderShim(out)
+  if (parts !== null && neededParts(runtimeNeeds(page())) !== parts) out = out.replace(SHIM_TAGS, '')
   const shim = hasInteractiveRuntime(out)
   const motion = hasMotionRuntime(out)
   // Only what is missing: an older export has the shim but no motion, and a
   // second shim would double-bind every handler it installs.
-  const needs = runtimeNeeds(out)
+  const needs = runtimeNeeds(page())
   const inject = (shim ? '' : interactiveTags(needs))
     + (motion || !needs.motion ? '' : MOTION_STYLE_TAG + MOTION_OBSERVER_TAG)
   if (/<style[^>]*data-pwb-embed-reset/i.test(out)) {
@@ -982,6 +1008,8 @@ export function withBuilderRuntimeHtml(html) {
   // document that already has the interactive half only needs the editor part
   // — injecting the whole thing would duplicate the shared handlers.
   let out = String(html || '')
+  // Anything can be added while editing: a script written for some needs gives way.
+  if (shimParts(out) !== null) out = out.replace(SHIM_TAGS, '')
   const shim = hasInteractiveRuntime(out)
   const motion = hasMotionRuntime(out)
   // Styles in <head> for the first paint; scripts that READ the document at the

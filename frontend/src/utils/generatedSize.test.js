@@ -6,7 +6,7 @@ import { DEFAULT_THEME } from './theme.js'
 import { publishedPagesFor } from './publishedPages.js'
 import { schemaToFiles, schemaToSingleHtml } from './schemaToFiles.js'
 import { schemaToResponsiveHtml } from './responsiveHtml.js'
-import { builderInteractiveJs, runtimeNeeds, withBuilderInteractiveHtml, withoutUnusedRules } from './htmlRuntime.js'
+import { builderInteractiveJs, runtimeNeeds, withBuilderInteractiveHtml, withBuilderRuntimeHtml, withoutBuilderShim, withoutUnusedRules } from './htmlRuntime.js'
 
 const block = (id, type, y, props = {}, styles = {}) => ({ id, type, props, styles, layout: { x: 60, y, w: 500, h: 60 } })
 const nav = block('nav', 'navbar', 0, { brand: 'Brand', links: [{ label: 'Home', href: '#' }] }, { backgroundColor: '#1d1d1f', color: '#f5f5f7' })
@@ -102,9 +102,17 @@ describe('what a page needs comes with it', () => {
     expect(runtimeNeeds(markup)[need]).toBe(true)
   })
 
+  it('takes an inline handler for a script of its author', () => {
+    expect(runtimeNeeds('<button onclick="go()">x</button>').tabs).toBe(true)
+    expect(runtimeNeeds('<button ONCLICK = "go()">x</button>').tabs).toBe(true)
+    expect(runtimeNeeds('<p>once = 1, online=2</p>').tabs).toBe(false)
+  })
+
   it('counts its own scripts as no reason for all of it', () => {
     expect(runtimeNeeds('<script data-builder-layout>x</script>').tabs).toBe(false)
     expect(runtimeNeeds('<script data-pwb-color-mode>x</script>').tabs).toBe(false)
+    expect(runtimeNeeds('<script data-pwb-state-reporter>x</script>').tabs).toBe(false)
+    expect(runtimeNeeds('<script data-builder-custom-js>x</script>').tabs).toBe(true)
     expect(runtimeNeeds('<script>x</script>').tabs).toBe(true)
     expect(runtimeNeeds('<script src="a.js"></script>').tabs).toBe(true)
     expect(runtimeNeeds(undefined).tabs).toBe(true)
@@ -160,6 +168,61 @@ describe('an HTML page or block given the shim', () => {
   it('is left alone when it has it already', () => {
     const once = withBuilderInteractiveHtml('<html><body><p data-anim-in="fade">x</p></body></html>')
     expect(withBuilderInteractiveHtml(once)).toBe(once)
+  })
+})
+
+describe('a page written by the builder and edited afterwards', () => {
+  const written = () => schemaToResponsiveHtml(site(plain))
+  const add = (doc, markup) => doc.replace('</body>', `${markup}</body>`)
+  const form = '<form><input name="a"><button>Send</button></form>'
+  const tabs = '<div data-builder-tabs><button role="tab" data-builder-tab="a">A</button></div>'
+  const toggle = '<button data-pwb-theme-toggle>t</button>'
+
+  it.each([
+    ['a form', form, ['postToInbox', '.pwb-ph']],
+    ['tabs', tabs, ['selectTab', '[role="tablist"]']],
+    ['a theme switch', toggle, ['choosePalette', '.pwb-theme-toggle']],
+  ])('gets the code for %s it was given', (name, markup, wanted) => {
+    const out = withBuilderInteractiveHtml(add(written(), markup))
+    for (const part of wanted) expect(out, part).toContain(part)
+    // In place of the one it had: only the first copy in a document would run.
+    expect(out.match(/<script data-builder-interactive\b/g)).toHaveLength(1)
+  })
+
+  it('keeps what it used before', () => {
+    const out = withBuilderInteractiveHtml(add(written(), form))
+    expect(out).toContain('navLabel')
+  })
+
+  it('stays as it is when nothing changed', () => {
+    const doc = written()
+    expect(withBuilderInteractiveHtml(doc)).toBe(doc)
+  })
+
+  it('gets everything while it is being edited, in one copy', () => {
+    const out = withBuilderRuntimeHtml(written())
+    for (const part of ['postToInbox', 'selectTab', 'choosePalette']) expect(out, part).toContain(part)
+    expect(out.match(/<script data-builder-interactive\b/g)).toHaveLength(1)
+  })
+
+  it('leaves a document from an earlier version, which has it all, alone', () => {
+    const old = '<html><body><form></form><style data-builder-interactive-style>x</style><script data-builder-interactive>old()</script></body></html>'
+    expect(withBuilderInteractiveHtml(old)).toContain('old()')
+    expect(withBuilderRuntimeHtml(old)).toContain('old()')
+  })
+
+  it('is kept without the builder\'s code when it becomes an HTML page', () => {
+    const moving = schemaToResponsiveHtml(site([...plain, block('x', 'text', 400, { text: 'x', animIn: 'fade-up' })]))
+    const kept = withoutBuilderShim(moving)
+    expect(kept).not.toContain('data-builder-interactive')
+    expect(kept).not.toContain('data-builder-motion')
+    expect(kept).toContain('data-anim-in')
+    expect(kept).toContain('Hello')
+    // It comes back, for what the page uses, when the page is shown.
+    const shown = withBuilderInteractiveHtml(kept)
+    expect(shown).toContain('data-builder-interactive')
+    expect(shown).toContain('data-builder-motion')
+    expect(shown).toContain('navLabel')
   })
 })
 
