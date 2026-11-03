@@ -491,15 +491,19 @@ const INTERACTIVE_SCRIPT = `
       window.__pwbInteractiveReady = true;
       document.addEventListener('click', onClick);
       // Before any other click handling: a link to another page of the site
-      // takes the palette along when the address is where it lives.
-      document.addEventListener('click', function (event) {
+      // takes the palette along when the address is where it lives, also one
+      // opened in a new tab with the middle button or from its menu.
+      function carryPalette(event) {
         if (paletteStorage || !event.target || !event.target.closest) return;
         var link = event.target.closest('a[href]');
         var mode = addressPalette();
         if (!link || !mode) return;
         var next = withPaletteParam(link.href, mode);
         if (next && next !== link.href) link.href = next;
-      }, true);
+      }
+      document.addEventListener('click', carryPalette, true);
+      document.addEventListener('auxclick', carryPalette, true);
+      document.addEventListener('contextmenu', carryPalette, true);
       document.addEventListener('submit', onSubmit);
       window.addEventListener('message', function (event) {
         if (!standalone() && event.source === window.parent && event.data && event.data.type === 'pwb-form-result') {

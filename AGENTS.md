@@ -167,6 +167,10 @@ Values mirrored between frontend and backend (change both sides together):
   `frontend/src/utils/useGuestGate.jsx`.
 - Page addresses: `_published_path` in `backend/builder/validators.py` and
   `frontend/src/utils/pageSlug.js`.
+- Which site has a theme switch: `_site_has_theme_switch` in `backend/builder/live_pages.py`
+  and `hasThemeToggle` in `frontend/src/utils/colorMode.js`.
+- The palette script and its `data-pwb-chosen`: `_PALETTE_SCRIPT` in
+  `backend/builder/published.py` and `colorModeHeadTags` in `frontend/src/utils/colorMode.js`.
 
 ## Important locations
 

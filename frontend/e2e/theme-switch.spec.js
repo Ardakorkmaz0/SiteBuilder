@@ -76,6 +76,43 @@ test('the owner chooses what the site opens in, and a visitor can still change i
   await api(request, 'DELETE', `/sites/${site.id}/`)
 })
 
+test('a visitor\'s choice is there on the next page and on a second visit, for that visitor only', async ({ page, request, browser }) => {
+  const siteId = await createHtmlSite(request, 'E2E theme memory', [
+    { html: '<!DOCTYPE html><html><head><style>:root{--bg:#ffffff;--ink:#171723}body{background:var(--bg);color:var(--ink)}</style></head><body><button data-pwb-theme-toggle>Theme</button><a href="#about">About</a></body></html>' },
+    { id: 'about', name: 'About', html: '<!DOCTYPE html><html><head><style>:root{--bg:#ffffff;--ink:#171723}body{background:var(--bg);color:var(--ink)}</style></head><body><h1>About us</h1></body></html>' },
+  ])
+  await openEditor(page, siteId)
+  const slug = await publish(page, request, siteId)
+
+  const { viewer, visitor } = await visit(browser, slug)
+  expect(await palette(visitor)).toBe('light')
+  await visitor.getByRole('button', { name: 'Theme' }).click()
+  await visitor.getByRole('link', { name: 'About' }).click()
+  await expect(visitor.getByRole('heading', { name: 'About us' })).toBeVisible()
+  expect(await palette(visitor)).toBe('dark')
+
+  // A second visit: a new tab, at the plain address.
+  const again = await viewer.newPage()
+  await again.goto(`${BACKEND}/s/${slug}/`)
+  expect(await palette(again)).toBe('dark')
+  expect(new URL(again.url()).search).toBe('')
+
+  // Going back to light is remembered the same way.
+  await again.getByRole('button', { name: 'Theme' }).click()
+  await again.getByRole('link', { name: 'About' }).click()
+  await expect(again.getByRole('heading', { name: 'About us' })).toBeVisible()
+  const third = await viewer.newPage()
+  await third.goto(`${BACKEND}/s/${slug}/`)
+  expect(await palette(third)).toBe('light')
+  await viewer.close()
+
+  // Someone else starts from the site's own palette.
+  const other = await visit(browser, slug)
+  expect(await palette(other.visitor)).toBe('light')
+  await other.viewer.close()
+  await api(request, 'DELETE', `/sites/${siteId}/`)
+})
+
 test('an HTML block on a dark page is not a white box', async ({ page, request, browser }) => {
   const { data: site } = await api(request, 'POST', '/sites/', { title: 'E2E dark block' })
   const { data: full } = await api(request, 'GET', `/sites/${site.id}/`)
