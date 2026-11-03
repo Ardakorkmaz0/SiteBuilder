@@ -105,16 +105,17 @@ describe('adding the switch to the pages', () => {
   it('offers nothing beyond this page on a site of one page', () => {
     open()
     expect(screen.getByRole('button', { name: 'Add a theme switch to this page' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Add one to every page' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Add one to/ })).not.toBeInTheDocument()
   })
 
   it('adds one to every canvas page as one step, leaving the page on screen and the selection', () => {
     const bar = { id: 'bar', type: 'navbar', props: {}, styles: {}, layout: { x: 0, y: 0, w: 1200, h: 64 } }
-    open({ pages: [page('home', [bar]), page('about'), { id: 'doc', name: 'doc', mode: 'html', html: '<p>Hi</p>', components: [] }] })
+    const heading = { id: 'h', type: 'heading', props: {}, styles: {}, layout: { x: 40, y: 120, w: 300, h: 60 } }
+    open({ pages: [page('home', [heading, bar]), page('about'), { id: 'doc', name: 'doc', mode: 'html', html: '<p>Hi</p>', components: [] }] })
     useEditorStore.getState().selectComponent('bar')
     const before = useEditorStore.getState().currentPageId
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add one to every page' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add one to 2 pages' }))
 
     expect(switches('home')).toHaveLength(1)
     expect(switches('about')).toHaveLength(1)
@@ -122,6 +123,8 @@ describe('adding the switch to the pages', () => {
     // Under the bar on the page that has one, and the corner on the other.
     expect(switches('home')[0].layout).toMatchObject({ y: 80, w: 44, h: 44 })
     expect(switches('about')[0].layout).toMatchObject({ y: 24, w: 44, h: 44 })
+    // A page that does not flow keeps its order: the new block is on top of it.
+    expect(useEditorStore.getState().schema.pages[0].components.map((c) => c.type)).toEqual(['heading', 'navbar', 'themeToggle'])
     const state = useEditorStore.getState()
     expect(state.currentPageId).toBe(before)
     expect(state.selectedIds).toEqual(['bar'])
@@ -132,16 +135,52 @@ describe('adding the switch to the pages', () => {
     expect(switches('about')).toHaveLength(0)
   })
 
+  it('puts it near the top of a page that flows, not at the end', () => {
+    const block = (id, type) => ({ id, type, props: {}, styles: {}, layout: { x: 0, y: 0, w: 300, h: 60 } })
+    const order = (id) => useEditorStore.getState().schema.pages.find((p) => p.id === id).components.map((c) => c.type)
+    open({ pages: [
+      { ...page('home', [block('n', 'navbar'), block('h', 'heading'), block('t', 'text')]), flowMode: true },
+      { ...page('about', [block('h2', 'heading'), block('t2', 'text')]), flowMode: true },
+    ] })
+    fireEvent.click(screen.getByRole('button', { name: 'Add one to 2 pages' }))
+    expect(order('home')).toEqual(['navbar', 'themeToggle', 'heading', 'text'])
+    expect(order('about')).toEqual(['themeToggle', 'heading', 'text'])
+    useEditorStore.getState().undo()
+    expect(order('home')).toEqual(['navbar', 'heading', 'text'])
+  })
+
+  it('adds to this page in the same place, and selects it to be moved', () => {
+    const block = { id: 'h', type: 'heading', props: {}, styles: {}, layout: { x: 0, y: 0, w: 300, h: 60 } }
+    open({ pages: [{ ...page('home', [block]), flowMode: true }] })
+    fireEvent.click(screen.getByRole('button', { name: 'Add a theme switch to this page' }))
+    const state = useEditorStore.getState()
+    const [first] = state.schema.pages[0].components
+    expect(first.type).toBe('themeToggle')
+    expect(state.selectedIds).toEqual([first.id])
+  })
+
+  it('names how many pages it can reach when HTML pages are left out, and says why', () => {
+    open({ pages: [page('home'), page('about'), { id: 'doc', name: 'doc', mode: 'html', html: '<p>Hi</p>', components: [] }] })
+    expect(screen.queryByRole('button', { name: 'Add one to every page' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add one to 2 pages' })).toBeInTheDocument()
+    expect(screen.getByText('An HTML page gets its own from Components, under Theme switch.')).toBeInTheDocument()
+  })
+
   it('says which pages are left, adds to those only, and points an HTML page to Components', () => {
     open({ pages: [page('home', [aSwitch]), page('about'), { id: 'doc', name: 'doc', mode: 'html', html: '<p>Hi</p>', components: [] }] })
     expect(screen.getByText('2 pages have no theme switch: they follow the choice, but visitors cannot change it there.')).toBeInTheDocument()
     expect(screen.getByText('An HTML page gets its own from Components, under Theme switch.')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add one to those pages' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add one to 1 page' }))
 
     expect(switches('home')).toHaveLength(1)
     expect(switches('about')).toHaveLength(1)
-    expect(screen.queryByRole('button', { name: 'Add one to those pages' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Add one to/ })).not.toBeInTheDocument()
+  })
+
+  it('counts one page in the singular', () => {
+    open({ pages: [page('home', [aSwitch]), page('about')] })
+    expect(screen.getByText('1 page has no theme switch: it follows the choice, but visitors cannot change it there.')).toBeInTheDocument()
   })
 
   it('says nothing once every page has one', () => {

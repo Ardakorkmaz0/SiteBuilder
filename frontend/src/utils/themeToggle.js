@@ -86,6 +86,15 @@ export function themeToggleHtml(props = {}, { style = '', attrs = '', className 
   return `<${tag} class="${cls}"${attrs}${themeToggleAttrs(props)}${css ? ` style="${esc(css)}"` : ''}>${themeToggleInner(props)}</${tag}>`
 }
 
+// A page that flows has no corner: the switch just added, last in its order,
+// goes to the top instead, under a bar there.
+export function themeSwitchFirstInFlow(components) {
+  const added = components[components.length - 1]
+  const rest = components.slice(0, -1)
+  const at = rest[0]?.type === 'navbar' ? 1 : 0
+  return [...rest.slice(0, at), added, ...rest.slice(at)]
+}
+
 // Where a switch goes when it is added for the owner: the top right corner of
 // the page, under a bar across the top of it, whose links are on that side.
 export function themeSwitchSpot(page, canvasWidth, width = 44) {

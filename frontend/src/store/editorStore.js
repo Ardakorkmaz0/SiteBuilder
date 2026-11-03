@@ -13,7 +13,7 @@ import {
   themedStyles,
 } from '../utils/theme.js'
 import { componentPresetStyles, componentPresetProps } from '../utils/componentPresets.js'
-import { themeSwitchSpot } from '../utils/themeToggle.js'
+import { themeSwitchFirstInFlow, themeSwitchSpot } from '../utils/themeToggle.js'
 import { recolorHtml } from '../utils/htmlRecolor.js'
 import { regionContentWidth, regionDisplayPatchToDesign } from '../utils/regionLayout.js'
 import { anchorOf, anchorProblem, elementIdFor, retargetLinks, slugifyAnchor } from '../utils/anchors.js'
@@ -2775,8 +2775,8 @@ export const useEditorStore = create((set, get) => ({
   },
 
   // A theme switch on each of these pages, as one step, leaving the page on
-  // screen and what is selected alone.
-  addThemeSwitchToPages: (pageIds) => {
+  // screen alone. `select` selects what was added, to move it on from there.
+  addThemeSwitchToPages: (pageIds, { select = false } = {}) => {
     const wanted = new Set(pageIds)
     const targets = (get().schema.pages || []).filter((page) => wanted.has(page.id))
     if (!targets.length) return
@@ -2788,8 +2788,11 @@ export const useEditorStore = create((set, get) => ({
         const page = next.schema.pages.find((candidate) => candidate.id === target.id)
         const { x, y } = themeSwitchSpot(page, page.canvasWidth || CANVAS_WIDTH)
         next = { ...next, ...insertComponent(next, page, 'themeToggle', x, y, null, 'icon', { w: 44, h: 44 }) }
+        if (page.flowMode) {
+          next = { ...next, schema: mapPage(next.schema, page.id, (p) => ({ ...p, components: themeSwitchFirstInFlow(p.components) })) }
+        }
       }
-      return { schema: next.schema, dirty: true }
+      return { schema: next.schema, dirty: true, ...(select ? { selectedId: next.selectedId, selectedIds: next.selectedIds } : {}) }
     })
   },
 

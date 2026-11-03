@@ -26,7 +26,11 @@ const devicePalette = () => (deviceQuery()?.matches ? 'dark' : 'light')
 // `forced` shows one palette and leaves the switch inert: the editor's canvas
 // preview, where a click selects the block rather than pressing it.
 export function ColorModeRoot({ mode, forced = null, children }) {
-  const [pick, setPick] = useState(() => (mode ? firstPick(mode) : null))
+  // What the visitor chose here. Until then the page follows what it is told,
+  // which can change while it is open: the owner changing what the site opens
+  // in, or the site gaining its second palette.
+  const [chosen, setChosen] = useState(null)
+  const pick = mode ? chosen || firstPick(mode) : null
   const [device, setDevice] = useState(devicePalette)
   useEffect(() => {
     const query = deviceQuery()
@@ -42,8 +46,8 @@ export function ColorModeRoot({ mode, forced = null, children }) {
       pick: forced || pick,
       base: mode.base,
       alt: mode.alt,
-      toggle: forced ? null : () => setPick(current === mode.alt ? mode.base : mode.alt),
-      choose: forced ? null : setPick,
+      toggle: forced ? null : () => setChosen(current === mode.alt ? mode.base : mode.alt),
+      choose: forced ? null : setChosen,
     }
     : null), [mode, current, pick, forced])
   if (!mode) return children
