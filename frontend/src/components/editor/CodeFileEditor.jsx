@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { assetDataUrl } from '../../utils/projectFs.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { CodeField } from './CodeField.jsx'
 
 // Source editor for the non-HTML files of a Code project. Text files (CSS / JS)
 // get a plain monospace editor whose edits flow straight into the store, so any
@@ -53,8 +54,9 @@ function TextFileEditor({ file, onChange, reveal }) {
         </span>
         <span className="truncate font-mono text-xs text-[#6b7280]">{file.path}</span>
       </div>
-      <textarea
+      <CodeField
         ref={taRef}
+        lang={/\.css$/i.test(file.path) ? 'css' : /\.m?js$/i.test(file.path) ? 'js' : 'html'}
         value={file.content ?? ''}
         onChange={(e) => onChange(e.target.value)}
         spellCheck={false}

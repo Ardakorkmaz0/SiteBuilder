@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { cloneSite, reportSite } from '../../api/sites.js'
 import { useAuthStore } from '../../store/authStore.js'
@@ -15,6 +15,7 @@ import {
   SparklesIcon,
 } from '../icons.jsx'
 import LanguageSwitcher from '../LanguageSwitcher.jsx'
+import { CodeColorsToggle, CodeText } from '../editor/CodeField.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useGuestGate } from '../../utils/useGuestGate.jsx'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
@@ -46,6 +47,9 @@ function sourceOf(site) {
 }
 
 // The creator's avatar (their uploaded photo, or an initial fallback).
+// From here a row of tabs stops being the quick way to a page.
+const PAGES_FOR_MENU = 5
+
 function CreatorAvatar({ url, name }) {
   const letter = (name || '?').trim().charAt(0).toUpperCase()
   if (url) {
@@ -112,6 +116,13 @@ export default function PublicToolbar({
   const [reportError, setReportError] = useState('')
   const [moreOpen, setMoreOpen] = useState(false)
   useEscapeToClose(moreOpen, () => setMoreOpen(false))
+  const [pagesOpen, setPagesOpen] = useState(false)
+  useEscapeToClose(pagesOpen, () => setPagesOpen(false))
+  // A row that overflows scrolls with no bar to show it: the open page stays in it.
+  const pageRow = useRef(null)
+  useEffect(() => {
+    pageRow.current?.querySelector('[aria-current="page"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [activePageId])
   const navigate = useNavigate()
   const goBack = useGoBack('/')
   const token = useAuthStore((s) => s.token)
@@ -229,7 +240,8 @@ export default function PublicToolbar({
               </div>
             </div>
 
-            <nav aria-label={t('Site pages')} className="preview-page-nav">
+            <div className="preview-page-area">
+            <nav ref={pageRow} aria-label={t('Site pages')} className="preview-page-nav">
               {pages.map((page) => (
                 <button
                   key={page.id}
@@ -242,6 +254,36 @@ export default function PublicToolbar({
                 </button>
               ))}
             </nav>
+            {!narrow && pages.length >= PAGES_FOR_MENU && (
+              <button
+                type="button"
+                onClick={() => setPagesOpen((open) => !open)}
+                aria-expanded={pagesOpen}
+                className="preview-page-tab preview-page-all"
+              >
+                {t('All pages ({count})', { count: pages.length })} <span aria-hidden="true">▾</span>
+              </button>
+            )}
+            {pagesOpen && (
+              <>
+                <button type="button" aria-label={t('Close menu')} className="fixed inset-0 z-[131] cursor-default" onClick={() => setPagesOpen(false)} />
+                <ul className="preview-pages-menu">
+                  {pages.map((page) => (
+                    <li key={page.id}>
+                      <button
+                        type="button"
+                        aria-current={page.id === activePageId ? 'page' : undefined}
+                        onClick={() => { setPagesOpen(false); onNavigate?.(page.id) }}
+                        className="preview-menu-item"
+                      >
+                        <span className="truncate">{page.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            </div>
 
             <div className="preview-topbar-actions">
               {!narrow && deviceSegment}
@@ -327,6 +369,7 @@ export default function PublicToolbar({
                 {t('Source')} — {site.title}
               </h2>
               <div className="flex shrink-0 items-center gap-2">
+                <CodeColorsToggle />
                 {/* Focus comes here from the toolbar, so the dialog is where the keyboard is. */}
                 <button
                   type="button"
@@ -351,7 +394,7 @@ export default function PublicToolbar({
               </div>
             </div>
             <pre className="min-h-0 flex-1 overflow-auto whitespace-pre p-4 font-mono text-xs leading-relaxed text-gray-100">
-              {code}
+              <CodeText value={code} />
             </pre>
           </div>
         </div>
