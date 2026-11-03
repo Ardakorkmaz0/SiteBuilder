@@ -152,7 +152,10 @@ export default function PreviewPage() {
   // The palette a visitor switched to (a site with a light/dark switch). A
   // page in a frame reports it; it is handed on when the next page opens, not
   // pushed into the page on screen, which would reload it.
-  const [palette, setPalette] = useState({ chosen: null, forPage: null, pageId: null })
+  // The route keeps this page mounted from one site to the next, and a choice
+  // is that site's: it is left behind with it.
+  const [palette, setPalette] = useState({ chosen: null, forPage: null, pageId: null, slug })
+  if (palette.slug !== slug) setPalette({ chosen: null, forPage: null, pageId: null, slug })
   const previewFrameRef = useRef(null)
   const siteCanvasRef = useRef(null)
 
@@ -620,7 +623,7 @@ body { font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, sans-serif);
       <style>{siteCss}</style>
       <PreviewStage device={device}>
         <div ref={siteCanvasRef} data-public-site-canvas className="site-surface">
-          <ColorModeRoot mode={colorMode}>
+          <ColorModeRoot key={slug} mode={colorMode}>
             <ResponsiveSite key={current.id} page={withColorModePage(current, colorMode)} />
           </ColorModeRoot>
         </div>

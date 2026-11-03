@@ -7,8 +7,6 @@ import { LabeledCheckbox, LabeledColor } from './controls.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
 import { colorModeFor, hasThemeToggle, pagesWithoutThemeToggle, siteStart } from '../../utils/colorMode.js'
-import { themeSwitchSpot } from '../../utils/themeToggle.js'
-import { CANVAS_WIDTH } from '../registry.jsx'
 import { moveInRadioGroup } from '../../ui/radioGroupKeys.js'
 
 const ROLES = [
@@ -36,7 +34,6 @@ export default function ColorModePanel({ htmlMode = false, htmlMap = NO_HTML }) 
   const updateColorMode = useEditorStore((s) => s.updateColorMode)
   const preview = useEditorStore((s) => s.colorModePreview)
   const setPreview = useEditorStore((s) => s.setColorModePreview)
-  const addComponent = useEditorStore((s) => s.addComponent)
   const addThemeSwitchToPages = useEditorStore((s) => s.addThemeSwitchToPages)
   // The page on screen decides the direction: a dark template's other
   // palette is a light one, whatever the site theme says.
@@ -50,10 +47,10 @@ export default function ColorModePanel({ htmlMode = false, htmlMap = NO_HTML }) 
   const without = pagesWithoutThemeToggle(schema, htmlMap)
   const canvasIds = without.canvas.map((missing) => missing.id)
 
-  const addSwitch = () => {
-    const { x, y } = themeSwitchSpot(page, page?.canvasWidth || CANVAS_WIDTH)
-    addComponent('themeToggle', x, y, null, 'icon', { w: 44, h: 44 })
-  }
+  const addSwitch = () => addThemeSwitchToPages([page.id], { select: true })
+  const addToMany = canvasIds.length === 1
+    ? t('Add one to 1 page')
+    : t('Add one to {count} pages', { count: canvasIds.length })
 
   return (
     <PanelGroup id="theme-color-mode" title={dark ? t('Dark mode') : t('Light mode')} defaultOpen>
@@ -102,19 +99,26 @@ export default function ColorModePanel({ htmlMode = false, htmlMap = NO_HTML }) 
           )}
           {canvasIds.length > 1 && (
             <button type="button" onClick={() => addThemeSwitchToPages(canvasIds)} className="studio-btn studio-btn-secondary px-2 py-1 text-xs">
-              {t('Add one to every page')}
+              {addToMany}
             </button>
+          )}
+          {!htmlMode && without.html.length > 0 && (
+            <p className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
+              {t('An HTML page gets its own from Components, under Theme switch.')}
+            </p>
           )}
         </div>
       )}
       {hasSwitch && canvasIds.length + without.html.length > 0 && (
         <div className="space-y-1.5 rounded-lg border border-[var(--studio-border)] p-2">
           <p className="text-[11px] leading-snug text-[var(--studio-text)]">
-            {t('{count} pages have no theme switch: they follow the choice, but visitors cannot change it there.', { count: canvasIds.length + without.html.length })}
+            {canvasIds.length + without.html.length === 1
+              ? t('1 page has no theme switch: it follows the choice, but visitors cannot change it there.')
+              : t('{count} pages have no theme switch: they follow the choice, but visitors cannot change it there.', { count: canvasIds.length + without.html.length })}
           </p>
           {canvasIds.length > 0 && (
             <button type="button" onClick={() => addThemeSwitchToPages(canvasIds)} className="studio-btn studio-btn-secondary px-2 py-1 text-xs">
-              {t('Add one to those pages')}
+              {addToMany}
             </button>
           )}
           {without.html.length > 0 && (

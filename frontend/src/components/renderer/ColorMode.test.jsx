@@ -59,6 +59,31 @@ describe('where a page opens', () => {
   })
 })
 
+describe('when what the page opens in changes while it is open', () => {
+  const tree = (mode) => <ColorModeRoot mode={mode}><ThemeToggle props={three} style={{}} /></ColorModeRoot>
+
+  it('follows the owner while the visitor has not chosen', () => {
+    const { rerender } = render(tree({ ...light, initial: 'light' }))
+    expect(palette()).toBe('light')
+    rerender(tree({ ...light, initial: 'dark' }))
+    expect(palette()).toBe('dark')
+    expect(radio('Dark')).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('keeps what the visitor chose', () => {
+    const { rerender } = render(tree({ ...light, initial: 'light' }))
+    fireEvent.click(radio('Device'))
+    rerender(tree({ ...light, initial: 'dark' }))
+    expect(radio('Device')).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('starts properly when the site gains its second palette while open', () => {
+    const { rerender } = render(<ColorModeRoot mode={null}><span>page</span></ColorModeRoot>)
+    rerender(tree({ ...light, initial: 'dark' }))
+    expect(palette()).toBe('dark')
+  })
+})
+
 describe('the two-way switch', () => {
   it('flips the palette on screen, also from the device', () => {
     deviceDark = true
