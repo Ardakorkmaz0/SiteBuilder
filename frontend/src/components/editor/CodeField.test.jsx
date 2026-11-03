@@ -88,6 +88,23 @@ describe('the switch', () => {
     expect(behind(again.container)).toBeNull()
   })
 
+  it('turns the colours off with a browser that refuses to remember', () => {
+    const { container } = open()
+    const refused = () => { throw new DOMException('denied', 'SecurityError') }
+    const reading = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(refused)
+    const writing = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(refused)
+    try {
+      fireEvent.click(toggle())
+      expect(toggle()).toHaveAttribute('aria-pressed', 'false')
+      expect(behind(container)).toBeNull()
+      fireEvent.click(toggle())
+      expect(toggle()).toHaveAttribute('aria-pressed', 'true')
+    } finally {
+      reading.mockRestore()
+      writing.mockRestore()
+    }
+  })
+
   it('keeps what was typed when it turns them off and on', () => {
     open()
     const before = screen.getByRole('textbox')

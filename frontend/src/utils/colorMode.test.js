@@ -229,6 +229,10 @@ describe('a colour however it is written', () => {
     ['hsl(0, 0%, 100%)', '#ffffff', 1],
     ['hsl(120 100% 25%)', '#008000', 1],
     ['hsla(240, 100%, 50%, .4)', '#0000ff', 0.4],
+    ['hsl(120deg 100% 50%)', '#00ff00', 1],
+    ['hsl(.5turn 100% 50%)', '#00ffff', 1],
+    ['hsl(200grad 100% 50%)', '#00ffff', 1],
+    ['hsl(3.14159265rad 100% 50%)', '#00ffff', 1],
     ['white', '#ffffff', 1],
     ['GREY', '#808080', 1],
   ])('%s', (written, hex, alpha) => {
@@ -279,6 +283,11 @@ describe('a colour however it is written', () => {
     // A solid colour of the owner's own keeps the text on it, as in hex.
     const solid = one(block('card', { backgroundColor: 'rgba(255, 204, 0, 0.9)', color: '#1d1d1f' }))
     expect(solid.styles.color).toBe('#1d1d1f')
+  })
+
+  it('does not read a tint as the page when the other palette\'s text cannot be read on it', () => {
+    const strong = one(block('card', { backgroundColor: 'rgba(255, 255, 0, 0.49)', color: '#1d1d1f' }))
+    expect(strong.styles.color).toBe('#1d1d1f')
   })
 
   it('takes a text on a solid role colour to that colour\'s own text role', () => {

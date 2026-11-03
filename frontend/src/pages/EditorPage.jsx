@@ -94,8 +94,8 @@ import { replacePageColor } from '../utils/htmlPageColors.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
 import { withoutBuilderShim } from '../utils/htmlRuntime.js'
-import { schemaToFiles, schemaToSingleHtml } from '../utils/schemaToFiles.js'
-import { componentHtmlFiles, componentSourceHtml, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
+import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
+import { componentDraftHtml, componentHtmlFiles, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
 import { viewColorMode } from '../utils/colorMode.js'
 import { emptyHtmlDocument } from '../utils/htmlTemplates.js'
 import { apiError } from '../utils/errors.js'
@@ -1531,12 +1531,11 @@ function SiteEditor() {
       const drafts = pendingComponentCode()
       if (Object.keys(drafts).length) {
         const schema = useEditorStore.getState().schema
-        const files = schemaToFiles(schema)
-        for (const file of componentHtmlFiles(schema, latestHtmlMapRef.current, files)) {
+        for (const file of componentHtmlFiles(schema, latestHtmlMapRef.current)) {
           if (!Object.prototype.hasOwnProperty.call(drafts, file.name)) continue
           applyComponentSourceHtml({
             pageId: file.pageId,
-            html: componentSourceHtml(file, drafts[file.name], files),
+            html: componentDraftHtml(schema, file, drafts[file.name]),
           })
         }
         setComponentSourceDrafts({})

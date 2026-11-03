@@ -60,6 +60,19 @@ describe('an HTML page in the Source workspace', () => {
     expect(screen.getByLabelText('HTML source editor').value).toBe(ABOUT)
   })
 
+  it('takes the code a page needs into the project zip when the form is only in its source so far', () => {
+    useEditorStore.getState().loadSchema({ theme: {}, pages: [{ id: 'p1', name: 'Home', components: [] }] })
+    renderPanel()
+    const source = screen.getByLabelText('HTML source editor')
+    fireEvent.change(source, { target: { value: source.value.replace('</body>', '<form><input name="email"></form></body>') } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Editable code project/i }))
+
+    expect(zipped.files.find((file) => file.name === 'index.html').content).toContain('<form>')
+    expect(zipped.files.find((file) => file.name === 'runtime.js').content).toContain('postToInbox')
+  })
+
   it('goes into the project zip as that document', () => {
     const htmlMap = loadMixedSite()
     renderPanel({ htmlMap })

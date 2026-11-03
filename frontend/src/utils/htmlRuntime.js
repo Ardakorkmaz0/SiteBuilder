@@ -852,8 +852,9 @@ const MOTION_OBSERVER_TAG = `<script data-builder-motion>${MOTION_OBSERVER_JS}${
 // What a page needs of the shim, read from its own markup. A script of the
 // author's can make anything at any time, so with one on the page it gets it all.
 // No source means nothing is known about the page: it gets it all as well.
-// The same for an inline handler (onclick="...").
-const AUTHOR_SCRIPT = /<script\b(?![^>]*\bdata-(?:builder-(?:interactive|layout|motion|motion-arm|runtime-script)|pwb-(?:color-mode|state-reporter))\b)|<[^<>]*\son[a-z]+\s*=/i
+// The same for an inline handler (onclick="...") or a javascript: address. The
+// tag is read attribute by attribute: a value can hold a ">".
+const AUTHOR_SCRIPT = /<script\b(?![^>]*\bdata-(?:builder-(?:interactive|layout|motion|motion-arm|runtime-script)|pwb-(?:color-mode|state-reporter))\b)|<[a-z](?:[^<>"']|"[^"]*"|'[^']*')*?(?:[\s/]|(?<=["']))on[a-z]+\s*=|\bjavascript:/i
 const NEEDS = {
   palette: /data-pwb-(?:color-mode|theme)/,
   nav: /data-builder-mobile-nav/,

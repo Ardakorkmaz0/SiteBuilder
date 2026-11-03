@@ -1048,7 +1048,9 @@ ${fixedBody ? `      <div class="export-fixed">\n${fixedBody}\n      </div>` : '
 </html>`
 }
 
-export function schemaToFiles(input) {
+// `documents`: pages edited in their source, by file name. The project's shared
+// code is written for what they say, not for what the canvas drew.
+export function schemaToFiles(input, { documents = {} } = {}) {
   // A site with a light/dark switch: every page, and the stylesheet they
   // share, carry both palettes, exactly as the published site does.
   const modes = (input?.pages || []).map((page) => colorModeFor(input, page))
@@ -1065,7 +1067,7 @@ export function schemaToFiles(input) {
     files.push({
       name,
       lang: 'html',
-      content: pageHtml(
+      content: documents[name] ?? pageHtml(
         page,
         page.name || 'My Site',
         'styles.css',

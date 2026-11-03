@@ -73,6 +73,13 @@ function alphaOf(text) {
   return within(text.endsWith('%') ? number / 100 : number, 1)
 }
 
+const HUE_UNITS = { deg: 1, grad: 0.9, rad: 180 / Math.PI, turn: 360 }
+
+function hueOf(text) {
+  const unit = /[a-z]+$/.exec(text)?.[0]
+  return parseFloat(text) * (unit ? HUE_UNITS[unit] : 1)
+}
+
 function hslToHex(hue, saturation, lightness) {
   const channel = (n) => {
     const k = (n + hue / 30) % 12
@@ -102,7 +109,8 @@ export function parseColor(value) {
     if (channels.some(Number.isNaN)) return null
     return { hex: toHex(...channels.map((v) => within(v, 255))), alpha }
   }
-  const [hue, saturation, lightness] = parts.slice(0, 3).map(parseFloat)
+  const hue = hueOf(parts[0])
+  const [saturation, lightness] = parts.slice(1, 3).map(parseFloat)
   if ([hue, saturation, lightness].some(Number.isNaN)) return null
   return { hex: hslToHex(((hue % 360) + 360) % 360, within(saturation, 100) / 100, within(lightness, 100) / 100), alpha }
 }
@@ -407,8 +415,15 @@ function wrap(role, token, alpha = 1) {
 }
 
 // Under this a background is a tint over what is behind it, not a colour of
-// its own: the text on it still reads against the page.
+// its own: the text on it still reads against the page. Unless it does not: a
+// strong tint over the other palette's page can be too close to its text.
 const FAINT = 0.5
+
+function tintReads(color, mode) {
+  const page = normalizeHex(mode.other?.backgroundColor)
+  const text = normalizeHex(mode.other?.textColor)
+  return !page || !text || contrast(text, mix(page, color.hex, color.alpha)) >= 4.5
+}
 
 // Every colour in `value` that is a role colour here, as its variable.
 // Returns the value and the role of what it paints (null when that is a
@@ -423,7 +438,7 @@ function mapValue(value, context, mode, hint) {
     const role = roleOf(color.hex, context, mode, hint)
     if (first === undefined) {
       first = role
-      faint = color.alpha < FAINT
+      faint = color.alpha < FAINT && tintReads(color, mode)
     }
     return role ? wrap(role, token, color.alpha) : token
   })
