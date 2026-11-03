@@ -128,6 +128,10 @@ const INTERACTIVE_SCRIPT = `
         if (url.host !== location.host) return null;
         // A jump within this page stays a jump: a new address would reload it.
         if (url.pathname === location.pathname && url.search === location.search && url.hash) return null;
+        // The builder's address holds many sites, one under each /s/<slug>/, and
+        // the server keeps what an address says as that site's choice.
+        var here = location.pathname.split('/');
+        if (here[1] === 's' && here[2] && url.pathname.indexOf('/s/' + here[2] + '/') !== 0) return null;
         url.searchParams.set('pwb-theme', mode);
         return url.href;
       } catch (e) { return null; }

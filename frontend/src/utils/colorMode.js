@@ -469,7 +469,7 @@ export function colorModeScript(mode) {
   const initial = mode.initial === mode.alt || mode.initial === mode.base ? mode.initial : null
   const cfg = JSON.stringify({ base: mode.base, alt: mode.alt, follow: mode.followDevice, initial })
   return `(function(){var c=${cfg},d=document.documentElement,m=null;`
-    + `var q=/[?&]${COLOR_MODE_PARAM}=(light|dark)(?:&|$)/.exec(location.search);if(q)m=q[1];`
+    + `var q=new URLSearchParams(location.search).get('${COLOR_MODE_PARAM}');if(q==='light'||q==='dark')m=q;`
     + `if(!m){try{m=localStorage.getItem('${COLOR_MODE_KEY}')}catch(e){}}`
     + `if(m!==c.base&&m!==c.alt&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');`
     + `if(m!==c.base&&m!==c.alt)m=c.initial;`

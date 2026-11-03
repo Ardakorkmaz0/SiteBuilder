@@ -231,7 +231,8 @@ describe('in the visitor\'s browser', () => {
     const mode = schema ? modeOf(schema) : { ...modeOf(site()), followDevice: follow }
     const page = new JSDOM(
       '<!DOCTYPE html><html><head></head><body><button data-pwb-theme-toggle aria-pressed="false">x</button>'
-        + '<a id="about" href="/about/">About</a><a id="jump" href="#top">Top</a><a id="away" href="https://elsewhere.test/">Away</a></body></html>',
+        + '<a id="about" href="/about/">About</a><a id="jump" href="#top">Top</a><a id="away" href="https://elsewhere.test/">Away</a>'
+        + '<a id="sibling" href="/s/site-a/about/">Same site</a><a id="neighbour" href="/s/site-b/">Another site</a><a id="neighbour-prefix" href="/s/site-a-2/">Similar name</a></body></html>',
       { url, runScripts: 'outside-only' },
     )
     pages.push(page)
@@ -354,7 +355,7 @@ describe('in the visitor\'s browser', () => {
   describe('with a choice the server remembered', () => {
     // The server writes it on the script itself, so the script has to run from
     // its own tag here.
-    function served({ chosen, url = 'https://example.test/', schema = site() }) {
+    function served({ chosen, url = 'https://example.test/', schema = site(), stored = null }) {
       const attribute = chosen ? ` data-pwb-chosen="${chosen}"` : ''
       const page = new JSDOM(
         `<!DOCTYPE html><html><head><script data-pwb-color-mode${attribute}>${colorModeScript(modeOf(schema))}</script></head><body></body></html>`,
@@ -362,7 +363,8 @@ describe('in the visitor\'s browser', () => {
           url,
           runScripts: 'dangerously',
           beforeParse(window) {
-            Object.defineProperty(window, 'localStorage', { get() { throw new window.DOMException('sandboxed', 'SecurityError') } })
+            if (stored) window.localStorage.setItem('pwb-color-mode', stored)
+            else Object.defineProperty(window, 'localStorage', { get() { throw new window.DOMException('sandboxed', 'SecurityError') } })
             window.matchMedia = (query) => ({ matches: query.includes('light') })
           },
         },
@@ -384,6 +386,10 @@ describe('in the visitor\'s browser', () => {
       expect(theme(served({ chosen: 'dark', url: 'https://example.test/?pwb-theme=light' }))).toBe('light')
     })
 
+    it('nor over storage, on a page that has it', () => {
+      expect(theme(served({ chosen: 'dark', stored: 'light' }))).toBe('light')
+    })
+
     it('and ignores a value that is no palette', () => {
       expect(theme(served({ chosen: 'blue', schema: site([toggle], { colorMode: { start: 'dark' } }) }))).toBe('dark')
     })
@@ -400,6 +406,37 @@ describe('in the visitor\'s browser', () => {
     about.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
     expect(about.getAttribute('href')).toBe('/about/')
     expect(window.location.search).toBe('')
+  })
+
+  it('on the builder\'s address, takes the choice along only inside the site', () => {
+    const window = visit({ sandboxed: true, url: 'https://example.test/s/site-a/?pwb-theme=dark' })
+    const click = (id) => {
+      const link = window.document.getElementById(id)
+      link.addEventListener('click', (event) => event.preventDefault())
+      link.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+      return link.getAttribute('href')
+    }
+    expect(click('sibling')).toBe('https://example.test/s/site-a/about/?pwb-theme=dark')
+    // The server would keep this as the other site's choice, for a year.
+    expect(click('neighbour')).toBe('/s/site-b/')
+    expect(click('neighbour-prefix')).toBe('/s/site-a-2/')
+    // The app itself, on the same host, is not part of the site either.
+    expect(click('about')).toBe('/about/')
+  })
+
+  it.each([
+    ['?pwb-theme=%64ark', 'dark'],
+    ['?pwb-theme=dark&pwb-theme=light', 'dark'],
+    ['?pwb-theme=light&pwb-theme=dark', 'light'],
+    ['?pwb-theme=blue&pwb-theme=dark', 'light'],
+    ['?other=1&pwb-theme=dark', 'dark'],
+    ['?xpwb-theme=dark', 'light'],
+  ])('reads the address as the server does: %s is %s', (search, expected) => {
+    expect(theme(visit({ sandboxed: true, url: `https://example.test/${search}` }))).toBe(expected)
+  })
+
+  it('lets a value in the address that is no palette leave storage in charge', () => {
+    expect(theme(visit({ stored: 'dark', url: 'https://example.test/?pwb-theme=blue' }))).toBe('dark')
   })
 
   it('without storage, keeps the choice on an address with a jump in it', () => {
