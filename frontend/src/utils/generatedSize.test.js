@@ -108,6 +108,26 @@ describe('what a page needs comes with it', () => {
     expect(runtimeNeeds('<p>once = 1, online=2</p>').tabs).toBe(false)
   })
 
+  it('finds an inline handler however the tag around it is written', () => {
+    expect(runtimeNeeds('<button title="a>b" onclick="go()">x</button>').tabs).toBe(true)
+    expect(runtimeNeeds("<button title='a>b' onclick='go()'>x</button>").tabs).toBe(true)
+    expect(runtimeNeeds('<img/onerror="go()" src="a.png">').tabs).toBe(true)
+    expect(runtimeNeeds('<a href="x"onclick="go()">x</a>').tabs).toBe(true)
+    expect(runtimeNeeds('<a href="javascript:go()">x</a>').tabs).toBe(true)
+  })
+
+  it('does not take what a page says for a handler', () => {
+    expect(runtimeNeeds('<p>a > b onclick = 1</p>').tabs).toBe(false)
+    expect(runtimeNeeds('<p>1 < 2 onclick=3</p>').tabs).toBe(false)
+    expect(runtimeNeeds('<a title=" onclick=go()">x</a>').tabs).toBe(false)
+  })
+
+  it('reads a broken page without taking long', () => {
+    const started = performance.now()
+    for (const page of ['<a "'.repeat(50000), "<a '".repeat(50000), '<a '.repeat(60000), '<a title="x>'.repeat(15000)]) runtimeNeeds(page)
+    expect(performance.now() - started).toBeLessThan(2000)
+  })
+
   it('counts its own scripts as no reason for all of it', () => {
     expect(runtimeNeeds('<script data-builder-layout>x</script>').tabs).toBe(false)
     expect(runtimeNeeds('<script data-pwb-color-mode>x</script>').tabs).toBe(false)
@@ -150,6 +170,14 @@ describe('every writer', () => {
     // The theme's variables stay in a file its owner goes on to edit.
     expect(alone.find((file) => file.name === 'styles.css').content).toContain('--site-soft:')
     expect(alone.find((file) => file.name === 'styles.css').content).not.toContain('.card-title')
+  })
+
+  it('writes a project\'s code for its pages as they were edited, not as they were drawn', () => {
+    const page = '<!doctype html><form><h3 class="card-title">x</h3></form><script src="runtime.js"></script>'
+    const files = schemaToFiles(site(plain), { documents: { 'index.html': page } })
+    expect(files.find((file) => file.name === 'index.html').content).toBe(page)
+    expect(files.find((file) => file.name === 'runtime.js').content).toContain('postToInbox')
+    expect(files.find((file) => file.name === 'styles.css').content).toContain('.card-title')
   })
 })
 

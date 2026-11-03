@@ -4,8 +4,11 @@ import { useSyncExternalStore } from 'react'
 
 const KEY = 'pwb_code_colors'
 const listeners = new Set()
+// What the browser would not keep: it holds until the page closes.
+let unsaved = null
 
 function read() {
+  if (unsaved !== null) return unsaved
   try { return localStorage.getItem(KEY) !== 'off' } catch { return true }
 }
 
@@ -15,7 +18,12 @@ function subscribe(listener) {
 }
 
 export function setCodeColors(on) {
-  try { localStorage.setItem(KEY, on ? 'on' : 'off') } catch { /* it lasts until the page closes */ }
+  try {
+    localStorage.setItem(KEY, on ? 'on' : 'off')
+    unsaved = null
+  } catch {
+    unsaved = on
+  }
   listeners.forEach((listener) => listener())
 }
 

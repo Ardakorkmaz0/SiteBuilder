@@ -7,6 +7,11 @@ export function componentSourceHtml(file, html, files) {
   return file.ownDocument ? html : inlineProjectHtml(html, files)
 }
 
+// A source edit as one document, with the code written for what it now says.
+export function componentDraftHtml(schema, file, html) {
+  return componentSourceHtml(file, html, file.ownDocument ? [] : schemaToFiles(schema, { documents: { [file.name]: html } }))
+}
+
 export function componentPageDocument(page, htmlMap) {
   const html = page?.mode === 'html' ? htmlMap?.[page.id] : ''
   return typeof html === 'string' && html.trim() ? html : ''

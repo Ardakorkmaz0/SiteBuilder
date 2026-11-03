@@ -177,8 +177,11 @@ test('review: published choices survive middle-click and later visits without re
     // never reports the tab it opens, with the link already rewritten, so the tab
     // is opened from what the link now says.
     const about = page.getByRole('link', { name: 'About', exact: true })
+    await page.evaluate(() => window.addEventListener('auxclick', (event) => { window.auxClickStopped = event.defaultPrevented }))
     await about.click({ button: 'middle' })
     await expect(about).toHaveAttribute('href', `${BACKEND}/s/${source.slug}/about/?pwb-theme=dark`)
+    // Nothing on the page keeps the browser from opening its tab.
+    expect(await page.evaluate(() => window.auxClickStopped)).toBe(false)
     const middleTab = await context.newPage()
     await middleTab.goto(await about.getAttribute('href'))
     namedPages.push({ page: middleTab, name: 'middle-click-new-tab' })

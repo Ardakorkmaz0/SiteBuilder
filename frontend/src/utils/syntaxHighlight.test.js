@@ -78,6 +78,29 @@ describe('what gets a colour', () => {
 })
 
 describe('a long file', () => {
+  it('runs what is never closed to its end, as a browser reads it', () => {
+    expect(kinds(highlightCode('a{} /*x/*x', 'css'))).toContainEqual(['comment', '/*x/*x'])
+    expect(kinds(highlightCode('a /*x/*x', 'js'))).toEqual([['comment', '/*x/*x']])
+    expect(kinds(highlightCode('<p>a</p><!--x<!--x', 'html'))).toContainEqual(['comment', '<!--x<!--x'])
+    expect(kinds(highlightCode('a = "x\\"y', 'js'))).toContainEqual(['string', '"x\\"y'])
+  })
+
+  it('does not take long on what is never closed', () => {
+    for (const [code, lang] of [
+      ['/*x'.repeat(66000), 'css'],
+      ['/*x'.repeat(66000), 'js'],
+      ['<!--x'.repeat(39000), 'html'],
+      ['<!doctype '.repeat(19000), 'html'],
+      ['"a\\'.repeat(66000), 'js'],
+      ['`a\\'.repeat(66000), 'js'],
+      ['a{b:"c\\'.repeat(28000), 'css'],
+    ]) {
+      const started = performance.now()
+      highlightCode(code, lang)
+      expect(performance.now() - started).toBeLessThan(700)
+    }
+  })
+
   it('does not take long, however it is broken', () => {
     const started = performance.now()
     for (const [code, lang] of [

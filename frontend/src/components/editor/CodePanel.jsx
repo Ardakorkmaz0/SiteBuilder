@@ -11,7 +11,7 @@ import { useEditorStore } from '../../store/editorStore.js'
 import { minifyGeneratedHtml } from '../../utils/exportFiles.js'
 import { schemaToFiles } from '../../utils/schemaToFiles.js'
 import { projectSnapshot } from '../../utils/projectSnapshot.js'
-import { componentHtmlFiles, componentPageDocument, componentSourceHtml } from '../../utils/componentSourceDrafts.js'
+import { componentDraftHtml, componentHtmlFiles, componentPageDocument } from '../../utils/componentSourceDrafts.js'
 import { pageToResponsiveHtml } from '../../utils/pageCode.js'
 import { revealLine } from '../../utils/revealCodeLine.js'
 import CodeLineGlow from './CodeLineGlow.jsx'
@@ -161,8 +161,8 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
     if (!item || item.content === item.generatedContent) return null
     // Exports include Source edits before Apply. Authored HTML keeps its own
     // asset links; canvas drafts embed the same assets as Apply HTML does.
-    return componentSourceHtml(item, item.content, rawGeneratedFiles)
-  }, [generatedFiles, rawGeneratedFiles])
+    return componentDraftHtml(schema, item, item.content)
+  }, [generatedFiles, schema])
   // One page as a file that stands on its own, and its smaller form. A
   // person's own document is not ours to minify: it goes out as written.
   const standalonePage = useCallback((page) => (
@@ -242,13 +242,13 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
     for (const item of dirtyHtmlFiles) {
       onApplyHtml({
         pageId: item.pageId,
-        html: componentSourceHtml(item, item.content, rawGeneratedFiles),
+        html: componentDraftHtml(schema, item, item.content),
         nextMode,
       })
     }
     setHtmlDrafts({})
     return dirtyHtmlFiles.length
-  }, [dirtyHtmlFiles, onApplyHtml, rawGeneratedFiles, setHtmlDrafts])
+  }, [dirtyHtmlFiles, onApplyHtml, schema, setHtmlDrafts])
 
   useImperativeHandle(ref, () => ({
     applyPendingHtml,
@@ -317,13 +317,9 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
 
   function downloadCleanProject() {
     setExportMenuOpen(false)
-    const htmlByName = new Map(htmlFiles.map((item) => [item.name, item.content]))
+    const documents = Object.fromEntries(htmlFiles.map((item) => [item.name, item.content]))
     const backup = generatedFiles.find((item) => item.name === 'schema.json')
-    const output = rawGeneratedFiles.map((item) => (
-      item.lang === 'html' && htmlByName.has(item.name)
-        ? { ...item, content: htmlByName.get(item.name) }
-        : item.name === 'schema.json' ? backup : item
-    ))
+    const output = schemaToFiles(schema, { documents }).map((item) => (item.name === 'schema.json' ? backup : item))
     saveAs(`${base}-project.zip`, zipFiles(output))
   }
 
@@ -368,7 +364,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
     if (!onApplyHtml || file?.editableKind !== 'html') return
     onApplyHtml({
       pageId: file.pageId,
-      html: componentSourceHtml(file, file.content, rawGeneratedFiles),
+      html: componentDraftHtml(schema, file, file.content),
       nextMode: 'source',
     })
     setHtmlDrafts((drafts) => {

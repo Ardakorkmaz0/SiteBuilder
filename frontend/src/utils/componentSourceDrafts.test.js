@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { schemaToFiles } from './schemaToFiles.js'
-import { componentSourceHtml, pendingComponentSourceDrafts } from './componentSourceDrafts.js'
+import { componentDraftHtml, componentSourceHtml, pendingComponentSourceDrafts } from './componentSourceDrafts.js'
 
 const schema = { theme: {}, pages: [{ id: 'home', name: 'Home', components: [] }] }
 
@@ -21,6 +21,20 @@ describe('component source document conversion', () => {
     expect(componentSourceHtml({ ownDocument: false }, html, files)).toBe(
       '<!doctype html>\n<html><head><style data-pwb-project-styles>\n.generated { display: block; }\n</style><style data-pwb-custom-styles>\n.custom { color: red; }\n</style></head>\n<body>  Authored text\n<script data-pwb-project-runtime>\nwindow.generated = true;\n</script><script data-pwb-custom-script>\nwindow.custom = true;\n</script></body></html>\n',
     )
+  })
+})
+
+describe('a source edit as one document', () => {
+  const page = '<!doctype html><form><input name="email"></form><script src="runtime.js"></script>'
+
+  it('has the code for what the edit added, which the canvas never had', () => {
+    const html = componentDraftHtml(schema, { name: 'index.html', ownDocument: false }, page)
+    expect(html).toContain('postToInbox')
+    expect(html).not.toContain('src="runtime.js"')
+  })
+
+  it('leaves a document of its own as written', () => {
+    expect(componentDraftHtml(schema, { name: 'index.html', ownDocument: true }, page)).toBe(page)
   })
 })
 
