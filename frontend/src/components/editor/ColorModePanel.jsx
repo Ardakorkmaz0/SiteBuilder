@@ -6,7 +6,7 @@ import PanelGroup from './PanelGroup.jsx'
 import { LabeledCheckbox, LabeledColor } from './controls.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
-import { colorModeFor, hasThemeToggle, pagesWithoutThemeToggle, siteStart } from '../../utils/colorMode.js'
+import { colorModeFor, contrastProblems, hasThemeToggle, pagesWithoutThemeToggle, siteStart } from '../../utils/colorMode.js'
 import { moveInRadioGroup } from '../../ui/radioGroupKeys.js'
 
 const ROLES = [
@@ -46,6 +46,8 @@ export default function ColorModePanel({ htmlMode = false, htmlMap = NO_HTML }) 
   const start = siteStart(schema) || mode.base
   const without = pagesWithoutThemeToggle(schema, htmlMap)
   const canvasIds = without.canvas.map((missing) => missing.id)
+  const problems = contrastProblems(other)
+  const roleLabel = (role) => t(ROLES.find(([id]) => id === role)[1])
 
   const addSwitch = () => addThemeSwitchToPages([page.id], { select: true })
   const addToMany = canvasIds.length === 1
@@ -128,20 +130,28 @@ export default function ColorModePanel({ htmlMode = false, htmlMap = NO_HTML }) 
           )}
         </div>
       )}
-      {!htmlMode && (
-        <LabeledCheckbox
-          label={dark ? t('Show dark mode on the canvas') : t('Show light mode on the canvas')}
-          checked={preview}
-          onChange={setPreview}
-        />
-      )}
+      {/* An HTML page has no canvas: its View shows the other palette, before
+          the page has a switch to reach it with. */}
+      <LabeledCheckbox
+        label={htmlMode
+          ? (dark ? t('Show dark mode in View') : t('Show light mode in View'))
+          : (dark ? t('Show dark mode on the canvas') : t('Show light mode on the canvas'))}
+        checked={preview}
+        onChange={setPreview}
+      />
       {ROLES.map(([role, label]) => (
-        <LabeledColor
-          key={role}
-          label={t(label)}
-          value={other[role]}
-          onChange={(value) => updateColorMode({ theme: { [role]: value } })}
-        />
+        <div key={role} className="space-y-1">
+          <LabeledColor
+            label={t(label)}
+            value={other[role]}
+            onChange={(value) => updateColorMode({ theme: { [role]: value } })}
+          />
+          {problems.filter((problem) => problem.role === role).map((problem) => (
+            <p key={problem.on} className="text-[11px] leading-snug text-[var(--studio-warning)]">
+              {t('Hard to read on {surface}: {ratio}:1, needs {min}:1.', { surface: roleLabel(problem.on), ratio: problem.ratio, min: problem.min })}
+            </p>
+          ))}
+        </div>
       ))}
       {edited && (
         <button type="button" onClick={() => updateColorMode({ theme: null })} className="studio-btn studio-btn-secondary px-2 py-1 text-xs">

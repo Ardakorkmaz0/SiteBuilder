@@ -7,8 +7,11 @@ import {
   colorModeFor,
   colorModeHeadTags,
   colorModeScript,
+  contrastProblems,
   hasThemeToggle,
   pagesWithoutThemeToggle,
+  parseColor,
+  viewColorMode,
   suggestedAltTheme,
   withColorModeComponents,
   withColorModeHtml,
@@ -65,6 +68,17 @@ describe('when a site has the other palette', () => {
     expect(dark.backgroundColor).toBe('#111317')
     // The navy brand colour is lifted until it stands out on the dark page.
     expect(dark.primaryColor).not.toBe('#1e3a8a')
+  })
+
+  it('suggests button text that reads on the brand colour, not only by its brightness', () => {
+    // A mid green: white gives 3.2:1 here, a brightness rule still picks it.
+    const dark = suggestedAltTheme({ ...DEFAULT_THEME, primaryColor: '#6e9b23' })
+    expect(dark.primaryColor).toBe('#6e9b23')
+    expect(dark.buttonTextColor).toBe('#111111')
+    // White stays where it is enough.
+    expect(suggestedAltTheme({ ...DEFAULT_THEME, primaryColor: '#7c3aed' }).buttonTextColor).toBe('#ffffff')
+    // Where neither white nor a near black reaches it, black does.
+    expect(suggestedAltTheme({ ...DEFAULT_THEME, primaryColor: '#777777' }).buttonTextColor).toBe('#000000')
   })
 
   it('keeps what the owner set for the other palette', () => {
@@ -198,6 +212,174 @@ describe('which colours follow', () => {
     expect(doc.querySelector('script')).toBeNull()
     // A frame painted in another scheme than its page's is a white box.
     expect(embed.props._colorModeCss).not.toContain('color-scheme')
+  })
+})
+
+describe('a colour however it is written', () => {
+  it.each([
+    ['#fff', '#ffffff', 1],
+    ['#1D1D1F', '#1d1d1f', 1],
+    ['#ffffff80', '#ffffff', 128 / 255],
+    ['#fff8', '#ffffff', 136 / 255],
+    ['rgb(29, 29, 31)', '#1d1d1f', 1],
+    ['rgb(29 29 31)', '#1d1d1f', 1],
+    ['rgba(0,0,0,.5)', '#000000', 0.5],
+    ['rgb(0 0 0 / 25%)', '#000000', 0.25],
+    ['rgb(100%, 100%, 100%)', '#ffffff', 1],
+    ['hsl(0, 0%, 100%)', '#ffffff', 1],
+    ['hsl(120 100% 25%)', '#008000', 1],
+    ['hsla(240, 100%, 50%, .4)', '#0000ff', 0.4],
+    ['white', '#ffffff', 1],
+    ['GREY', '#808080', 1],
+  ])('%s', (written, hex, alpha) => {
+    const color = parseColor(written)
+    expect(color.hex).toBe(hex)
+    expect(color.alpha).toBeCloseTo(alpha, 3)
+  })
+
+  it.each(['transparent', 'red', 'currentColor', 'rgb(1,2)', 'rgb(a,b,c)', '#12', '', 'var(--x)'])('not %s', (written) => {
+    expect(parseColor(written)).toBeNull()
+  })
+
+  const mode = modeOf(site())
+  const one = (component) => withColorModeComponents([component], mode)[0]
+
+  it('follows the palette as it would written in hex', () => {
+    expect(one(block('text', { color: 'rgb(29, 29, 31)' })).styles.color).toBe('var(--pwb-alt-text, rgb(29, 29, 31))')
+    expect(one(block('text', { color: 'hsl(240, 3%, 12%)' })).styles.color).toBe('var(--pwb-alt-text, hsl(240, 3%, 12%))')
+    expect(one(block('text', { color: 'black' })).styles.color).toBe('var(--pwb-alt-text, black)')
+    expect(one(block('card', { backgroundColor: 'white' })).styles.backgroundColor).toBe('var(--pwb-alt-surface, white)')
+    expect(one(block('card', { border: '1px solid silver' })).styles.border).toBe('1px solid var(--pwb-alt-border, silver)')
+  })
+
+  it('keeps its opacity in both palettes', () => {
+    expect(one(block('text', { color: 'rgba(29, 29, 31, 0.5)' })).styles.color).toBe('color-mix(in srgb, var(--pwb-alt-text, #1d1d1f) 50%, transparent)')
+    expect(one(block('text', { color: '#1d1d1f80' })).styles.color).toBe('color-mix(in srgb, var(--pwb-alt-text, #1d1d1f) 50.2%, transparent)')
+    const header = withColorModeHtml('<head><style>.bar{background:rgba(255,255,255,.9)}</style></head>', mode)
+    expect(header).toContain('.bar{background:color-mix(in srgb, var(--pwb-alt-bg, #ffffff) 90%, transparent)}')
+  })
+
+  it('never twice', () => {
+    const text = one(block('text', { color: 'rgba(29, 29, 31, 0.5)' }))
+    expect(withColorModeComponents([text], mode)[0].styles.color).toBe(text.styles.color)
+  })
+
+  it('leaves alone what only looks like one', () => {
+    expect(one(block('card', { background: 'url(white.png)' })).styles.background).toBe('url(white.png)')
+    // A longer name is that name, not the short one at its start.
+    expect(one(block('section', { backgroundColor: 'whitesmoke' })).styles.backgroundColor).toBe('var(--pwb-alt-soft, whitesmoke)')
+    expect(one(block('card', { backgroundColor: 'red' })).styles.backgroundColor).toBe('red')
+    expect(one(block('text', { color: 'rgb(200, 30, 30)' })).styles.color).toBe('rgb(200, 30, 30)')
+    expect(withColorModeHtml('<head><style>.a{background:var(--white);color:offwhite}</style></head>', mode)).toContain('.a{background:var(--white);color:offwhite}')
+  })
+
+  it('reads a faint tint as the page behind it, so the text on it still follows', () => {
+    const tint = one(block('card', { backgroundColor: 'rgba(120, 30, 30, 0.1)', color: '#1d1d1f' }))
+    expect(tint.styles.color).toBe('var(--pwb-alt-text, #1d1d1f)')
+    // A solid colour of the owner's own keeps the text on it, as in hex.
+    const solid = one(block('card', { backgroundColor: 'rgba(255, 204, 0, 0.9)', color: '#1d1d1f' }))
+    expect(solid.styles.color).toBe('#1d1d1f')
+  })
+
+  it('takes a text on a solid role colour to that colour\'s own text role', () => {
+    const button = one(block('button', { backgroundColor: '#0071e3', color: 'white' }))
+    expect(button.styles.color).toBe('var(--pwb-alt-button-text, white)')
+  })
+
+  it('in an HTML page: single quotes, and a palette in rgb', () => {
+    expect(withColorModeHtml("<body><p style='color:#1d1d1f'>x</p></body>", mode)).toContain("style='color:var(--pwb-alt-text, #1d1d1f)'")
+    const html = '<html><head><style>:root{--bg:rgb(11,18,32);--ink:rgba(232,237,244,1);--accent:rgba(1,2,3,.5)}</style></head><body></body></html>'
+    const schema = site([])
+    schema.pages[0] = { ...schema.pages[0], mode: 'html', html: `${html}<button data-pwb-theme-toggle>x</button>` }
+    // It is read as a page designed dark, whose palette is in its own variables.
+    expect(modeOf(schema)).toMatchObject({ base: 'dark', alt: 'light' })
+    // A see-through colour names no palette: the theme's stays.
+    expect(modeOf(schema).light.primaryColor).toBe(DEFAULT_THEME.primaryColor)
+    expect(withColorModeHtml(html, modeOf(schema))).toContain('--bg:var(--pwb-alt-bg, rgb(11,18,32))')
+    expect(withColorModeHtml(html, modeOf(schema))).toContain('--accent:color-mix(in srgb, var(--pwb-alt-primary, #010203) 50%, transparent)')
+  })
+})
+
+describe('a tab row', () => {
+  const mode = modeOf(site())
+  const tabs = (props, styles = {}) => withColorModeComponents([block('tabs', styles, { props })], mode)[0]
+  const look = {
+    tabTextColor: '#6b7280', tabBackgroundColor: 'transparent', tablistBorderColor: '#e5e7eb', tablistBackgroundColor: '#f3f4f6',
+    panelBackgroundColor: '#ffffff', panelBorderColor: '#d2d2d7',
+  }
+
+  it('follows the palette, part by part', () => {
+    expect(tabs(look).props).toMatchObject({
+      tabTextColor: 'var(--pwb-alt-muted, #6b7280)',
+      tabBackgroundColor: 'transparent',
+      tablistBorderColor: 'var(--pwb-alt-border, #e5e7eb)',
+      tablistBackgroundColor: 'var(--pwb-alt-soft, #f3f4f6)',
+      panelBackgroundColor: 'var(--pwb-alt-surface, #ffffff)',
+      panelBorderColor: 'var(--pwb-alt-border, #d2d2d7)',
+    })
+  })
+
+  it('keeps an active tab\'s text readable on its own colour', () => {
+    const filled = tabs({ activeTabBackgroundColor: '#0071e3', activeTabColor: '#ffffff' }).props
+    expect(filled.activeTabBackgroundColor).toBe('var(--pwb-alt-primary, #0071e3)')
+    expect(filled.activeTabColor).toBe('var(--pwb-alt-button-text, #ffffff)')
+    const plain = tabs({ activeTabBackgroundColor: '#eff3fb', activeTabColor: '#1d1d1f' }).props
+    expect(plain.activeTabColor).toBe('var(--pwb-alt-text, #1d1d1f)')
+    const own = tabs({ activeTabBackgroundColor: '#ffcc00', activeTabColor: '#1d1d1f' }).props
+    expect(own).toMatchObject({ activeTabBackgroundColor: '#ffcc00', activeTabColor: '#1d1d1f' })
+  })
+
+  it('stays as designed inside a box with a colour of the owner\'s own', () => {
+    const box = withColorModeComponents([block('container', { backgroundColor: '#ffcc00' }, { children: [block('tabs', {}, { props: look })] })], mode)[0]
+    expect(box.children[0].props.tabTextColor).toBe('#6b7280')
+  })
+
+  it('reaches the published page', () => {
+    const [page] = publishedPagesFor(site([toggle, block('tabs', {}, { props: { ...look, tabs: [{ id: 't1', label: 'One' }], activeId: 't1' } })]))
+    expect(page.html).toContain('--builder-tab-color:var(--pwb-alt-muted, #6b7280)')
+  })
+})
+
+describe('whether the other palette can be read', () => {
+  it('names each pair that falls short', () => {
+    const palette = { backgroundColor: '#111317', surfaceColor: '#1a1d23', textColor: '#333333', mutedColor: '#a3a9b3', primaryColor: '#60a5fa', buttonTextColor: '#111111', accentColor: '#60a5fa', headerColor: '#0b0c0f', headerTextColor: '#eceef1' }
+    expect(contrastProblems(palette)).toEqual([
+      { role: 'textColor', on: 'backgroundColor', min: 4.5, ratio: 1.4 },
+      { role: 'textColor', on: 'surfaceColor', min: 4.5, ratio: 1.3 },
+    ])
+  })
+
+  it('holds text to the higher bar', () => {
+    expect(contrastProblems({ backgroundColor: '#111317', textColor: '#777777' })).toEqual([{ role: 'textColor', on: 'backgroundColor', min: 4.5, ratio: 4.1 }])
+  })
+
+  it('asks less of a colour that only has to be seen', () => {
+    const palette = { backgroundColor: '#ffffff', primaryColor: '#808080' }
+    expect(contrastProblems(palette)).toEqual([])
+    expect(contrastProblems({ backgroundColor: '#ffffff', primaryColor: '#b0b0b0' })).toEqual([{ role: 'primaryColor', on: 'backgroundColor', min: 3, ratio: 2.1 }])
+  })
+
+  it('finds nothing wrong with black on white', () => {
+    expect(contrastProblems({ backgroundColor: '#ffffff', surfaceColor: '#ffffff', textColor: '#000000', mutedColor: '#000000' })).toEqual([])
+  })
+
+  it.each(THEME_PRESETS.map((preset) => [preset.id, preset]))('finds nothing wrong with what it suggests for %s', (id, preset) => {
+    expect(contrastProblems(suggestedAltTheme(presetTheme(preset)))).toEqual([])
+  })
+})
+
+describe('the editor\'s View', () => {
+  const html = '<html><head></head><body>x</body></html>'
+  const schema = { theme: { ...DEFAULT_THEME }, pages: [{ id: 'doc', mode: 'html', html, components: [] }] }
+
+  it('shows an HTML page in the other palette before it has a switch', () => {
+    expect(viewColorMode(schema, schema.pages[0], false, {})).toBeNull()
+    expect(viewColorMode(schema, schema.pages[0], true, {})).toMatchObject({ initial: 'dark', alt: 'dark' })
+  })
+
+  it('reads the page\'s own palette from the document being edited', () => {
+    const edited = { doc: '<html><head><style>:root{--bg:#0b1220}</style></head></html>' }
+    expect(viewColorMode(schema, schema.pages[0], true, edited)).toMatchObject({ base: 'dark', alt: 'light', initial: 'light' })
   })
 })
 

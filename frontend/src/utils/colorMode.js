@@ -46,7 +46,66 @@ const SITE_VARS = {
   accentColor: 'accent',
 }
 
-const HEX = /#(?:[0-9a-f]{6}|[0-9a-f]{3})\b/gi
+// Named colours worth knowing: the greys, which follow the palette like any
+// other. A name with a hue is a colour of the owner's own.
+const NAMED_GREYS = {
+  white: '#ffffff', snow: '#fffafa', ghostwhite: '#f8f8ff', whitesmoke: '#f5f5f5',
+  gainsboro: '#dcdcdc', lightgray: '#d3d3d3', lightgrey: '#d3d3d3', silver: '#c0c0c0',
+  darkgray: '#a9a9a9', darkgrey: '#a9a9a9', gray: '#808080', grey: '#808080',
+  dimgray: '#696969', dimgrey: '#696969', slategray: '#708090', slategrey: '#708090',
+  black: '#000000',
+}
+
+// Every colour written in a value. A url() comes first so that a file named
+// after a colour is passed over whole.
+const COLOR_TOKEN = new RegExp(
+  `url\\([^)]*\\)|#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{4}|[0-9a-f]{3})\\b|\\b(?:rgb|hsl)a?\\([^()]*\\)|(?<![-\\w#.])(?:${Object.keys(NAMED_GREYS).join('|')})(?![-\\w])`,
+  'gi',
+)
+
+const toHex = (red, green, blue) => `#${[red, green, blue].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`
+const within = (value, max) => Math.min(max, Math.max(0, value))
+
+function alphaOf(text) {
+  if (text === undefined) return 1
+  const number = parseFloat(text)
+  if (Number.isNaN(number)) return null
+  return within(text.endsWith('%') ? number / 100 : number, 1)
+}
+
+function hslToHex(hue, saturation, lightness) {
+  const channel = (n) => {
+    const k = (n + hue / 30) % 12
+    const a = saturation * Math.min(lightness, 1 - lightness)
+    return (lightness - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))) * 255
+  }
+  return toHex(channel(0), channel(8), channel(4))
+}
+
+// A colour as its plain hex and its opacity, or null for anything else.
+export function parseColor(value) {
+  const text = String(value || '').trim().toLowerCase()
+  if (NAMED_GREYS[text]) return { hex: NAMED_GREYS[text], alpha: 1 }
+  const hex = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(text)
+  if (hex) {
+    const full = hex[1].length < 6 ? hex[1].split('').map((c) => c + c).join('') : hex[1]
+    return { hex: `#${full.slice(0, 6)}`, alpha: full.length === 8 ? parseInt(full.slice(6), 16) / 255 : 1 }
+  }
+  const call = /^(rgb|hsl)a?\(([^()]*)\)$/.exec(text)
+  if (!call) return null
+  const parts = call[2].trim().split(/[\s,/]+/).filter(Boolean)
+  if (parts.length !== 3 && parts.length !== 4) return null
+  const alpha = alphaOf(parts[3])
+  if (alpha === null) return null
+  if (call[1] === 'rgb') {
+    const channels = parts.slice(0, 3).map((part) => (part.endsWith('%') ? parseFloat(part) * 2.55 : parseFloat(part)))
+    if (channels.some(Number.isNaN)) return null
+    return { hex: toHex(...channels.map((v) => within(v, 255))), alpha }
+  }
+  const [hue, saturation, lightness] = parts.slice(0, 3).map(parseFloat)
+  if ([hue, saturation, lightness].some(Number.isNaN)) return null
+  return { hex: hslToHex(((hue % 360) + 360) % 360, within(saturation, 100) / 100, within(lightness, 100) / 100), alpha }
+}
 
 export function normalizeHex(value) {
   const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(value || '').trim())
@@ -108,6 +167,12 @@ function readableOn(color, background, toward) {
   return out
 }
 
+// Text on a colour in the other palette: white where it reads, then a near
+// black. Between the two only pure black is sure of 4.5:1 on any colour.
+function textOn(color) {
+  return ['#ffffff', '#111111', '#000000'].find((text) => contrast(text, color) >= 4.5) || '#000000'
+}
+
 // The other palette, worked out from the theme: the owner can change every
 // colour of it, this is where it starts.
 export function suggestedAltTheme(theme) {
@@ -127,7 +192,7 @@ export function suggestedAltTheme(theme) {
       mutedColor: '#a3a9b3',
       borderColor: '#2e333b',
       primaryColor: primary,
-      buttonTextColor: readableTextOn(primary),
+      buttonTextColor: textOn(primary),
       accentColor: accent,
     }
   }
@@ -145,7 +210,7 @@ export function suggestedAltTheme(theme) {
     mutedColor: '#5f6670',
     borderColor: '#dfe2e7',
     primaryColor: primary,
-    buttonTextColor: readableTextOn(primary),
+    buttonTextColor: textOn(primary),
     accentColor: accent,
   }
 }
@@ -168,10 +233,10 @@ export function altTheme(schema, designed = schema?.theme) {
 // does not name comes from the theme.
 export function htmlPalette(html) {
   const out = {}
-  for (const match of String(html || '').matchAll(/--([a-z0-9-]+)\s*:\s*(#[0-9a-f]{3,6})\b/gi)) {
+  for (const match of String(html || '').matchAll(/--([a-z0-9-]+)\s*:\s*([^;{}"']+)/gi)) {
     const role = VAR_ROLE.get(match[1].toLowerCase())
-    const hex = normalizeHex(match[2])
-    if (role && hex && !out[role]) out[role] = hex
+    const color = role && parseColor(match[2])
+    if (color && color.alpha === 1 && !out[role]) out[role] = color.hex
   }
   return out
 }
@@ -239,15 +304,36 @@ export function colorModeFor(schema, page, htmlMap = {}, { always = false } = {}
     followDevice: start === 'system',
     ...(start === 'light' || start === 'dark' ? { initial: start } : {}),
     light,
-    other: { ...alt, onAccent: readableTextOn(alt.accentColor, alt.buttonTextColor) },
+    other: { ...alt, onAccent: normalizeHex(alt.accentColor) ? textOn(alt.accentColor) : alt.buttonTextColor },
   }
 }
 
 // The editor's View: the page as a visitor gets it, starting in the other
 // palette while the owner is looking at that one on the canvas.
-export function viewColorMode(schema, page, showOther = false) {
-  const mode = colorModeFor(schema, page, {}, { always: showOther })
+export function viewColorMode(schema, page, showOther = false, htmlMap = {}) {
+  const mode = colorModeFor(schema, page, htmlMap, { always: showOther })
   return mode && showOther ? { ...mode, initial: mode.alt } : mode
+}
+
+// What has to stay readable in a palette: WCAG's 4.5:1 for text, 3:1 for a
+// colour that only has to be seen (a brand colour used for links and icons).
+const CONTRAST_RULES = [
+  { role: 'textColor', on: 'backgroundColor', min: 4.5 },
+  { role: 'textColor', on: 'surfaceColor', min: 4.5 },
+  { role: 'mutedColor', on: 'backgroundColor', min: 4.5 },
+  { role: 'buttonTextColor', on: 'primaryColor', min: 4.5 },
+  { role: 'headerTextColor', on: 'headerColor', min: 4.5 },
+  { role: 'primaryColor', on: 'backgroundColor', min: 3 },
+  { role: 'accentColor', on: 'backgroundColor', min: 3 },
+]
+
+export function contrastProblems(palette) {
+  return CONTRAST_RULES.flatMap(({ role, on, min }) => {
+    const [color, surface] = [normalizeHex(palette?.[role]), normalizeHex(palette?.[on])]
+    if (!color || !surface) return []
+    const ratio = contrast(color, surface)
+    return ratio < min ? [{ role, on, min, ratio: Math.floor(ratio * 10) / 10 }] : []
+  })
 }
 
 const altVar = (role) => `--pwb-alt-${ROLE_VARS[role]}`
@@ -313,26 +399,40 @@ function paints(value) {
   return /^[a-z]+$/.test(v)
 }
 
-const wrap = (role, token) => `var(${altVar(role)}, ${token})`
+// A colour as its variable. One with an opacity keeps it, in both palettes.
+function wrap(role, token, alpha = 1) {
+  if (alpha >= 1) return `var(${altVar(role)}, ${token})`
+  const percent = Math.round(alpha * 1000) / 10
+  return `color-mix(in srgb, var(${altVar(role)}, ${parseColor(token).hex}) ${percent}%, transparent)`
+}
 
-// Every hex colour in `value` that is a role colour here, as its variable.
+// Under this a background is a tint over what is behind it, not a colour of
+// its own: the text on it still reads against the page.
+const FAINT = 0.5
+
+// Every colour in `value` that is a role colour here, as its variable.
 // Returns the value and the role of what it paints (null when that is a
 // colour of the owner's own).
 function mapValue(value, context, mode, hint) {
   if (typeof value !== 'string' || !value || value.includes('var(--pwb-alt-')) return { value, role: null, paints: paints(value) }
   let first
-  const out = value.replace(HEX, (token) => {
-    const role = roleOf(normalizeHex(token), context, mode, hint)
-    if (first === undefined) first = role
-    return role ? wrap(role, token) : token
+  let faint = false
+  const out = value.replace(COLOR_TOKEN, (token) => {
+    const color = parseColor(token)
+    if (!color) return token
+    const role = roleOf(color.hex, context, mode, hint)
+    if (first === undefined) {
+      first = role
+      faint = color.alpha < FAINT
+    }
+    return role ? wrap(role, token, color.alpha) : token
   })
-  return { value: out, role: first || null, paints: paints(value) }
+  return { value: out, role: first || null, paints: paints(value) && !(faint && !first) }
 }
 
 // A text colour on a solid role colour (a button's white) follows that
 // colour's own text role; any other one is left to the owner.
-function onSolid(value, boxRole) {
-  const hex = normalizeHex(value)
+function onSolid(hex, boxRole) {
   const lc = hex && lightChroma(hex)
   return !!lc && lc[1] <= GREY && (lc[0] >= 0.85 || lc[0] <= 0.15) ? ON[boxRole] : null
 }
@@ -340,9 +440,9 @@ function onSolid(value, boxRole) {
 function mapForeground(value, { boxRole, fixed, mode, hint }) {
   if (fixed || typeof value !== 'string') return value
   if (ON[boxRole]) {
-    const hex = normalizeHex(value)
-    const role = hex && (mode.light[ON[boxRole]] === hex ? ON[boxRole] : onSolid(value, boxRole))
-    return role ? wrap(role, value.trim()) : value
+    const color = parseColor(value)
+    const role = color && (mode.light[ON[boxRole]] === color.hex ? ON[boxRole] : onSolid(color.hex, boxRole))
+    return role ? wrap(role, value.trim(), color.alpha) : value
   }
   return mapValue(value, 'fg', mode, hint).value
 }
@@ -399,12 +499,36 @@ function mapFieldProps(props, mode, fixed) {
   return out
 }
 
+// A tab row's colours live in its props too, each tab's text on its own tab.
+function mapTabProps(props, mode, fixed) {
+  const out = { ...props }
+  const paint = (key, context, hint) => {
+    if (typeof props[key] === 'string' && props[key]) out[key] = mapValue(props[key], context, mode, hint).value
+  }
+  if (fixed) return out
+  paint('tablistBackgroundColor', 'bg', 'softColor')
+  paint('tablistBorderColor', 'border')
+  paint('tabBackgroundColor', 'bg', 'softColor')
+  paint('tabTextColor', 'fg', 'mutedColor')
+  paint('panelBackgroundColor', 'bg', 'surfaceColor')
+  paint('panelBorderColor', 'border')
+  paint('activeTabBorderColor', 'border')
+  const active = mapValue(props.activeTabBackgroundColor || '', 'bg', mode, 'softColor')
+  if (props.activeTabBackgroundColor) out.activeTabBackgroundColor = active.value
+  if (typeof props.activeTabColor === 'string' && props.activeTabColor) {
+    const custom = !active.role && active.paints
+    out.activeTabColor = custom ? props.activeTabColor : mapForeground(props.activeTabColor, { boxRole: active.role, fixed: false, mode })
+  }
+  return out
+}
+
 function mapComponent(component, mode, inside = false) {
   if (!component || typeof component !== 'object') return component
   const { styles, fixed } = mapStyles(component.styles, component.type, mode, inside)
   const next = { ...component, styles }
   if (component.stylesMobile) next.stylesMobile = mapStyles(component.stylesMobile, component.type, mode, inside).styles
   if (component.type === 'input' || component.type === 'select') next.props = mapFieldProps(component.props || {}, mode, fixed)
+  if (component.type === 'tabs') next.props = mapTabProps(component.props || {}, mode, fixed)
   // An HTML block is a document of its own: its colours are read the same
   // way, and it carries the other palette, which the page around it switches
   // on by message (see the runtime).
@@ -544,7 +668,12 @@ function mapDeclarations(text, mode) {
     if (part.next !== undefined || !part.property) continue
     if (part.property.startsWith('--')) {
       const role = VAR_ROLE.get(part.property.slice(2))
-      part.next = role && !part.value.includes('var(--pwb-alt-') ? part.value.replace(HEX, (token) => wrap(role, token)) : part.value
+      part.next = role && !part.value.includes('var(--pwb-alt-')
+        ? part.value.replace(COLOR_TOKEN, (token) => {
+          const color = parseColor(token)
+          return color ? wrap(role, token, color.alpha) : token
+        })
+        : part.value
       continue
     }
     const context = propertyContext(part.property)
@@ -576,6 +705,7 @@ export function withColorModeHtml(html, mode, { embed = false } = {}) {
   out = out
     .replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi, (m, open, css, close) => `${open}${mapCss(css, mode)}${close}`)
     .replace(/(\sstyle=")([^"]*)(")/gi, (m, open, css, close) => `${open}${mapDeclarations(css, mode)}${close}`)
+    .replace(/(\sstyle=')([^']*)(')/gi, (m, open, css, close) => `${open}${mapDeclarations(css, mode)}${close}`)
     .replace(/(\d+)/g, (m, i) => held[Number(i)])
   if (embed) return out
   const tags = colorModeHeadTags(mode)

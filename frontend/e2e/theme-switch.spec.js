@@ -229,6 +229,39 @@ test('an HTML block on a dark page is not a white box', async ({ page, request, 
   await api(request, 'DELETE', `/sites/${site.id}/`)
 })
 
+test('an HTML page written in rgb and named colors switches, and shows the other palette in View before it has a switch', async ({ page, request, browser }) => {
+  const siteId = await createHtmlSite(request, 'E2E theme rgb', [{
+    html: '<!DOCTYPE html><html><head><style>body{background:rgb(255,255,255);color:rgba(23,23,35,.9)}.card{background:white;border:1px solid silver}</style></head>'
+      + '<body><h1 id="title">Hello</h1><div class="card" id="card">Card</div></body></html>',
+  }])
+  await openEditor(page, siteId)
+  await page.getByRole('tab', { name: 'Theme', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Show dark mode in View' }).check()
+  await page.getByRole('button', { name: 'View', exact: true }).click()
+  const view = page.frameLocator('main iframe').first().locator('html')
+  await expect(view).toHaveAttribute('data-pwb-theme', 'dark')
+
+  await page.getByRole('checkbox', { name: 'Show dark mode in View' }).uncheck()
+  await expect(view).not.toHaveAttribute('data-pwb-theme', 'dark')
+
+  const { data: full } = await api(request, 'GET', `/sites/${siteId}/`)
+  full.schema.pages[0].html = full.schema.pages[0].html.replace('</body>', '<button data-pwb-theme-toggle>Theme</button></body>')
+  await api(request, 'PATCH', `/sites/${siteId}/`, { schema: full.schema })
+  await openEditor(page, siteId)
+  const slug = await publish(page, request, siteId)
+  const { viewer, visitor } = await visit(browser, slug)
+  const css = (selector, property) => visitor.evaluate(([s, p]) => getComputedStyle(document.querySelector(s))[p], [selector, property])
+  expect(await pageColor(visitor)).toBe('rgb(255, 255, 255)')
+  expect(await css('#card', 'backgroundColor')).toBe('rgb(255, 255, 255)')
+  await visitor.getByRole('button', { name: 'Theme' }).click()
+  expect(await palette(visitor)).toBe('dark')
+  expect(await pageColor(visitor)).toBe('rgb(17, 19, 23)')
+  // A stylesheet does not say this is a card: its white reads as the page's.
+  expect(await css('#card', 'backgroundColor')).toBe('rgb(17, 19, 23)')
+  await viewer.close()
+  await api(request, 'DELETE', `/sites/${siteId}/`)
+})
+
 test('an HTML page switches by its own palette', async ({ page, request, browser }) => {
   const siteId = await createHtmlSite(request, 'E2E theme switch html', [{
     html: '<!DOCTYPE html><html><head><style>:root{--bg:#ffffff;--ink:#171723}body{background:var(--bg);color:var(--ink)}</style></head>'
