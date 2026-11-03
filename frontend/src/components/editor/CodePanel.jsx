@@ -18,6 +18,7 @@ import CodeLineGlow from './CodeLineGlow.jsx'
 import { appendSnippet, cssSnippets, groupSnippets, jsSnippets } from '../../utils/snippets.js'
 import { zipFiles } from '../../utils/zip.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { CodeColorsToggle, CodeField, CodeText } from './CodeField.jsx'
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -619,8 +620,9 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
           {/* Positioned so the jumped-to line can be lit over the field. */}
           <div className="relative flex min-h-0 flex-1 flex-col">
           {file?.editable ? (
-            <textarea
+            <CodeField
               ref={codeBodyRef}
+              lang={file.lang}
               aria-label={t(
                 file.editableKind === 'html'
                   ? 'HTML source editor'
@@ -644,7 +646,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
               aria-label={t('Generated source preview')}
               className="min-h-0 flex-1 overflow-auto bg-[#0d1117] p-5 font-mono text-[13px] leading-6 text-gray-100"
             >
-              <code>{file?.content}</code>
+              <CodeText value={file?.content} lang={file?.lang} />
             </pre>
           )}
           <CodeLineGlow targetRef={codeBodyRef} text={file?.content || ''} line={glow?.line} endLine={glow?.endLine} onClear={clearGlow} />
@@ -654,6 +656,7 @@ function CodePanel({ currentPageId, onApplyHtml, onDraftDirtyChange, htmlMap = n
             <span>{String(file?.lang || '').toUpperCase()}</span>
             <span>{t('{count} lines', { count: lines })}</span>
             <span>{t('{count} characters', { count: file?.content?.length || 0 })}</span>
+            <CodeColorsToggle />
             {file?.name === 'custom.js' && (
               <span className="ml-auto hidden text-amber-300/80 md:inline">
                 {t('Runs in preview and in the published-site sandbox')}

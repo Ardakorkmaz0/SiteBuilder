@@ -76,6 +76,7 @@ import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { shouldForwardIframeShortcut } from '../../utils/editorLeave.js'
 import { revealLine } from '../../utils/revealCodeLine.js'
 import CodeLineGlow from './CodeLineGlow.jsx'
+import { CodeColorsToggle, CodeField } from './CodeField.jsx'
 
 // Editable, pixel-perfect HTML/JS workspace embedded in the site editor.
 // - View: real document in a sandboxed iframe with scripts enabled.
@@ -2339,11 +2340,13 @@ function HtmlWorkspace({
           )
         ) : mode === 'source' ? (
           <main className="flex min-h-0 flex-1 flex-col bg-[#1e1e1e]">
-            <div className="border-b border-white/10 bg-[#252526] px-4 py-2 font-mono text-xs text-gray-300">
+            <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-[#252526] px-4 py-2 font-mono text-xs text-gray-300">
               {fileName}
+              <CodeColorsToggle />
             </div>
-            <textarea
+            <CodeField
               ref={sourceRef}
+              lang="html"
               aria-label={t('HTML source editor')}
               value={sourceDraft}
               onChange={(e) => { setGlow(null); setSourceDraft(e.target.value) }}

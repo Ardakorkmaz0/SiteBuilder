@@ -469,7 +469,7 @@ body {
    that. Outside them only Tailwind's layered reset applies, so a button's own
    size and weight classes actually take effect: unlayered, this rule used to
    beat every one of them. */
-:root:not([data-surface="app"]) :is(button, input, textarea, select),
+:root:not([data-surface="app"]) :is(button, input, textarea:not(.code-field-text), select),
 [data-public-site-canvas] :is(button, input, textarea, select) {
   font: inherit;
 }
@@ -1466,11 +1466,40 @@ button:not(:disabled),
     height: 0.9rem;
     font-size: 0.5rem;
   }
-  .preview-page-nav {
+  .preview-page-area {
+    position: relative;
     display: flex;
     min-width: 0;
     align-items: center;
     justify-content: center;
+    gap: 0.25rem;
+  }
+  .preview-page-all {
+    color: var(--studio-text);
+  }
+  .preview-pages-menu {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    z-index: 132;
+    width: 15rem;
+    max-height: min(24rem, 70vh);
+    overflow-y: auto;
+    border: 1px solid var(--studio-border);
+    border-radius: 0.75rem;
+    background: var(--studio-panel);
+    box-shadow: var(--studio-shadow-lg);
+  }
+  .preview-pages-menu [aria-current="page"] {
+    background: var(--studio-panel-raised);
+    color: var(--studio-accent-text);
+  }
+  .preview-page-nav {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    /* Safe: centred, the start of a row that overflows was cut off for good. */
+    justify-content: safe center;
     gap: 0.25rem;
     overflow-x: auto;
     padding: 0.25rem;
@@ -2401,4 +2430,61 @@ button:not(:disabled),
   outline: 2px dashed var(--studio-accent);
   outline-offset: -2px;
   background-color: color-mix(in srgb, var(--studio-accent) 7%, transparent);
+}
+
+/* Source views in colour (components/editor/CodeField.jsx). They are dark in
+   both themes of the app, so one set of colours serves. */
+.code-field {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0%;
+  flex-direction: column;
+}
+.code-field-behind {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  scrollbar-gutter: stable;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: #e6edf3;
+  pointer-events: none;
+}
+/* Its weight is for the dark theme's rule on every field, which would show its
+   text over the colours. */
+:root .code-field textarea.code-field-input.code-field-input.code-field-input {
+  position: relative;
+  scrollbar-gutter: stable;
+  background: transparent !important;
+  color: transparent !important;
+  caret-color: #e6edf3;
+}
+.code-field-input::selection {
+  background: rgb(88 166 255 / 0.35);
+}
+.code-field-input::placeholder {
+  color: #8b949e;
+}
+.code-t-comment { color: #8b949e; font-style: italic; }
+.code-t-string { color: #a5d6ff; }
+.code-t-keyword { color: #ff7b72; }
+.code-t-number { color: #79c0ff; }
+.code-t-function { color: #d2a8ff; }
+.code-t-tag { color: #7ee787; }
+.code-t-attr { color: #ffa657; }
+.code-t-property { color: #79c0ff; }
+.code-colors-toggle {
+  margin-left: auto;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  border-radius: 0.4rem;
+  padding: 0.1rem 0.45rem;
+  color: #8b949e;
+  font-family: inherit;
+  font-size: 0.68rem;
+}
+.code-colors-toggle[aria-pressed="true"] {
+  border-color: rgb(126 231 135 / 0.45);
+  color: #7ee787;
 }
