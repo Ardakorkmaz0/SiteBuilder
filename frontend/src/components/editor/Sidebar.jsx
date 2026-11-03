@@ -25,7 +25,9 @@ function HtmlPreview({ html, wide }) {
   // element shows (a percentage width + top-left origin left navbars/sections
   // looking empty). Inline snippets just scale a touch from their natural size.
   return (
-    <div className="flex h-[56px] w-full items-center justify-center overflow-hidden rounded-md bg-[#f8fafc]">
+    // Its own text colour: a snippet that inherits one (the theme switch) must
+    // not take the panel's, which in the dark theme is white on this stage.
+    <div className="flex h-[56px] w-full items-center justify-center overflow-hidden rounded-md bg-[#f8fafc] text-black">
       <div
         style={
           wide

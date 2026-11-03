@@ -113,6 +113,79 @@ test('a visitor\'s choice is there on the next page and on a second visit, for t
   await api(request, 'DELETE', `/sites/${siteId}/`)
 })
 
+test('the three-way switch: the device is a choice, followed while the page is open and kept on the next visit', async ({ page, request, browser }) => {
+  const { data: site } = await api(request, 'POST', '/sites/', { title: 'E2E three-way switch' })
+  await openEditor(page, site.id)
+  await pickSwitch(page, 'Light, dark or device')
+  const area = await page.locator('main').last().boundingBox()
+  await page.mouse.click(area.x + 600, area.y + 120)
+  await expect(page.locator('main [data-cid] [role=radiogroup]')).toHaveCount(1)
+  await save(page)
+  const { data: saved } = await api(request, 'GET', `/sites/${site.id}/`)
+  const stored = saved.schema.pages[0].components.find((c) => c.type === 'themeToggle')
+  expect(stored.props.states).toBe('three')
+
+  const slug = await publish(page, request, site.id)
+  const { viewer, visitor } = await visit(browser, slug)
+  const group = visitor.getByRole('radiogroup', { name: 'Color theme' })
+  const radio = (name) => group.getByRole('radio', { name, exact: true })
+  await visitor.emulateMedia({ colorScheme: 'light' })
+  expect(await palette(visitor)).toBe('light')
+  await expect(radio('Light')).toHaveAttribute('aria-checked', 'true')
+
+  await radio('Device').click()
+  await expect(radio('Device')).toHaveAttribute('aria-checked', 'true')
+  await visitor.emulateMedia({ colorScheme: 'dark' })
+  await expect.poll(() => palette(visitor)).toBe('dark')
+  await visitor.emulateMedia({ colorScheme: 'light' })
+  await expect.poll(() => palette(visitor)).toBe('light')
+
+  // The keyboard: the arrows move along the group and choose.
+  await radio('Device').focus()
+  await visitor.keyboard.press('ArrowLeft')
+  await expect(radio('Dark')).toHaveAttribute('aria-checked', 'true')
+  await expect(radio('Dark')).toBeFocused()
+  expect(await palette(visitor)).toBe('dark')
+  await visitor.emulateMedia({ colorScheme: 'light' })
+  expect(await palette(visitor)).toBe('dark')
+
+  // Back to the device, and a reload writes it to the server's memory.
+  await visitor.keyboard.press('ArrowRight')
+  await visitor.reload()
+  const again = await viewer.newPage()
+  await again.emulateMedia({ colorScheme: 'dark' })
+  await again.goto(`${BACKEND}/s/${slug}/`)
+  expect(await palette(again)).toBe('dark')
+  await expect(again.getByRole('radio', { name: 'Device', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await viewer.close()
+  await api(request, 'DELETE', `/sites/${site.id}/`)
+})
+
+test('the owner adds the switch to every page at once', async ({ page, request, browser }) => {
+  const { data: site } = await api(request, 'POST', '/sites/', { title: 'E2E switch on every page' })
+  const { data: full } = await api(request, 'GET', `/sites/${site.id}/`)
+  const home = full.schema.pages[0]
+  await api(request, 'PATCH', `/sites/${site.id}/`, {
+    schema: { ...full.schema, pages: [home, { ...home, id: 'about', name: 'About' }, { ...home, id: 'contact', name: 'Contact' }] },
+  })
+  await openEditor(page, site.id)
+  await page.getByRole('tab', { name: 'Theme', exact: true }).click()
+  await page.getByRole('button', { name: 'Add one to every page' }).click()
+  await expect(page.getByRole('button', { name: 'Add one to every page' })).toHaveCount(0)
+  await save(page)
+  const { data: saved } = await api(request, 'GET', `/sites/${site.id}/`)
+  expect(saved.schema.pages.map((p) => p.components.filter((c) => c.type === 'themeToggle').length)).toEqual([1, 1, 1])
+
+  const slug = await publish(page, request, site.id)
+  const { viewer, visitor } = await visit(browser, slug)
+  for (const path of ['', 'about/', 'contact/']) {
+    await visitor.goto(`${BACKEND}/s/${slug}/${path}`)
+    await expect(visitor.locator('[data-pwb-theme-toggle]')).toHaveCount(1)
+  }
+  await viewer.close()
+  await api(request, 'DELETE', `/sites/${site.id}/`)
+})
+
 test('an HTML block on a dark page is not a white box', async ({ page, request, browser }) => {
   const { data: site } = await api(request, 'POST', '/sites/', { title: 'E2E dark block' })
   const { data: full } = await api(request, 'GET', `/sites/${site.id}/`)

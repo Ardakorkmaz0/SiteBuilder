@@ -4,7 +4,7 @@
 // The result becomes an "HTML site" that adapts natively on every device.
 import { sanitizeStyles, sanitizeUrl, sanitizeImageSrc } from './sanitize.js'
 import { fieldHtml } from './formField.js'
-import { themeToggleAttrs, themeToggleInner } from './themeToggle.js'
+import { themeToggleAttrs, themeToggleClass, themeToggleInner, themeToggleTag } from './themeToggle.js'
 import { ICONS, iconSvg } from './icons.js'
 import { ALERT_VARIANTS } from '../components/renderer/constants.js'
 import { customCssBlock, customJsBlock, pageTheme, themeVariablesCss } from './theme.js'
@@ -311,7 +311,7 @@ function itemElHtml(c, multi, colOverride) {
     case 'icon':
       return `<span class="rh-item"${iconA11yAttrs(p)}${styleAttr(c, colOverride || 'flex:0 0 auto;display:inline-flex;align-items:center;line-height:0')}>${iconSvg(p.name)}</span>`
     case 'themeToggle':
-      return `<button class="rh-item pwb-theme-toggle"${themeToggleAttrs(p)}${styleAttr(c, colOverride || 'flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:.5em')}>${themeToggleInner(p)}</button>`
+      return `<${themeToggleTag(p)} class="rh-item ${themeToggleClass(p)}"${themeToggleAttrs(p)}${styleAttr(c, colOverride || 'flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:.5em')}>${themeToggleInner(p)}</${themeToggleTag(p)}>`
     case 'input':
     case 'select':
       return `<div class="${cls}"${styleAttr(c, `${col};display:flex;flex-direction:column;min-width:0`)}>${fieldHtml(c.type, p, c.id)}</div>`

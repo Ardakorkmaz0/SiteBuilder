@@ -121,7 +121,7 @@ def serve_published_page(request, slug, path=''):
 _PALETTE_SCRIPT = '<script data-pwb-color-mode>'
 _PALETTE_PARAM = 'pwb-theme'
 _PALETTE_COOKIE = 'pwb-theme'
-_PALETTES = ('light', 'dark')
+_PALETTES = ('light', 'dark', 'system')
 _PALETTE_COOKIE_AGE = 60 * 60 * 24 * 365
 
 

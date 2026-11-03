@@ -59,3 +59,20 @@ describe('the entrance delay', () => {
     expect(s().schema.pages[0].components[0].props.animDelay).toBe(250)
   })
 })
+
+describe('the theme switch\'s words', () => {
+  it('ask for the names of the three choices only on the switch that has them', () => {
+    s().loadSchema({
+      theme: {},
+      pages: [{ id: 'p1', name: 'Home', components: [{ id: 't1', type: 'themeToggle', props: { label: 'Theme', showLabel: '' }, styles: {}, layout: { x: 0, y: 0, w: 44, h: 44 } }] }],
+    })
+    s().selectComponent('t1')
+    renderPanel()
+    expect(screen.queryByLabelText('Name of device')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Visitors choose'), { target: { value: 'three' } })
+
+    expect(s().schema.pages[0].components[0].props.states).toBe('three')
+    expect(screen.getByLabelText('Name of device')).toBeInTheDocument()
+  })
+})

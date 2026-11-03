@@ -42,7 +42,7 @@ function fieldVariants(type) {
 
 // The theme switch is a component of its own on the canvas (the site needs to
 // know it has one); an HTML page gets the same button as HTML.
-const TOGGLE_SIZES = { icon: [44, 44], labelled: [150, 44], soft: [44, 44] }
+const TOGGLE_SIZES = { icon: [44, 44], labelled: [150, 44], soft: [44, 44], choices: [132, 44] }
 
 function themeToggleVariants() {
   return presetsForType('themeToggle').map((preset) => {

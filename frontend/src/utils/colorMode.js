@@ -192,12 +192,22 @@ function walk(components, visit) {
 
 export const THEME_TOGGLE_ATTR = 'data-pwb-theme-toggle'
 
+function pageHasThemeToggle(page, htmlMap) {
+  return walk(page.components, (component) => component?.type === 'themeToggle')
+    || String(htmlMap[page.id] ?? page.html ?? '').includes(THEME_TOGGLE_ATTR)
+}
+
 // A switch anywhere on the site, on a canvas page or in an HTML page.
 export function hasThemeToggle(schema, htmlMap = {}) {
-  return (schema?.pages || []).some((page) => (
-    walk(page.components, (component) => component?.type === 'themeToggle')
-    || String(htmlMap[page.id] ?? page.html ?? '').includes(THEME_TOGGLE_ATTR)
-  ))
+  return (schema?.pages || []).some((page) => pageHasThemeToggle(page, htmlMap))
+}
+
+// The pages a visitor could not change the palette on: the canvas pages, which
+// can be given a switch for the owner, and the HTML pages, which cannot.
+export function pagesWithoutThemeToggle(schema, htmlMap = {}) {
+  const missing = (schema?.pages || []).filter((page) => !pageHasThemeToggle(page, htmlMap))
+  const isHtml = (page) => page.mode === 'html' || !!String(htmlMap[page.id] ?? page.html ?? '').trim()
+  return { canvas: missing.filter((page) => !isHtml(page)), html: missing.filter(isHtml) }
 }
 
 // What the owner chose the site to open in: 'light', 'dark' or 'system' (the
@@ -464,18 +474,23 @@ function embedCss(mode) {
 export const COLOR_MODE_KEY = 'pwb-color-mode'
 export const COLOR_MODE_PARAM = 'pwb-theme'
 
+// A choice is 'light', 'dark' or 'system': the device, even over what the owner
+// chose. data-pwb-theme is the palette on; data-pwb-theme-pick is the choice it
+// came from, and data-pwb-theme-follow says the runtime keeps it to the device.
 export function colorModeScript(mode) {
   if (!mode) return ''
-  const initial = mode.initial === mode.alt || mode.initial === mode.base ? mode.initial : null
+  const initial = ['light', 'dark', 'system'].includes(mode.initial) ? mode.initial : null
   const cfg = JSON.stringify({ base: mode.base, alt: mode.alt, follow: mode.followDevice, initial })
   return `(function(){var c=${cfg},d=document.documentElement,m=null;`
-    + `var q=new URLSearchParams(location.search).get('${COLOR_MODE_PARAM}');if(q==='light'||q==='dark')m=q;`
+    + `function k(v){return v==='light'||v==='dark'||v==='system'}`
+    + `var q=new URLSearchParams(location.search).get('${COLOR_MODE_PARAM}');if(k(q))m=q;`
     + `if(!m){try{m=localStorage.getItem('${COLOR_MODE_KEY}')}catch(e){}}`
-    + `if(m!==c.base&&m!==c.alt&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');`
-    + `if(m!==c.base&&m!==c.alt)m=c.initial;`
-    + `if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;`
-    + `d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);`
-    + `d.setAttribute('data-pwb-theme',m===c.alt?c.alt:c.base)})();`
+    + `if(!k(m)&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');`
+    + `if(!k(m))m=c.initial;`
+    + `if(!k(m))m=c.follow?'system':c.base;`
+    + `var p=m;if(m==='system'){d.setAttribute('data-pwb-theme-follow','');m=window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches?c.alt:c.base}`
+    + `d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme-pick',p);`
+    + `d.setAttribute('data-pwb-theme',m)})();`
 }
 
 const SCRIPT_END = '</scr' + 'ipt>'

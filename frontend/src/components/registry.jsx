@@ -463,8 +463,12 @@ export const registry = {
       padding: '0px 12px',
     },
     editableProps: [
+      { key: 'states', label: 'Visitors choose', control: 'select', options: [['', 'Light or dark'], ['three', 'Light, dark or device']] },
       { key: 'showLabel', label: 'Shows', control: 'select', options: [['', 'Icon only'], ['on', 'Icon and text']] },
       { key: 'label', label: 'Text', control: 'text' },
+      { key: 'lightLabel', label: 'Name of light', control: 'text', onlyWhen: (props) => props.states === 'three' },
+      { key: 'darkLabel', label: 'Name of dark', control: 'text', onlyWhen: (props) => props.states === 'three' },
+      { key: 'deviceLabel', label: 'Name of device', control: 'text', onlyWhen: (props) => props.states === 'three' },
     ],
     editableStyles: [
       'color', 'backgroundColor', 'fontSize', 'fontWeight', 'fontFamily', 'padding',

@@ -13,6 +13,7 @@ import {
   themedStyles,
 } from '../utils/theme.js'
 import { componentPresetStyles, componentPresetProps } from '../utils/componentPresets.js'
+import { themeSwitchSpot } from '../utils/themeToggle.js'
 import { recolorHtml } from '../utils/htmlRecolor.js'
 import { regionContentWidth, regionDisplayPatchToDesign } from '../utils/regionLayout.js'
 import { anchorOf, anchorProblem, elementIdFor, retargetLinks, slugifyAnchor } from '../utils/anchors.js'
@@ -1281,6 +1282,224 @@ let gesture = null
 let historySeq = 0
 export const nextHistoryStamp = () => ++historySeq
 
+// One new block on a page, as the partial state that holds it.
+function insertComponent(state, page, type, x, y, parentId, presetId, initialSize, initialProps) {
+  const def = registry[type]
+  const defaultSize = def.defaultSize || { w: 200, h: 80 }
+  const customW = Number(initialSize?.w)
+  const customH = Number(initialSize?.h)
+  // A Section (region) is a full-width band — always drop it at its native
+  // size, never the palette's guessed swatch size, so it spans the page.
+  const size = type === 'region'
+    ? { ...defaultSize }
+    : {
+        w: Number.isFinite(customW) && customW > 0 ? Math.round(customW) : defaultSize.w,
+        h: Number.isFinite(customH) && customH > 0 ? Math.round(customH) : defaultSize.h,
+      }
+  const comps = page.components
+  const mobileWidth = page.mobileWidth || MOBILE_CANVAS_WIDTH
+  const id = genId(type)
+  const theme = pageTheme(state.schema, page)
+  let styles = themedStyles(type, def.defaultStyles, theme)
+  // A palette VARIANT carries a preset id — bake its styles in at creation so
+  // the component drops onto the canvas already styled.
+  let presetProps = null
+  if (presetId) {
+    const ps = componentPresetStyles(type, presetId, theme)
+    if (ps) styles = { ...styles, ...ps }
+    presetProps = componentPresetProps(type, presetId)
+  }
+  const verticalNavbar = type === 'navbar' && presetProps?.navLayout === 'vertical'
+  const fullWidth = FULL_WIDTH_TYPES.has(type) && !verticalNavbar
+  const makeProps = () => {
+    // A preset's own look (a filled or underlined field) wins over the theme's.
+    const base = themedProps(type, defaultPropsFor(type), theme)
+    return { ...base, ...(presetProps || {}), ...(initialProps || {}) }
+  }
+  const kids = PARENT_TYPES.has(type) ? { children: [] } : {}
+
+  // Dropping a palette item INTO a container: it becomes a flowing child.
+  if (parentId) {
+    const parentNode = findInTree(comps, parentId)
+    const parentW = parentDesignWidth(parentNode)
+    const parentH = Math.round(parentNode?.layout?.h || 0) || undefined
+    const regionParent = parentNode?.type === 'region'
+    const siblings = Array.isArray(parentNode?.children) ? parentNode.children : []
+    const desktopBottom = siblings.reduce((max, sibling) => {
+      const layout = sibling.layout || {}
+      return Math.max(max, (layout.y || 0) + (layout.h || 0))
+    }, 0)
+    const mobileBottom = siblings.reduce((max, sibling) => {
+      const layout = sibling.mobileLayout || sibling.layout || {}
+      return Math.max(max, (layout.y || 0) + (layout.h || 0))
+    }, 0)
+    const desktopLayout = regionParent && state.viewport === 'mobile'
+      ? {
+          x: MOBILE_PAD,
+          y: desktopBottom ? desktopBottom + MOBILE_GAP : MOBILE_PAD,
+          w: Math.min(size.w, Math.max(8, parentW - MOBILE_PAD * 2)),
+          h: size.h,
+        }
+      : {
+          x: Math.max(0, Math.round(x)),
+          y: Math.max(0, Math.round(y)),
+          w: fullWidth ? parentW || page.canvasWidth || CANVAS_WIDTH : size.w,
+          h: size.h,
+        }
+    const regionMobileLayout = state.viewport === 'mobile'
+      ? {
+          x: Math.max(0, Math.round(x)),
+          y: Math.max(0, Math.round(y)),
+          w: fullWidth ? mobileWidth : Math.min(size.w, mobileWidth - MOBILE_PAD * 2),
+          h: size.h,
+        }
+      : {
+          x: MOBILE_PAD,
+          y: mobileBottom ? mobileBottom + MOBILE_GAP : MOBILE_PAD,
+          w: fullWidth ? mobileWidth : Math.min(size.w, mobileWidth - MOBILE_PAD * 2),
+          h: size.h,
+        }
+    const child = {
+      id,
+      type,
+      props: makeProps(),
+      styles,
+      layout: clampLayout(
+        desktopLayout,
+        { maxX: parentW, maxY: parentH },
+      ),
+      mobileLayout: regionParent
+        ? clampLayout(regionMobileLayout, { maxX: mobileWidth, maxY: parentNode?.mobileLayout?.h || parentH })
+        : {
+            x: 0,
+            y: 0,
+            w: fullWidth ? mobileWidth : Math.min(size.w, mobileWidth - MOBILE_PAD * 2),
+            h: size.h,
+          },
+      hidden: false,
+      hiddenMobile: false,
+      ...kids,
+    }
+    return {
+      schema: withComponents(
+        state.schema,
+        page.id,
+        addChildToTree(page.components, parentId, child),
+      ),
+      selectedId: id,
+      selectedIds: [id],
+      dirty: true,
+    }
+  }
+
+  if (page.flowMode) {
+    const component = {
+      id,
+      type,
+      props: makeProps(),
+      styles,
+      layout: {
+        x: 0,
+        y: 0,
+        w: fullWidth ? page.canvasWidth || CANVAS_WIDTH : size.w,
+        h: size.h,
+      },
+      mobileLayout: {
+        x: 0,
+        y: 0,
+        w: fullWidth ? mobileWidth : Math.min(size.w, mobileWidth - MOBILE_PAD * 2),
+        h: size.h,
+      },
+      hidden: false,
+      hiddenMobile: false,
+      ...kids,
+    }
+    return {
+      schema: withComponents(state.schema, page.id, [...comps, component]),
+      selectedId: id,
+      selectedIds: [id],
+      dirty: true,
+    }
+  }
+
+  const pcW = page.canvasWidth || CANVAS_WIDTH
+  const isRegion = type === 'region'
+  const desktopBandY = comps.reduce(
+    (max, component) => Math.max(max, (component.layout?.y || 0) + (component.layout?.h || 0)),
+    0,
+  )
+  const mobileBandY = comps.reduce((max, component) => {
+    const itemLayout = component.mobileLayout || component.layout || {}
+    return Math.max(max, (itemLayout.y || 0) + (itemLayout.h || 0))
+  }, 0)
+  let layout, mobileLayout
+  if (state.viewport === 'mobile') {
+    // Drop lands on the mobile canvas; give the desktop a stacked default.
+    const mw = fullWidth
+      ? mobileWidth
+      : Math.min(size.w, mobileWidth - MOBILE_PAD * 2)
+    mobileLayout = clampLayout(
+      {
+        x: fullWidth ? 0 : Math.round(x),
+        y: isRegion ? mobileBandY : Math.round(y),
+        w: mw,
+        h: size.h,
+      },
+      { maxX: mobileWidth },
+    )
+    const dy =
+      comps.reduce(
+        (m, c) => Math.max(m, (c.layout?.y || 0) + (c.layout?.h || 0)),
+        24,
+      ) + 16
+    layout = clampLayout(
+      { x: isRegion ? 0 : 24, y: isRegion ? desktopBandY : dy, w: size.w, h: size.h },
+      { maxX: pcW },
+    )
+  } else {
+    // Drop lands on the desktop canvas; stack a mobile default below.
+    layout = clampLayout(
+      { x: isRegion ? 0 : Math.round(x), y: isRegion ? desktopBandY : Math.round(y), w: size.w, h: size.h },
+      { maxX: pcW },
+    )
+    const my =
+      comps.reduce(
+        (m, c) =>
+          Math.max(m, (c.mobileLayout?.y || 0) + (c.mobileLayout?.h || 0)),
+        MOBILE_PAD,
+      ) + MOBILE_GAP
+    mobileLayout = clampLayout(
+      {
+        x: fullWidth ? 0 : MOBILE_PAD,
+        y: isRegion ? mobileBandY : my,
+        w: fullWidth ? mobileWidth : mobileWidth - MOBILE_PAD * 2,
+        h: size.h,
+      },
+      { maxX: mobileWidth },
+    )
+  }
+
+  const component = {
+    id,
+    type,
+    props: makeProps(),
+    styles,
+    layout,
+    mobileLayout,
+    hidden: false,
+    hiddenMobile: false,
+    ...kids,
+  }
+  const nextComps = [...comps, component]
+  // Dropping on the mobile canvas is a manual mobile edit; a PC drop keeps
+  // mobile auto-syncing (withComponents re-derives it).
+  const schema =
+    state.viewport === 'mobile'
+      ? mapPage(state.schema, page.id, (p) => ({ ...p, components: nextComps, mobileManual: true }))
+      : withComponents(state.schema, page.id, nextComps)
+  return { schema, selectedId: id, selectedIds: [id], dirty: true }
+}
+
 export const useEditorStore = create((set, get) => ({
   schema: emptySchema(),
   currentPageId: 'page_home',
@@ -1617,222 +1836,7 @@ export const useEditorStore = create((set, get) => ({
       if (parent && !parentHasRoom(components, parent)) return refuseInsert(set)
     }
     get().record('add')
-    set((state) => {
-      const page = selectCurrentPage(state)
-      const defaultSize = def.defaultSize || { w: 200, h: 80 }
-      const customW = Number(initialSize?.w)
-      const customH = Number(initialSize?.h)
-      // A Section (region) is a full-width band — always drop it at its native
-      // size, never the palette's guessed swatch size, so it spans the page.
-      const size = type === 'region'
-        ? { ...defaultSize }
-        : {
-            w: Number.isFinite(customW) && customW > 0 ? Math.round(customW) : defaultSize.w,
-            h: Number.isFinite(customH) && customH > 0 ? Math.round(customH) : defaultSize.h,
-          }
-      const comps = page.components
-      const mobileWidth = page.mobileWidth || MOBILE_CANVAS_WIDTH
-      const id = genId(type)
-      const theme = pageTheme(state.schema, page)
-      let styles = themedStyles(type, def.defaultStyles, theme)
-      // A palette VARIANT carries a preset id — bake its styles in at creation so
-      // the component drops onto the canvas already styled.
-      let presetProps = null
-      if (presetId) {
-        const ps = componentPresetStyles(type, presetId, theme)
-        if (ps) styles = { ...styles, ...ps }
-        presetProps = componentPresetProps(type, presetId)
-      }
-      const verticalNavbar = type === 'navbar' && presetProps?.navLayout === 'vertical'
-      const fullWidth = FULL_WIDTH_TYPES.has(type) && !verticalNavbar
-      const makeProps = () => {
-        // A preset's own look (a filled or underlined field) wins over the theme's.
-        const base = themedProps(type, defaultPropsFor(type), theme)
-        return { ...base, ...(presetProps || {}), ...(initialProps || {}) }
-      }
-      const kids = PARENT_TYPES.has(type) ? { children: [] } : {}
-
-      // Dropping a palette item INTO a container: it becomes a flowing child.
-      if (parentId) {
-        const parentNode = findInTree(comps, parentId)
-        const parentW = parentDesignWidth(parentNode)
-        const parentH = Math.round(parentNode?.layout?.h || 0) || undefined
-        const regionParent = parentNode?.type === 'region'
-        const siblings = Array.isArray(parentNode?.children) ? parentNode.children : []
-        const desktopBottom = siblings.reduce((max, sibling) => {
-          const layout = sibling.layout || {}
-          return Math.max(max, (layout.y || 0) + (layout.h || 0))
-        }, 0)
-        const mobileBottom = siblings.reduce((max, sibling) => {
-          const layout = sibling.mobileLayout || sibling.layout || {}
-          return Math.max(max, (layout.y || 0) + (layout.h || 0))
-        }, 0)
-        const desktopLayout = regionParent && state.viewport === 'mobile'
-          ? {
-              x: MOBILE_PAD,
-              y: desktopBottom ? desktopBottom + MOBILE_GAP : MOBILE_PAD,
-              w: Math.min(size.w, Math.max(8, parentW - MOBILE_PAD * 2)),
-              h: size.h,
-            }
-          : {
-              x: Math.max(0, Math.round(x)),
-              y: Math.max(0, Math.round(y)),
-              w: fullWidth ? parentW || page.canvasWidth || CANVAS_WIDTH : size.w,
-              h: size.h,
-            }
-        const regionMobileLayout = state.viewport === 'mobile'
-          ? {
-              x: Math.max(0, Math.round(x)),
-              y: Math.max(0, Math.round(y)),
-              w: fullWidth ? mobileWidth : Math.min(size.w, mobileWidth - MOBILE_PAD * 2),
-              h: size.h,
-            }
-          : {
-              x: MOBILE_PAD,
-              y: mobileBottom ? mobileBottom + MOBILE_GAP : MOBILE_PAD,
-              w: fullWidth ? mobileWidth : Math.min(size.w, mobileWidth - MOBILE_PAD * 2),
-              h: size.h,
-            }
-        const child = {
-          id,
-          type,
-          props: makeProps(),
-          styles,
-          layout: clampLayout(
-            desktopLayout,
-            { maxX: parentW, maxY: parentH },
-          ),
-          mobileLayout: regionParent
-            ? clampLayout(regionMobileLayout, { maxX: mobileWidth, maxY: parentNode?.mobileLayout?.h || parentH })
-            : {
-                x: 0,
-                y: 0,
-                w: fullWidth ? mobileWidth : Math.min(size.w, mobileWidth - MOBILE_PAD * 2),
-                h: size.h,
-              },
-          hidden: false,
-          hiddenMobile: false,
-          ...kids,
-        }
-        return {
-          schema: withComponents(
-            state.schema,
-            page.id,
-            addChildToTree(page.components, parentId, child),
-          ),
-          selectedId: id,
-          selectedIds: [id],
-          dirty: true,
-        }
-      }
-
-      if (page.flowMode) {
-        const component = {
-          id,
-          type,
-          props: makeProps(),
-          styles,
-          layout: {
-            x: 0,
-            y: 0,
-            w: fullWidth ? page.canvasWidth || CANVAS_WIDTH : size.w,
-            h: size.h,
-          },
-          mobileLayout: {
-            x: 0,
-            y: 0,
-            w: fullWidth ? mobileWidth : Math.min(size.w, mobileWidth - MOBILE_PAD * 2),
-            h: size.h,
-          },
-          hidden: false,
-          hiddenMobile: false,
-          ...kids,
-        }
-        return {
-          schema: withComponents(state.schema, page.id, [...comps, component]),
-          selectedId: id,
-          selectedIds: [id],
-          dirty: true,
-        }
-      }
-
-      const pcW = page.canvasWidth || CANVAS_WIDTH
-      const isRegion = type === 'region'
-      const desktopBandY = comps.reduce(
-        (max, component) => Math.max(max, (component.layout?.y || 0) + (component.layout?.h || 0)),
-        0,
-      )
-      const mobileBandY = comps.reduce((max, component) => {
-        const itemLayout = component.mobileLayout || component.layout || {}
-        return Math.max(max, (itemLayout.y || 0) + (itemLayout.h || 0))
-      }, 0)
-      let layout, mobileLayout
-      if (state.viewport === 'mobile') {
-        // Drop lands on the mobile canvas; give the desktop a stacked default.
-        const mw = fullWidth
-          ? mobileWidth
-          : Math.min(size.w, mobileWidth - MOBILE_PAD * 2)
-        mobileLayout = clampLayout(
-          {
-            x: fullWidth ? 0 : Math.round(x),
-            y: isRegion ? mobileBandY : Math.round(y),
-            w: mw,
-            h: size.h,
-          },
-          { maxX: mobileWidth },
-        )
-        const dy =
-          comps.reduce(
-            (m, c) => Math.max(m, (c.layout?.y || 0) + (c.layout?.h || 0)),
-            24,
-          ) + 16
-        layout = clampLayout(
-          { x: isRegion ? 0 : 24, y: isRegion ? desktopBandY : dy, w: size.w, h: size.h },
-          { maxX: pcW },
-        )
-      } else {
-        // Drop lands on the desktop canvas; stack a mobile default below.
-        layout = clampLayout(
-          { x: isRegion ? 0 : Math.round(x), y: isRegion ? desktopBandY : Math.round(y), w: size.w, h: size.h },
-          { maxX: pcW },
-        )
-        const my =
-          comps.reduce(
-            (m, c) =>
-              Math.max(m, (c.mobileLayout?.y || 0) + (c.mobileLayout?.h || 0)),
-            MOBILE_PAD,
-          ) + MOBILE_GAP
-        mobileLayout = clampLayout(
-          {
-            x: fullWidth ? 0 : MOBILE_PAD,
-            y: isRegion ? mobileBandY : my,
-            w: fullWidth ? mobileWidth : mobileWidth - MOBILE_PAD * 2,
-            h: size.h,
-          },
-          { maxX: mobileWidth },
-        )
-      }
-
-      const component = {
-        id,
-        type,
-        props: makeProps(),
-        styles,
-        layout,
-        mobileLayout,
-        hidden: false,
-        hiddenMobile: false,
-        ...kids,
-      }
-      const nextComps = [...comps, component]
-      // Dropping on the mobile canvas is a manual mobile edit; a PC drop keeps
-      // mobile auto-syncing (withComponents re-derives it).
-      const schema =
-        state.viewport === 'mobile'
-          ? mapPage(state.schema, page.id, (p) => ({ ...p, components: nextComps, mobileManual: true }))
-          : withComponents(state.schema, page.id, nextComps)
-      return { schema, selectedId: id, selectedIds: [id], dirty: true }
-    })
+    set((state) => insertComponent(state, selectCurrentPage(state), type, x, y, parentId, presetId, initialSize, initialProps))
   },
 
   // Drop a ready-made SECTION block — a list of pre-positioned, pre-styled
@@ -2767,6 +2771,25 @@ export const useEditorStore = create((set, get) => ({
       // Still written for a tab running the previous version.
       const followDevice = start ? start === 'system' : !!before.followDevice
       return { schema: { ...state.schema, colorMode: { theme, followDevice, ...(start ? { start } : {}) } }, dirty: true }
+    })
+  },
+
+  // A theme switch on each of these pages, as one step, leaving the page on
+  // screen and what is selected alone.
+  addThemeSwitchToPages: (pageIds) => {
+    const wanted = new Set(pageIds)
+    const targets = (get().schema.pages || []).filter((page) => wanted.has(page.id))
+    if (!targets.length) return
+    get().record('add')
+    set((state) => {
+      // The desktop canvas: the phone layout follows from it.
+      let next = { ...state, viewport: 'pc' }
+      for (const target of targets) {
+        const page = next.schema.pages.find((candidate) => candidate.id === target.id)
+        const { x, y } = themeSwitchSpot(page, page.canvasWidth || CANVAS_WIDTH)
+        next = { ...next, ...insertComponent(next, page, 'themeToggle', x, y, null, 'icon', { w: 44, h: 44 }) }
+      }
+      return { schema: next.schema, dirty: true }
     })
   },
 

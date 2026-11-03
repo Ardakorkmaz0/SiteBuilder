@@ -356,7 +356,7 @@ export default function PreviewPage() {
       if (!isPreviewMessageSource(e, previewFrameRef.current, siteCanvasRef.current)) return
       if (e.data?.type === 'pwb-color-mode') {
         const chosen = e.data.mode
-        if (chosen === 'light' || chosen === 'dark') setPalette((was) => ({ ...was, chosen }))
+        if (chosen === 'light' || chosen === 'dark' || chosen === 'system') setPalette((was) => ({ ...was, chosen }))
         return
       }
       if (e.data?.type !== 'pwb-navigate') return

@@ -1511,7 +1511,7 @@ export default function PropertiesPanel({
           )}
         />
       )}
-      {!def.fieldParts && def.editableProps.map((field) => (
+      {!def.fieldParts && def.editableProps.filter((field) => !field.onlyWhen || field.onlyWhen(component.props)).map((field) => (
         <PropControl
           key={`${field.key}-${field.control || 'text'}-${field.label}`}
           field={field}
