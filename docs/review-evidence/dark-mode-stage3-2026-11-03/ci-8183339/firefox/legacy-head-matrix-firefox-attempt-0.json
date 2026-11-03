@@ -1,0 +1,414 @@
+{
+  "browserName": "firefox",
+  "requestedColorScheme": "dark",
+  "interceptedDocumentCount": 15,
+  "interceptedDocuments": [
+    "9a7b2ec-cookie-light",
+    "9a7b2ec-cookie-dark",
+    "9a7b2ec-cookie-system",
+    "9a7b2ec-query-system-encoded",
+    "9a7b2ec-query-dark-first",
+    "66f4cf7-cookie-light",
+    "66f4cf7-cookie-dark",
+    "66f4cf7-cookie-system",
+    "66f4cf7-query-system-encoded",
+    "66f4cf7-query-dark-first",
+    "7a0730b-cookie-light",
+    "7a0730b-cookie-dark",
+    "7a0730b-cookie-system",
+    "7a0730b-query-system-encoded",
+    "7a0730b-query-dark-first"
+  ],
+  "results": [
+    {
+      "id": "9a7b2ec-cookie-light",
+      "browserName": "firefox",
+      "headCommit": "9a7b2ec",
+      "incomingCookie": "light",
+      "query": "",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "light"
+      },
+      "palette": "light",
+      "pick": null,
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "light",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "9a7b2ec-cookie-dark",
+      "browserName": "firefox",
+      "headCommit": "9a7b2ec",
+      "incomingCookie": "dark",
+      "query": "",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      },
+      "palette": "light",
+      "pick": null,
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "dark",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "9a7b2ec-cookie-system",
+      "browserName": "firefox",
+      "headCommit": "9a7b2ec",
+      "incomingCookie": "system",
+      "query": "",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "system"
+      },
+      "palette": "light",
+      "pick": null,
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "system",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "9a7b2ec-query-system-encoded",
+      "browserName": "firefox",
+      "headCommit": "9a7b2ec",
+      "incomingCookie": null,
+      "query": "?pwb-theme=%73ystem",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "system"
+      },
+      "palette": "light",
+      "pick": null,
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "system",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "9a7b2ec-query-dark-first",
+      "browserName": "firefox",
+      "headCommit": "9a7b2ec",
+      "incomingCookie": null,
+      "query": "?pwb-theme=dark&pwb-theme=light",
+      "expected": {
+        "palette": "dark",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      },
+      "palette": "dark",
+      "pick": null,
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "dark",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "66f4cf7-cookie-light",
+      "browserName": "firefox",
+      "headCommit": "66f4cf7",
+      "incomingCookie": "light",
+      "query": "",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "light"
+      },
+      "palette": "light",
+      "pick": null,
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "light",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "66f4cf7-cookie-dark",
+      "browserName": "firefox",
+      "headCommit": "66f4cf7",
+      "incomingCookie": "dark",
+      "query": "",
+      "expected": {
+        "palette": "dark",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      },
+      "palette": "dark",
+      "pick": null,
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "dark",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "66f4cf7-cookie-system",
+      "browserName": "firefox",
+      "headCommit": "66f4cf7",
+      "incomingCookie": "system",
+      "query": "",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "system"
+      },
+      "palette": "light",
+      "pick": null,
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "system",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "66f4cf7-query-system-encoded",
+      "browserName": "firefox",
+      "headCommit": "66f4cf7",
+      "incomingCookie": null,
+      "query": "?pwb-theme=%73ystem",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "system"
+      },
+      "palette": "light",
+      "pick": null,
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "system",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "66f4cf7-query-dark-first",
+      "browserName": "firefox",
+      "headCommit": "66f4cf7",
+      "incomingCookie": null,
+      "query": "?pwb-theme=dark&pwb-theme=light",
+      "expected": {
+        "palette": "dark",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      },
+      "palette": "dark",
+      "pick": null,
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "dark",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "7a0730b-cookie-light",
+      "browserName": "firefox",
+      "headCommit": "7a0730b",
+      "incomingCookie": "light",
+      "query": "",
+      "expected": {
+        "palette": "light",
+        "pick": "light",
+        "followsDevice": false,
+        "cookieAfterLoad": "light"
+      },
+      "palette": "light",
+      "pick": "light",
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "light",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "7a0730b-cookie-dark",
+      "browserName": "firefox",
+      "headCommit": "7a0730b",
+      "incomingCookie": "dark",
+      "query": "",
+      "expected": {
+        "palette": "dark",
+        "pick": "dark",
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      },
+      "palette": "dark",
+      "pick": "dark",
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "dark",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "7a0730b-cookie-system",
+      "browserName": "firefox",
+      "headCommit": "7a0730b",
+      "incomingCookie": "system",
+      "query": "",
+      "expected": {
+        "palette": "device",
+        "pick": "system",
+        "followsDevice": true,
+        "cookieAfterLoad": "system"
+      },
+      "palette": "dark",
+      "pick": "system",
+      "followsDevice": true,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "system",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "7a0730b-query-system-encoded",
+      "browserName": "firefox",
+      "headCommit": "7a0730b",
+      "incomingCookie": null,
+      "query": "?pwb-theme=%73ystem",
+      "expected": {
+        "palette": "device",
+        "pick": "system",
+        "followsDevice": true,
+        "cookieAfterLoad": "system"
+      },
+      "palette": "dark",
+      "pick": "system",
+      "followsDevice": true,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "system",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    },
+    {
+      "id": "7a0730b-query-dark-first",
+      "browserName": "firefox",
+      "headCommit": "7a0730b",
+      "incomingCookie": null,
+      "query": "?pwb-theme=dark&pwb-theme=light",
+      "expected": {
+        "palette": "dark",
+        "pick": "dark",
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      },
+      "palette": "dark",
+      "pick": "dark",
+      "followsDevice": false,
+      "headNativeDark": true,
+      "loadedNativeDark": true,
+      "storageBlocked": true,
+      "keptCookie": {
+        "value": "dark",
+        "path": "/s/stage3-review/",
+        "httpOnly": true,
+        "sameSite": "Lax"
+      },
+      "documentInterceptions": 1
+    }
+  ]
+}

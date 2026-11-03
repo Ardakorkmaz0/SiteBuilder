@@ -1,0 +1,249 @@
+{
+  "browserName": "chromium",
+  "history": [
+    {
+      "step": "keyboard selected Device",
+      "url": "http://127.0.0.1:8001/s/review-keyboard-and-device/?pwb-theme=system",
+      "palette": "light",
+      "pick": "system",
+      "followsDevice": true,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "true",
+          "tabIndex": 0
+        }
+      ]
+    },
+    {
+      "step": "Device follows dark while open",
+      "url": "http://127.0.0.1:8001/s/review-keyboard-and-device/?pwb-theme=system",
+      "palette": "dark",
+      "pick": "system",
+      "followsDevice": true,
+      "nativeDark": true,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "true",
+          "tabIndex": 0
+        }
+      ]
+    },
+    {
+      "step": "Device follows light while open",
+      "url": "http://127.0.0.1:8001/s/review-keyboard-and-device/?pwb-theme=system",
+      "palette": "light",
+      "pick": "system",
+      "followsDevice": true,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "true",
+          "tabIndex": 0
+        }
+      ]
+    },
+    {
+      "step": "explicit Light survives native dark",
+      "url": "http://127.0.0.1:8001/s/review-keyboard-and-device/?pwb-theme=light",
+      "palette": "light",
+      "pick": "light",
+      "followsDevice": false,
+      "nativeDark": true,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    },
+    {
+      "step": "explicit Dark survives native light",
+      "url": "http://127.0.0.1:8001/s/review-keyboard-and-device/?pwb-theme=dark",
+      "palette": "dark",
+      "pick": "dark",
+      "followsDevice": false,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    },
+    {
+      "step": "new tab remembers system at plain URL",
+      "url": "http://127.0.0.1:8001/s/review-keyboard-and-device/",
+      "palette": "light",
+      "pick": "system",
+      "followsDevice": true,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "true",
+          "tabIndex": 0
+        }
+      ]
+    },
+    {
+      "step": "remembered Device follows a later native dark change",
+      "url": "http://127.0.0.1:8001/s/review-keyboard-and-device/",
+      "palette": "dark",
+      "pick": "system",
+      "followsDevice": true,
+      "nativeDark": true,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "true",
+          "tabIndex": 0
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "three-way-switch",
+      "url": "http://127.0.0.1:8001/s/review-keyboard-and-device/?pwb-theme=system",
+      "palette": "light",
+      "pick": "system",
+      "followsDevice": true,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "true",
+          "tabIndex": 0
+        }
+      ]
+    },
+    {
+      "name": "device-second-visit",
+      "url": "http://127.0.0.1:8001/s/review-keyboard-and-device/",
+      "palette": "dark",
+      "pick": "system",
+      "followsDevice": true,
+      "nativeDark": true,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "true",
+          "tabIndex": 0
+        }
+      ]
+    }
+  ],
+  "contexts": [
+    {
+      "index": 0,
+      "paletteCookies": [
+        {
+          "name": "pwb-theme",
+          "value": "system",
+          "domain": "127.0.0.1",
+          "path": "/s/review-keyboard-and-device/",
+          "expires": 1825260726.65916,
+          "httpOnly": true,
+          "secure": false,
+          "sameSite": "Lax"
+        }
+      ]
+    }
+  ]
+}

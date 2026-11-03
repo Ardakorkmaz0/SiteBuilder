@@ -1,0 +1,14 @@
+{
+  "rendering": "canvas",
+  "routeRemainsMounted": true,
+  "steps": [
+    {
+      "site": "A",
+      "palette": "dark"
+    },
+    {
+      "site": "B",
+      "palette": "light"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "startTime": 1793723597457,
+  "duration": 781637.8620000001,
+  "stats": {
+    "total": 128,
+    "expected": 126,
+    "unexpected": 1,
+    "flaky": 1,
+    "skipped": 0,
+    "ok": false
+  },
+  "projectNames": [
+    "setup",
+    "chromium"
+  ]
+}

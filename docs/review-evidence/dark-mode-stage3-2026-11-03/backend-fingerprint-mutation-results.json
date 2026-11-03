@@ -1,0 +1,36 @@
+[
+  {
+    "mutation": "ignore_three_canvas_switch",
+    "suite": "full_file",
+    "returncode": 0,
+    "summary": [
+      "55 passed, 52 warnings in 10.60s"
+    ]
+  },
+  {
+    "mutation": "ignore_three_canvas_switch",
+    "suite": "temporary_controls",
+    "returncode": 1,
+    "summary": [
+      "FAILED ::test_three_way_switch_elsewhere_marks_live_home_older[canvas-three]",
+      "1 failed, 1 passed, 1 deselected, 2 warnings in 1.23s"
+    ]
+  },
+  {
+    "mutation": "html_switch_requires_bare_attribute",
+    "suite": "full_file",
+    "returncode": 0,
+    "summary": [
+      "55 passed, 52 warnings in 10.55s"
+    ]
+  },
+  {
+    "mutation": "html_switch_requires_bare_attribute",
+    "suite": "temporary_controls",
+    "returncode": 1,
+    "summary": [
+      "FAILED ::test_three_way_switch_elsewhere_marks_live_home_older[html-choices]",
+      "1 failed, 1 passed, 1 deselected, 2 warnings in 1.21s"
+    ]
+  }
+]

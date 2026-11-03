@@ -1,0 +1,16 @@
+{
+  "startTime": 1793724721206,
+  "duration": 807906.657,
+  "stats": {
+    "total": 129,
+    "expected": 128,
+    "unexpected": 1,
+    "flaky": 0,
+    "skipped": 0,
+    "ok": false
+  },
+  "projectNames": [
+    "setup",
+    "firefox"
+  ]
+}

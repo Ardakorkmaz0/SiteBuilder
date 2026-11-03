@@ -1,0 +1,866 @@
+{
+  "metadata": {
+    "browserName": "firefox",
+    "browserVersion": "155.0",
+    "project": "firefox",
+    "descriptor": {
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "screen": {
+        "width": 1920,
+        "height": 1080
+      },
+      "deviceScaleFactor": 1,
+      "isMobile": false,
+      "hasTouch": false,
+      "defaultBrowserType": "firefox"
+    },
+    "syntheticDocument": true,
+    "realPaletteHeadScript": true
+  },
+  "observations": [
+    {
+      "setup": "context-dark",
+      "sandboxed": false,
+      "kind": "control",
+      "navigation": "first",
+      "interceptedDocuments": 1,
+      "head": {
+        "palette": null,
+        "pick": null,
+        "follow": false,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 20
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 20
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 20
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 51
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 51
+        }
+      ],
+      "controlFirst": true,
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "context-dark",
+      "sandboxed": false,
+      "kind": "control",
+      "navigation": "reload",
+      "interceptedDocuments": 2,
+      "head": {
+        "palette": null,
+        "pick": null,
+        "follow": false,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 14
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 14
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 14
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 37
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 37
+        }
+      ],
+      "controlFirst": true,
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "context-dark",
+      "sandboxed": false,
+      "kind": "palette",
+      "navigation": "first",
+      "interceptedDocuments": 1,
+      "head": {
+        "palette": "dark",
+        "pick": "system",
+        "follow": true,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 15
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 15
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 15
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 53
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 53
+        }
+      ],
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": "dark",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "context-dark",
+      "sandboxed": false,
+      "kind": "palette",
+      "navigation": "reload",
+      "interceptedDocuments": 2,
+      "head": {
+        "palette": "dark",
+        "pick": "system",
+        "follow": true,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 16
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 17
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 17
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 34
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 34
+        }
+      ],
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": "dark",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "context-dark",
+      "sandboxed": true,
+      "kind": "control",
+      "navigation": "first",
+      "interceptedDocuments": 1,
+      "head": {
+        "palette": null,
+        "pick": null,
+        "follow": false,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 54
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 54
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 54
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 87
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 87
+        }
+      ],
+      "controlFirst": true,
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "context-dark",
+      "sandboxed": true,
+      "kind": "control",
+      "navigation": "reload",
+      "interceptedDocuments": 2,
+      "head": {
+        "palette": null,
+        "pick": null,
+        "follow": false,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 16
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 16
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 16
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 38
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 38
+        }
+      ],
+      "controlFirst": true,
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "context-dark",
+      "sandboxed": true,
+      "kind": "palette",
+      "navigation": "first",
+      "interceptedDocuments": 1,
+      "head": {
+        "palette": "dark",
+        "pick": "system",
+        "follow": true,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 17
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 18
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 18
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 48
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 48
+        }
+      ],
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": "dark",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "context-dark",
+      "sandboxed": true,
+      "kind": "palette",
+      "navigation": "reload",
+      "interceptedDocuments": 2,
+      "head": {
+        "palette": "dark",
+        "pick": "system",
+        "follow": true,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 19
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 19
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 19
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 38
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 38
+        }
+      ],
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": "dark",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "page-dark-before-goto",
+      "sandboxed": false,
+      "kind": "control",
+      "navigation": "first",
+      "interceptedDocuments": 1,
+      "head": {
+        "palette": null,
+        "pick": null,
+        "follow": false,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 19
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 19
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 19
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 50
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 50
+        }
+      ],
+      "controlFirst": true,
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "page-dark-before-goto",
+      "sandboxed": false,
+      "kind": "control",
+      "navigation": "reload",
+      "interceptedDocuments": 2,
+      "head": {
+        "palette": null,
+        "pick": null,
+        "follow": false,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 20
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 20
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 20
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 41
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 41
+        }
+      ],
+      "controlFirst": true,
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "page-dark-before-goto",
+      "sandboxed": false,
+      "kind": "palette",
+      "navigation": "first",
+      "interceptedDocuments": 1,
+      "head": {
+        "palette": "dark",
+        "pick": "system",
+        "follow": true,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 17
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 17
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 17
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 48
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 48
+        }
+      ],
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": "dark",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "page-dark-before-goto",
+      "sandboxed": false,
+      "kind": "palette",
+      "navigation": "reload",
+      "interceptedDocuments": 2,
+      "head": {
+        "palette": "dark",
+        "pick": "system",
+        "follow": true,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 17
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 17
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 17
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 39
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 39
+        }
+      ],
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": "dark",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "page-dark-before-goto",
+      "sandboxed": true,
+      "kind": "control",
+      "navigation": "first",
+      "interceptedDocuments": 1,
+      "head": {
+        "palette": null,
+        "pick": null,
+        "follow": false,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 18
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 18
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 18
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 57
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 57
+        }
+      ],
+      "controlFirst": true,
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "page-dark-before-goto",
+      "sandboxed": true,
+      "kind": "control",
+      "navigation": "reload",
+      "interceptedDocuments": 2,
+      "head": {
+        "palette": null,
+        "pick": null,
+        "follow": false,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 15
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 15
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 15
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 34
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 34
+        }
+      ],
+      "controlFirst": true,
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "page-dark-before-goto",
+      "sandboxed": true,
+      "kind": "palette",
+      "navigation": "first",
+      "interceptedDocuments": 1,
+      "head": {
+        "palette": "dark",
+        "pick": "system",
+        "follow": true,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 21
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 21
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 21
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 51
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 51
+        }
+      ],
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": "dark",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    },
+    {
+      "setup": "page-dark-before-goto",
+      "sandboxed": true,
+      "kind": "palette",
+      "navigation": "reload",
+      "interceptedDocuments": 2,
+      "head": {
+        "palette": "dark",
+        "pick": "system",
+        "follow": true,
+        "darkAfterScript": true,
+        "lightAfterScript": false,
+        "readyState": "loading"
+      },
+      "mediaCalls": [
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 16
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "loading",
+          "time": 17
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "loading",
+          "time": 17
+        },
+        {
+          "query": "(prefers-color-scheme: dark)",
+          "matches": true,
+          "readyState": "complete",
+          "time": 36
+        },
+        {
+          "query": "(prefers-color-scheme: light)",
+          "matches": false,
+          "readyState": "complete",
+          "time": 36
+        }
+      ],
+      "darkAfterLoad": true,
+      "lightAfterLoad": false,
+      "cssControl": "rgb(0, 0, 0)",
+      "paletteAfterLoad": "dark",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0"
+    }
+  ]
+}

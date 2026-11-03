@@ -1,0 +1,283 @@
+{
+  "composition": "real EditorPage plus extra real ColorModePanel; autosave disabled",
+  "steps": [
+    {
+      "step": "before",
+      "state": {
+        "currentPageId": "home",
+        "selectedIds": [
+          "selected-heading"
+        ],
+        "viewport": "pc",
+        "dirty": false,
+        "pastLength": 0,
+        "pages": [
+          {
+            "id": "home",
+            "name": "Home",
+            "mode": "empty",
+            "flowMode": false,
+            "components": [
+              {
+                "id": "bar",
+                "type": "navbar",
+                "order": 0,
+                "layout": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1200,
+                  "h": 72
+                },
+                "mobileLayout": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 390,
+                  "h": 72
+                }
+              },
+              {
+                "id": "selected-heading",
+                "type": "heading",
+                "order": 1,
+                "layout": {
+                  "x": 40,
+                  "y": 120,
+                  "w": 400,
+                  "h": 64
+                },
+                "mobileLayout": {
+                  "x": 16,
+                  "y": 88,
+                  "w": 358,
+                  "h": 51
+                }
+              }
+            ]
+          },
+          {
+            "id": "flow",
+            "name": "Flow",
+            "mode": "empty",
+            "flowMode": true,
+            "components": [
+              {
+                "id": "flow-bar",
+                "type": "navbar",
+                "order": 0,
+                "layout": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1200,
+                  "h": 72
+                },
+                "mobileLayout": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 390,
+                  "h": 72
+                }
+              },
+              {
+                "id": "flow-heading",
+                "type": "heading",
+                "order": 1,
+                "layout": {
+                  "x": 40,
+                  "y": 120,
+                  "w": 400,
+                  "h": 64
+                },
+                "mobileLayout": {
+                  "x": 16,
+                  "y": 88,
+                  "w": 358,
+                  "h": 51
+                }
+              },
+              {
+                "id": "flow-text",
+                "type": "text",
+                "order": 2,
+                "layout": {
+                  "x": 40,
+                  "y": 220,
+                  "w": 400,
+                  "h": 64
+                },
+                "mobileLayout": {
+                  "x": 16,
+                  "y": 155,
+                  "w": 358,
+                  "h": 32
+                }
+              }
+            ]
+          },
+          {
+            "id": "document",
+            "name": "Document",
+            "mode": "html",
+            "flowMode": false,
+            "components": []
+          }
+        ]
+      }
+    },
+    {
+      "step": "after-batch",
+      "state": {
+        "currentPageId": "home",
+        "selectedIds": [
+          "selected-heading"
+        ],
+        "viewport": "pc",
+        "dirty": true,
+        "pastLength": 1,
+        "pages": [
+          {
+            "id": "home",
+            "name": "Home",
+            "mode": "empty",
+            "flowMode": false,
+            "components": [
+              {
+                "id": "bar",
+                "type": "navbar",
+                "order": 0,
+                "layout": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1200,
+                  "h": 72
+                },
+                "mobileLayout": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 390,
+                  "h": 72
+                }
+              },
+              {
+                "id": "selected-heading",
+                "type": "heading",
+                "order": 1,
+                "layout": {
+                  "x": 40,
+                  "y": 120,
+                  "w": 400,
+                  "h": 64
+                },
+                "mobileLayout": {
+                  "x": 16,
+                  "y": 148,
+                  "w": 358,
+                  "h": 51
+                }
+              },
+              {
+                "id": "themeToggle_20auys",
+                "type": "themeToggle",
+                "order": 2,
+                "layout": {
+                  "x": 1132,
+                  "y": 88,
+                  "w": 44,
+                  "h": 44
+                },
+                "mobileLayout": {
+                  "x": 173,
+                  "y": 88,
+                  "w": 44,
+                  "h": 44
+                }
+              }
+            ]
+          },
+          {
+            "id": "flow",
+            "name": "Flow",
+            "mode": "empty",
+            "flowMode": true,
+            "components": [
+              {
+                "id": "flow-bar",
+                "type": "navbar",
+                "order": 0,
+                "layout": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 1200,
+                  "h": 72
+                },
+                "mobileLayout": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 390,
+                  "h": 72
+                }
+              },
+              {
+                "id": "themeToggle_e9g1ws",
+                "type": "themeToggle",
+                "order": 1,
+                "layout": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 44,
+                  "h": 44
+                },
+                "mobileLayout": {
+                  "x": 173,
+                  "y": 88,
+                  "w": 44,
+                  "h": 44
+                }
+              },
+              {
+                "id": "flow-heading",
+                "type": "heading",
+                "order": 2,
+                "layout": {
+                  "x": 40,
+                  "y": 120,
+                  "w": 400,
+                  "h": 64
+                },
+                "mobileLayout": {
+                  "x": 16,
+                  "y": 148,
+                  "w": 358,
+                  "h": 51
+                }
+              },
+              {
+                "id": "flow-text",
+                "type": "text",
+                "order": 3,
+                "layout": {
+                  "x": 40,
+                  "y": 220,
+                  "w": 400,
+                  "h": 64
+                },
+                "mobileLayout": {
+                  "x": 16,
+                  "y": 215,
+                  "w": 358,
+                  "h": 32
+                }
+              }
+            ]
+          },
+          {
+            "id": "document",
+            "name": "Document",
+            "mode": "html",
+            "flowMode": false,
+            "components": []
+          }
+        ]
+      }
+    }
+  ]
+}

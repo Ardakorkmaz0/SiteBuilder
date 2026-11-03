@@ -1,0 +1,28 @@
+Undo selection clearing predates dark-mode stage 3.
+
+18759dd frontend/src/store/editorStore.js:
+3163:   undo: () =>
+3164:     set((state) => {
+3165:       if (state.past.length === 0) return {}
+3166:       gesture = null
+3167:       lastKey = null
+3168:       const previous = state.past[state.past.length - 1]
+3169:       const currentPageId = previous.pages.some((p) => p.id === state.currentPageId)
+3170:         ? state.currentPageId
+3171:         : previous.pages[0].id
+3172:       return {
+3173:         schema: previous,
+3174:         currentPageId,
+3175:         past: state.past.slice(0, -1),
+3176:         future: [state.schema, ...state.future],
+3177:         pastAt: state.pastAt.slice(0, -1),
+3178:         futureAt: [state.pastAt[state.pastAt.length - 1] ?? nextHistoryStamp(), ...state.futureAt],
+3179:         selectedId: null,
+3180:         selectedIds: [],
+3181:         dirty: true,
+3182:       }
+3183:     }),
+
+Current source line origins at f282fc7:
+efa083d (ArdaKorkmaz0 2026-05-29 17:54:07 +0300 3207)         selectedId: null,
+739a87c (ArdaKorkmaz0 2026-07-15 05:28:53 +0300 3208)         selectedIds: [],

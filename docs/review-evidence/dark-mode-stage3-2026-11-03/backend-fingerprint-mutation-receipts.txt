@@ -1,0 +1,23 @@
+## ignore_three_canvas_switch / full_file
+55 passed, 52 warnings in 10.60s
+
+## ignore_three_canvas_switch / temporary_controls
+E       AssertionError: assert {'home': 'live'} == {'home': 'older'}
+E         
+E         Differing items:
+E         {'home': 'live'} != {'home': 'older'}
+E         Use -v to get more diff
+FAILED ::test_three_way_switch_elsewhere_marks_live_home_older[canvas-three]
+1 failed, 1 passed, 1 deselected, 2 warnings in 1.23s
+
+## html_switch_requires_bare_attribute / full_file
+55 passed, 52 warnings in 10.55s
+
+## html_switch_requires_bare_attribute / temporary_controls
+E       AssertionError: assert {'home': 'live'} == {'home': 'older'}
+E         
+E         Differing items:
+E         {'home': 'live'} != {'home': 'older'}
+E         Use -v to get more diff
+FAILED ::test_three_way_switch_elsewhere_marks_live_home_older[html-choices]
+1 failed, 1 passed, 1 deselected, 2 warnings in 1.21s

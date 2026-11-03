@@ -1,0 +1,18 @@
+{
+  "rendering": "frame",
+  "routeRemainsMounted": true,
+  "steps": [
+    {
+      "site": "A",
+      "palette": "dark",
+      "pick": "dark",
+      "deviceDark": true
+    },
+    {
+      "site": "B",
+      "palette": "light",
+      "pick": "light",
+      "deviceDark": true
+    }
+  ]
+}

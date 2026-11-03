@@ -1,0 +1,190 @@
+[
+  {
+    "title": "records first-load device media in plain and sandboxed documents in both engines",
+    "outcome": "expected",
+    "location": {
+      "file": "dark-mode-browser-probe.spec.js",
+      "line": 33,
+      "column": 1
+    },
+    "attempts": [
+      {
+        "status": "passed",
+        "duration": 1320
+      }
+    ]
+  },
+  {
+    "title": "records the same initial documents without a matchMedia wrapper or init script",
+    "outcome": "expected",
+    "location": {
+      "file": "dark-mode-browser-probe.spec.js",
+      "line": 120,
+      "column": 1
+    },
+    "attempts": [
+      {
+        "status": "passed",
+        "duration": 605
+      }
+    ]
+  },
+  {
+    "title": "recorded old and new palette heads keep their documented cookie and device behavior",
+    "outcome": "expected",
+    "location": {
+      "file": "dark-mode-legacy-review.spec.js",
+      "line": 14,
+      "column": 1
+    },
+    "attempts": [
+      {
+        "status": "passed",
+        "duration": 1981
+      }
+    ]
+  },
+  {
+    "title": "review: the three-way published group has one keyboard stop and follows only an explicit device choice",
+    "outcome": "expected",
+    "location": {
+      "file": "dark-mode-published-review.spec.js",
+      "line": 91,
+      "column": 1
+    },
+    "attempts": [
+      {
+        "status": "passed",
+        "duration": 1597
+      }
+    ]
+  },
+  {
+    "title": "review: published choices survive middle-click and later visits without reaching another site or visitor",
+    "outcome": "flaky",
+    "location": {
+      "file": "dark-mode-published-review.spec.js",
+      "line": 157,
+      "column": 1
+    },
+    "attempts": [
+      {
+        "status": "timedOut",
+        "duration": 90135
+      },
+      {
+        "status": "passed",
+        "duration": 2219
+      }
+    ]
+  },
+  {
+    "title": "review: a real published HTML block corner shows the dark page through its frame",
+    "outcome": "unexpected",
+    "location": {
+      "file": "dark-mode-published-review.spec.js",
+      "line": 218,
+      "column": 1
+    },
+    "attempts": [
+      {
+        "status": "failed",
+        "duration": 939
+      },
+      {
+        "status": "failed",
+        "duration": 1040
+      }
+    ]
+  },
+  {
+    "title": "real editor batch keeps page and selection, orders flow, and one Ctrl+Z removes the batch",
+    "outcome": "expected",
+    "location": {
+      "file": "dark-mode-ui-review.spec.js",
+      "line": 60,
+      "column": 1
+    },
+    "attempts": [
+      {
+        "status": "passed",
+        "duration": 3084
+      }
+    ]
+  },
+  {
+    "title": "real ColorModeRoot follows owner updates until chosen and live device changes only on Device",
+    "outcome": "expected",
+    "location": {
+      "file": "dark-mode-ui-review.spec.js",
+      "line": 111,
+      "column": 1
+    },
+    "attempts": [
+      {
+        "status": "passed",
+        "duration": 2074
+      }
+    ]
+  },
+  {
+    "title": "real PreviewPage isolates a canvas choice on the same mounted A to B route",
+    "outcome": "expected",
+    "location": {
+      "file": "dark-mode-ui-review.spec.js",
+      "line": 142,
+      "column": 3
+    },
+    "attempts": [
+      {
+        "status": "passed",
+        "duration": 2269
+      }
+    ]
+  },
+  {
+    "title": "real PreviewPage isolates a frame choice on the same mounted A to B route",
+    "outcome": "expected",
+    "location": {
+      "file": "dark-mode-ui-review.spec.js",
+      "line": 142,
+      "column": 3
+    },
+    "attempts": [
+      {
+        "status": "passed",
+        "duration": 2590
+      }
+    ]
+  },
+  {
+    "title": "diagnostic measurement of theme continuity between real canvas and HTML pages",
+    "outcome": "expected",
+    "location": {
+      "file": "dark-mode-ui-review.spec.js",
+      "line": 183,
+      "column": 1
+    },
+    "attempts": [
+      {
+        "status": "passed",
+        "duration": 2917
+      }
+    ]
+  },
+  {
+    "title": "diagnostic measurement of real batch placement beside a vertical navbar",
+    "outcome": "expected",
+    "location": {
+      "file": "dark-mode-ui-review.spec.js",
+      "line": 217,
+      "column": 1
+    },
+    "attempts": [
+      {
+        "status": "passed",
+        "duration": 2519
+      }
+    ]
+  }
+]

@@ -1,0 +1,288 @@
+{
+  "browserName": "chromium",
+  "history": [
+    {
+      "step": "A selected dark before any cookie-writing navigation",
+      "url": "http://127.0.0.1:8001/s/review-source-a-2/?pwb-theme=dark",
+      "palette": "dark",
+      "pick": "dark",
+      "followsDevice": false,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    },
+    {
+      "step": "middle click carries dark to A about",
+      "url": "http://127.0.0.1:8001/s/review-source-a-2/about/?pwb-theme=dark",
+      "palette": "dark",
+      "pick": "dark",
+      "followsDevice": false,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    },
+    {
+      "step": "ordinary navigation carries dark to A about",
+      "url": "http://127.0.0.1:8001/s/review-source-a-2/about/?pwb-theme=dark",
+      "palette": "dark",
+      "pick": "dark",
+      "followsDevice": false,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    },
+    {
+      "step": "second visit at plain A address keeps dark",
+      "url": "http://127.0.0.1:8001/s/review-source-a-2/",
+      "palette": "dark",
+      "pick": "dark",
+      "followsDevice": false,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    },
+    {
+      "step": "A link does not replace B light cookie",
+      "url": "http://127.0.0.1:8001/s/review-destination-b-2/",
+      "palette": "light",
+      "pick": "light",
+      "followsDevice": false,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    },
+    {
+      "step": "new visitor does not inherit A dark choice",
+      "url": "http://127.0.0.1:8001/s/review-source-a-2/",
+      "palette": "light",
+      "pick": "light",
+      "followsDevice": false,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "site-navigation",
+      "url": "http://127.0.0.1:8001/s/review-source-a-2/about/?pwb-theme=dark",
+      "palette": "dark",
+      "pick": "dark",
+      "followsDevice": false,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "middle-click-new-tab",
+      "url": "http://127.0.0.1:8001/s/review-source-a-2/about/?pwb-theme=dark",
+      "palette": "dark",
+      "pick": "dark",
+      "followsDevice": false,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Dark",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "site-second-visit",
+      "url": "http://127.0.0.1:8001/s/review-destination-b-2/",
+      "palette": "light",
+      "pick": "light",
+      "followsDevice": false,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "separate-visitor",
+      "url": "http://127.0.0.1:8001/s/review-source-a-2/",
+      "palette": "light",
+      "pick": "light",
+      "followsDevice": false,
+      "nativeDark": false,
+      "radios": [
+        {
+          "name": "Light",
+          "checked": "true",
+          "tabIndex": 0
+        },
+        {
+          "name": "Dark",
+          "checked": "false",
+          "tabIndex": -1
+        },
+        {
+          "name": "Device",
+          "checked": "false",
+          "tabIndex": -1
+        }
+      ]
+    }
+  ],
+  "contexts": [
+    {
+      "index": 0,
+      "paletteCookies": [
+        {
+          "name": "pwb-theme",
+          "value": "light",
+          "domain": "127.0.0.1",
+          "path": "/s/review-destination-b-2/",
+          "expires": 1825259765.637946,
+          "httpOnly": true,
+          "secure": false,
+          "sameSite": "Lax"
+        },
+        {
+          "name": "pwb-theme",
+          "value": "dark",
+          "domain": "127.0.0.1",
+          "path": "/s/review-source-a-2/",
+          "expires": 1825259765.977692,
+          "httpOnly": true,
+          "secure": false,
+          "sameSite": "Lax"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "paletteCookies": []
+    }
+  ]
+}

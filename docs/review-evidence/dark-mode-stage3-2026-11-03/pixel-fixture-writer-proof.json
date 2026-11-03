@@ -1,0 +1,28 @@
+[
+  {
+    "kind": "raw",
+    "inputBackground": null,
+    "mappedBackground": null,
+    "palette": "dark",
+    "bodyRule": "body { background: #ffffff; }",
+    "cssBodyRule": [
+      "var(--site-bg, #ffffff)",
+      "rgb(255, 255, 255)"
+    ],
+    "bodyComputed": "rgb(255, 255, 255)",
+    "publishedBodyRule": "body { background: #ffffff; }"
+  },
+  {
+    "kind": "clean",
+    "inputBackground": "#ffffff",
+    "mappedBackground": "var(--pwb-alt-bg, #ffffff)",
+    "palette": "dark",
+    "bodyRule": "body { background: var(--pwb-alt-bg, #ffffff); }",
+    "cssBodyRule": [
+      "var(--site-bg, #ffffff)",
+      "var(--pwb-alt-bg, #ffffff)"
+    ],
+    "bodyComputed": "rgba(0, 0, 0, 0)",
+    "publishedBodyRule": "body { background: var(--pwb-alt-bg, #ffffff); }"
+  }
+]
