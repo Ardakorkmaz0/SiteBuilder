@@ -1,0 +1,336 @@
+{
+  "description": "Review evidence: 15 HTML responses captured through Django PublishedPage serving, with real head writers from the three listed commits. These fixtures are historical response replays, not live-backend E2E coverage.",
+  "ownerInitialPalette": "light",
+  "cases": [
+    {
+      "id": "9a7b2ec-cookie-light",
+      "headCommit": "9a7b2ec",
+      "url": "https://app.example/s/stage3-review/",
+      "incomingCookie": "light",
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": null,
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode data-pwb-chosen=\"light\">(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;var q=/[?&]pwb-theme=(light|dark)(?:&|$)/.exec(location.search);if(q)m=q[1];if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(m!==c.base&&m!==c.alt)m=c.initial;if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme',m===c.alt?c.alt:c.base)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "light"
+      }
+    },
+    {
+      "id": "9a7b2ec-cookie-dark",
+      "headCommit": "9a7b2ec",
+      "url": "https://app.example/s/stage3-review/",
+      "incomingCookie": "dark",
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": null,
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode data-pwb-chosen=\"dark\">(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;var q=/[?&]pwb-theme=(light|dark)(?:&|$)/.exec(location.search);if(q)m=q[1];if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(m!==c.base&&m!==c.alt)m=c.initial;if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme',m===c.alt?c.alt:c.base)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      }
+    },
+    {
+      "id": "9a7b2ec-cookie-system",
+      "headCommit": "9a7b2ec",
+      "url": "https://app.example/s/stage3-review/",
+      "incomingCookie": "system",
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": null,
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode data-pwb-chosen=\"system\">(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;var q=/[?&]pwb-theme=(light|dark)(?:&|$)/.exec(location.search);if(q)m=q[1];if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(m!==c.base&&m!==c.alt)m=c.initial;if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme',m===c.alt?c.alt:c.base)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "system"
+      }
+    },
+    {
+      "id": "9a7b2ec-query-system-encoded",
+      "headCommit": "9a7b2ec",
+      "url": "https://app.example/s/stage3-review/?pwb-theme=%73ystem",
+      "incomingCookie": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": "pwb-theme=system; expires=Wed, 03 Nov 2027 16:20:25 GMT; HttpOnly; Max-Age=31536000; Path=/s/stage3-review/; SameSite=Lax",
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode>(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;var q=/[?&]pwb-theme=(light|dark)(?:&|$)/.exec(location.search);if(q)m=q[1];if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(m!==c.base&&m!==c.alt)m=c.initial;if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme',m===c.alt?c.alt:c.base)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "system"
+      }
+    },
+    {
+      "id": "9a7b2ec-query-dark-first",
+      "headCommit": "9a7b2ec",
+      "url": "https://app.example/s/stage3-review/?pwb-theme=dark&pwb-theme=light",
+      "incomingCookie": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": "pwb-theme=dark; expires=Wed, 03 Nov 2027 16:20:25 GMT; HttpOnly; Max-Age=31536000; Path=/s/stage3-review/; SameSite=Lax",
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode>(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;var q=/[?&]pwb-theme=(light|dark)(?:&|$)/.exec(location.search);if(q)m=q[1];if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(m!==c.base&&m!==c.alt)m=c.initial;if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme',m===c.alt?c.alt:c.base)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "dark",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      }
+    },
+    {
+      "id": "66f4cf7-cookie-light",
+      "headCommit": "66f4cf7",
+      "url": "https://app.example/s/stage3-review/",
+      "incomingCookie": "light",
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": null,
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode data-pwb-chosen=\"light\">(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;var q=new URLSearchParams(location.search).get('pwb-theme');if(q==='light'||q==='dark')m=q;if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(m!==c.base&&m!==c.alt&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');if(m!==c.base&&m!==c.alt)m=c.initial;if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme',m===c.alt?c.alt:c.base)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "light"
+      }
+    },
+    {
+      "id": "66f4cf7-cookie-dark",
+      "headCommit": "66f4cf7",
+      "url": "https://app.example/s/stage3-review/",
+      "incomingCookie": "dark",
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": null,
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode data-pwb-chosen=\"dark\">(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;var q=new URLSearchParams(location.search).get('pwb-theme');if(q==='light'||q==='dark')m=q;if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(m!==c.base&&m!==c.alt&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');if(m!==c.base&&m!==c.alt)m=c.initial;if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme',m===c.alt?c.alt:c.base)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "dark",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      }
+    },
+    {
+      "id": "66f4cf7-cookie-system",
+      "headCommit": "66f4cf7",
+      "url": "https://app.example/s/stage3-review/",
+      "incomingCookie": "system",
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": null,
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode data-pwb-chosen=\"system\">(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;var q=new URLSearchParams(location.search).get('pwb-theme');if(q==='light'||q==='dark')m=q;if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(m!==c.base&&m!==c.alt&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');if(m!==c.base&&m!==c.alt)m=c.initial;if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme',m===c.alt?c.alt:c.base)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "system"
+      }
+    },
+    {
+      "id": "66f4cf7-query-system-encoded",
+      "headCommit": "66f4cf7",
+      "url": "https://app.example/s/stage3-review/?pwb-theme=%73ystem",
+      "incomingCookie": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": "pwb-theme=system; expires=Wed, 03 Nov 2027 16:20:25 GMT; HttpOnly; Max-Age=31536000; Path=/s/stage3-review/; SameSite=Lax",
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode>(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;var q=new URLSearchParams(location.search).get('pwb-theme');if(q==='light'||q==='dark')m=q;if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(m!==c.base&&m!==c.alt&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');if(m!==c.base&&m!==c.alt)m=c.initial;if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme',m===c.alt?c.alt:c.base)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "light",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "system"
+      }
+    },
+    {
+      "id": "66f4cf7-query-dark-first",
+      "headCommit": "66f4cf7",
+      "url": "https://app.example/s/stage3-review/?pwb-theme=dark&pwb-theme=light",
+      "incomingCookie": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": "pwb-theme=dark; expires=Wed, 03 Nov 2027 16:20:25 GMT; HttpOnly; Max-Age=31536000; Path=/s/stage3-review/; SameSite=Lax",
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode>(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;var q=new URLSearchParams(location.search).get('pwb-theme');if(q==='light'||q==='dark')m=q;if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(m!==c.base&&m!==c.alt&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');if(m!==c.base&&m!==c.alt)m=c.initial;if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme',m===c.alt?c.alt:c.base)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "dark",
+        "pick": null,
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      }
+    },
+    {
+      "id": "7a0730b-cookie-light",
+      "headCommit": "7a0730b",
+      "url": "https://app.example/s/stage3-review/",
+      "incomingCookie": "light",
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": null,
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode data-pwb-chosen=\"light\">(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;function k(v){return v==='light'||v==='dark'||v==='system'}var q=new URLSearchParams(location.search).get('pwb-theme');if(k(q))m=q;if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(!k(m)&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');if(!k(m))m=c.initial;if(!k(m))m=c.follow?'system':c.base;var p=m;if(m==='system'){d.setAttribute('data-pwb-theme-follow','');m=window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches?c.alt:c.base}d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme-pick',p);d.setAttribute('data-pwb-theme',m)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "light",
+        "pick": "light",
+        "followsDevice": false,
+        "cookieAfterLoad": "light"
+      }
+    },
+    {
+      "id": "7a0730b-cookie-dark",
+      "headCommit": "7a0730b",
+      "url": "https://app.example/s/stage3-review/",
+      "incomingCookie": "dark",
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": null,
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode data-pwb-chosen=\"dark\">(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;function k(v){return v==='light'||v==='dark'||v==='system'}var q=new URLSearchParams(location.search).get('pwb-theme');if(k(q))m=q;if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(!k(m)&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');if(!k(m))m=c.initial;if(!k(m))m=c.follow?'system':c.base;var p=m;if(m==='system'){d.setAttribute('data-pwb-theme-follow','');m=window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches?c.alt:c.base}d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme-pick',p);d.setAttribute('data-pwb-theme',m)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "dark",
+        "pick": "dark",
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      }
+    },
+    {
+      "id": "7a0730b-cookie-system",
+      "headCommit": "7a0730b",
+      "url": "https://app.example/s/stage3-review/",
+      "incomingCookie": "system",
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": null,
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode data-pwb-chosen=\"system\">(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;function k(v){return v==='light'||v==='dark'||v==='system'}var q=new URLSearchParams(location.search).get('pwb-theme');if(k(q))m=q;if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(!k(m)&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');if(!k(m))m=c.initial;if(!k(m))m=c.follow?'system':c.base;var p=m;if(m==='system'){d.setAttribute('data-pwb-theme-follow','');m=window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches?c.alt:c.base}d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme-pick',p);d.setAttribute('data-pwb-theme',m)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "device",
+        "pick": "system",
+        "followsDevice": true,
+        "cookieAfterLoad": "system"
+      }
+    },
+    {
+      "id": "7a0730b-query-system-encoded",
+      "headCommit": "7a0730b",
+      "url": "https://app.example/s/stage3-review/?pwb-theme=%73ystem",
+      "incomingCookie": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": "pwb-theme=system; expires=Wed, 03 Nov 2027 16:20:25 GMT; HttpOnly; Max-Age=31536000; Path=/s/stage3-review/; SameSite=Lax",
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode>(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;function k(v){return v==='light'||v==='dark'||v==='system'}var q=new URLSearchParams(location.search).get('pwb-theme');if(k(q))m=q;if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(!k(m)&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');if(!k(m))m=c.initial;if(!k(m))m=c.follow?'system':c.base;var p=m;if(m==='system'){d.setAttribute('data-pwb-theme-follow','');m=window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches?c.alt:c.base}d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme-pick',p);d.setAttribute('data-pwb-theme',m)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "device",
+        "pick": "system",
+        "followsDevice": true,
+        "cookieAfterLoad": "system"
+      }
+    },
+    {
+      "id": "7a0730b-query-dark-first",
+      "headCommit": "7a0730b",
+      "url": "https://app.example/s/stage3-review/?pwb-theme=dark&pwb-theme=light",
+      "incomingCookie": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads; frame-ancestors 'self' http://localhost:5173",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "cache-control": "private, max-age=60",
+        "vary": "Cookie"
+      },
+      "responseSetCookie": "pwb-theme=dark; expires=Wed, 03 Nov 2027 16:20:25 GMT; HttpOnly; Max-Age=31536000; Path=/s/stage3-review/; SameSite=Lax",
+      "html": "<!DOCTYPE html><html><head><meta name=\"pwb-form-endpoint\" content=\"/s/stage3-review/__sitebuilder/form/\"><script data-pwb-color-mode>(function(){var c={\"base\":\"light\",\"alt\":\"dark\",\"follow\":false,\"initial\":\"light\"},d=document.documentElement,m=null;function k(v){return v==='light'||v==='dark'||v==='system'}var q=new URLSearchParams(location.search).get('pwb-theme');if(k(q))m=q;if(!m){try{m=localStorage.getItem('pwb-color-mode')}catch(e){}}if(!k(m)&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');if(!k(m))m=c.initial;if(!k(m))m=c.follow?'system':c.base;var p=m;if(m==='system'){d.setAttribute('data-pwb-theme-follow','');m=window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches?c.alt:c.base}d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme-pick',p);d.setAttribute('data-pwb-theme',m)})();</script></head><body>Review</body></html>",
+      "expected": {
+        "palette": "dark",
+        "pick": "dark",
+        "followsDevice": false,
+        "cookieAfterLoad": "dark"
+      }
+    }
+  ]
+}
