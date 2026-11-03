@@ -5,6 +5,7 @@ import { JSDOM } from 'jsdom'
 import {
   colorModeCss,
   colorModeFor,
+  colorModeHeadTags,
   colorModeScript,
   hasThemeToggle,
   suggestedAltTheme,
@@ -16,6 +17,7 @@ import { DEFAULT_THEME, THEME_PRESETS, presetTheme, themedStyles } from './theme
 import { builderInteractiveJs } from './htmlRuntime.js'
 import { schemaToFiles, schemaToSingleHtml } from './schemaToFiles.js'
 import { pageToResponsiveHtml } from './pageCode.js'
+import { schemaToResponsiveHtml } from './responsiveHtml.js'
 import { publishedPagesFor } from './publishedPages.js'
 import { htmlEmbedDocument } from './htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from './htmlSnippetSizing.js'
@@ -38,6 +40,16 @@ describe('when a site has the other palette', () => {
     two.pages.push({ id: 'about', name: 'About', components: [toggle] })
     expect(modeOf(two)).not.toBeNull()
     expect(hasThemeToggle(site([]), { home: '<button data-pwb-theme-toggle>x</button>' })).toBe(true)
+  })
+
+  it('when the owner opens it in the palette it is not designed in, or on the device', () => {
+    expect(modeOf(site([], { colorMode: { start: 'dark' } }))).toMatchObject({ base: 'light', alt: 'dark', initial: 'dark', followDevice: false })
+    expect(modeOf(site([], { colorMode: { start: 'system' } }))).toMatchObject({ followDevice: true })
+    expect(modeOf(site([], { colorMode: { start: 'system' } })).initial).toBeUndefined()
+    // Opening as designed needs no second palette, and writes the page as before.
+    expect(modeOf(site([], { colorMode: { start: 'light' } }))).toBeNull()
+    expect(modeOf(site([toggle], { colorMode: { start: 'light' } }))).toMatchObject({ initial: 'light' })
+    expect(modeOf(site([], { colorMode: { start: 'blue' } }))).toBeNull()
   })
 
   it('switches a light site to dark and a dark one to light', () => {
@@ -114,6 +126,8 @@ describe('which colours follow', () => {
     const doc = new JSDOM(htmlEmbedDocument(embed.props.code, htmlEmbedDocumentOptions(embed))).window.document
     expect(doc.head.querySelector('style[data-pwb-color-mode]').textContent).toContain('--pwb-alt-text:')
     expect(doc.querySelector('script')).toBeNull()
+    // A frame painted in another scheme than its page's is a white box.
+    expect(embed.props._colorModeCss).not.toContain('color-scheme')
   })
 })
 
@@ -134,6 +148,13 @@ describe('the published page', () => {
     expect(button.getAttribute('type')).toBe('button')
     // The head script runs before the body's styles are read.
     expect(doc.head.querySelector('script[data-pwb-color-mode]')).not.toBeNull()
+  })
+
+  it('tells the browser which palette is on, leaving the frames on the page out', () => {
+    const css = new JSDOM(colorModeHeadTags(modeOf(site()))).window.document.querySelector('style').textContent
+    expect(css).toContain('[data-pwb-theme="dark"]{color-scheme:dark}')
+    expect(css).toContain('[data-pwb-theme="light"]{color-scheme:light}')
+    expect(css).toContain('[data-pwb-theme] iframe{color-scheme:normal}')
   })
 
   it('reads an HTML page\'s own palette: a dark template switches to light', () => {
@@ -190,14 +211,24 @@ describe('the downloaded site', () => {
     expect(schemaToFiles(schema).find((file) => file.name === 'index.html').content).not.toContain('data-pwb-color-mode')
     expect(pageToResponsiveHtml(schema.pages[0], 'Home', schema)).not.toContain('var(--pwb-alt-')
   })
+
+  it('in the responsive code, sets the other palette after the page\'s own variables', () => {
+    const schema = site([toggle, text])
+    const html = schemaToResponsiveHtml(schema, 'x', { colorMode: modeOf(schema) })
+    // Both rules weigh the same, so the later one is the one that holds.
+    expect(html.indexOf('--site-bg: #ffffff')).toBeGreaterThan(-1)
+    expect(html.indexOf('--site-bg:#111317')).toBeGreaterThan(html.indexOf('--site-bg: #ffffff'))
+  })
 })
 
 describe('in the visitor\'s browser', () => {
   const pages = []
   afterEach(() => pages.splice(0).forEach((page) => page.window.close()))
 
-  function visit({ stored = null, url = 'https://example.test/', prefersDark = false, follow = false, sandboxed = false } = {}) {
-    const mode = { ...modeOf(site()), followDevice: follow }
+  const slate = presetTheme(THEME_PRESETS.find((preset) => preset.id === 'slate'))
+
+  function visit({ stored = null, url = 'https://example.test/', prefersDark = false, follow = false, sandboxed = false, schema = null } = {}) {
+    const mode = schema ? modeOf(schema) : { ...modeOf(site()), followDevice: follow }
     const page = new JSDOM(
       '<!DOCTYPE html><html><head></head><body><button data-pwb-theme-toggle aria-pressed="false">x</button>'
         + '<a id="about" href="/about/">About</a><a id="jump" href="#top">Top</a><a id="away" href="https://elsewhere.test/">Away</a></body></html>',
@@ -208,7 +239,8 @@ describe('in the visitor\'s browser', () => {
     if (stored) window.localStorage.setItem('pwb-color-mode', stored)
     // The builder's own /s/ pages are sandboxed: storage throws there.
     if (sandboxed) Object.defineProperty(window, 'localStorage', { get() { throw new window.DOMException('sandboxed', 'SecurityError') } })
-    window.matchMedia = (query) => ({ matches: prefersDark && query.includes('dark') })
+    // A device with no preference answers "light", as browsers do.
+    window.matchMedia = (query) => ({ matches: query.includes(prefersDark ? 'dark' : 'light') })
     window.eval(colorModeScript(mode))
     window.eval(builderInteractiveJs())
     window.document.dispatchEvent(new window.Event('DOMContentLoaded'))
@@ -223,6 +255,28 @@ describe('in the visitor\'s browser', () => {
     // The device's preference counts only when the owner said so.
     expect(theme(visit({ prefersDark: true }))).toBe('light')
     expect(theme(visit({ prefersDark: true, follow: true }))).toBe('dark')
+  })
+
+  it('on the device means the device, for a site designed dark too', () => {
+    const schema = site([toggle], { theme: slate, colorMode: { start: 'system' } })
+    expect(theme(visit({ schema }))).toBe('light')
+    expect(theme(visit({ schema, prefersDark: true }))).toBe('dark')
+    // A site saved before the choice existed has only the old box.
+    const older = site([toggle], { theme: slate, colorMode: { followDevice: true } })
+    expect(theme(visit({ schema: older }))).toBe('light')
+  })
+
+  it('opens in what the owner chose, whatever the device says', () => {
+    const dark = site([toggle], { colorMode: { start: 'dark' } })
+    expect(theme(visit({ schema: dark }))).toBe('dark')
+    const light = site([toggle], { theme: slate, colorMode: { start: 'light' } })
+    expect(theme(visit({ schema: light, prefersDark: true }))).toBe('light')
+  })
+
+  it('lets the visitor\'s own choice outrank the owner\'s', () => {
+    const schema = site([toggle], { colorMode: { start: 'dark' } })
+    expect(theme(visit({ schema, stored: 'light' }))).toBe('light')
+    expect(theme(visit({ schema, url: 'https://example.test/?pwb-theme=light', sandboxed: true }))).toBe('light')
   })
 
   it('remembers the choice, in storage or in the address', () => {
@@ -266,6 +320,38 @@ describe('in the visitor\'s browser', () => {
     expect(link('jump').getAttribute('href')).toBe('#top')
     expect(link('away').getAttribute('href')).toBe('https://elsewhere.test/')
     press(window)
+    expect(window.location.search).toBe('?pwb-theme=light')
+  })
+
+  it('without storage, keeps going back to the designed palette when the site opens in the other', () => {
+    const schema = site([toggle], { colorMode: { start: 'dark' } })
+    const window = visit({ schema, sandboxed: true })
+    press(window)
+    expect(theme(window)).toBe('light')
+    // A reload reads this address: without it the site would open dark again.
+    expect(theme(visit({ schema, sandboxed: true, url: window.location.href }))).toBe('light')
+  })
+
+  it('without storage and without a choice, leaves the address and the links alone', () => {
+    const window = visit({ schema: site([toggle], { colorMode: { start: 'dark' } }), sandboxed: true })
+    const about = window.document.getElementById('about')
+    about.addEventListener('click', (event) => event.preventDefault())
+    about.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(about.getAttribute('href')).toBe('/about/')
     expect(window.location.search).toBe('')
+  })
+
+  it('without storage, keeps the choice on an address with a jump in it', () => {
+    const window = visit({ sandboxed: true, url: 'https://example.test/#top' })
+    press(window)
+    expect(window.location.href).toBe('https://example.test/?pwb-theme=dark#top')
+  })
+
+  it('with storage, takes an old choice out of the address, which would outrank the new one', () => {
+    const window = visit({ url: 'https://example.test/about/?pwb-theme=dark&x=1' })
+    expect(theme(window)).toBe('dark')
+    press(window)
+    expect(window.localStorage.getItem('pwb-color-mode')).toBe('light')
+    expect(window.location.search).toBe('?x=1')
   })
 })

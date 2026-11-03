@@ -200,21 +200,34 @@ export function hasThemeToggle(schema, htmlMap = {}) {
   ))
 }
 
+// What the owner chose the site to open in: 'light', 'dark' or 'system' (the
+// visitor's device), or null for the palette it is designed in. A site saved
+// before the choice existed says only whether it follows the device.
+export function siteStart(schema) {
+  const { start, followDevice } = schema?.colorMode || {}
+  if (start === 'light' || start === 'dark' || start === 'system') return start
+  return followDevice ? 'system' : null
+}
+
 // Everything a writer needs to draw one page with both palettes, or null when
-// the site has only the one (no switch, and not following the device).
-// `always` is the editor's preview of the other palette, before any switch.
+// the site has only the one: no switch, and it opens in the palette it is
+// designed in. `always` is the editor's preview of the other palette, before
+// any switch.
 export function colorModeFor(schema, page, htmlMap = {}, { always = false } = {}) {
-  const followDevice = !!schema?.colorMode?.followDevice
-  if (!always && !followDevice && !hasThemeToggle(schema, htmlMap)) return null
+  const start = siteStart(schema)
+  const toggled = hasThemeToggle(schema, htmlMap)
+  if (!always && !start && !toggled) return null
   const theme = designedTheme(schema, page, htmlMap)
   const base = baseMode(theme)
+  if (!always && !toggled && start === base) return null
   const alt = altTheme(schema, theme)
   const light = Object.fromEntries(COLOR_ROLES.map((role) => [role, normalizeHex(theme[role])]))
   light.onAccent = normalizeHex(readableTextOn(theme.accentColor, theme.buttonTextColor))
   return {
     base,
     alt: base === 'light' ? 'dark' : 'light',
-    followDevice,
+    followDevice: start === 'system',
+    ...(start === 'light' || start === 'dark' ? { initial: start } : {}),
     light,
     other: { ...alt, onAccent: readableTextOn(alt.accentColor, alt.buttonTextColor) },
   }
@@ -423,10 +436,16 @@ export function colorModeCss(mode) {
   const roles = Object.keys(ROLE_VARS)
     .map((role) => `${altVar(role)}:${cssColor(mode.other[role])}`)
   const site = Object.entries(SITE_VARS).map(([role, name]) => `--site-${name}:${cssColor(mode.other[role])}`)
-  // No color-scheme here: an embedded block's frame whose scheme differs
-  // from the page's is painted opaque, a white box on a dark page.
   return `[data-pwb-theme="${mode.alt}"]{${[...roles, ...site].join(';')}}`
 }
+
+// What the browser draws by itself (scrollbars, date pickers, a select's list)
+// follows the palette too. Not inside an HTML block, and not for a frame on the
+// page: a frame whose scheme differs from its document's is painted opaque, a
+// white box on a dark page.
+export const COLOR_SCHEME_CSS = '[data-pwb-theme="light"]{color-scheme:light}'
+  + '[data-pwb-theme="dark"]{color-scheme:dark}'
+  + '[data-pwb-theme] iframe{color-scheme:normal}'
 
 // An HTML block starts in the browser's black text, which no theme colour
 // set; in the other palette it takes that palette's text colour. The :where()
@@ -460,7 +479,7 @@ const SCRIPT_END = '</scr' + 'ipt>'
 
 export function colorModeHeadTags(mode) {
   if (!mode) return ''
-  return `<style data-pwb-color-mode>${colorModeCss(mode)}</style><script data-pwb-color-mode>${colorModeScript(mode)}${SCRIPT_END}`
+  return `<style data-pwb-color-mode>${colorModeCss(mode)}${COLOR_SCHEME_CSS}</style><script data-pwb-color-mode>${colorModeScript(mode)}${SCRIPT_END}`
 }
 
 // ---------------------------------------------------------------------------

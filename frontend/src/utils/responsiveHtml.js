@@ -472,7 +472,7 @@ export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = 
     <title>${esc(pageSeoTitle(page, title))}</title>
     ${seoHeadTags(page, title)}${pageBehaviourStyleTag(page)}
     ${googleFontLinkTag(pageTheme(schema, page))}
-    ${motionHeadTags()}${colorMode ? `\n    ${colorModeHeadTags(colorMode)}` : ''}
+    ${motionHeadTags()}
     <style>
       ${themeVariablesCss(pageTheme(schema, page))}
       *{ box-sizing: border-box; }
@@ -525,7 +525,7 @@ export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = 
         .rh-wrap { gap: 24px; padding: 28px 0; }
       }
       ${customCssBlock(schema?.customCss)}
-    </style>
+    </style>${colorMode ? `\n    ${colorModeHeadTags(colorMode)}` : ''}
   </head>
   <body>${body}
   ${builderInteractiveTags()}

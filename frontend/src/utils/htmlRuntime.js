@@ -128,11 +128,23 @@ const INTERACTIVE_SCRIPT = `
         if (url.host !== location.host) return null;
         // A jump within this page stays a jump: a new address would reload it.
         if (url.pathname === location.pathname && url.search === location.search && url.hash) return null;
-        var base = document.documentElement.getAttribute('data-pwb-theme-base');
-        if (mode && mode !== base) url.searchParams.set('pwb-theme', mode);
-        else url.searchParams.delete('pwb-theme');
+        url.searchParams.set('pwb-theme', mode);
         return url.href;
       } catch (e) { return null; }
+    }
+    // The choice this address holds. Without one a link stays as it is, and
+    // the next page opens the way the owner said.
+    function addressPalette() {
+      var mode = new URLSearchParams(location.search).get('pwb-theme');
+      return mode === 'light' || mode === 'dark' ? mode : null;
+    }
+    function setAddressPalette(mode) {
+      try {
+        var url = new URL(location.href);
+        if (mode) url.searchParams.set('pwb-theme', mode);
+        else url.searchParams.delete('pwb-theme');
+        history.replaceState(history.state, '', url.href);
+      } catch (e) {}
     }
     // HTML blocks are frames of their own: tell each which palette is on,
     // now and whenever one (re)loads.
@@ -170,9 +182,10 @@ const INTERACTIVE_SCRIPT = `
       root.setAttribute('data-pwb-theme', next);
       if (paletteStorage) {
         try { localStorage.setItem('pwb-color-mode', next); } catch (e) {}
+        // The address outranks storage, so an old choice must not stay in it.
+        if (addressPalette()) setAddressPalette(null);
       } else {
-        var here = withPaletteParam(location.href, next);
-        try { if (here) history.replaceState(history.state, '', here); } catch (e) {}
+        setAddressPalette(next);
       }
       broadcastPalette(next);
       // Inside the app's viewer each page is a new frame: the viewer keeps
@@ -482,7 +495,7 @@ const INTERACTIVE_SCRIPT = `
       document.addEventListener('click', function (event) {
         if (paletteStorage || !event.target || !event.target.closest) return;
         var link = event.target.closest('a[href]');
-        var mode = document.documentElement.getAttribute('data-pwb-theme');
+        var mode = addressPalette();
         if (!link || !mode) return;
         var next = withPaletteParam(link.href, mode);
         if (next && next !== link.href) link.href = next;

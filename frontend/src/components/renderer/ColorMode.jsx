@@ -4,7 +4,7 @@
 // switch component reads and flips it here; on a published page the runtime
 // does the same to <html>.
 import { useMemo, useState } from 'react'
-import { colorModeCss } from '../../utils/colorMode.js'
+import { COLOR_SCHEME_CSS, colorModeCss } from '../../utils/colorMode.js'
 import { ColorModeContext } from './colorModeContext.js'
 
 function firstMode(mode) {
@@ -33,7 +33,7 @@ export function ColorModeRoot({ mode, forced = null, children }) {
   if (!mode) return children
   return (
     <ColorModeContext.Provider value={value}>
-      <style data-pwb-color-mode="" dangerouslySetInnerHTML={{ __html: colorModeCss(mode) }} />
+      <style data-pwb-color-mode="" dangerouslySetInnerHTML={{ __html: colorModeCss(mode) + COLOR_SCHEME_CSS }} />
       <div data-pwb-color-root="" data-pwb-theme={current} style={{ display: 'contents' }}>
         {children}
       </div>

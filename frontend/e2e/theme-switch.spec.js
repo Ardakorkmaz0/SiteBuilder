@@ -50,6 +50,32 @@ test('a switch on a canvas page turns the published site dark and back', async (
   await api(request, 'DELETE', `/sites/${site.id}/`)
 })
 
+test('the owner chooses what the site opens in, and a visitor can still change it', async ({ page, request, browser }) => {
+  const { data: site } = await api(request, 'POST', '/sites/', { title: 'E2E site opens dark' })
+  await openEditor(page, site.id)
+  await page.getByRole('tab', { name: 'Theme', exact: true }).click()
+  await page.getByRole('radiogroup', { name: 'The site opens in' }).getByRole('radio', { name: 'Dark', exact: true }).click()
+  await pickSwitch(page)
+  const area = await page.locator('main').last().boundingBox()
+  await page.mouse.click(area.x + 600, area.y + 120)
+  await save(page)
+  const { data: saved } = await api(request, 'GET', `/sites/${site.id}/`)
+  expect(saved.schema.colorMode.start).toBe('dark')
+
+  const slug = await publish(page, request, site.id)
+  const { viewer, visitor } = await visit(browser, slug)
+  const scheme = () => visitor.evaluate(() => getComputedStyle(document.documentElement).colorScheme)
+  expect([await palette(visitor), await scheme()]).toEqual(['dark', 'dark'])
+  await visitor.locator('[data-pwb-theme-toggle]').click()
+  expect([await palette(visitor), await scheme()]).toEqual(['light', 'light'])
+  // Going back to the designed palette is a choice too: the reload must not
+  // open the site dark again.
+  await visitor.reload()
+  expect(await palette(visitor)).toBe('light')
+  await viewer.close()
+  await api(request, 'DELETE', `/sites/${site.id}/`)
+})
+
 test('an HTML page switches by its own palette', async ({ page, request, browser }) => {
   const siteId = await createHtmlSite(request, 'E2E theme switch html', [{
     html: '<!DOCTYPE html><html><head><style>:root{--bg:#ffffff;--ink:#171723}body{background:var(--bg);color:var(--ink)}</style></head>'

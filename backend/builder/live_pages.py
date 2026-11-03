@@ -27,6 +27,9 @@ from .validators import (
 )
 
 
+THEME_SWITCH_ATTR = 'data-pwb-theme-toggle'
+
+
 def _pages(schema):
     pages = schema.get('pages') if isinstance(schema, dict) else None
     return [page for page in pages if isinstance(page, dict)] if isinstance(pages, list) else []
@@ -36,13 +39,38 @@ def _site_level(schema):
     return {key: value for key, value in schema.items() if key != 'pages'} if isinstance(schema, dict) else {}
 
 
+def _holds_theme_switch(components):
+    if not isinstance(components, list):
+        return False
+    return any(
+        isinstance(component, dict)
+        and (component.get('type') == 'themeToggle' or _holds_theme_switch(component.get('children')))
+        for component in components
+    )
+
+
+def _site_has_theme_switch(schema, html):
+    """Mirrors hasThemeToggle in frontend/src/utils/colorMode.js."""
+    if THEME_SWITCH_ATTR in (html or ''):
+        return True
+    return any(
+        _holds_theme_switch(page.get('components')) or THEME_SWITCH_ATTR in str(page.get('html') or '')
+        for page in _pages(schema)
+    )
+
+
 def page_fingerprint(schema, html, page):
     """Changes when what this page would render as changes: the page itself,
-    what the whole site shares (a canvas page is rendered with the theme), and
-    the home page's mirrored document."""
+    what the whole site shares (a canvas page is rendered with the theme), the
+    home page's mirrored document, and whether any page has a theme switch,
+    which gives every page both palettes. A site with no switch keeps the
+    fingerprints its pages went live with."""
     pages = _pages(schema)
     is_home = bool(pages) and pages[0].get('id') == page.get('id')
-    payload = json.dumps([_site_level(schema), page, html if is_home else ''], sort_keys=True, default=str)
+    parts = [_site_level(schema), page, html if is_home else '']
+    if _site_has_theme_switch(schema, html):
+        parts.append(True)
+    payload = json.dumps(parts, sort_keys=True, default=str)
     return hashlib.sha256(payload.encode('utf-8', 'surrogatepass')).hexdigest()
 
 

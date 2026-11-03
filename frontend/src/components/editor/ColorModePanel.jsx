@@ -6,7 +6,7 @@ import PanelGroup from './PanelGroup.jsx'
 import { LabeledCheckbox, LabeledColor } from './controls.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
-import { colorModeFor, hasThemeToggle } from '../../utils/colorMode.js'
+import { colorModeFor, hasThemeToggle, siteStart } from '../../utils/colorMode.js'
 import { CANVAS_WIDTH } from '../registry.jsx'
 
 const ROLES = [
@@ -22,6 +22,8 @@ const ROLES = [
   ['headerColor', 'Header background'],
   ['headerTextColor', 'Header text'],
 ]
+
+const STARTS = [['light', 'Light'], ['dark', 'Dark'], ['system', 'Device']]
 
 const NO_HTML = {}
 
@@ -41,6 +43,7 @@ export default function ColorModePanel({ htmlMode = false, htmlMap = NO_HTML }) 
   const hasSwitch = hasThemeToggle(schema, htmlMap)
   const own = schema?.colorMode?.theme || {}
   const edited = Object.keys(own).length > 0
+  const start = siteStart(schema) || mode.base
 
   const addSwitch = () => {
     const width = page?.canvasWidth || CANVAS_WIDTH
@@ -49,6 +52,29 @@ export default function ColorModePanel({ htmlMode = false, htmlMap = NO_HTML }) 
 
   return (
     <PanelGroup id="theme-color-mode" title={dark ? t('Dark mode') : t('Light mode')} defaultOpen>
+      <div className="space-y-1.5">
+        <p id="theme-color-mode-start" className="text-[11px] font-medium leading-snug text-[var(--studio-text)]">{t('The site opens in')}</p>
+        <div role="radiogroup" aria-labelledby="theme-color-mode-start" className="studio-segment flex w-full">
+          {STARTS.map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={start === value}
+              onClick={() => { if (start !== value) updateColorMode({ start: value }) }}
+              className={`studio-segment-btn flex-1 whitespace-nowrap ${start === value ? 'studio-segment-btn-active' : ''}`}
+            >
+              {t(label)}
+            </button>
+          ))}
+        </div>
+        {start === 'system' && (
+          <p className="text-[11px] leading-snug text-[var(--studio-text-muted)]">{t('Each visitor gets the setting of their own device.')}</p>
+        )}
+        {start === mode.alt && (
+          <p className="text-[11px] leading-snug text-[var(--studio-text-muted)]">{t('Visitors see the colors below first; the editor keeps showing the colors you design in.')}</p>
+        )}
+      </div>
       <p className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
         {dark
           ? t('Visitors switch to these colors with the theme switch. Colors from the theme follow; a color you picked for one block stays.')
@@ -77,11 +103,6 @@ export default function ColorModePanel({ htmlMode = false, htmlMap = NO_HTML }) 
           onChange={setPreview}
         />
       )}
-      <LabeledCheckbox
-        label={t('Start in the visitor’s device setting')}
-        checked={!!schema?.colorMode?.followDevice}
-        onChange={(on) => updateColorMode({ followDevice: on })}
-      />
       {ROLES.map(([role, label]) => (
         <LabeledColor
           key={role}
