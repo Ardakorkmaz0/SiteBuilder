@@ -172,6 +172,7 @@ test('review: published choices survive middle-click and later visits without re
     expect((await page.goto(`${BACKEND}/s/${source.slug}/`)).status()).toBe(200)
     await radio(page, 'Dark').click()
     await record(history, page, 'A selected dark before any cookie-writing navigation')
+    await expect(page.getByRole('link', { name: 'About', exact: true })).toHaveAttribute('href', `/s/${source.slug}/about/`)
     const opened = context.waitForEvent('page')
     await page.getByRole('link', { name: 'About', exact: true }).click({ button: 'middle' })
     const middleTab = await opened
@@ -223,6 +224,9 @@ test('review: a real published HTML block corner shows the dark page through its
       colorMode: { start: 'dark', theme: { backgroundColor: '#111317' } },
       pages: schema.pages.map((page, index) => index ? page : {
         ...page,
+        // An explicit design background isolates iframe transparency from the
+        // writer's separate fallback for a page with no background field.
+        background: '#ffffff',
         components: [...page.components, {
           id: 'review-html-block', type: 'html', props: { code: '<p>In a block</p>' }, styles: {}, layout: { x: 40, y: 360, w: 400, h: 160 },
         }],
@@ -261,6 +265,28 @@ test('review: a real published HTML block corner shows the dark page through its
     history.push({ step: 'actual frame corner pixel', rgba: pixel, box })
     await record(history, page, 'dark HTML frame after its text loaded')
     expect(pixel).toEqual([17, 19, 23, 255])
+  } finally {
+    try { await attachEvidence(testInfo, browserName, history, contexts, namedPages) }
+    finally { await cleanUp(request, contexts, owned) }
+  }
+})
+
+test('review: a real published page follows a dark device from its first request in both browsers', async ({ request, browser, browserName }, testInfo) => {
+  const owned = [], contexts = [], namedPages = [], history = []
+  try {
+    const site = await publishFixture(request, owned, 'Review first real device')
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] }, colorScheme: 'dark' })
+    contexts.push(context)
+    const page = await context.newPage()
+    namedPages.push({ page, name: 'real-first-device' })
+    expect((await page.goto(`${BACKEND}/s/${site.slug}/?pwb-theme=system`)).status()).toBe(200)
+    await record(history, page, 'real first request on a dark context; no init script or media wrapper')
+    expect(await palette(page)).toBe('dark')
+    await expect(radio(page, 'Device')).toHaveAttribute('aria-checked', 'true')
+    await page.reload()
+    await record(history, page, 'real reload on the same dark context')
+    expect(await palette(page)).toBe('dark')
+    expect((await context.cookies()).find((cookie) => cookie.name === 'pwb-theme' && cookie.path === `/s/${site.slug}/`)?.value).toBe('system')
   } finally {
     try { await attachEvidence(testInfo, browserName, history, contexts, namedPages) }
     finally { await cleanUp(request, contexts, owned) }
