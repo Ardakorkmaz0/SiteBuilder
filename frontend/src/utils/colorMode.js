@@ -458,7 +458,9 @@ function embedCss(mode) {
 // palette never sees a flash of this one. A published page on the builder's
 // own address has no storage (its sandbox gives it no origin), so there the
 // runtime keeps the choice in the address instead (?pwb-theme=dark), which a
-// reload and the site's own links carry on.
+// reload and the site's own links carry on. The server remembers an address's
+// choice in a cookie the page cannot read, and on a later visit says what it
+// holds on this script (data-pwb-chosen, see backend/builder/published.py).
 export const COLOR_MODE_KEY = 'pwb-color-mode'
 export const COLOR_MODE_PARAM = 'pwb-theme'
 
@@ -469,6 +471,7 @@ export function colorModeScript(mode) {
   return `(function(){var c=${cfg},d=document.documentElement,m=null;`
     + `var q=/[?&]${COLOR_MODE_PARAM}=(light|dark)(?:&|$)/.exec(location.search);if(q)m=q[1];`
     + `if(!m){try{m=localStorage.getItem('${COLOR_MODE_KEY}')}catch(e){}}`
+    + `if(m!==c.base&&m!==c.alt&&document.currentScript)m=document.currentScript.getAttribute('data-pwb-chosen');`
     + `if(m!==c.base&&m!==c.alt)m=c.initial;`
     + `if(m!==c.base&&m!==c.alt&&c.follow&&window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches)m=c.alt;`
     + `d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);`

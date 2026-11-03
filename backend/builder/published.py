@@ -22,6 +22,10 @@ the admin session and the visitor's token. The response is sandboxed by CSP,
 which gives it an opaque origin: scripts still run (a page's own interactions
 work), forms still post, but localStorage, cookies and same-origin requests
 belong to nobody. Same contract the public HTML iframe has always had.
+
+A visitor's light or dark choice is the one thing kept across visits, and the
+page has no part in it: the server writes it to a cookie the page cannot read
+and says what it holds when it sends the page (see _with_visitor_palette).
 """
 from html import escape, unescape
 from html.parser import HTMLParser
@@ -32,6 +36,7 @@ from django.conf import settings
 from django.http import Http404, HttpResponse, HttpResponseNotAllowed, HttpResponsePermanentRedirect, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.urls import reverse
+from django.utils.cache import patch_vary_headers
 from django.utils.xmlutils import SimplerXMLGenerator
 from django.views.decorators.http import require_safe
 from io import StringIO
@@ -101,10 +106,54 @@ def serve_published_page(request, slug, path=''):
     record_served_view(site, request, wanted)
     html = with_site_meta(page.html, site, request.build_absolute_uri('/'))
     html = _with_form_endpoint(html, published_form_path(site.slug))
+    two_palettes = _PALETTE_SCRIPT in html
+    html, remember = _with_visitor_palette(html, request) if two_palettes else (html, None)
     response = _harden(HttpResponse(html, content_type='text/html; charset=utf-8'))
     if page.no_index:
         response['X-Robots-Tag'] = 'noindex'
+    if two_palettes:
+        _keep_palette_per_visitor(response, request, site.slug, remember)
     return response
+
+
+# A document with both palettes opens with this tag (colorModeHeadTags in
+# frontend/src/utils/colorMode.js), and its script reads data-pwb-chosen.
+_PALETTE_SCRIPT = '<script data-pwb-color-mode>'
+_PALETTE_PARAM = 'pwb-theme'
+_PALETTE_COOKIE = 'pwb-theme'
+_PALETTES = ('light', 'dark')
+_PALETTE_COOKIE_AGE = 60 * 60 * 24 * 365
+
+
+def _with_visitor_palette(html, request):
+    """The page with the visitor's remembered palette on its palette script,
+    and the palette to remember from this request's address, if any.
+
+    The sandbox leaves the page no storage, so a choice travels in the address
+    (?pwb-theme=dark) and only as far as the visitor's next click. An address
+    that holds one is a request the server can answer with a cookie, which a
+    second visit then brings back. The address comes first: it is the newer of
+    the two, and the page reads it by itself."""
+    chosen = request.GET.get(_PALETTE_PARAM)
+    if chosen in _PALETTES:
+        return html, chosen
+    kept = request.COOKIES.get(_PALETTE_COOKIE)
+    if kept in _PALETTES:
+        return html.replace(_PALETTE_SCRIPT, f'<script data-pwb-color-mode data-pwb-chosen="{kept}">', 1), None
+    return html, None
+
+
+def _keep_palette_per_visitor(response, request, slug, remember):
+    # The same address now answers differently per visitor: a cache must not
+    # hand one visitor's page or cookie to another.
+    patch_vary_headers(response, ['Cookie'])
+    if remember or request.COOKIES.get(_PALETTE_COOKIE):
+        response['Cache-Control'] = 'private, max-age=60'
+    if remember:
+        response.set_cookie(
+            _PALETTE_COOKIE, remember, max_age=_PALETTE_COOKIE_AGE, path=f'/s/{slug}/',
+            secure=request.is_secure(), httponly=True, samesite='Lax',
+        )
 
 
 def published_form_path(slug):

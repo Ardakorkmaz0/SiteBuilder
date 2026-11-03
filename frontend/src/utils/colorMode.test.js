@@ -343,6 +343,56 @@ describe('in the visitor\'s browser', () => {
     expect(theme(visit({ schema, sandboxed: true, url: about.href }))).toBe('light')
   })
 
+  it.each(['auxclick', 'contextmenu'])('without storage, takes the choice along on a link opened by %s', (type) => {
+    const window = visit({ sandboxed: true })
+    press(window)
+    const about = window.document.getElementById('about')
+    about.dispatchEvent(new window.MouseEvent(type, { bubbles: true, cancelable: true }))
+    expect(about.getAttribute('href')).toBe('https://example.test/about/?pwb-theme=dark')
+  })
+
+  describe('with a choice the server remembered', () => {
+    // The server writes it on the script itself, so the script has to run from
+    // its own tag here.
+    function served({ chosen, url = 'https://example.test/', schema = site() }) {
+      const attribute = chosen ? ` data-pwb-chosen="${chosen}"` : ''
+      const page = new JSDOM(
+        `<!DOCTYPE html><html><head><script data-pwb-color-mode${attribute}>${colorModeScript(modeOf(schema))}</script></head><body></body></html>`,
+        {
+          url,
+          runScripts: 'dangerously',
+          beforeParse(window) {
+            Object.defineProperty(window, 'localStorage', { get() { throw new window.DOMException('sandboxed', 'SecurityError') } })
+            window.matchMedia = (query) => ({ matches: query.includes('light') })
+          },
+        },
+      )
+      pages.push(page)
+      return page.window
+    }
+
+    it('opens in it, over what the owner chose', () => {
+      expect(theme(served({ chosen: 'dark' }))).toBe('dark')
+      expect(theme(served({ chosen: 'light', schema: site([toggle], { colorMode: { start: 'dark' } }) }))).toBe('light')
+    })
+
+    it('over the device', () => {
+      expect(theme(served({ chosen: 'dark', schema: site([toggle], { colorMode: { start: 'system' } }) }))).toBe('dark')
+    })
+
+    it('but not over the address, which is newer', () => {
+      expect(theme(served({ chosen: 'dark', url: 'https://example.test/?pwb-theme=light' }))).toBe('light')
+    })
+
+    it('and ignores a value that is no palette', () => {
+      expect(theme(served({ chosen: 'blue', schema: site([toggle], { colorMode: { start: 'dark' } }) }))).toBe('dark')
+    })
+
+    it('opens as the owner chose without one', () => {
+      expect(theme(served({ schema: site([toggle], { colorMode: { start: 'dark' } }) }))).toBe('dark')
+    })
+  })
+
   it('without storage and without a choice, leaves the address and the links alone', () => {
     const window = visit({ schema: site([toggle], { colorMode: { start: 'dark' } }), sandboxed: true })
     const about = window.document.getElementById('about')

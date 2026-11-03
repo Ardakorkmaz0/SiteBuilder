@@ -175,6 +175,93 @@ class TestServing:
         assert APIClient().get(f'/s/{site.slug}/sitemap.xml').status_code == 404
 
 
+class TestRememberingAVisitorsPalette:
+    """The sandbox gives the page no storage, so the server keeps the choice."""
+    TWO_PALETTES = '<!DOCTYPE html><html><head><script data-pwb-color-mode>x()</script></head><body>Hi</body></html>'
+
+    @pytest.fixture
+    def page(self, site):
+        return PublishedPage.objects.create(site=site, path='', title='Ada', html=self.TWO_PALETTES)
+
+    def visit(self, site, query='', cookie=None):
+        visitor = APIClient()
+        if cookie is not None:
+            visitor.cookies['pwb-theme'] = cookie
+        return visitor.get(f'/s/{site.slug}/{query}')
+
+    def test_a_choice_in_the_address_becomes_a_cookie_for_this_site_only(self, site, page):
+        response = self.visit(site, '?pwb-theme=dark')
+
+        cookie = response.cookies['pwb-theme']
+        assert cookie.value == 'dark'
+        assert cookie['path'] == f'/s/{site.slug}/'
+        assert cookie['samesite'] == 'Lax'
+        assert cookie['httponly'] is True
+        assert cookie['max-age'] == 31536000
+        assert cookie['secure'] == ''
+
+    def test_the_cookie_is_secure_on_https(self, site, page):
+        visitor = APIClient()
+        response = visitor.get(f'/s/{site.slug}/?pwb-theme=dark', secure=True)
+
+        assert response.cookies['pwb-theme']['secure'] is True
+
+    def test_going_back_to_light_is_remembered_too(self, site, page):
+        assert self.visit(site, '?pwb-theme=light', cookie='dark').cookies['pwb-theme'].value == 'light'
+
+    def test_anything_else_in_the_address_is_not_a_choice(self, site, page):
+        for value in ('blue', 'system', '', '<script>'):
+            response = self.visit(site, f'?pwb-theme={value}')
+            assert 'pwb-theme' not in response.cookies
+            assert 'data-pwb-chosen' not in response.content.decode()
+
+    def test_a_later_visit_is_told_what_the_cookie_holds(self, site, page):
+        response = self.visit(site, cookie='dark')
+
+        assert '<script data-pwb-color-mode data-pwb-chosen="dark">x()</script>' in response.content.decode()
+        assert 'pwb-theme' not in response.cookies
+
+    def test_a_cookie_that_is_no_palette_never_reaches_the_page(self, site, page):
+        response = self.visit(site, cookie='"><script>alert(1)</script>')
+
+        assert 'data-pwb-chosen' not in response.content.decode()
+        assert 'alert(1)' not in response.content.decode()
+
+    def test_the_address_outranks_the_cookie_on_the_page(self, site, page):
+        response = self.visit(site, '?pwb-theme=light', cookie='dark')
+
+        assert 'data-pwb-chosen' not in response.content.decode()
+
+    def test_a_remembered_page_is_kept_out_of_shared_caches(self, site, page):
+        for response in (self.visit(site, '?pwb-theme=dark'), self.visit(site, cookie='dark')):
+            assert response['Cache-Control'] == 'private, max-age=60'
+            assert response['Vary'] == 'Cookie'
+
+    def test_a_first_visit_may_be_cached_but_only_for_those_without_a_cookie(self, site, page):
+        response = self.visit(site)
+
+        assert response['Cache-Control'] == 'public, max-age=60'
+        assert response['Vary'] == 'Cookie'
+        assert 'pwb-theme' not in response.cookies
+
+    def test_the_sandbox_stays_on_a_page_with_a_cookie(self, site, page):
+        policy = self.visit(site, '?pwb-theme=dark')['Content-Security-Policy']
+
+        assert 'sandbox allow-scripts' in policy
+        assert 'allow-same-origin' not in policy
+
+    def test_a_site_with_one_palette_is_served_as_before(self, site):
+        PublishedPage.objects.create(site=site, path='', title='Ada', html=HOME)
+
+        response = self.visit(site, '?pwb-theme=dark', cookie='dark')
+
+        assert response.content.decode().endswith('<h1>Ada</h1></body></html>')
+        assert 'data-pwb-chosen' not in response.content.decode()
+        assert 'pwb-theme' not in response.cookies
+        assert response['Cache-Control'] == 'public, max-age=60'
+        assert 'Vary' not in response
+
+
 class TestSitemap:
     def test_it_lists_every_page_that_may_be_found(self, client, site):
         publish(client, site)
