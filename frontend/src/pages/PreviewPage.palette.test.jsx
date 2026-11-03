@@ -13,7 +13,11 @@ vi.mock('../api/sites.js', () => ({
   getReviewSite: vi.fn(),
   submitReviewComment: vi.fn(),
 }))
-vi.mock('../components/preview/PublicToolbar.jsx', () => ({ default: () => null }))
+vi.mock('../components/preview/PublicToolbar.jsx', () => ({
+  default: ({ onNavigate, pages = [] }) => (
+    <nav>{pages.map((page) => <button key={page.id} type="button" onClick={() => onNavigate(page.id)}>{`Go to ${page.name}`}</button>)}</nav>
+  ),
+}))
 vi.mock('../components/LanguageSwitcher.jsx', () => ({ default: () => null }))
 vi.mock('../i18n/useLanguage.js', () => ({
   useLanguage: () => ({ t: (value, params = {}) => value.replace(/\{(\w+)\}/g, (_, key) => params[key] || key) }),
@@ -31,6 +35,20 @@ const htmlSite = (slug) => ({
     pages: [{ id: `${slug}-home`, name: 'Home', mode: 'html', html: `<!DOCTYPE html><html><head></head><body><button data-pwb-theme-toggle>x</button><p>${slug}-home-marker</p></body></html>`, components: [] }],
   },
 })
+
+const three = { id: 'sw', type: 'themeToggle', props: { label: 'Theme', states: 'three', lightLabel: 'Light', darkLabel: 'Dark', deviceLabel: 'Device' }, styles: {}, layout: { x: 0, y: 0, w: 132, h: 44 } }
+const mixedSite = () => ({
+  title: 'a', slug: 'a', published: true,
+  schema: {
+    theme: { backgroundColor: '#ffffff' },
+    pages: [
+      { id: 'canvas', name: 'Canvas', components: [three] },
+      { id: 'doc', name: 'Document', mode: 'html', html: '<!DOCTYPE html><html><head></head><body><button data-pwb-theme-toggle>x</button></body></html>', components: [] },
+    ],
+  },
+})
+const go = (name) => act(async () => { fireEvent.click(screen.getByRole('button', { name: `Go to ${name}` })) })
+const frameInitial = () => /"initial":("\w+"|null)/.exec(document.querySelector('iframe').getAttribute('srcdoc'))[1]
 
 async function open(sites) {
   getPublicSite.mockImplementation(async (slug) => sites[slug])
@@ -53,7 +71,48 @@ const goToB = async () => {
 beforeEach(() => {
   vi.clearAllMocks()
   sessionStorage.clear()
+  // The viewer keeps the open page in the address.
+  window.history.replaceState(null, '', '/')
   globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+})
+
+describe('the palette a visitor chose, across the pages of one site', () => {
+  it('goes from a page drawn in the app to a page in a frame', async () => {
+    await open({ a: mixedSite() })
+    fireEvent.click(await screen.findByRole('radio', { name: 'Dark' }))
+
+    await go('Document')
+
+    expect(frameInitial()).toBe('"dark"')
+  })
+
+  it('goes from a page in a frame back to a page drawn in the app', async () => {
+    await open({ a: mixedSite() })
+    await screen.findByRole('radio', { name: 'Dark' })
+    await go('Document')
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'pwb-color-mode', mode: 'dark' }, source: document.querySelector('iframe').contentWindow }))
+    })
+
+    await go('Canvas')
+
+    expect(document.querySelector('[data-pwb-color-root]')).toHaveAttribute('data-pwb-theme', 'dark')
+  })
+
+  it('is the newest one: a choice in the app replaces the one a frame made', async () => {
+    await open({ a: mixedSite() })
+    await screen.findByRole('radio', { name: 'Dark' })
+    await go('Document')
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'pwb-color-mode', mode: 'system' }, source: document.querySelector('iframe').contentWindow }))
+    })
+    await go('Canvas')
+    fireEvent.click(await screen.findByRole('radio', { name: 'Light' }))
+
+    await go('Document')
+
+    expect(frameInitial()).toBe('"light"')
+  })
 })
 
 describe('the palette a visitor chose', () => {

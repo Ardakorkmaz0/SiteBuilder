@@ -1,6 +1,4 @@
 // Browser guards use unchanged production components through the review harness.
-// Tests named diagnostic are measurements of known gaps, not regression guards:
-// they attach actual/expected JSON without deliberately breaking master CI.
 import { test, expect, api } from './support.js'
 import { bulkSchema, rawDocument, reviewPublication, reviewSchema } from './dark-mode-review-data.js'
 
@@ -180,8 +178,8 @@ for (const rendering of ['canvas', 'frame']) {
 
 // The two continuity differences below are measured, not asserted as bugs that
 // are already fixed. Reaching the correct pages and making each choice is guarded.
-test('diagnostic measurement of theme continuity between real canvas and HTML pages', async ({ page, request }, info) => {
-  const sites = [], observed = { diagnosticOnly: true, guardsKnownGap: false, steps: [] }
+test('a choice carries between real canvas and HTML pages of one site', async ({ page, request }, info) => {
+  const sites = [], observed = { steps: [] }
   try {
     const site = await seed(request, 'Review mixed', reviewSchema('Review mixed', { mixed: true }), true)
     sites.push(site)
@@ -196,7 +194,8 @@ test('diagnostic measurement of theme continuity between real canvas and HTML pa
     await expect(frame.getByRole('heading', { name: 'Review mixed document', exact: true })).toBeVisible()
     const first = await framePalette(frame)
     observed.steps.push({ step: 'canvas-Dark-to-HTML', expected: { palette: 'dark', pick: 'dark' }, actual: first, matchesExpected: first.palette === 'dark' && first.pick === 'dark' })
-    await attach(page, info, 'diagnostic-canvas-to-html', observed)
+    await attach(page, info, 'canvas-to-html', observed)
+    expect(first).toMatchObject({ palette: 'dark', pick: 'dark' })
     await frame.getByRole('radio', { name: 'Device', exact: true }).click()
     await expect(frame.locator('html')).toHaveAttribute('data-pwb-theme-pick', 'system')
     await page.emulateMedia({ colorScheme: 'dark' })
@@ -209,13 +208,14 @@ test('diagnostic measurement of theme continuity between real canvas and HTML pa
     await expect(frame.getByRole('heading', { name: 'Review mixed document', exact: true })).toBeVisible()
     const second = await framePalette(frame)
     observed.steps.push({ step: 'HTML-Device-canvas-Light-to-HTML', expected: { palette: 'light', pick: 'light' }, actual: second, matchesExpected: second.palette === 'light' && second.pick === 'light' })
+    expect(second).toMatchObject({ palette: 'light', pick: 'light' })
   } finally {
-    try { await attach(page, info, 'diagnostic-mixed-renderers-final', observed) } finally { await remove(request, sites) }
+    try { await attach(page, info, 'mixed-renderers-final', observed) } finally { await remove(request, sites) }
   }
 })
 
-test('diagnostic measurement of real batch placement beside a vertical navbar', async ({ page, request }, info) => {
-  const sites = [], observed = { diagnosticOnly: true, guardsKnownGap: false }
+test('a switch added beside a vertical navbar goes in the top right corner', async ({ page, request }, info) => {
+  const sites = [], observed = {}
   try {
     const site = await seed(request, 'Review vertical navbar', bulkSchema({ vertical: true }))
     sites.push(site)
@@ -227,7 +227,8 @@ test('diagnostic measurement of real batch placement beside a vertical navbar', 
     expect(state.pages.find((item) => item.id === 'home').components.find((item) => item.id === 'bar').layout).toMatchObject({ w: 200, h: 600 })
     const actual = switches(state, 'home')[0].layout
     Object.assign(observed, { expected: { y: 24 }, actual, matchesExpected: actual.y === 24, state })
+    expect(actual.y).toBe(24)
   } finally {
-    try { await attach(page, info, 'diagnostic-vertical-navbar-placement', observed) } finally { await remove(request, sites) }
+    try { await attach(page, info, 'vertical-navbar-placement', observed) } finally { await remove(request, sites) }
   }
 })

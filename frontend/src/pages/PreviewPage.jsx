@@ -623,7 +623,7 @@ body { font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, sans-serif);
       <style>{siteCss}</style>
       <PreviewStage device={device}>
         <div ref={siteCanvasRef} data-public-site-canvas className="site-surface">
-          <ColorModeRoot key={slug} mode={colorMode}>
+          <ColorModeRoot key={slug} mode={colorMode} onChoose={(chosen) => setPalette((was) => ({ ...was, chosen }))}>
             <ResponsiveSite key={current.id} page={withColorModePage(current, colorMode)} />
           </ColorModeRoot>
         </div>

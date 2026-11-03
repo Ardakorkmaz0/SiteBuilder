@@ -98,7 +98,7 @@ export function themeSwitchFirstInFlow(components) {
 // Where a switch goes when it is added for the owner: the top right corner of
 // the page, under a bar across the top of it, whose links are on that side.
 export function themeSwitchSpot(page, canvasWidth, width = 44) {
-  const bar = (page?.components || []).find((c) => c?.type === 'navbar' && (c.layout?.y || 0) < 40)
+  const bar = (page?.components || []).find((c) => c?.type === 'navbar' && c.props?.navLayout !== 'vertical' && (c.layout?.y || 0) < 40)
   return {
     x: Math.max(0, canvasWidth - width - 24),
     y: bar ? (bar.layout?.y || 0) + (bar.layout?.h || 0) + 16 : 24,

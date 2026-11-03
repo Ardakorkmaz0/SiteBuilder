@@ -103,6 +103,9 @@ describe('where a switch is added for the owner', () => {
     // A bar further down the page is not in the way.
     const lower = { components: [{ type: 'navbar', layout: { y: 300, h: 64 } }] }
     expect(themeSwitchSpot(lower, 1200)).toEqual({ x: 1132, y: 24 })
+    // A bar down the side of the page leaves the corner free.
+    const side = { components: [{ type: 'navbar', props: { navLayout: 'vertical' }, layout: { y: 0, w: 200, h: 600 } }] }
+    expect(themeSwitchSpot(side, 1200)).toEqual({ x: 1132, y: 24 })
   })
 })
 

@@ -238,6 +238,24 @@ class TestStatusOfEachPage:
         assert 'data-pwb-theme-toggle' not in site.schema['pages'][0]['html']
         assert response.data['page_live'] == {'home': 'older', 'about': 'older'}
 
+    def test_a_three_way_switch_on_one_page_makes_the_other_pages_older(self, client, site):
+        send(client, site, 'home', 'Home v1')
+        with_switch = schema()
+        with_switch['pages'][1]['components'] = [{'id': 'sw', 'type': 'themeToggle', 'props': {'states': 'three'}}]
+
+        response = client.patch(f'/api/sites/{site.pk}/', {'schema': with_switch}, format='json')
+
+        assert response.data['page_live'] == {'home': 'older'}
+
+    def test_a_three_way_switch_in_an_html_page_makes_the_other_pages_older(self, client, site):
+        send(client, site, 'home', 'Home v1')
+        with_switch = schema()
+        with_switch['pages'][1]['html'] = document('About v1') + '<div role="radiogroup" data-pwb-theme-toggle="choices"></div>'
+
+        response = client.patch(f'/api/sites/{site.pk}/', {'schema': with_switch}, format='json')
+
+        assert response.data['page_live'] == {'home': 'older'}
+
     def test_removing_the_only_switch_makes_the_other_pages_older(self, client, site):
         with_switch = schema()
         with_switch['pages'][1]['components'] = [
