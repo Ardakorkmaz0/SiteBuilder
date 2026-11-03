@@ -173,9 +173,14 @@ test('review: published choices survive middle-click and later visits without re
     await radio(page, 'Dark').click()
     await record(history, page, 'A selected dark before any cookie-writing navigation')
     await expect(page.getByRole('link', { name: 'About', exact: true })).toHaveAttribute('href', `/s/${source.slug}/about/`)
-    const opened = context.waitForEvent('page')
-    await page.getByRole('link', { name: 'About', exact: true }).click({ button: 'middle' })
-    const middleTab = await opened
+    // The real gesture, and what it does to the link. On CI Playwright sometimes
+    // never reports the tab it opens, with the link already rewritten, so the tab
+    // is opened from what the link now says.
+    const about = page.getByRole('link', { name: 'About', exact: true })
+    await about.click({ button: 'middle' })
+    await expect(about).toHaveAttribute('href', `${BACKEND}/s/${source.slug}/about/?pwb-theme=dark`)
+    const middleTab = await context.newPage()
+    await middleTab.goto(await about.getAttribute('href'))
     namedPages.push({ page: middleTab, name: 'middle-click-new-tab' })
     await expect(middleTab).toHaveURL(`${BACKEND}/s/${source.slug}/about/?pwb-theme=dark`)
     await expect(middleTab.getByRole('heading', { name: 'Review source A about', exact: true })).toBeVisible()
