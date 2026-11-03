@@ -529,6 +529,10 @@ function mapComponent(component, mode, inside = false) {
   if (component.stylesMobile) next.stylesMobile = mapStyles(component.stylesMobile, component.type, mode, inside).styles
   if (component.type === 'input' || component.type === 'select') next.props = mapFieldProps(component.props || {}, mode, fixed)
   if (component.type === 'tabs') next.props = mapTabProps(component.props || {}, mode, fixed)
+  // The writers show one of two images; each says which palette it belongs to.
+  if (component.type === 'image' && component.props?.srcOther) {
+    next.props = { ...component.props, _otherSrc: component.props.srcOther, _otherMode: mode.alt, _baseMode: mode.base }
+  }
   // An HTML block is a document of its own: its colours are read the same
   // way, and it carries the other palette, which the page around it switches
   // on by message (see the runtime).
@@ -577,9 +581,17 @@ export function colorModeCss(mode) {
 // follows the palette too. Not inside an HTML block, and not for a frame on the
 // page: a frame whose scheme differs from its document's is painted opaque, a
 // white box on a dark page.
+//
+// An image with a version for the other palette is written twice, one of them
+// on show. An HTML block opening in the palette it is not designed in stays out
+// of sight until it has been told: the runtime lets it go, and the delay is for
+// a page whose runtime never came.
 export const COLOR_SCHEME_CSS = '[data-pwb-theme="light"]{color-scheme:light}'
   + '[data-pwb-theme="dark"]{color-scheme:dark}'
   + '[data-pwb-theme] iframe{color-scheme:normal}'
+  + '[data-pwb-theme="light"] .pwb-on-dark,[data-pwb-theme="dark"] .pwb-on-light{display:none!important}'
+  + '[data-pwb-theme-wait] iframe[srcdoc]{animation:pwb-frame-in 0s linear 3s both}'
+  + '@keyframes pwb-frame-in{from{visibility:hidden}to{visibility:visible}}'
 
 // An HTML block starts in the browser's black text, which no theme colour
 // set; in the other palette it takes that palette's text colour. The :where()
@@ -604,7 +616,8 @@ export const COLOR_MODE_PARAM = 'pwb-theme'
 export function colorModeScript(mode) {
   if (!mode) return ''
   const initial = ['light', 'dark', 'system'].includes(mode.initial) ? mode.initial : null
-  const cfg = JSON.stringify({ base: mode.base, alt: mode.alt, follow: mode.followDevice, initial })
+  const bar = normalizeHex(mode.other?.backgroundColor)
+  const cfg = JSON.stringify({ base: mode.base, alt: mode.alt, follow: mode.followDevice, initial, bar })
   return `(function(){var c=${cfg},d=document.documentElement,m=null;`
     + `function k(v){return v==='light'||v==='dark'||v==='system'}`
     + `var q=new URLSearchParams(location.search).get('${COLOR_MODE_PARAM}');if(k(q))m=q;`
@@ -614,7 +627,8 @@ export function colorModeScript(mode) {
     + `if(!k(m))m=c.follow?'system':c.base;`
     + `var p=m;if(m==='system'){d.setAttribute('data-pwb-theme-follow','');m=window.matchMedia&&matchMedia('(prefers-color-scheme: '+c.alt+')').matches?c.alt:c.base}`
     + `d.setAttribute('data-pwb-theme-base',c.base);d.setAttribute('data-pwb-theme-alt',c.alt);d.setAttribute('data-pwb-theme-pick',p);`
-    + `d.setAttribute('data-pwb-theme',m)})();`
+    + `d.setAttribute('data-pwb-theme',m);if(m!==c.base)d.setAttribute('data-pwb-theme-wait','');`
+    + `if(c.bar){d.setAttribute('data-pwb-theme-bar',c.bar);var b=document.querySelector('meta[name="theme-color"]');if(b&&m===c.alt){b.setAttribute('data-pwb-base',b.content);b.content=c.bar}}})();`
 }
 
 const SCRIPT_END = '</scr' + 'ipt>'

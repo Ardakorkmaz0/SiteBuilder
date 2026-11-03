@@ -669,6 +669,17 @@ class TestLightAndDark:
     def test_a_choice_name_is_cut_like_the_label(self):
         assert self._switch(states='three', lightLabel='x' * 200)['lightLabel'] == 'x' * 80
 
+    def _image(self, **props):
+        comp = {'id': 'i1', 'type': 'image', 'props': {'src': 'https://a.test/light.png', **props}}
+        return validate_and_clean_schema({'pages': [{'id': 'p', 'components': [comp]}]})['pages'][0]['components'][0]['props']
+
+    def test_an_image_stores_what_it_did_before_until_it_has_a_second_version(self):
+        assert 'srcOther' not in self._image()
+        assert self._image(srcOther='https://a.test/dark.png')['srcOther'] == 'https://a.test/dark.png'
+
+    def test_an_images_second_version_is_cleaned_like_the_first(self):
+        assert 'srcOther' not in self._image(srcOther='javascript:alert(1)')
+
     def test_a_site_without_the_other_palette_stores_nothing_for_it(self):
         assert 'colorMode' not in self._schema()
 

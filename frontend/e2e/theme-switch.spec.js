@@ -229,6 +229,46 @@ test('an HTML block on a dark page is not a white box', async ({ page, request, 
   await api(request, 'DELETE', `/sites/${site.id}/`)
 })
 
+test('an image has a version for each palette, the browser bar follows, and an HTML block is let go', async ({ page, request, browser }) => {
+  const { data: site } = await api(request, 'POST', '/sites/', { title: 'E2E palette image' })
+  const { data: full } = await api(request, 'GET', `/sites/${site.id}/`)
+  const dot = (color) => `data:image/png;base64,${color}`
+  const WHITE = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
+  const BLACK = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+  const components = [
+    { id: 'sw', type: 'themeToggle', props: { label: 'Theme' }, styles: {}, layout: { x: 900, y: 20, w: 44, h: 44 } },
+    { id: 'pic', type: 'image', props: { src: dot(WHITE), srcOther: dot(BLACK), alt: 'Logo' }, styles: {}, layout: { x: 40, y: 40, w: 200, h: 100 } },
+    { id: 'block', type: 'html', props: { code: '<p>In a block</p>' }, styles: {}, layout: { x: 40, y: 160, w: 400, h: 120 } },
+  ]
+  await api(request, 'PATCH', `/sites/${site.id}/`, {
+    schema: { ...full.schema, pages: [{ ...full.schema.pages[0], background: '#ffffff', themeColor: '#123456', components }] },
+  })
+  await openEditor(page, site.id)
+  const slug = await publish(page, request, site.id)
+
+  const { viewer, visitor } = await visit(browser, slug)
+  const logo = visitor.getByRole('img', { name: 'Logo' })
+  const bar = () => visitor.evaluate(() => document.querySelector('meta[name="theme-color"]').getAttribute('content'))
+  await expect(logo).toHaveCount(1)
+  await expect(logo).toHaveAttribute('src', dot(WHITE))
+  expect(await bar()).toBe('#123456')
+  await visitor.getByRole('button', { name: 'Theme' }).click()
+  await expect(logo).toHaveCount(1)
+  await expect(logo).toHaveAttribute('src', dot(BLACK))
+  expect(await bar()).toBe('#111317')
+
+  // Opening in the other palette: the block is held back, then let go.
+  await visitor.goto(`${BACKEND}/s/${slug}/?pwb-theme=dark`)
+  await expect(logo).toHaveAttribute('src', dot(BLACK))
+  expect(await bar()).toBe('#111317')
+  const frame = visitor.locator('iframe')
+  await expect(frame).toHaveCount(1)
+  await expect.poll(() => frame.evaluate((el) => getComputedStyle(el).animationName)).toBe('none')
+  await expect(frame).toBeVisible()
+  await viewer.close()
+  await api(request, 'DELETE', `/sites/${site.id}/`)
+})
+
 test('an HTML page written in rgb and named colors switches, and shows the other palette in View before it has a switch', async ({ page, request, browser }) => {
   const siteId = await createHtmlSite(request, 'E2E theme rgb', [{
     html: '<!DOCTYPE html><html><head><style>body{background:rgb(255,255,255);color:rgba(23,23,35,.9)}.card{background:white;border:1px solid silver}</style></head>'

@@ -240,6 +240,7 @@ export const registry = {
     defaultStyles: { borderRadius: '18px', objectFit: 'cover' },
     editableProps: [
       { key: 'src', label: 'Image', control: 'image' },
+      { key: 'srcOther', label: 'Image in the other color mode', control: 'image' },
       { key: 'alt', label: 'Alt text', control: 'text' },
     ],
     editableStyles: [

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { ColorModeRoot } from './ColorMode.jsx'
-import { ThemeToggle } from './components.jsx'
+import { Image, ThemeToggle } from './components.jsx'
 
 const light = { base: 'light', alt: 'dark', followDevice: false, light: {}, other: {} }
 const root = () => document.querySelector('[data-pwb-color-root]')
@@ -81,6 +81,23 @@ describe('when what the page opens in changes while it is open', () => {
     const { rerender } = render(<ColorModeRoot mode={null}><span>page</span></ColorModeRoot>)
     rerender(tree({ ...light, initial: 'dark' }))
     expect(palette()).toBe('dark')
+  })
+})
+
+describe('an image with a version for the other palette', () => {
+  const picture = { src: 'https://a.test/light.png', _otherSrc: 'https://a.test/dark.png', _otherMode: 'dark', alt: 'Logo' }
+  const src = () => screen.getByRole('img', { name: 'Logo' }).getAttribute('src')
+
+  it('shows the one for the palette on, and changes with it', () => {
+    render(<ColorModeRoot mode={light}><Image props={picture} style={{}} /><ThemeToggle props={{ label: 'Theme' }} style={{}} /></ColorModeRoot>)
+    expect(src()).toBe('https://a.test/light.png')
+    fireEvent.click(screen.getByRole('button', { name: 'Theme' }))
+    expect(src()).toBe('https://a.test/dark.png')
+  })
+
+  it('shows its own without a second palette', () => {
+    render(<Image props={picture} style={{}} />)
+    expect(src()).toBe('https://a.test/light.png')
   })
 })
 

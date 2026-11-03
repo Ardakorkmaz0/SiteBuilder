@@ -300,6 +300,47 @@ describe('a colour however it is written', () => {
   })
 })
 
+describe('an image with a version for the other palette', () => {
+  const picture = (extra = {}) => block('image', { objectFit: 'cover' }, { id: 'pic', props: { src: 'https://a.test/light.png', srcOther: 'https://a.test/dark.png', alt: 'Logo', ...extra } })
+  const images = (html) => [...new JSDOM(html).window.document.querySelectorAll('img')]
+    .map((img) => [img.getAttribute('src'), img.className.includes('pwb-on-light') ? 'light' : img.className.includes('pwb-on-dark') ? 'dark' : null, img.getAttribute('alt'), img.getAttribute('loading')])
+  const both = [['https://a.test/light.png', 'light', 'Logo', null], ['https://a.test/dark.png', 'dark', 'Logo', 'lazy']]
+
+  it('is written twice by every writer, the other one loading only when it is needed', () => {
+    const schema = site([toggle, picture()])
+    expect(images(publishedPagesFor(schema)[0].html)).toEqual(both)
+    expect(images(schemaToFiles(schema).find((file) => file.name === 'index.html').content)).toEqual(both)
+    expect(images(schemaToResponsiveHtml(schema, 'x', { colorMode: modeOf(schema) }))).toEqual(both)
+  })
+
+  it('inside a parent too, keeping the id on the one that opens', () => {
+    const box = block('container', {}, { id: 'box', children: [picture()] })
+    expect(images(publishedPagesFor(site([toggle, box]))[0].html)).toEqual(both)
+  })
+
+  it('is written once on a site with one palette, where it can never show', () => {
+    expect(images(publishedPagesFor(site([picture()]))[0].html)).toEqual([['https://a.test/light.png', null, 'Logo', null]])
+  })
+
+  it('belongs to the palette the page is not designed in', () => {
+    const slate = site([toggle, picture()], { theme: presetTheme(THEME_PRESETS.find((preset) => preset.id === 'slate')) })
+    expect(images(publishedPagesFor(slate)[0].html).map(([src, on]) => [src, on])).toEqual([
+      ['https://a.test/light.png', 'dark'],
+      ['https://a.test/dark.png', 'light'],
+    ])
+  })
+
+  it('does not carry an address a page must not load', () => {
+    const [page] = publishedPagesFor(site([toggle, picture({ srcOther: 'javascript:alert(1)' })]))
+    expect(page.html).not.toContain('javascript:alert')
+  })
+
+  it('shows only the one for the palette on', () => {
+    const css = new JSDOM(colorModeHeadTags(modeOf(site()))).window.document.querySelector('style').textContent
+    expect(css).toContain('[data-pwb-theme="light"] .pwb-on-dark,[data-pwb-theme="dark"] .pwb-on-light{display:none!important}')
+  })
+})
+
 describe('a tab row', () => {
   const mode = modeOf(site())
   const tabs = (props, styles = {}) => withColorModeComponents([block('tabs', styles, { props })], mode)[0]
@@ -479,10 +520,10 @@ describe('in the visitor\'s browser', () => {
 
   const slate = presetTheme(THEME_PRESETS.find((preset) => preset.id === 'slate'))
 
-  function visit({ stored = null, url = 'https://example.test/', prefersDark = false, follow = false, sandboxed = false, schema = null } = {}) {
+  function visit({ stored = null, url = 'https://example.test/', prefersDark = false, follow = false, sandboxed = false, schema = null, head = '', body = '', stillLoading = false } = {}) {
     const mode = schema ? modeOf(schema) : { ...modeOf(site()), followDevice: follow }
     const page = new JSDOM(
-      '<!DOCTYPE html><html><head></head><body><button data-pwb-theme-toggle aria-pressed="false">x</button>'
+      `<!DOCTYPE html><html><head>${head}</head><body>${body}<button data-pwb-theme-toggle aria-pressed="false">x</button>`
         + '<a id="about" href="/about/">About</a><a id="jump" href="#top">Top</a><a id="away" href="https://elsewhere.test/">Away</a>'
         + `${themeToggleHtml({ states: 'three' })}<a id="sibling" href="/s/site-a/about/">Same site</a><a id="neighbour" href="/s/site-b/">Another site</a><a id="neighbour-prefix" href="/s/site-a-2/">Similar name</a></body></html>`,
       { url, runScripts: 'outside-only' },
@@ -504,6 +545,7 @@ describe('in the visitor\'s browser', () => {
       listeners.forEach((listener) => listener())
     }
     window.eval(colorModeScript(mode))
+    if (stillLoading) Object.defineProperty(window.document, 'readyState', { value: 'interactive', configurable: true })
     window.eval(builderInteractiveJs())
     window.document.dispatchEvent(new window.Event('DOMContentLoaded'))
     return window
@@ -571,6 +613,80 @@ describe('in the visitor\'s browser', () => {
       expect(root(window).getAttribute('data-pwb-theme-pick')).toBe('light')
       press('light', 'ArrowLeft')
       expect(root(window).getAttribute('data-pwb-theme-pick')).toBe('system')
+    })
+  })
+
+  describe('the browser\'s own bar', () => {
+    const bar = (window) => window.document.querySelector('meta[name="theme-color"]').getAttribute('content')
+    const head = '<meta name="theme-color" content="#123456">'
+
+    it('takes the page\'s color in the other palette, and goes back', () => {
+      const window = visit({ head })
+      expect(bar(window)).toBe('#123456')
+      press(window)
+      expect(bar(window)).toBe('#111317')
+      press(window)
+      expect(bar(window)).toBe('#123456')
+    })
+
+    it('is right from the start on a page that opens in the other palette, and goes back from there', () => {
+      const window = visit({ head, stored: 'dark' })
+      expect(bar(window)).toBe('#111317')
+      press(window)
+      expect(bar(window)).toBe('#123456')
+    })
+
+    it('follows the device with the page', () => {
+      const window = visit({ head, schema: site([toggle], { colorMode: { start: 'system' } }) })
+      window.setDevice(true)
+      expect(bar(window)).toBe('#111317')
+      window.setDevice(false)
+      expect(bar(window)).toBe('#123456')
+    })
+
+    it('stays out of a page that set no color for it', () => {
+      const window = visit()
+      press(window)
+      expect(window.document.querySelector('meta[name="theme-color"]')).toBeNull()
+    })
+  })
+
+  describe('an HTML block on a page opening in the other palette', () => {
+    const body = '<iframe srcdoc="<p>x</p>"></iframe>'
+    const after = (ms) => new Promise((resolve) => { setTimeout(resolve, ms) })
+    const waits = (window) => window.document.documentElement.hasAttribute('data-pwb-theme-wait')
+
+    it('waits only then', () => {
+      expect(waits(visit())).toBe(false)
+      expect(waits(visit({ stored: 'light' }))).toBe(false)
+      expect(waits(visit({ stored: 'dark' }))).toBe(true)
+    })
+
+    it('is let go a little after it is told, when it loads', async () => {
+      const window = visit({ stored: 'dark', body, stillLoading: true })
+      const frame = window.document.querySelector('iframe')
+      await after(90)
+      expect(frame.style.animation).toBe('')
+      frame.dispatchEvent(new window.Event('load'))
+      expect(frame.style.animation).toBe('')
+      await after(90)
+      expect(frame.style.animation).toContain('none')
+    })
+
+    it('is let go when the page has loaded, if it loaded before the runtime ran', async () => {
+      const window = visit({ stored: 'dark', body, stillLoading: true })
+      const frame = window.document.querySelector('iframe')
+      await after(90)
+      expect(frame.style.animation).toBe('')
+      window.dispatchEvent(new window.Event('load'))
+      await after(90)
+      expect(frame.style.animation).toContain('none')
+    })
+
+    it('has a way out in the stylesheet, for a page whose runtime never came', () => {
+      const css = new JSDOM(colorModeHeadTags(modeOf(site()))).window.document.querySelector('style').textContent
+      expect(css).toContain('[data-pwb-theme-wait] iframe[srcdoc]{animation:pwb-frame-in 0s linear 3s both}')
+      expect(css).toContain('@keyframes pwb-frame-in{from{visibility:hidden}to{visibility:visible}}')
     })
   })
 

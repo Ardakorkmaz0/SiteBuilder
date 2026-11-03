@@ -289,7 +289,8 @@ export function LinkButton({ props, style }) {
 }
 
 export function Image({ props, style }) {
-  const src = sanitizeImageSrc(props.src)
+  const colorMode = useColorMode()
+  const src = sanitizeImageSrc(props._otherSrc && colorMode?.current === props._otherMode ? props._otherSrc : props.src)
   return (
     <img
       src={src || undefined}
