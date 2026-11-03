@@ -108,6 +108,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dark-mode-stage3-${{ matrix.browser }}
-          path: frontend/test-results
+          path: |
+            frontend/playwright-report
+            frontend/test-results
           if-no-files-found: ignore
           retention-days: 7
