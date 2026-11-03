@@ -157,9 +157,17 @@ test('the three-way switch: the device is a choice, followed while the page is o
   await expect(again.getByRole('radio', { name: 'Device', exact: true })).toHaveAttribute('aria-checked', 'true')
   await again.emulateMedia({ colorScheme: 'dark' })
   await expect.poll(() => palette(again)).toBe('dark')
-  await again.reload()
-  expect(await palette(again)).toBe('dark')
   await viewer.close()
+
+  // A device set to dark from the first request: the head script reads it
+  // before the page paints, so there is no waiting for it here.
+  const darkDevice = await browser.newContext({ storageState: { cookies: [], origins: [] }, colorScheme: 'dark' })
+  const first = await darkDevice.newPage()
+  await first.goto(`${BACKEND}/s/${slug}/?pwb-theme=system`)
+  expect(await palette(first)).toBe('dark')
+  await first.reload()
+  expect(await palette(first)).toBe('dark')
+  await darkDevice.close()
   await api(request, 'DELETE', `/sites/${site.id}/`)
 })
 

@@ -53,8 +53,10 @@ for (const initiallyEmpty of [false, true]) test(`importing HTML into an inactiv
     await header(page).getByRole('button', { name: 'Redo (Ctrl+Shift+Z)', exact: true }).click()
     await expect(source(page)).toHaveValue(/About imported revision/)
     await save(page)
+    // A reload comes back to the open file and its source view. Clicking the
+    // open file here would toggle that view off, whenever the click came late
+    // enough to reach it.
     await page.reload()
-    await file(page, 'About').click()
     await expect(source(page)).toHaveValue(/About imported revision/)
   } finally { await api(request, 'DELETE', `/sites/${siteId}/`) }
 })
