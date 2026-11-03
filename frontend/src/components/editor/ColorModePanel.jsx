@@ -8,6 +8,7 @@ import { useLanguage } from '../../i18n/useLanguage.js'
 import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
 import { colorModeFor, hasThemeToggle, siteStart } from '../../utils/colorMode.js'
 import { CANVAS_WIDTH } from '../registry.jsx'
+import { moveInRadioGroup } from '../../ui/radioGroupKeys.js'
 
 const ROLES = [
   ['backgroundColor', 'Page background'],
@@ -54,13 +55,14 @@ export default function ColorModePanel({ htmlMode = false, htmlMap = NO_HTML }) 
     <PanelGroup id="theme-color-mode" title={dark ? t('Dark mode') : t('Light mode')} defaultOpen>
       <div className="space-y-1.5">
         <p id="theme-color-mode-start" className="text-[11px] font-medium leading-snug text-[var(--studio-text)]">{t('The site opens in')}</p>
-        <div role="radiogroup" aria-labelledby="theme-color-mode-start" className="studio-segment flex w-full">
+        <div role="radiogroup" aria-labelledby="theme-color-mode-start" onKeyDown={moveInRadioGroup} className="studio-segment flex w-full">
           {STARTS.map(([value, label]) => (
             <button
               key={value}
               type="button"
               role="radio"
               aria-checked={start === value}
+              tabIndex={start === value ? 0 : -1}
               onClick={() => { if (start !== value) updateColorMode({ start: value }) }}
               className={`studio-segment-btn flex-1 whitespace-nowrap ${start === value ? 'studio-segment-btn-active' : ''}`}
             >

@@ -40,6 +40,7 @@ import {
   getAiPreferences,
   setAiPreferences,
 } from '../../utils/aiPreferences.js'
+import { moveInRadioGroup } from '../../ui/radioGroupKeys.js'
 
 const FIELD =
   'w-full rounded-lg border border-[var(--studio-border-strong)] bg-[var(--studio-panel)] px-2 py-1 text-sm text-[var(--studio-text)] focus:bg-[var(--studio-control)] focus:outline-none'
@@ -155,13 +156,14 @@ function BehaviourSettings() {
       </div>
       <div>
         <span className={FIELD_LABEL}>{t('Creativity')}</span>
-        <div className="studio-segment" role="radiogroup" aria-label={t('Creativity')} aria-describedby={`${id}-creativity-hint`}>
+        <div className="studio-segment" role="radiogroup" aria-label={t('Creativity')} aria-describedby={`${id}-creativity-hint`} onKeyDown={moveInRadioGroup}>
           {AI_CREATIVITY.map((c) => (
             <button
               key={c.id}
               type="button"
               role="radio"
               aria-checked={prefs.creativity === c.id}
+              tabIndex={creativity.id === c.id ? 0 : -1}
               onClick={() => change({ creativity: c.id })}
               className={prefs.creativity === c.id ? 'studio-segment-btn studio-segment-btn-active flex-1' : 'studio-segment-btn flex-1'}
             >

@@ -236,6 +236,19 @@ describe('the history of a published site, with draft and live apart', () => {
     expect(payload.published_pages.map((page) => page.path)).toEqual(['', 'contact'])
   }, 30000)
 
+  it('changes between draft and live with the arrow keys', async () => {
+    await openEditor()
+    const versions = screen.getByRole('radiogroup', { name: 'Version shown' })
+    const live = within(versions).getByRole('radio', { name: 'Live', exact: true })
+    expect(live).toHaveAttribute('tabindex', '-1')
+
+    fireEvent.keyDown(within(versions).getByRole('radio', { name: 'Draft', exact: true }), { key: 'ArrowRight' })
+
+    expect(live).toHaveAttribute('aria-checked', 'true')
+    expect(live).toHaveFocus()
+    expect(screen.getByRole('region', { name: 'Live version' })).toBeInTheDocument()
+  }, 30000)
+
   it('shows the live pages from the switch at the top and copies them into the draft', async () => {
     await openEditor()
     const versions = screen.getByRole('radiogroup', { name: 'Version shown' })

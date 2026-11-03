@@ -332,6 +332,17 @@ describe('in the visitor\'s browser', () => {
     expect(theme(visit({ schema, sandboxed: true, url: window.location.href }))).toBe('light')
   })
 
+  it('without storage, takes going back to the designed palette to the next page', () => {
+    const schema = site([toggle], { colorMode: { start: 'dark' } })
+    const window = visit({ schema, sandboxed: true })
+    press(window)
+    const about = window.document.getElementById('about')
+    about.addEventListener('click', (event) => event.preventDefault())
+    about.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(about.getAttribute('href')).toBe('https://example.test/about/?pwb-theme=light')
+    expect(theme(visit({ schema, sandboxed: true, url: about.href }))).toBe('light')
+  })
+
   it('without storage and without a choice, leaves the address and the links alone', () => {
     const window = visit({ schema: site([toggle], { colorMode: { start: 'dark' } }), sandboxed: true })
     const about = window.document.getElementById('about')

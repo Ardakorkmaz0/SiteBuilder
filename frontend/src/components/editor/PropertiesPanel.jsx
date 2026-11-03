@@ -51,6 +51,7 @@ import ColorModePanel from './ColorModePanel.jsx'
 import { FIT_TYPES } from '../../utils/boxFit.js'
 import { anchorOf, anchorProblem, slugifyAnchor } from '../../utils/anchors.js'
 import HtmlPageColors from './HtmlPageColors.jsx'
+import { moveInRadioGroup } from '../../ui/radioGroupKeys.js'
 
 // How far below the top edge a bar can be drawn and still be read as "meant
 // to sit at the top". Above this the Y is a design position, not a gap.
@@ -1100,7 +1101,7 @@ export default function PropertiesPanel({
           {/* Where the theme goes. A page on "This page only" keeps its own
               theme: the site theme skips it, and its changes skip the site. */}
           <div className="space-y-1.5">
-            <div role="radiogroup" aria-label={t('Where the theme applies')} className="studio-segment flex w-full">
+            <div role="radiogroup" aria-label={t('Where the theme applies')} onKeyDown={moveInRadioGroup} className="studio-segment flex w-full">
               {[['site', t('Whole site'), t('Whole site')], ['page', t('This page'), t('This page only')]].map(([scope, label, hint]) => (
                 <button
                   key={scope}
@@ -1108,6 +1109,7 @@ export default function PropertiesPanel({
                   title={hint}
                   role="radio"
                   aria-checked={(scope === 'page') === ownTheme}
+                  tabIndex={(scope === 'page') === ownTheme ? 0 : -1}
                   onClick={() => { if ((scope === 'page') !== ownTheme) setPageThemeScope(page.id, scope) }}
                   className={`studio-segment-btn flex-1 whitespace-nowrap ${(scope === 'page') === ownTheme ? 'studio-segment-btn-active' : ''}`}
                 >
