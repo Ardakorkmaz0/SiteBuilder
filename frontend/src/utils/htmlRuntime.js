@@ -64,6 +64,7 @@ const INTERACTIVE_SCRIPT = `
     function sitePath(value) {
       return typeof value === 'string' && /^\\/(?!\\/)/.test(value);
     }
+    //#if forms
     // A path that resolves on this site, as a full address. The parser reads
     // "/\\x" and "/<line break>/x" as "//x", another site; and a path that
     // resolves to "//x" ("/a/..//x") turns into another site again if it is
@@ -76,6 +77,7 @@ const INTERACTIVE_SCRIPT = `
         return url.host === location.host && /^https?:$/.test(url.protocol) ? url.href : '';
       } catch (e) { return ''; }
     }
+    //#endif forms
     function safeDestination(value) {
       try {
         var url = new URL(value, location.href);
@@ -89,10 +91,13 @@ const INTERACTIVE_SCRIPT = `
     function turkish() {
       return /^tr(-|$)/i.test(document.documentElement.getAttribute('lang') || '');
     }
+    //#if nav
     function navLabel(open) {
       if (turkish()) return open ? 'Gezinme menüsünü kapat' : 'Gezinme menüsünü aç';
       return open ? 'Close navigation menu' : 'Open navigation menu';
     }
+    //#endif nav
+    //#if tabs
     function selectTab(tabsRoot, tabId) {
       var tabs = tabsRoot.querySelectorAll('[role="tab"][data-builder-tab]');
       for (var i = 0; i < tabs.length; i++) {
@@ -110,6 +115,8 @@ const INTERACTIVE_SCRIPT = `
         }
       }
     }
+    //#endif tabs
+    //#if palette
     // The site's light/dark switch. The head script (colorMode.js) has put
     // the palette, and which one the site was designed in, on the root.
     function syncThemeToggles() {
@@ -251,7 +258,9 @@ const INTERACTIVE_SCRIPT = `
       try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'pwb-color-mode', mode: pick }, '*'); } catch (e) {}
       syncThemeToggles();
     }
+    //#endif palette
     function onClick(event) {
+      //#if palette
       var themeChoice = event.target && event.target.closest && event.target.closest('[data-pwb-theme-choose]');
       if (themeChoice) {
         event.preventDefault();
@@ -264,6 +273,8 @@ const INTERACTIVE_SCRIPT = `
         switchPalette();
         return;
       }
+      //#endif palette
+      //#if reveal
       // A password field's eye: show what was typed, and hide it again.
       var reveal = event.target && event.target.closest && event.target.closest('[data-pwb-reveal]');
       if (reveal) {
@@ -276,6 +287,8 @@ const INTERACTIVE_SCRIPT = `
         }
         return;
       }
+      //#endif reveal
+      //#if nav
       var navToggle = event.target && event.target.closest && event.target.closest('[data-builder-mobile-nav-toggle]');
       if (navToggle) {
         var navRoot = navToggle.closest('[data-builder-mobile-nav]');
@@ -289,6 +302,8 @@ const INTERACTIVE_SCRIPT = `
         }
         return;
       }
+      //#endif nav
+      //#if tabs
       var tab = event.target && event.target.closest && event.target.closest('[role="tab"][data-builder-tab]');
       if (tab) {
         var root = tab.closest('[data-builder-tabs]');
@@ -298,10 +313,12 @@ const INTERACTIVE_SCRIPT = `
         }
         return;
       }
+      //#endif tabs
       // Srcdoc previews have no navigation base; real published documents do.
       // Hash scrolling and mobile navigation work in both contexts.
       var link = event.target && event.target.closest && event.target.closest('a[href]');
       if (!link || event.defaultPrevented) return;
+      //#if nav
       var openNav = link.closest('[data-builder-mobile-nav]');
       if (openNav) {
         openNav.setAttribute('data-mobile-open', 'false');
@@ -312,6 +329,7 @@ const INTERACTIVE_SCRIPT = `
           openNavToggle.textContent = '☰';
         }
       }
+      //#endif nav
       var href = String(link.getAttribute('href') || '').trim();
       if (!href) { event.preventDefault(); return; }
       // Double-escape slashes so the emitted regex literal stays escaped —
@@ -347,6 +365,7 @@ const INTERACTIVE_SCRIPT = `
         try { parent.postMessage({ type: 'pwb-navigate', href: href }, '*'); } catch (e) {}
       }
     }
+    //#if forms
     // Forms inside a sandboxed iframe (allow-scripts WITHOUT allow-same-origin)
     // try to navigate to their action URL on submit. Empty / hash / relative
     // actions resolve to about:srcdoc and blank the iframe out — same failure
@@ -507,6 +526,8 @@ const INTERACTIVE_SCRIPT = `
       event.preventDefault();
       sendToInbox(form);
     }
+    //#endif forms
+    //#if sticky
     // Sticky components on ABSOLUTE component pages. They keep their absolute
     // design position (no flow exists for native position:sticky), and this
     // handler translates them once the viewport passes them — sticking to the
@@ -545,6 +566,7 @@ const INTERACTIVE_SCRIPT = `
       window.addEventListener('resize', update);
       update();
     }
+    //#endif sticky
     function init() {
       // A document can end up carrying two copies of this script — an export
       // already contains it, and a viewer that injects the runtime adds
@@ -554,6 +576,7 @@ const INTERACTIVE_SCRIPT = `
       if (window.__pwbInteractiveReady) return;
       window.__pwbInteractiveReady = true;
       document.addEventListener('click', onClick);
+      //#if palette
       // Before any other click handling: a link to another page of the site
       // takes the palette along when the address is where it lives, also one
       // opened in a new tab with the middle button or from its menu.
@@ -580,6 +603,8 @@ const INTERACTIVE_SCRIPT = `
         choosePalette(next.getAttribute('data-pwb-theme-choose'));
         next.focus();
       });
+      //#endif palette
+      //#if forms
       document.addEventListener('submit', onSubmit);
       window.addEventListener('message', function (event) {
         if (!standalone() && event.source === window.parent && event.data && event.data.type === 'pwb-form-result') {
@@ -589,19 +614,29 @@ const INTERACTIVE_SCRIPT = `
       });
       window.addEventListener('message', relayBlockForm);
       window.addEventListener('message', followBlockLink);
+      //#endif forms
+      //#if nav
       // The menu button is written into the page with an English label.
       var navToggles = document.querySelectorAll('[data-builder-mobile-nav-toggle]');
       for (var n = 0; n < navToggles.length; n++) {
         navToggles[n].setAttribute('aria-label', navLabel(navToggles[n].getAttribute('aria-expanded') === 'true'));
       }
+      //#endif nav
+      //#if reveal
       // So is a password field's eye; one the author renamed keeps its name.
       if (turkish()) {
         var reveals = document.querySelectorAll('[data-pwb-reveal][aria-label="Show password"]');
         for (var r = 0; r < reveals.length; r++) reveals[r].setAttribute('aria-label', 'Şifreyi göster');
       }
+      //#endif reveal
+      //#if sticky
       initSticky();
+      //#endif sticky
+      //#if palette
       syncThemeToggles();
       initPalette();
+      //#endif palette
+      //#if tabs
       // Ensure each tabs widget has exactly one panel visible on load (the one
       // whose tab is marked aria-selected, falling back to the first tab).
       var roots = document.querySelectorAll('[data-builder-tabs]');
@@ -611,11 +646,12 @@ const INTERACTIVE_SCRIPT = `
         if (!selected) selected = root.querySelector('[role="tab"][data-builder-tab]');
         if (selected) selectTab(root, selected.getAttribute('data-builder-tab'));
       }
+      //#endif tabs
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
   })();
-` + boxFitScript()
+`
 
 // Blocks sized by hand fit their box (utils/boxFit.js): on the published page
 // the native ones ([data-pwb-fit] around the block), and inside an HTML block
@@ -804,9 +840,7 @@ const INTERACTIVE_STYLE = `[data-builder-tabs] [role="tab"]{appearance:none;back
 // instead of all of them or none.
 const RUNTIME_STYLE_TAG = `<style data-builder-runtime-style>${RUNTIME_STYLE}</style>`
 const MOTION_STYLE_TAG = `<style data-builder-motion-style>${MOTION_CSS}</style>`
-const INTERACTIVE_STYLE_TAG = `<style data-builder-interactive-style>${INTERACTIVE_STYLE}${FORM_FIELD_CSS}${THEME_TOGGLE_CSS}${BOX_FIT_CSS}</style>`
 const RUNTIME_SCRIPT_TAG = `<script data-builder-runtime-script>${RUNTIME_SCRIPT}${SCRIPT_END}`
-const INTERACTIVE_TAG = `<script data-builder-interactive>${INTERACTIVE_SCRIPT}${SCRIPT_END}`
 const MOTION_OBSERVER_TAG = `<script data-builder-motion>${MOTION_OBSERVER_JS}${SCRIPT_END}`
 
 // Every injection below goes through insertBeforeClosingTag, which splices by
@@ -815,21 +849,96 @@ const MOTION_OBSERVER_TAG = `<script data-builder-motion>${MOTION_OBSERVER_JS}${
 // take the FIRST closing tag in the string — which on a page whose own script
 // writes a document is inside that script.
 
-// The interactive shim alone (style + script) for static HTML exports that do
-// not need the editor's readonly enforcement — only the runtime behaviours that
-// make tabs/modals/dropdowns work in the published page.
-export function builderInteractiveTags() {
-  return INTERACTIVE_STYLE_TAG + INTERACTIVE_TAG + MOTION_STYLE_TAG + MOTION_OBSERVER_TAG
+// What a page needs of the shim, read from its own markup. A script of the
+// author's can make anything at any time, so with one on the page it gets it all.
+// No source means nothing is known about the page: it gets it all as well.
+const AUTHOR_SCRIPT = /<script\b(?![^>]*\bdata-(?:builder-(?:interactive|layout|motion|motion-arm|runtime-script)|pwb-color-mode)\b)/i
+const NEEDS = {
+  palette: /data-pwb-(?:color-mode|theme)/,
+  nav: /data-builder-mobile-nav/,
+  reveal: /data-pwb-reveal/,
+  tabs: /data-builder-tab/,
+  // An HTML block's form and links are passed up to the page around it.
+  forms: /<form\b|<iframe\b/i,
+  sticky: /data-builder-sticky/,
+  fit: /data-pwb-(?:fit|container-width)/,
+  fields: /<(?:input|select|textarea)\b|pwb-(?:ph|focus|password)/i,
+  motion: /data-anim-in|pwb-hover/,
+}
+const ALL_NEEDS = Object.fromEntries(Object.keys(NEEDS).map((need) => [need, true]))
+
+export function runtimeNeeds(source) {
+  if (typeof source !== 'string' || AUTHOR_SCRIPT.test(source)) return ALL_NEEDS
+  return Object.fromEntries(Object.entries(NEEDS).map(([need, pattern]) => [need, pattern.test(source)]))
+}
+
+// A written page's stylesheet without the rules nothing on the page can match and
+// the theme variables nothing reads. Only for rules on their own line, starting
+// with a class: anything else stays. `source` is everything the page says.
+// `keepVariables`: a project's stylesheet is a file its owner goes on to edit,
+// and the theme's variables are what they would edit it with.
+export function withoutUnusedRules(css, source, { keepVariables = false } = {}) {
+  if (AUTHOR_SCRIPT.test(source)) return css
+  const classes = new Set([...source.matchAll(/\bclass="([^"]*)"/g)].flatMap((match) => match[1].split(/\s+/)))
+  const everything = css + source
+  const usable = (selector) => [...selector.replace(/:not\([^)]*\)/g, '').matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].every((match) => classes.has(match[1]))
+  return css
+    .split('\n')
+    .filter((line) => {
+      const variable = /^\s*(--site-[\w-]+):/.exec(line)
+      if (variable) return keepVariables || everything.includes(`var(${variable[1]}`)
+      const rule = /^\s*(\.[^{}]*)\{[^{}]*\}\s*$/.exec(line)
+      return !rule || rule[1].split(',').some(usable)
+    })
+    .join('\n')
+    .replace(/^\s*@media[^{\n]*\{\s*\n\s*\}\s*$/gm, '')
+}
+
+// The script for those needs: the parts a page does not use are cut, and the
+// comments and indentation are for this file, not for every published page.
+function compactScript(script, needs) {
+  return script
+    .replace(/^[ \t]*\/\/#if (\w+)\n([\s\S]*?)^[ \t]*\/\/#endif \1\n/gm, (_, need, part) => (needs[need] ? part : ''))
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('//'))
+    .join('\n')
+}
+
+const interactiveJs = (needs) => compactScript(INTERACTIVE_SCRIPT, needs) + (needs.fit ? `\n${compactScript(boxFitScript(), needs)}` : '')
+
+function interactiveCss(needs) {
+  return [
+    needs.tabs ? INTERACTIVE_STYLE : '',
+    needs.fields ? FORM_FIELD_CSS : '',
+    needs.palette ? THEME_TOGGLE_CSS : '',
+    needs.fit ? BOX_FIT_CSS : '',
+  ].join('')
+}
+
+const interactiveTags = (needs) => {
+  const css = interactiveCss(needs)
+  return `${css ? `<style data-builder-interactive-style>${css}</style>` : ''}<script data-builder-interactive>${interactiveJs(needs)}${SCRIPT_END}`
+}
+
+// The interactive shim (style + script) for static HTML exports that do not need
+// the editor's readonly enforcement. The writers have put the motion stylesheet
+// in the head already.
+export function builderInteractiveTags(source) {
+  const needs = runtimeNeeds(source)
+  return interactiveTags(needs) + (needs.motion ? MOTION_OBSERVER_TAG : '')
 }
 
 // Split-project exports share these assets across every page instead of
 // embedding the same runtime into each HTML document.
-export function builderInteractiveCss() {
-  return `${INTERACTIVE_STYLE}${FORM_FIELD_CSS}${THEME_TOGGLE_CSS}${BOX_FIT_CSS}\n${MOTION_CSS}`
+export function builderInteractiveCss(source) {
+  const needs = runtimeNeeds(source)
+  return `${interactiveCss(needs)}${needs.motion ? `\n${MOTION_CSS}` : ''}`
 }
 
-export function builderInteractiveJs() {
-  return `${MOTION_ARM_JS}\n${INTERACTIVE_SCRIPT}\n${MOTION_OBSERVER_JS}`
+export function builderInteractiveJs(source) {
+  const needs = runtimeNeeds(source)
+  return [needs.motion ? MOTION_ARM_JS : '', interactiveJs(needs), needs.motion ? MOTION_OBSERVER_JS : ''].filter(Boolean).join('\n')
 }
 
 // Does this document already carry the interactive shim / the motion runtime?
@@ -854,11 +963,11 @@ export function withBuilderInteractiveHtml(html) {
   const out = String(html || '')
   const shim = hasInteractiveRuntime(out)
   const motion = hasMotionRuntime(out)
-  if (shim && motion) return out
   // Only what is missing: an older export has the shim but no motion, and a
   // second shim would double-bind every handler it installs.
-  const inject = (shim ? '' : INTERACTIVE_STYLE_TAG + INTERACTIVE_TAG)
-    + (motion ? '' : MOTION_STYLE_TAG + MOTION_OBSERVER_TAG)
+  const needs = runtimeNeeds(out)
+  const inject = (shim ? '' : interactiveTags(needs))
+    + (motion || !needs.motion ? '' : MOTION_STYLE_TAG + MOTION_OBSERVER_TAG)
   if (/<style[^>]*data-pwb-embed-reset/i.test(out)) {
     const head = insertBeforeClosingTag(out, 'head', inject)
     if (head) return head
@@ -879,7 +988,7 @@ export function withBuilderRuntimeHtml(html) {
   // end of <body>, where the elements they look for already exist.
   const head = RUNTIME_STYLE_TAG + (motion ? '' : MOTION_STYLE_TAG)
   const body = RUNTIME_SCRIPT_TAG
-    + (shim ? '' : INTERACTIVE_TAG)
+    + (shim ? '' : interactiveTags(ALL_NEEDS))
     + (motion ? '' : MOTION_OBSERVER_TAG)
   const headed = insertBeforeClosingTag(out, 'head', head)
   if (headed) out = headed
