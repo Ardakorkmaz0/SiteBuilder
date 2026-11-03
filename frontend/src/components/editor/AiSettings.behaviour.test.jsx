@@ -64,6 +64,21 @@ describe('the behaviour settings', () => {
   })
 })
 
+describe('the creativity choice', () => {
+  it('changes with the arrow keys, and is one Tab stop', () => {
+    renderSettings()
+    const checked = screen.getAllByRole('radio').filter((radio) => radio.getAttribute('aria-checked') === 'true')
+    expect(checked).toHaveLength(1)
+    expect(screen.getAllByRole('radio').filter((radio) => radio.getAttribute('tabindex') === '0')).toEqual(checked)
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Creative' }))
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Creative' }), { key: 'ArrowLeft' })
+
+    expect(getAiPreferences().creativity).not.toBe('creative')
+    expect(screen.getByRole('radio', { name: 'Creative' })).toHaveAttribute('tabindex', '-1')
+  })
+})
+
 describe('the connection test', () => {
   it('reports a working key with how long it took', async () => {
     localStorage.setItem('pwb_ai_provider', 'groq')

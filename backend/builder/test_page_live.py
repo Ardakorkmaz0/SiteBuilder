@@ -226,6 +226,18 @@ class TestStatusOfEachPage:
 
         assert response.data['page_live'] == {'home': 'older', 'about': 'older'}
 
+    def test_a_switch_only_in_the_home_document_makes_the_other_pages_older(self, client, site):
+        send(client, site, 'home', 'Home v1')
+        send(client, site, 'about', 'About v1')
+        changed = document('Home v1') + '<button data-pwb-theme-toggle>x</button>'
+
+        response = client.patch(f'/api/sites/{site.pk}/', {'html': changed}, format='json')
+
+        site.refresh_from_db()
+        assert site.html == changed
+        assert 'data-pwb-theme-toggle' not in site.schema['pages'][0]['html']
+        assert response.data['page_live'] == {'home': 'older', 'about': 'older'}
+
     def test_removing_the_only_switch_makes_the_other_pages_older(self, client, site):
         with_switch = schema()
         with_switch['pages'][1]['components'] = [

@@ -76,6 +76,48 @@ test('the owner chooses what the site opens in, and a visitor can still change i
   await api(request, 'DELETE', `/sites/${site.id}/`)
 })
 
+test('an HTML block on a dark page is not a white box', async ({ page, request, browser }) => {
+  const { data: site } = await api(request, 'POST', '/sites/', { title: 'E2E dark block' })
+  const { data: full } = await api(request, 'GET', `/sites/${site.id}/`)
+  const block = { id: 'block', type: 'html', props: { code: '<p>In a block</p>' }, styles: {}, layout: { x: 40, y: 40, w: 400, h: 160 } }
+  await api(request, 'PATCH', `/sites/${site.id}/`, {
+    schema: {
+      ...full.schema,
+      colorMode: { theme: { backgroundColor: '#111317' }, start: 'dark' },
+      pages: [{ ...full.schema.pages[0], background: '#ffffff', components: [block] }],
+    },
+  })
+  await openEditor(page, site.id)
+  const slug = await publish(page, request, site.id)
+
+  const { viewer, visitor } = await visit(browser, slug)
+  expect(await palette(visitor)).toBe('dark')
+  // A published block's frame has no name to find it by.
+  const frame = visitor.locator('iframe')
+  await expect(frame).toHaveCount(1)
+  await expect(frame).toBeVisible()
+  await visitor.waitForLoadState('networkidle')
+  const box = await frame.boundingBox()
+  // Read from the screen: the frame's corner, where the text is not, shows the
+  // page through it. A frame in another scheme than its page's paints it white.
+  const shot = await visitor.screenshot({ clip: { x: box.x + box.width - 12, y: box.y + box.height - 12, width: 4, height: 4 } })
+  const reader = await viewer.newPage()
+  const pixel = await reader.evaluate(async (png) => {
+    const image = new Image()
+    image.src = `data:image/png;base64,${png}`
+    await image.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = image.width
+    canvas.height = image.height
+    const context = canvas.getContext('2d')
+    context.drawImage(image, 0, 0)
+    return [...context.getImageData(1, 1, 1, 1).data]
+  }, shot.toString('base64'))
+  expect(pixel).toEqual([17, 19, 23, 255])
+  await viewer.close()
+  await api(request, 'DELETE', `/sites/${site.id}/`)
+})
+
 test('an HTML page switches by its own palette', async ({ page, request, browser }) => {
   const siteId = await createHtmlSite(request, 'E2E theme switch html', [{
     html: '<!DOCTYPE html><html><head><style>:root{--bg:#ffffff;--ink:#171723}body{background:var(--bg);color:var(--ink)}</style></head>'

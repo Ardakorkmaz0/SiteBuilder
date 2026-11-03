@@ -50,6 +50,18 @@ describe('the theme scope', () => {
     expect(screen.getByText('Changes here reach every page.')).toBeInTheDocument()
   })
 
+  it('changes with the arrow keys, and is one Tab stop', () => {
+    renderThemeTab()
+
+    expect(screen.getByRole('radio', { name: 'This page' })).toHaveAttribute('tabindex', '-1')
+    screen.getByRole('radio', { name: 'Whole site' }).focus()
+    fireEvent.keyDown(document.activeElement, { key: 'ArrowRight' })
+
+    expect(screen.getByRole('radio', { name: 'This page' })).toHaveFocus()
+    expect(screen.getByRole('radio', { name: 'This page' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: 'This page' })).toHaveAttribute('tabindex', '0')
+  })
+
   it('keeps a preset on this page when "This page only" is chosen', () => {
     renderThemeTab()
     const noir = THEME_PRESETS.find((p) => p.id === 'noir')

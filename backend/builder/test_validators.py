@@ -675,6 +675,9 @@ class TestLightAndDark:
         assert self._schema(colorMode={'start': 'system'})['colorMode'] == {
             'theme': {}, 'followDevice': True, 'start': 'system',
         }
+        assert self._schema(colorMode={'start': 'light', 'followDevice': True})['colorMode'] == {
+            'theme': {}, 'followDevice': False, 'start': 'light',
+        }
 
     def test_an_unknown_opening_is_left_out(self):
         assert self._schema(colorMode={'start': 'blue', 'followDevice': True})['colorMode'] == {

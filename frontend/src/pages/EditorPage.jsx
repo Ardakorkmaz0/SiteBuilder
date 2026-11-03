@@ -134,6 +134,7 @@ import { useUiTheme } from '../ui/useUiTheme.js'
 import { useEscapeToClose } from '../ui/useEscapeToClose.js'
 import MobileEditorPreview from '../components/editor/MobileEditorPreview.jsx'
 import SiteControlCenter from '../components/editor/SiteControlCenter.jsx'
+import { moveInRadioGroup } from '../ui/radioGroupKeys.js'
 
 // The three panels below all sit behind a toggle / file-mode switch and most
 // editor sessions never open them. Lazy-loading them keeps the initial
@@ -2697,13 +2698,14 @@ function SiteEditor() {
           {/* Draft and live are apart: saves change the draft, and visitors see
               the live version until the draft is sent live. */}
           {published && (
-            <div role="radiogroup" aria-label={t('Version shown')} className="studio-segment shrink-0">
+            <div role="radiogroup" aria-label={t('Version shown')} onKeyDown={moveInRadioGroup} className="studio-segment shrink-0">
               {[[false, t('Draft')], [true, t('Live')]].map(([live, label]) => (
                 <button
                   key={label}
                   type="button"
                   role="radio"
                   aria-checked={viewLive === live}
+                  tabIndex={viewLive === live ? 0 : -1}
                   onClick={() => setViewLive(live)}
                   className={`studio-segment-btn ${viewLive === live ? 'studio-segment-btn-active' : ''}`}
                 >

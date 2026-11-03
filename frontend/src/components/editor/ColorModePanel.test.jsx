@@ -2,6 +2,7 @@
 // one, and written as the store keeps it.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../../ui/UiThemeProvider.jsx'
 import ColorModePanel from './ColorModePanel.jsx'
@@ -66,6 +67,26 @@ describe('the site opens in', () => {
     expect(saved().theme).toEqual({ backgroundColor: '#000000' })
     useEditorStore.getState().updateColorMode({ theme: { textColor: '#eeeeee' } })
     expect(saved()).toEqual({ theme: { backgroundColor: '#000000', textColor: '#eeeeee' }, followDevice: false, start: 'dark' })
+  })
+
+  it('moves and chooses with the arrow keys', async () => {
+    const user = userEvent.setup()
+    open()
+    choice('Light').focus()
+    await user.keyboard('{ArrowRight}')
+    expect(choice('Dark')).toHaveFocus()
+    expect(choice('Dark')).toHaveAttribute('aria-checked', 'true')
+    expect(saved().start).toBe('dark')
+  })
+
+  it('is one Tab stop, at the choice', async () => {
+    const user = userEvent.setup()
+    open()
+    choice('Light').focus()
+    await user.tab()
+    expect(screen.getByRole('radiogroup', { name: 'The site opens in' })).not.toContainElement(document.activeElement)
+    await user.tab({ shift: true })
+    expect(choice('Light')).toHaveFocus()
   })
 
   it('takes the choice back with undo', () => {
