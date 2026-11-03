@@ -93,6 +93,7 @@ import { applyThemeToDocument } from '../utils/htmlTheme.js'
 import { replacePageColor } from '../utils/htmlPageColors.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
+import { withoutBuilderShim } from '../utils/htmlRuntime.js'
 import { schemaToFiles, schemaToSingleHtml } from '../utils/schemaToFiles.js'
 import { componentHtmlFiles, componentSourceHtml, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
 import { viewColorMode } from '../utils/colorMode.js'
@@ -2268,7 +2269,7 @@ function SiteEditor() {
     // converted, the way the Code panel already does.
     const state = useEditorStore.getState()
     const page = state.schema.pages.find((p) => p.id === currentPageId) || state.schema.pages[0]
-    commitHtml(schemaToResponsiveHtml({ ...state.schema, pages: [page] }, title), {
+    commitHtml(withoutBuilderShim(schemaToResponsiveHtml({ ...state.schema, pages: [page] }, title)), {
       reseedWorkspace: true,
     })
     setPageMode(currentPageId, 'html')

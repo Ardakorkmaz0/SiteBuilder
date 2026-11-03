@@ -91,11 +91,11 @@ test.describe('editing an HTML page', () => {
     await (await chooser).setFiles({ name: 'red.png', mimeType: 'image/png', buffer: RED_PNG })
     await expect.poll(() => inFrame(page, (doc) => doc.querySelector('#pic')?.getAttribute('src') ?? null), { timeout: 15_000 })
       .toContain('/media/')
-    const image = await inFrame(page, (doc) => {
+    // The address changes first; the browser takes up the new image a moment later.
+    await expect.poll(() => inFrame(page, (doc) => {
       const img = doc.querySelector('#pic')
       return { srcset: img.getAttribute('srcset'), lazy: img.getAttribute('data-src'), shows: img.currentSrc === img.src }
-    })
-    expect(image).toEqual({ srcset: null, lazy: null, shows: true })
+    })).toEqual({ srcset: null, lazy: null, shows: true })
   })
 
   // The snapshot before a load was of the SAVED site; work on screen was lost.
