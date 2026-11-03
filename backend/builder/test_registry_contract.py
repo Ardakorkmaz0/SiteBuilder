@@ -64,6 +64,7 @@ PROBES = {
     'shape': 'square',
     'states': 'three',
     'src': 'https://example.com/a.png',
+    'srcOther': 'https://example.com/b.png',
     'href': 'https://example.com',
     'buttonHref': 'https://example.com',
 }

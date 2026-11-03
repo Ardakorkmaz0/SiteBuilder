@@ -262,10 +262,14 @@ def sanitize_props(ctype, props):
             'icon': _str(props.get('icon'))[:40],
         }
     if ctype == 'image':
+        # Absent until the owner adds one, so what an image stores does not
+        # change and its page stays live as it was sent.
+        other = sanitize_image_src(props.get('srcOther'))
         return {
             'src': sanitize_image_src(props.get('src')),
             'alt': _str(props.get('alt')),
             'href': sanitize_url(props.get('href')),
+            **({'srcOther': other} if other else {}),
         }
     if ctype == 'section':
         # A text band is five fields, not one. Rebuilding only `heading` here

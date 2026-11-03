@@ -282,7 +282,9 @@ function itemElHtml(c, multi, colOverride) {
     }
     case 'image': {
       const src = sanitizeImageSrc(p.src)
-      return `<img class="${cls} rh-img" src="${esc(src)}" alt="${esc(p.alt)}"${styleAttr(c, col)} />`
+      if (!p._otherSrc) return `<img class="${cls} rh-img" src="${esc(src)}" alt="${esc(p.alt)}"${styleAttr(c, col)} />`
+      return `<img class="${cls} rh-img pwb-on-${esc(p._baseMode)}" src="${esc(src)}" alt="${esc(p.alt)}"${styleAttr(c, col)} />`
+        + `<img class="${cls} rh-img pwb-on-${esc(p._otherMode)}" src="${esc(sanitizeImageSrc(p._otherSrc))}" alt="${esc(p.alt)}" loading="lazy"${styleAttr(c, col)} />`
     }
     case 'card':
       return `<div class="${cls} rh-card"${styleAttr(c, col)}>${

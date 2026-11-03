@@ -1301,6 +1301,7 @@ export const TURKISH_TRANSLATIONS = {
   'Show dark mode on the canvas': 'Koyu modu tuvalde göster',
   'Show light mode on the canvas': 'Açık modu tuvalde göster',
   'The site opens in': 'Site şu temada açılır',
+  'Image in the other color mode': 'Diğer renk modundaki görsel',
   'Show dark mode in View': 'Koyu modu Görüntüle ekranında göster',
   'Show light mode in View': 'Açık modu Görüntüle ekranında göster',
   'Hard to read on {surface}: {ratio}:1, needs {min}:1.': '{surface} üzerinde zor okunur: {ratio}:1, en az {min}:1 olmalı.',

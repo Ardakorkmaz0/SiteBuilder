@@ -171,10 +171,19 @@ const INTERACTIVE_SCRIPT = `
       var root = document.documentElement;
       if (!root.hasAttribute('data-pwb-theme-base')) return;
       var frames = document.querySelectorAll('iframe');
+      // A little after it is told, for the block to have drawn what it was told.
+      var showFrame = function (frame) { setTimeout(function () { frame.style.animation = 'none'; }, 60); };
+      var showFrames = function () { for (var k = 0; k < frames.length; k++) showFrame(frames[k]); };
       for (var i = 0; i < frames.length; i++) {
-        frames[i].addEventListener('load', function () { sendPalette(this, root.getAttribute('data-pwb-theme')); });
+        frames[i].addEventListener('load', function () {
+          sendPalette(this, root.getAttribute('data-pwb-theme'));
+          showFrame(this);
+        });
       }
       broadcastPalette(root.getAttribute('data-pwb-theme'));
+      // A block that loaded before this ran had its message just now.
+      if (document.readyState === 'complete') showFrames();
+      else window.addEventListener('load', showFrames);
       // A page following the device follows it while it is open too.
       if (!window.matchMedia) return;
       var device = matchMedia('(prefers-color-scheme: dark)');
@@ -185,9 +194,19 @@ const INTERACTIVE_SCRIPT = `
         root.setAttribute('data-pwb-theme', next);
         broadcastPalette(next);
         syncThemeToggles();
+        syncBrowserBar();
       };
       if (device.addEventListener) device.addEventListener('change', onDeviceChange);
       else if (device.addListener) device.addListener(onDeviceChange);
+    }
+    // The browser's own bar, where the page set a colour for it.
+    function syncBrowserBar() {
+      var root = document.documentElement;
+      var meta = document.querySelector('meta[name="theme-color"]');
+      var bar = root.getAttribute('data-pwb-theme-bar');
+      if (!meta || !bar) return;
+      if (!meta.hasAttribute('data-pwb-base')) meta.setAttribute('data-pwb-base', meta.getAttribute('content') || '');
+      meta.setAttribute('content', root.getAttribute('data-pwb-theme') === root.getAttribute('data-pwb-theme-alt') ? bar : meta.getAttribute('data-pwb-base'));
     }
     function devicePalette() {
       var root = document.documentElement;
@@ -226,6 +245,7 @@ const INTERACTIVE_SCRIPT = `
         setAddressPalette(pick);
       }
       broadcastPalette(next);
+      syncBrowserBar();
       // Inside the app's viewer each page is a new frame: the viewer keeps
       // the choice and hands it to the next page.
       try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'pwb-color-mode', mode: pick }, '*'); } catch (e) {}

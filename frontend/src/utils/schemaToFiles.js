@@ -488,7 +488,11 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
   const base = baseRules(c.type)
   if (tag === 'img') {
     const src = sanitizeImageSrc(p.src)
-    return `<img src="${esc(src)}" alt="${esc(p.alt)}" style="${base} ${styleStr} max-width:100%;" />`
+    const onBase = p._otherSrc ? ` class="pwb-on-${esc(p._baseMode)}"` : ''
+    const other = p._otherSrc
+      ? `<img class="pwb-on-${esc(p._otherMode)}" src="${esc(sanitizeImageSrc(p._otherSrc))}" alt="${esc(p.alt)}" loading="lazy" style="${base} ${styleStr} max-width:100%;" />`
+      : ''
+    return `<img${onBase} src="${esc(src)}" alt="${esc(p.alt)}" style="${base} ${styleStr} max-width:100%;" />${other}`
   }
   // Through openTag, so a nested button keeps its link and the theme switch
   // its button attributes, exactly as at the top level.
@@ -587,8 +591,11 @@ function openTag(c, extraAttrs = '', inner = false) {
     return `<a${idAttr} class="${cls}" href="${esc(href || '#')}"${ext}>`
   }
   if (tag === 'img') {
-    const src = sanitizeImageSrc((c.props || {}).src)
-    return `<img${idAttr} class="${cls}" src="${esc(src)}" alt="${esc((c.props || {}).alt)}" />`
+    const p = c.props || {}
+    const src = sanitizeImageSrc(p.src)
+    if (!p._otherSrc) return `<img${idAttr} class="${cls}" src="${esc(src)}" alt="${esc(p.alt)}" />`
+    return `<img${idAttr} class="${cls} pwb-on-${esc(p._baseMode)}" src="${esc(src)}" alt="${esc(p.alt)}" />`
+      + `<img class="${cls} pwb-on-${esc(p._otherMode)}" src="${esc(sanitizeImageSrc(p._otherSrc))}" alt="${esc(p.alt)}" loading="lazy" />`
   }
   if (c.type === 'icon') {
     return `<${tag}${idAttr} class="${cls}"${iconA11yAttrs(c.props || {})}>`
