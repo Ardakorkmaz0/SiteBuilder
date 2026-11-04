@@ -150,6 +150,30 @@ describe('component source ownership across phone preview', () => {
     expect(unload.defaultPrevented).toBe(false)
   }, 30000)
 
+  it('saves a form only in the source with the code it needs after its panel unmounts', async () => {
+    let resolveSave
+    const response = new Promise((resolve) => { resolveSave = resolve })
+    updateSite.mockImplementationOnce(() => response)
+    mountEditor()
+    const source = await screen.findByLabelText('HTML source editor', {}, SLOW)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'History', exact: true }))
+    const history = await screen.findByRole('complementary', { name: 'Saves & history', exact: true }, SLOW)
+    const load = await within(history).findByRole('button', { name: 'Load', exact: true })
+    await waitFor(() => expect(load).toBeEnabled())
+    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true })))
+    await waitFor(() => expect(updateSite).toHaveBeenCalledTimes(1), SLOW)
+    fireEvent.change(source, { target: { value: '<!doctype html><form><input name="email"></form><script src="runtime.js"></script>' } })
+    fireEvent.click(load)
+    await setMobile(true)
+    await act(async () => {
+      resolveSave({ ...updateSite.mock.calls[0][1], slug: site.slug, revision: 5 })
+      await response
+    })
+    await waitFor(() => expect(updateSite).toHaveBeenCalledTimes(2), SLOW)
+    expect(JSON.stringify(updateSite.mock.calls[1][1])).toContain('postToInbox')
+  }, 30000)
+
   it('saves pending source before a queued history load after its panel unmounts', async () => {
     let resolveSave
     const response = new Promise((resolve) => { resolveSave = resolve })

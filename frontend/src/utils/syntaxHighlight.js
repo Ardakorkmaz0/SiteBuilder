@@ -10,10 +10,10 @@ export const HIGHLIGHT_LIMIT = 200_000
 
 // What is never closed runs on to its end, as a browser reads it. Looking for a
 // close from every opening again would take seconds on a long file.
-const STRING = /"(?:[^"\\\n]|\\.)*"?|'(?:[^'\\\n]|\\.)*'?/.source
+const STRING = /"(?:[^"\\\n]|\\[\s\S])*"?|'(?:[^'\\\n]|\\[\s\S])*'?/.source
 const JS_KEYWORDS = 'async|await|break|case|catch|class|const|continue|default|delete|do|else|export|extends|false|finally|for|from|function|if|import|in|instanceof|let|new|null|of|return|static|super|switch|this|throw|true|try|typeof|undefined|var|void|while|yield'
 const JS = new RegExp(
-  `(/\\*[\\s\\S]*?(?:\\*/|$)|//[^\\n]*)|(${STRING}|\`(?:[^\`\\\\]|\\\\[\\s\\S])*\`?)|\\b(${JS_KEYWORDS})\\b|\\b(0x[\\da-fA-F]+|\\d[\\d_.]*)\\b|\\b([A-Za-z_$][\\w$]*)(?=\\s*\\()`,
+  `(/\\*[\\s\\S]*?(?:\\*/|$)|//[^\\n]*)|(${STRING}|\`(?:[^\`\\\\]|\\\\[\\s\\S])*\`?|(?<=[(,=:\\[!&|?{};]\\s*)/(?:[^/\\\\\\n]|\\\\.)+/[a-z]*)|\\b(${JS_KEYWORDS})\\b|\\b(0x[\\da-fA-F]+|\\d[\\d_.]*)\\b|\\b([A-Za-z_$][\\w$]*)(?=\\s*\\()`,
   'g',
 )
 const CSS_VALUE = new RegExp(`(${STRING})|(#[0-9a-fA-F]{3,8}\\b)|(-?\\d*\\.?\\d+(?:%|[a-zA-Z]+)?)`, 'g')
@@ -55,7 +55,7 @@ function paintCss(code) {
 const paintJs = (code) => paint(code, JS, JS_KINDS)
 const ATTRIBUTE = /([^\s=/"'<>]+)|("[^"]*"|'[^']*')/g
 const paintAttributes = (text) => paint(text, ATTRIBUTE, ['attr', 'string'])
-const TAG = /<!--[\s\S]*?(?:-->|$)|<!doctype[^>]*>?|(<\/?)([a-zA-Z][\w:-]*)((?:[^>"']|"[^"]*"|'[^']*')*)(>?)/gi
+const TAG = /<!--(?:-?>|[\s\S]*?(?:--!?>|$))|<!doctype[^>]*>?|(<\/?)([a-zA-Z][\w:-]*)((?:[^>"']|"[^"]*"|'[^']*')*)(>?)/gi
 
 function paintHtml(code) {
   const lower = code.toLowerCase()

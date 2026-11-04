@@ -15,8 +15,8 @@ const about = { id: 'about', name: 'About', components: [], mode: 'html' }
 const ownHtml = '<!doctype html><html><head><link rel="stylesheet" href="own.css"></head><body><h1>Before</h1></body></html>'
 const draft = '<!doctype html><html><head><title>Unsaved export</title></head><body><h1>Keep my unsaved source ğüş</h1></body></html>'
 
-function panel(pages = [home], props = {}) {
-  useEditorStore.getState().loadSchema({ theme: {}, customCss: '.custom{color:red}', customJs: 'window.customReady=true', pages })
+function panel(pages = [home], props = {}, customJs = 'window.customReady=true') {
+  useEditorStore.getState().loadSchema({ theme: {}, customCss: '.custom{color:red}', customJs, pages })
   return render(<UiThemeProvider><LanguageProvider><CodePanel currentPageId="home" onApplyHtml={vi.fn()} {...props} /></LanguageProvider></UiThemeProvider>)
 }
 
@@ -54,6 +54,14 @@ describe('editing and exporting before Apply', () => {
     changeHtml()
     exportAs(format)
     expect(await blobs[0].text()).toContain('Keep my unsaved source ğüş')
+  })
+
+  it.each([/Single website file/, /Optimized publication/])('gives a form only in the source the code it needs for %s', async (format) => {
+    // No script of the owner's: that alone would bring all of the code.
+    panel([home], {}, '')
+    changeHtml('<!doctype html><form><input name="email"></form><script src="runtime.js"></script>')
+    exportAs(format)
+    expect(await blobs[0].text()).toContain('postToInbox')
   })
 
   it('optimized multi-page export keeps both drafts and authored linked assets', () => {
