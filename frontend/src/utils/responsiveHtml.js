@@ -159,7 +159,7 @@ function styleOnly(component, extra = '') {
     .map(([k, v]) => `${kebab(k)}:${cssVal(v)}`)
   Object.entries(pinnedLayoutStyle(component, {}))
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
-    .forEach(([k, v]) => parts.push(`${kebab(k)}:${cssVal(v)}`))
+    .forEach(([k, v]) => parts.push(`${kebab(k)}:${cssVal(typeof v === 'number' && v !== 0 && k !== 'zIndex' ? `${v}px` : v)}`))
   if (extra) parts.push(extra)
   return parts.length ? ` style="${parts.join(';')}"` : ''
 }
