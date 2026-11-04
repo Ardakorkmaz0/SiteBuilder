@@ -290,6 +290,31 @@ describe('a colour however it is written', () => {
     expect(strong.styles.color).toBe('#1d1d1f')
   })
 
+  describe('a tint, and the text its block really has', () => {
+    const themed = (other, styles) => {
+      const schema = {
+        theme: { ...DEFAULT_THEME, backgroundColor: '#ffffff', textColor: '#111111', mutedColor: '#54595f' },
+        colorMode: { start: 'dark', theme: { backgroundColor: '#111317', ...other } },
+        pages: [{ id: 'home', name: 'Home', components: [] }],
+      }
+      return withColorModeComponents([block('card', styles)], colorModeFor(schema, schema.pages[0]))[0].styles.color
+    }
+
+    it('follows when that text reads, whatever the palette\'s body text does', () => {
+      expect(themed({ textColor: '#888888', mutedColor: '#ffffff' }, { backgroundColor: 'rgba(255,100,0,.3)', color: '#54595f' }))
+        .toBe('var(--pwb-alt-muted, #54595f)')
+    })
+
+    it('keeps the owner\'s when following reads worse', () => {
+      expect(themed({ textColor: '#e8edf4' }, { backgroundColor: 'rgba(255,255,0,.49)', color: '#111111' })).toBe('#111111')
+    })
+
+    it('follows when neither reaches 4.5:1 and following reads better', () => {
+      expect(themed({ textColor: '#b0b0b0' }, { backgroundColor: 'rgba(255,255,0,.25)', color: '#111111' }))
+        .toBe('var(--pwb-alt-text, #111111)')
+    })
+  })
+
   it('takes a text on a solid role colour to that colour\'s own text role', () => {
     const button = one(block('button', { backgroundColor: '#0071e3', color: 'white' }))
     expect(button.styles.color).toBe('var(--pwb-alt-button-text, white)')

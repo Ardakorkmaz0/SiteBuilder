@@ -415,20 +415,25 @@ function wrap(role, token, alpha = 1) {
 }
 
 // Under this a background is a tint over what is behind it, not a colour of
-// its own: the text on it still reads against the page. Unless it does not: a
-// strong tint over the other palette's page can be too close to its text.
+// its own: the text on it still reads against the page. Unless it does not: over
+// the other palette's page a strong tint can be too close to the text the block
+// has there. Then, if the owner's own text reads better on it, that stays.
 const FAINT = 0.5
 
-function tintReads(color, mode) {
+function tintReads(color, mode, { text, hint } = {}) {
   const page = normalizeHex(mode.other?.backgroundColor)
-  const text = normalizeHex(mode.other?.textColor)
-  return !page || !text || contrast(text, mix(page, color.hex, color.alpha)) >= 4.5
+  const owner = parseColor(text)?.hex || mode.light.textColor
+  const follows = normalizeHex(mode.other?.[(owner && roleOf(owner, 'fg', mode, hint)) || 'textColor'])
+  if (!page || !owner || !follows) return true
+  const tint = mix(page, color.hex, color.alpha)
+  const reads = contrast(follows, tint)
+  return reads >= 4.5 || reads >= contrast(owner, tint)
 }
 
 // Every colour in `value` that is a role colour here, as its variable.
 // Returns the value and the role of what it paints (null when that is a
 // colour of the owner's own).
-function mapValue(value, context, mode, hint) {
+function mapValue(value, context, mode, hint, onTint) {
   if (typeof value !== 'string' || !value || value.includes('var(--pwb-alt-')) return { value, role: null, paints: paints(value) }
   let first
   let faint = false
@@ -438,7 +443,7 @@ function mapValue(value, context, mode, hint) {
     const role = roleOf(color.hex, context, mode, hint)
     if (first === undefined) {
       first = role
-      faint = color.alpha < FAINT && tintReads(color, mode)
+      faint = color.alpha < FAINT && tintReads(color, mode, onTint)
     }
     return role ? wrap(role, token, color.alpha) : token
   })
@@ -472,7 +477,7 @@ function mapStyles(styles, type, mode, inside) {
   let custom = false
   for (const key of ['backgroundColor', 'background']) {
     if (typeof styles[key] !== 'string') continue
-    const mapped = mapValue(styles[key], 'bg', mode, hints.bg)
+    const mapped = mapValue(styles[key], 'bg', mode, hints.bg, { text: styles.color, hint: hints.fg })
     out[key] = mapped.value
     if (mapped.role) boxRole = boxRole || mapped.role
     else if (mapped.paints) custom = true

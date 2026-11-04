@@ -85,6 +85,22 @@ describe('a long file', () => {
     expect(kinds(highlightCode('a = "x\\"y', 'js'))).toContainEqual(['string', '"x\\"y'])
   })
 
+  it('ends a comment where a browser does, also when it is written wrong', () => {
+    for (const comment of ['<!-->', '<!--->', '<!--x--!>']) {
+      expect(kinds(highlightCode(`${comment}<p>x</p>`, 'html')).slice(0, 2)).toEqual([['comment', comment], ['tag', 'p']])
+    }
+  })
+
+  it('reads a string on past a line continuation', () => {
+    expect(kinds(highlightCode('const a="x\\\ny"; let n=3', 'js')).map(([kind]) => kind)).toEqual(['keyword', 'string', 'keyword', 'number'])
+  })
+
+  it('does not take the quote in a regular expression for a string', () => {
+    expect(kinds(highlightCode(`s.replace(/'/g, "x"); let n = 3`, 'js'))).toContainEqual(['keyword', 'let'])
+    expect(kinds(highlightCode(`s.replace(/'/g, "x"); let n = 3`, 'js'))).toContainEqual(['string', '"x"'])
+    expect(kinds(highlightCode('const half = a / b; let c = d / e', 'js'))).toContainEqual(['keyword', 'let'])
+  })
+
   it('does not take long on what is never closed', () => {
     for (const [code, lang] of [
       ['/*x'.repeat(66000), 'css'],
@@ -94,6 +110,8 @@ describe('a long file', () => {
       ['"a\\'.repeat(66000), 'js'],
       ['`a\\'.repeat(66000), 'js'],
       ['a{b:"c\\'.repeat(28000), 'css'],
+      ['=/a\\'.repeat(49000), 'js'],
+      ['(/\\/'.repeat(49000), 'js'],
     ]) {
       const started = performance.now()
       highlightCode(code, lang)

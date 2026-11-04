@@ -50,6 +50,16 @@ describe('editor-owned component source drafts', () => {
     expect(onHtmlDraftsChange).toHaveBeenLastCalledWith({})
   })
 
+  it('applies a form added in the source with the code it needs', () => {
+    const onApplyHtml = vi.fn()
+    render(panel({
+      htmlDrafts: { 'index.html': '<!doctype html><form><input name="email"></form><script src="runtime.js"></script>' },
+      onApplyHtml,
+    }))
+    fireEvent.click(screen.getByRole('button', { name: 'Apply HTML' }))
+    expect(onApplyHtml.mock.calls[0][0].html).toContain('postToInbox')
+  })
+
   it('clears the applied file from its owner without erasing other pending files', () => {
     const onHtmlDraftsChange = vi.fn()
     const onApplyHtml = vi.fn()

@@ -24,7 +24,9 @@ belgesi ve kendi `@media` kurallarını taşıyor.
 1. **Telefon sırası:** sol sütunda başlık, paragraf, düğme, sağda görsel varsa sıra başlık, görsel, paragraf, düğme oluyor.
 2. **HTML'e çevirme:** aynı sol sütun yan yana dört sütuna dağılıyor (`readingRows`).
 3. **Proje dışa aktarımı:** 900 pikselde 100 piksel yatay taşma.
-4. **Geçiş ölçüsü:** görüntüleyici `el.clientWidth < 768`, yayımlanan sayfa `innerWidth <= 768` kullanıyor. Çizim 768'de ve
+4. **Geniş tasarımda sıçrama büyüyor:** 1200 piksellik tasarım 769'da 0,64'e iniyor, proje çıktısı 900'de 300 piksel taşıyor (ChatGPT).
+5. **HTML'e çevirmede katman dağılıyor:** panel, üstündeki başlık ve düğme yan yana üç sütun oluyor. Basit altı kart ise doğru: `[3,3]` (ChatGPT).
+6. **Geçiş ölçüsü:** görüntüleyici `el.clientWidth < 768`, yayımlanan sayfa `innerWidth <= 768` kullanıyor. Çizim 768'de ve
    kaydırma çubuklu pencerede farklı seçiliyor.
 
 Yalnızca Claude'un taradığı, ChatGPT'nin tekrarlamadığı: 320 pikselde 227 şablonda 4 piksellik kayma ve 360 pikselde 41
@@ -82,11 +84,13 @@ kuralları ise kalkar. Net boyut farkını gerçek yazıcıyla henüz ölçmedim
 ## Prototip
 
 Fikri yazmadan önce denedim: `docs/review-evidence/responsive-grid-prototype-2026-11-04/` (`proto.cjs`, `results.txt`, üç görüntü).
-ChatGPT'nin kendi örnekleri kullanıldı. Chromium 156, 14 genişlik (320-1920).
+ChatGPT'nin kendi örnekleri kullanıldı. Chromium 156, 17 genişlik (320-1920). ChatGPT planın bu sürümünü ve prototipi henüz sınamadı.
 
 | Örnek | Yatay taşma | Beklenmeyen çakışma | Kesilen blok | Tasarım genişliğinde en büyük sapma |
 |---|---|---|---|---|
-| Sol sütun + görsel | 0 | 0 | 0 | 0 px |
+| Sol sütun + görsel | 0 | 0 | 0 | PC ve telefon 1 pikselin altında |
+| Altı kart, 1200 + 360 | 0 | 0 | 0 | PC ve telefon 1 pikselin altında |
+| Katmanlı afiş, elle telefon çizimi, 1200 + 360 | 0 | 0, iki çakışma tasarımdaki | 0 | PC ve telefon 1 pikselin altında |
 | Aynısı, çok uzun metin ve bölünmeyen adres | 0 | 0 | 0 | 67 px, beklenen: yazı kutuya sığmıyor ve alttakini itiyor |
 | Beş kart | 0 | 0 | 0 | 0 px |
 | Görsel üstünde yazı | 0 | 0, tek çakışma tasarımdaki | 0 | 0 px |
@@ -137,7 +141,7 @@ Her sabit örnek şu genişliklerde ölçülür: 320, 360, 390, 600, 767, 768, 7
 
 Her aşama ayrı onaylanır, canlıya çıkış ayrıca izin ister. Aşama 4'e kadar sayfaların görünümü değişmez.
 
-**Aşama 0: Ölçüm ve sözleşme.** Sabit örnekler: sol sütun ve görsel, beş kart, çakışma, uzun metin, gizli blok, elle telefon, RTL, bölge,
+**Aşama 0: Ölçüm ve sözleşme.** Sabit örnekler: sol sütun ve görsel, altı kart, beş kart, katmanlı afiş, uzun metin, gizli blok, elle telefon, RTL, bölge,
 konteyner, sekme, HTML bloğu, sticky, fixed. Mevcut davranışı kaydeden testler, ürün davranışı değişmez. Sahibin gösterdiği gerçek sayfa
 da buraya eklenir.
 
@@ -181,5 +185,4 @@ Hiçbiri gerçek yazıcıyla denenmedi:
 
 ## ChatGPT'den istenecek kontrol
 
-Hazır olduğunda, aşama 1 sonucuyla birlikte, tasarımı değil gerçek çıktıyı kontrol etmesi daha değerli olur. `41978ae` düzeltmelerinin kontrolü
-de hâlâ yapılmadı: inceleme raporu bu commit'i onaylamadığını açıkça yazıyor.
+Aşama 1 sonucuyla birlikte, tasarımı değil gerçek çıktıyı kontrol etmesi daha değerli olur. O zaman `proto.cjs` da sınanabilir.

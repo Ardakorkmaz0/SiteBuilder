@@ -116,6 +116,14 @@ describe('what a page needs comes with it', () => {
     expect(runtimeNeeds('<a href="javascript:go()">x</a>').tabs).toBe(true)
   })
 
+  it('takes a script for the builder\'s only by a real attribute of that name', () => {
+    expect(runtimeNeeds('<script title="data-builder-layout">go()</script>').tabs).toBe(true)
+    expect(runtimeNeeds("<script title='data-pwb-color-mode'>go()</script>").tabs).toBe(true)
+    expect(runtimeNeeds('<script data-builder-layout-of-mine>go()</script>').tabs).toBe(true)
+    expect(runtimeNeeds('<script title="a>b" data-builder-layout>x</script>').tabs).toBe(false)
+    expect(runtimeNeeds('<script data-builder-layout="">x</script>').tabs).toBe(false)
+  })
+
   it('does not take what a page says for a handler', () => {
     expect(runtimeNeeds('<p>a > b onclick = 1</p>').tabs).toBe(false)
     expect(runtimeNeeds('<p>1 < 2 onclick=3</p>').tabs).toBe(false)
@@ -124,7 +132,11 @@ describe('what a page needs comes with it', () => {
 
   it('reads a broken page without taking long', () => {
     const started = performance.now()
-    for (const page of ['<a "'.repeat(50000), "<a '".repeat(50000), '<a '.repeat(60000), '<a title="x>'.repeat(15000)]) runtimeNeeds(page)
+    for (const page of [
+      '<a "'.repeat(50000), "<a '".repeat(50000), '<a '.repeat(60000), '<a title="x>'.repeat(15000),
+      `<script title="${'<script '.repeat(50000)}data-builder-layout"></script>`,
+      `${'<script '.repeat(50000)}data-builder-layout></script>`,
+    ]) runtimeNeeds(page)
     expect(performance.now() - started).toBeLessThan(2000)
   })
 

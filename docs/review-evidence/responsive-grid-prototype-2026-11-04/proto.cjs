@@ -44,19 +44,37 @@ const overlap = [
   { id: 'side', type: 'text', layout: { x: 560, y: 100, w: 300, h: 300 } },
 ]
 const many = Array.from({ length: 60 }, (_, i) => ({ id: 'm' + i, type: 'text', layout: { x: 20 + (i % 6) * 160 + (i % 7), y: 10 + Math.floor(i / 6) * 90 + (i % 5) * 3, w: 150, h: 70 } }))
+// ChatGPT's two pages from the review's continuation: 1200 wide, a 360 wide phone.
+const cards = Array.from({ length: 6 }, (_, i) => {
+  const col = i % 3, row = Math.floor(i / 3)
+  return { id: 'card' + (i + 1), type: 'card', layout: { x: 40 + col * 380, y: 80 + row * 220, w: 340, h: 180 }, mobileLayout: { x: 16, y: 80 + i * 196, w: 328, h: 180 } }
+})
+const poster = [
+  { id: 'panel', type: 'card', layout: { x: 40, y: 100, w: 1120, h: 340 }, mobileLayout: { x: 16, y: 80, w: 328, h: 240 } },
+  { id: 'title', type: 'heading', layout: { x: 80, y: 140, w: 600, h: 90 }, mobileLayout: { x: 32, y: 110, w: 290, h: 80 } },
+  { id: 'view', type: 'button', layout: { x: 80, y: 270, w: 200, h: 50 }, mobileLayout: { x: 32, y: 220, w: 180, h: 44 } },
+  { id: 'note', type: 'text', layout: { x: 40, y: 530, w: 1120, h: 60 }, mobileLayout: { x: 16, y: 360, w: 328, h: 70 } },
+]
+const shortTexts = (list) => Object.fromEntries(list.map((b) => [b.id, b.id]))
 const cases = {
-  hero: doc(heroPage.components),
+  cards: doc(cards, { W: 1200, MW: 360, texts: shortTexts(cards) }),
+  poster: doc(poster, { W: 1200, MW: 360, texts: shortTexts(poster) }),
+  hero: doc(heroPage.components, { texts: shortTexts(heroPage.components) }),
   heroLong: doc(heroPage.components, { texts: { paragraph: LONG.repeat(5), heading: 'Çok uzun bir başlık ' .repeat(4), footer: 'https://example.com/' + 'x'.repeat(200) } }),
   pinwheel: doc(pinPage.components),
   overlap: doc(overlap),
   many: doc(many),
   stickyBar: doc([{ id: 'bar', type: 'text', layout: { x: 0, y: 40, w: 1000, h: 50 } }, { id: 'tall', type: 'text', layout: { x: 100, y: 120, w: 800, h: 3000 } }], { sticky: 'bar' }),
 }
-const designs = { hero: heroPage.components, heroLong: heroPage.components, pinwheel: pinPage.components, overlap, many, stickyBar: null }
+const designs = {
+  hero: { list: heroPage.components, W: 1000, MW: 390 }, heroLong: { list: heroPage.components, W: 1000, MW: 390 },
+  pinwheel: { list: pinPage.components, W: 1000 }, overlap: { list: overlap, W: 1000 }, many: { list: many, W: 1000 },
+  cards: { list: cards, W: 1200, MW: 360 }, poster: { list: poster, W: 1200, MW: 360 },
+}
 ;(async () => {
   const b = await chromium.launch({ executablePath: '/usr/bin/chromium' }); console.log('chromium', b.version())
   const p = await (await b.newContext()).newPage()
-  const WIDTHS = [320, 360, 390, 600, 767, 768, 769, 780, 900, 999, 1000, 1001, 1024, 1920]
+  const WIDTHS = [320, 360, 390, 600, 767, 768, 769, 780, 900, 999, 1000, 1001, 1024, 1199, 1200, 1201, 1920]
   for (const [name, c] of Object.entries(cases)) {
     fs.writeFileSync(path.join(OUT, name + '.html'), c.html)
     await p.setContent(c.html)
@@ -74,10 +92,21 @@ const designs = { hero: heroPage.components, heroLong: heroPage.components, pinw
       lines.push(w + ':' + [m.over, m.hit, m.cut, m.inner].join('/') + ' h' + m.H)
     }
     console.log(name, 'css', c.css.length, 'B  [width:scroll/overlaps/cut/innerOverflow]'); console.log('  ' + lines.join('  '))
-    if (designs[name]) {
-      await p.setViewportSize({ width: 1000, height: 900 })
-      const worst = await p.evaluate((ds) => { let w = 0; const off = document.querySelector('.page').getBoundingClientRect(); for (const d of ds) { const r = document.querySelector('.c-' + d.id).getBoundingClientRect(); const l = d.layout; for (const v of [Math.abs(r.left - off.left - l.x), Math.abs(r.top - off.top - l.y), Math.abs(r.width - l.w), Math.abs(r.height - l.h)]) w = Math.max(w, v) } return +w.toFixed(3) }, designs[name])
-      console.log('  at design width, worst block deviation px:', worst)
+    const design = designs[name]
+    if (design) {
+      const worstAt = async (width, key) => {
+        await p.setViewportSize({ width, height: 900 })
+        return p.evaluate(({ ds, key }) => {
+          let w = 0
+          const off = document.querySelector('.page').getBoundingClientRect()
+          for (const d of ds) {
+            const r = document.querySelector('.c-' + d.id).getBoundingClientRect(), l = d[key]
+            for (const v of [Math.abs(r.left - off.left - l.x), Math.abs(r.top - off.top - l.y), Math.abs(r.width - l.w), Math.abs(r.height - l.h)]) w = Math.max(w, v)
+          }
+          return +w.toFixed(3)
+        }, { ds: design.list, key })
+      }
+      console.log('  at design width, worst block deviation px: PC', await worstAt(design.W, 'layout'), design.MW ? 'phone ' + await worstAt(design.MW, 'mobileLayout') : '')
     }
     if (name === 'stickyBar') { await p.setViewportSize({ width: 900, height: 600 }); await p.evaluate(() => scrollTo(0, 800)); await p.waitForTimeout(60); console.log('  sticky at scroll 800, top =', await p.evaluate(() => Math.round(document.querySelector('.c-bar').getBoundingClientRect().top))) }
     if (name === 'heroLong' || name === 'pinwheel' || name === 'overlap') for (const w of name === 'heroLong' ? [390, 768, 900] : [900]) { await p.setViewportSize({ width: w, height: 800 }); await p.screenshot({ path: path.join(OUT, name + '-' + w + '.png'), fullPage: true }) }
