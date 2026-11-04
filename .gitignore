@@ -75,8 +75,6 @@ TODO.md
 # noise in the repository.
 tempCodeRunnerFile.*
 .hallmark/
-docs/verification/
-docs/TEST-RAPORU-*.md
 
 # Misc
 *.iml
@@ -84,7 +82,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-## AI tools / LLM caches and credentials
+# Tool caches and credentials
 # Caches
 .cache/
 .cache/huggingface/
@@ -115,3 +113,10 @@ frontend/e2e/.auth/
 frontend/e2e/.mail/
 frontend/test-results/
 frontend/playwright-report/
+
+# Working notes (local only)
+AGENTS.md
+CLAUDE.md
+docs/*
+!docs/screenshots/
+docs/screenshots/round-*

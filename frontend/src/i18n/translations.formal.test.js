@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { TURKISH_TRANSLATIONS } from './translations.js'
 
-// The Turkish interface addresses the user formally ("siz"), as AGENTS.md
-// says. Dozens of strings had drifted to "sen": "Alan adını gir", "projeni",
+// The Turkish interface addresses the user formally ("siz"). Dozens of
+// strings had drifted to "sen": "Alan adını gir", "projeni",
 // "Giriş yaparsan kalır". These forms only ever mean "you" in the singular.
 // Word edges are written as (?<!\p{L}) and (?!\p{L}): JavaScript's \b only
 // knows ASCII letters, so it never matched before "Ç" in "Çalışmanı".

@@ -4,7 +4,7 @@
 import fs from 'node:fs'
 import { test, expect } from '@playwright/test'
 
-const matrix = JSON.parse(fs.readFileSync(new URL('../../docs/review-evidence/dark-mode-stage3-2026-11-03/served-head-matrix.json', import.meta.url), 'utf8'))
+const matrix = JSON.parse(fs.readFileSync(new URL('./fixtures/served-head-matrix.json', import.meta.url), 'utf8'))
 
 // Firefox's Playwright context can report light during the first head script
 // even when colorScheme is dark. Use an independent native reading at that
