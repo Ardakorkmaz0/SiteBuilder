@@ -490,6 +490,8 @@ ileride), aşağıdaki normal kontroller yeniden çalıştırıldı:
 
 Node 26.13.0, kurulu Vitest 4.1.11. Bağımsız yeni karşı örnekler bu normal paketlere eklenmedi;
 bunların ayrı kırmızı sonuçları yukarıda verildi. Tam paketin yeşilliği yeni bulguların yokluğu anlamına gelmez.
+İnceleme sırasında araya giren `fe11c02` yalnız responsive planı/prototip kanıtlarını değiştirdi;
+frontend/backend üretim kaynağını değiştirmedi. Dolayısıyla bu normal kontrollerin kaynak kapsamı aynı.
 D kopyasında da 702 izlenen frontend dosyası byte karşılaştırmasıyla `41978ae` ile aynı;
 `colorMode.js` SHA-256 `b20b06cc9e30f7a8cc539ff2b62d985647c459b8476ecc74d4936c5b4bc26bee`.
 
