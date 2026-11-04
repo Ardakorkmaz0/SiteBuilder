@@ -1,0 +1,43 @@
+{
+  "boxes": [
+    {
+      "h": 103.02083587646484,
+      "id": "heading",
+      "w": 250.9479217529297,
+      "x": 36,
+      "y": 67
+    },
+    {
+      "h": 96,
+      "id": "paragraph",
+      "w": 250.9479217529297,
+      "x": 310.94793701171875,
+      "y": 67
+    },
+    {
+      "h": 48,
+      "id": "action",
+      "w": 127.15625,
+      "x": 585.8958740234375,
+      "y": 67
+    },
+    {
+      "h": 250.9479217529297,
+      "id": "picture",
+      "w": 250.9479217529297,
+      "x": 737.0521240234375,
+      "y": 67
+    }
+  ],
+  "rows": [
+    {
+      "children": 4,
+      "text": "Build a clear pageA left hand column with a heading, paragraph and action. This is an inde"
+    },
+    {
+      "children": 1,
+      "text": "A footer after the two columns."
+    }
+  ],
+  "width": 1024
+}

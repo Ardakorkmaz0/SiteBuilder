@@ -1,0 +1,224 @@
+{
+  "theme": {
+    "primaryColor": "#0071e3",
+    "buttonTextColor": "#ffffff",
+    "textColor": "#1d1d1f",
+    "mutedColor": "#6e6e73",
+    "borderColor": "#d2d2d7",
+    "backgroundColor": "#ffffff",
+    "surfaceColor": "#ffffff",
+    "softColor": "#f5f5f7",
+    "headerColor": "#1d1d1f",
+    "headerTextColor": "#f5f5f7",
+    "fontFamily": "Arial",
+    "headingFontFamily": "Arial",
+    "radius": "18px",
+    "buttonRadius": "980px",
+    "shadow": "0 4px 20px rgba(0,0,0,0.08)",
+    "accentColor": "#0071e3",
+    "headingWeight": "",
+    "headingLetterSpacing": "",
+    "bodyLineHeight": ""
+  },
+  "pages": [
+    {
+      "id": "home",
+      "name": "Review",
+      "canvasWidth": 1000,
+      "mobileWidth": 390,
+      "background": "#ffffff",
+      "backgroundMobile": "#eaf2ff",
+      "components": [
+        {
+          "id": "nav",
+          "type": "navbar",
+          "props": {
+            "brand": "Review",
+            "links": [
+              {
+                "label": "Home",
+                "href": "#"
+              }
+            ]
+          },
+          "styles": {
+            "backgroundColor": "#1d1d1f",
+            "color": "#ffffff",
+            "fontFamily": "Arial"
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 1000,
+            "h": 64
+          },
+          "mobileLayout": {
+            "x": 0,
+            "y": 0,
+            "w": 390,
+            "h": 64
+          },
+          "hidden": false,
+          "hiddenMobile": false
+        },
+        {
+          "id": "heading",
+          "type": "heading",
+          "props": {
+            "text": "Build a clear page",
+            "level": "h1"
+          },
+          "styles": {
+            "fontSize": 32,
+            "color": "#1d1d1f",
+            "fontFamily": "Arial"
+          },
+          "layout": {
+            "x": 40,
+            "y": 110,
+            "w": 420,
+            "h": 72
+          },
+          "stylesMobile": {
+            "fontSize": 30
+          },
+          "mobileLayout": {
+            "x": 16,
+            "y": 80,
+            "w": 358,
+            "h": 51
+          },
+          "hidden": false,
+          "hiddenMobile": false
+        },
+        {
+          "id": "paragraph",
+          "type": "text",
+          "props": {
+            "text": "A left hand column with a heading, paragraph and action. This is an independent review fixture, not a user website."
+          },
+          "styles": {
+            "fontSize": 16,
+            "color": "#1d1d1f",
+            "fontFamily": "Arial"
+          },
+          "layout": {
+            "x": 40,
+            "y": 200,
+            "w": 420,
+            "h": 90
+          },
+          "stylesMobile": {
+            "fontSize": 18
+          },
+          "mobileLayout": {
+            "x": 16,
+            "y": 363,
+            "w": 358,
+            "h": 105
+          },
+          "hidden": false,
+          "hiddenMobile": false
+        },
+        {
+          "id": "action",
+          "type": "button",
+          "props": {
+            "text": "Read more",
+            "href": "#"
+          },
+          "styles": {
+            "fontSize": 16,
+            "color": "#ffffff",
+            "backgroundColor": "#1769e0",
+            "fontFamily": "Arial"
+          },
+          "layout": {
+            "x": 40,
+            "y": 310,
+            "w": 180,
+            "h": 48
+          },
+          "stylesMobile": {
+            "fontSize": 18
+          },
+          "mobileLayout": {
+            "x": 126,
+            "y": 484,
+            "w": 138,
+            "h": 40
+          },
+          "hidden": false,
+          "hiddenMobile": false
+        },
+        {
+          "id": "picture",
+          "type": "image",
+          "props": {
+            "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jS1kAAAAASUVORK5CYII=",
+            "alt": "Review picture",
+            "objectFit": "cover"
+          },
+          "styles": {
+            "fontFamily": "Arial"
+          },
+          "layout": {
+            "x": 540,
+            "y": 110,
+            "w": 420,
+            "h": 300
+          },
+          "mobileLayout": {
+            "x": 55,
+            "y": 147,
+            "w": 280,
+            "h": 200
+          },
+          "hidden": false,
+          "hiddenMobile": false
+        },
+        {
+          "id": "footer",
+          "type": "text",
+          "props": {
+            "text": "A footer after the two columns."
+          },
+          "styles": {
+            "fontSize": 16,
+            "color": "#333333",
+            "fontFamily": "Arial"
+          },
+          "layout": {
+            "x": 40,
+            "y": 520,
+            "w": 920,
+            "h": 60
+          },
+          "mobileLayout": {
+            "x": 16,
+            "y": 540,
+            "w": 358,
+            "h": 32
+          },
+          "hidden": false,
+          "hiddenMobile": false
+        }
+      ],
+      "folder": "",
+      "mode": "empty",
+      "language": "en",
+      "direction": "",
+      "themeColor": "",
+      "smoothScroll": false,
+      "canonicalUrl": "",
+      "noIndex": false,
+      "showScrollIndicator": true,
+      "canvasFold": 0,
+      "mobileFold": 0,
+      "mobileManual": false,
+      "flowMode": false
+    }
+  ],
+  "customCss": "",
+  "customJs": ""
+}
