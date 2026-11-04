@@ -288,6 +288,13 @@ export function isCssColor(value) {
   return probe.color !== ''
 }
 
+// These are a colour to a property as a whole, never to a stop of its gradient.
+const WHOLE_PROPERTY_ONLY = /^\s*(?:inherit|initial|unset|revert|revert-layer)\s*$/i
+
+export function isGradientStop(value) {
+  return isCssColor(value) && !WHOLE_PROPERTY_ONLY.test(String(value))
+}
+
 // The curated families the panel offers. Each is a Google Font (bar the system
 // stack), so picking one also means fetching it — see ensureFontLink.
 export const FONT_CHOICES = [
@@ -543,6 +550,15 @@ function setImageSource(img, src) {
   picture?.querySelectorAll(':scope > source').forEach((source) => source.remove())
 }
 
+// Which element a description is of: what is typed for one is not for another.
+const ELEMENT_KEYS = new WeakMap()
+let lastElementKey = 0
+
+function elementKey(el) {
+  if (!ELEMENT_KEYS.has(el)) ELEMENT_KEYS.set(el, ++lastElementKey)
+  return ELEMENT_KEYS.get(el)
+}
+
 export function describeElement(el, win = el?.ownerDocument?.defaultView) {
   if (!el || el.nodeType !== 1) return null
   const tag = el.tagName.toLowerCase()
@@ -567,6 +583,7 @@ export function describeElement(el, win = el?.ownerDocument?.defaultView) {
   // stops at <body>) and a readable ancestor trail for context.
   const parent = selectableParent(el)
   return {
+    elementKey: elementKey(el),
     tag,
     classes: [...el.classList].join(' '),
     canEditText,

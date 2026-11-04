@@ -188,4 +188,118 @@ describe('typing a colour into the HTML element panel', () => {
     await typeKeys(user, border, '#123456')
     expect(element.style.getPropertyValue('border-color')).toBe('rgb(18, 52, 86)')
   })
+
+  // Firefox can leave the panel's field focused while the click selects another
+  // element in the page: its blur comes only later, with that element selected.
+  describe('when another element gets selected before the field is left', () => {
+    // fireEvent moves no focus: this selects without the field being left.
+    const select = () => fireEvent.click(screen.getByRole('button', { name: 'Select the other' }))
+    function Switching({ first, other, onPatch }) {
+      const [element, setElement] = useState(first)
+      const [, refresh] = useState(0)
+      return (
+        <LanguageProvider>
+          <button type="button" onClick={() => setElement(other)}>Select the other</button>
+          <HtmlElementPanel
+            info={describeElement(element)}
+            onChange={(patch) => {
+              onPatch(patch)
+              applyElementPatch(element, patch)
+              refresh((n) => n + 1)
+            }}
+          />
+        </LanguageProvider>
+      )
+    }
+
+    async function openTwo() {
+      localStorage.setItem('pwb_language', 'en')
+      document.body.innerHTML = '<h1 id="a" style="color:#112233">A</h1><h1 id="b" style="color:#445566">B</h1><div id="panel"></div>'
+      const [a, b] = [document.getElementById('a'), document.getElementById('b')]
+      const onPatch = vi.fn()
+      const user = userEvent.setup()
+      render(<Switching first={a} other={b} onPatch={onPatch} />, { container: document.getElementById('panel') })
+      await user.click(screen.getByRole('tab', { name: 'Design' }))
+      return { a, b, onPatch, user }
+    }
+
+    it('does not clear the new element when the emptied field is left', async () => {
+      const { a, b, onPatch, user } = await openTwo()
+      const input = field('Text color')
+
+      await user.clear(input)
+      select()
+      expect(input).toHaveValue('#445566')
+      await user.click(input)
+      await user.tab()
+
+      expect(onPatch).not.toHaveBeenCalled()
+      expect(b.style.getPropertyValue('color')).toBe('rgb(68, 85, 102)')
+      expect(a.style.getPropertyValue('color')).toBe('rgb(17, 34, 51)')
+    })
+
+    it('drops a half-typed colour with the element it was typed for', async () => {
+      const { user } = await openTwo()
+      const input = field('Text color')
+
+      await user.clear(input)
+      await user.keyboard('#7a')
+      select()
+
+      expect(input).toHaveValue('#445566')
+    })
+  })
+
+  describe('a gradient stop', () => {
+    const GRADIENT = '<section id="selected" style="background-image: linear-gradient(45deg, #e11d48, #2563eb)">Hi</section>'
+
+    // In a gradient the browser refuses these, and on a phone the value goes
+    // into a variable that takes them anyway: the gradient was gone there.
+    it.each(['inherit', 'initial', 'unset', 'revert'])('takes no %s, which a gradient cannot hold', async (keyword) => {
+      const { element, onPatch, user } = await open(GRADIENT, { apply: applyMobileElementPatch })
+      await openGroup(user, 'Background image & gradient')
+      const from = field('Gradient from')
+
+      await user.clear(from)
+      await user.keyboard(keyword)
+
+      expect(onPatch).not.toHaveBeenCalled()
+      expect(element.getAttribute('style')).not.toContain(keyword)
+      expect(from).toHaveValue(keyword)
+      await user.tab()
+      expect(from).toHaveValue('#e11d48')
+    })
+
+    it('takes no keyword at its end either', async () => {
+      const { onPatch, user } = await open(GRADIENT, { apply: applyMobileElementPatch })
+      await openGroup(user, 'Background image & gradient')
+      const to = field('Gradient to')
+
+      await user.clear(to)
+      await user.keyboard('inherit')
+
+      expect(onPatch).not.toHaveBeenCalled()
+    })
+
+    it('still takes a colour by name', async () => {
+      const { onPatch, user } = await open(GRADIENT)
+      await openGroup(user, 'Background image & gradient')
+      const from = field('Gradient from')
+
+      await user.clear(from)
+      await user.paste('red')
+
+      expect(onPatch).toHaveBeenCalledWith({ gradientFrom: 'red' })
+    })
+
+    it('leaves inherit to the plain colour fields, where it means something', async () => {
+      const { onPatch, user } = await open('<h1 id="selected" style="color: #2c2520">Hi</h1>')
+      const input = field('Text color')
+
+      await user.clear(input)
+      await user.paste('inherit')
+
+      expect(onPatch).toHaveBeenCalledWith({ color: 'inherit' })
+    })
+  })
 })

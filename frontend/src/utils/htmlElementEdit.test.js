@@ -14,6 +14,7 @@ import {
   ensureAnchor,
   ensureElementId,
   isCssColor,
+  isGradientStop,
   linkSectionsInDocument,
   moveElement,
   nearestAnchor,
@@ -66,6 +67,29 @@ describe('isCssColor', () => {
     for (const value of ['', ' ', '#', '#7', '#7a', '#7a2e1', '#7a2e123', 'rgb(', 'not-a-colour', null, undefined]) {
       expect(isCssColor(value), String(value)).toBe(false)
     }
+  })
+})
+
+describe('isGradientStop', () => {
+  it('takes a colour', () => {
+    for (const value of ['#7a2e12', 'red', 'transparent', 'rgb(1, 2, 3)']) expect(isGradientStop(value), value).toBe(true)
+  })
+
+  it('refuses a half-typed one, and the keywords only a whole property can be', () => {
+    for (const value of ['', '#7a', 'inherit', 'INHERIT', ' initial ', 'unset', 'revert', 'revert-layer']) {
+      expect(isGradientStop(value), value).toBe(false)
+    }
+  })
+})
+
+describe('the identity of a described element', () => {
+  it('stays with the element and differs between elements', () => {
+    document.body.innerHTML = '<p id="one">1</p><p id="two">2</p>'
+    const [one, two] = [document.getElementById('one'), document.getElementById('two')]
+    const first = describeElement(one).elementKey
+    one.style.color = 'red'
+    expect(describeElement(one).elementKey).toBe(first)
+    expect(describeElement(two).elementKey).not.toBe(first)
   })
 })
 
