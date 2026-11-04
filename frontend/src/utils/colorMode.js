@@ -453,6 +453,15 @@ function mapValue(value, context, mode, hint, onTint) {
   return { value: out, role: first || null, color: painted, paints: paints(value) && !(faint && !first) }
 }
 
+function firstColor(value) {
+  if (typeof value !== 'string') return null
+  for (const [token] of value.matchAll(COLOR_TOKEN)) {
+    const color = parseColor(token)
+    if (color) return color
+  }
+  return null
+}
+
 // What a block's background makes of what is behind it, in the other palette.
 function surfaceOver(behind, { color, role }, mode) {
   const own = normalizeHex(role && mode.other?.[role]) || color.hex
@@ -494,6 +503,10 @@ function mapStyles(styles, type, mode, inside, behind) {
     if (mapped.role) boxRole = boxRole || mapped.role
     else if (mapped.paints) custom = true
   }
+  // A gradient covers the background colour and keeps its colours in both
+  // palettes. Its first colour stands for it, as it does for a background.
+  const stop = firstColor(styles.backgroundImage)
+  if (stop) surface = surfaceOver(surface, { color: stop }, mode)
   const fixed = !boxRole && (custom || inside)
   if (typeof styles.color === 'string') {
     out.color = mapForeground(styles.color, { boxRole, fixed, mode, hint: hints.fg })
@@ -554,11 +567,18 @@ function mapTabProps(props, mode, fixed) {
   return out
 }
 
-function mapComponent(component, mode, inside = false, behind = mode.other?.backgroundColor) {
+// `behind` is what the block stands on in the other palette, `behindPhone` the
+// same on a phone: a parent or a page can have another background there.
+function mapComponent(component, mode, inside = false, behind = mode.other?.backgroundColor, behindPhone = behind) {
   if (!component || typeof component !== 'object') return component
   const { styles, fixed, surface } = mapStyles(component.styles, component.type, mode, inside, behind)
+  const phone = mapStyles({ ...component.styles, ...component.stylesMobile }, component.type, mode, inside, behindPhone)
   const next = { ...component, styles }
-  if (component.stylesMobile) next.stylesMobile = mapStyles(component.stylesMobile, component.type, mode, inside, behind).styles
+  if (component.stylesMobile) next.stylesMobile = mapStyles(component.stylesMobile, component.type, mode, inside, behindPhone).styles
+  // The same text can need another answer on another surface.
+  if (typeof styles?.color === 'string' && !component.stylesMobile?.color && phone.styles.color !== styles.color) {
+    next.stylesMobile = { ...next.stylesMobile, color: phone.styles.color }
+  }
   if (component.type === 'input' || component.type === 'select') next.props = mapFieldProps(component.props || {}, mode, fixed)
   if (component.type === 'tabs') next.props = mapTabProps(component.props || {}, mode, fixed)
   // The writers show one of two images; each says which palette it belongs to.
@@ -578,13 +598,26 @@ function mapComponent(component, mode, inside = false, behind = mode.other?.back
       _colorModeCss: embedCss(mode),
     }
   }
-  if (Array.isArray(component.children)) next.children = component.children.map((child) => mapComponent(child, mode, fixed, surface))
+  if (Array.isArray(component.children)) {
+    // A tab's blocks stand on its panel, whose colour lives in the props.
+    const panel = component.type === 'tabs' ? mapValue(component.props?.panelBackgroundColor, 'bg', mode, 'surfaceColor') : {}
+    const over = (under) => (panel.color ? surfaceOver(under, panel, mode) : under)
+    next.children = component.children.map((child) => mapComponent(child, mode, fixed, over(surface), over(phone.surface)))
+  }
   return next
 }
 
-export function withColorModeComponents(components, mode) {
+// `page`: the page's own background and phone background, when it has them.
+export function withColorModeComponents(components, mode, { background, backgroundMobile } = {}) {
   if (!mode || !Array.isArray(components)) return components
-  return components.map((component) => mapComponent(component, mode))
+  const palette = mode.other?.backgroundColor
+  const under = (value) => {
+    const mapped = mapValue(value, 'bg', mode, 'backgroundColor')
+    return mapped.color ? surfaceOver(palette, mapped, mode) : palette
+  }
+  const behind = under(background)
+  const behindPhone = backgroundMobile ? under(backgroundMobile) : behind
+  return components.map((component) => mapComponent(component, mode, false, behind, behindPhone))
 }
 
 export function withColorModePage(page, mode) {
@@ -594,7 +627,7 @@ export function withColorModePage(page, mode) {
     ...page,
     background: background(page.background),
     backgroundMobile: background(page.backgroundMobile),
-    components: withColorModeComponents(page.components, mode),
+    components: withColorModeComponents(page.components, mode, page),
   }
 }
 

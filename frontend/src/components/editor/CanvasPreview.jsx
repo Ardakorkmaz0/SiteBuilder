@@ -349,7 +349,7 @@ export default function CanvasPreview({
     >
       <ColorModeRoot mode={colorMode}>
         <Renderer
-          components={withColorModeComponents(components, colorMode)}
+          components={withColorModeComponents(components, colorMode, { background })}
           background={colorMode ? withColorModePage({ background }, colorMode).background : background}
           viewport={viewport}
           width={width}

@@ -389,6 +389,112 @@ describe('a colour however it is written', () => {
         expect(outer.children[0].stylesMobile.color).toBe('var(--pwb-alt-muted, #54595f)')
       })
 
+      describe('a parent with a gradient', () => {
+        // The gradient covers the background colour, and keeps its colours in both palettes.
+        const under = (backgroundImage, color = '#888888') => nested(PALE, box({ backgroundColor: '#fafafa', backgroundImage }, [card(color)])).children[0].styles.color
+
+        it('judges on the gradient, not on the colour it covers', () => {
+          expect(under('linear-gradient(90deg,#111317,#111317)')).toBe('#888888')
+        })
+
+        it('in the other direction too', () => {
+          const schema = {
+            theme: { ...DEFAULT_THEME, backgroundColor: '#111317', surfaceColor: '#223344', textColor: '#e8edf4', mutedColor: '#bbbbbb' },
+            colorMode: { start: 'light', theme: { backgroundColor: '#ffffff', surfaceColor: '#333333', textColor: '#111111', mutedColor: '#111111' } },
+            pages: [{ id: 'home', name: 'Home', components: [] }],
+          }
+          const tree = box({ backgroundColor: '#223344', backgroundImage: 'linear-gradient(90deg,#ffffff,#ffffff)' }, [card('#bbbbbb')])
+          const [outer] = withColorModeComponents([tree], colorModeFor(schema, schema.pages[0]))
+          expect(outer.children[0].styles.color).toBe('var(--pwb-alt-muted, #bbbbbb)')
+        })
+
+        it('lets its first colour stand for it', () => {
+          expect(under('linear-gradient(90deg,#111317,#ffffff)')).toBe('#888888')
+          expect(under('linear-gradient(90deg,#ffffff,#111317)')).toBe('var(--pwb-alt-muted, #888888)')
+        })
+
+        it('counts how much of the surface a faint gradient lets through', () => {
+          expect(under('linear-gradient(90deg,rgba(17,19,23,.1),rgba(17,19,23,.1))')).toBe('var(--pwb-alt-muted, #888888)')
+        })
+
+        it('does not take a gradient for a surface when it has no colour to read', () => {
+          expect(under('none')).toBe('var(--pwb-alt-muted, #888888)')
+        })
+      })
+
+      describe('a parent that differs on the phone', () => {
+        it('judges the child on the phone surface when the parent has none there', () => {
+          const parent = { ...box({ backgroundColor: '#fafafa' }, [card('#888888')]), stylesMobile: { backgroundColor: 'transparent' } }
+          const [child] = nested(PALE, parent).children
+          expect(child.styles.color).toBe('var(--pwb-alt-muted, #888888)')
+          expect(child.stylesMobile.color).toBe('#888888')
+        })
+
+        it('judges the child on the phone surface when only the phone has one', () => {
+          const parent = { ...box({}, [card()]), stylesMobile: { backgroundColor: '#fafafa' } }
+          const [child] = nested(PALE, parent).children
+          expect(child.styles.color).toBe('#54595f')
+          expect(child.stylesMobile.color).toBe('var(--pwb-alt-muted, #54595f)')
+        })
+
+        it('carries the phone surface further down', () => {
+          const parent = { ...box({ backgroundColor: '#fafafa' }, [box({}, [card('#888888')])]), stylesMobile: { backgroundColor: 'transparent' } }
+          expect(nested(PALE, parent).children[0].children[0].stylesMobile.color).toBe('#888888')
+        })
+
+        it('adds nothing for the phone when the answer is the same', () => {
+          const [child] = nested(PALE, box({ backgroundColor: '#fafafa' }, [card()])).children
+          expect(child.stylesMobile).toBeUndefined()
+        })
+
+        it('leaves a colour the phone has of its own', () => {
+          const parent = { ...box({ backgroundColor: '#fafafa' }, [{ ...card('#888888'), stylesMobile: { color: '#54595f' } }]), stylesMobile: { backgroundColor: 'transparent' } }
+          expect(nested(PALE, parent).children[0].stylesMobile.color).toBe('var(--pwb-alt-muted, #54595f)')
+        })
+      })
+
+      describe('a page or a tab panel of its own colour', () => {
+        const modeOfPale = () => {
+          const schema = {
+            theme: { ...DEFAULT_THEME, backgroundColor: '#ffffff', textColor: '#111111', mutedColor: '#54595f', surfaceColor: '#fafafa' },
+            colorMode: { start: 'dark', theme: { backgroundColor: '#111317', ...PALE } },
+            pages: [{ id: 'home', name: 'Home', components: [] }],
+          }
+          return colorModeFor(schema, schema.pages[0])
+        }
+
+        it('judges a block on the page background it stands on', () => {
+          const page = withColorModePage({ background: '#fafafa', components: [card()] }, modeOfPale())
+          expect(page.components[0].styles.color).toBe('var(--pwb-alt-muted, #54595f)')
+        })
+
+        it('judges a block on the phone background of the page', () => {
+          const page = withColorModePage({ background: '#ffffff', backgroundMobile: '#fafafa', components: [card()] }, modeOfPale())
+          expect(page.components[0].styles.color).toBe('#54595f')
+          expect(page.components[0].stylesMobile.color).toBe('var(--pwb-alt-muted, #54595f)')
+        })
+
+        it('reads the same in the writers that hand the page colour over apart', () => {
+          const [block] = withColorModeComponents([card()], modeOfPale(), { background: '#fafafa' })
+          expect(block.styles.color).toBe('var(--pwb-alt-muted, #54595f)')
+        })
+
+        it('still judges on the page of the palette for a page with no colour', () => {
+          const page = withColorModePage({ components: [card()] }, modeOfPale())
+          expect(page.components[0].styles.color).toBe('#54595f')
+        })
+
+        it('judges a block in a tab panel on the panel', () => {
+          const tabs = { ...block('tabs', {}, { children: [card()] }), props: { tabs: [{ id: 'a', label: 'A' }], activeId: 'a', panelBackgroundColor: '#fafafa' } }
+          expect(withColorModeComponents([tabs], modeOfPale())[0].children[0].styles.color).toBe('var(--pwb-alt-muted, #54595f)')
+        })
+
+        it('looks through a transparent tab panel', () => {
+          const tabs = { ...block('tabs', {}, { children: [card()] }), props: { tabs: [{ id: 'a', label: 'A' }], activeId: 'a', panelBackgroundColor: 'transparent' } }
+          expect(withColorModeComponents([tabs], modeOfPale())[0].children[0].styles.color).toBe('#54595f')
+        })
+      })
+
       it('writes the followed text in the real published page', () => {
         const schema = {
           theme: { ...DEFAULT_THEME, backgroundColor: '#ffffff', textColor: '#111111', mutedColor: '#54595f', surfaceColor: '#fafafa' },
