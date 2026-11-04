@@ -295,9 +295,15 @@ function ImageLibrary({ value, onPick }) {
 // announced as its placeholder ("#000000"), so every colour of a theme
 // sounded the same. The name now goes to the code field, and the swatch says
 // it picks that colour.
-export function LabeledColor({ label, value, onChange, fallback }) {
+// `accepts` is for a setting that can hold nothing but a colour. Only what it
+// accepts goes out while typing, and an emptied field goes out on leaving: for
+// a gradient stop, emptying drops the gradient the new colour is being typed for.
+export function LabeledColor({ label, value, onChange, fallback, accepts }) {
   const { t } = useLanguage()
   const labelId = useId()
+  // What the person is typing ("#7a") until they leave the field; the value that
+  // comes back from the page would otherwise overwrite it.
+  const [draft, setDraft] = useState(null)
   const shown = value || fallback || ''
   const hex = /^#[0-9a-fA-F]{6}$/.test(shown) ? shown : '#000000'
   return (
@@ -310,15 +316,26 @@ export function LabeledColor({ label, value, onChange, fallback }) {
           aria-label={typeof label === 'string' ? t('Pick a colour: {label}', { label }) : undefined}
           aria-labelledby={typeof label === 'string' ? undefined : labelId}
           value={hex}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            setDraft(null)
+            onChange(e.target.value)
+          }}
         />
         <input
           type="text"
           className={inputCls}
           aria-labelledby={labelId}
-          value={value ?? ''}
+          value={draft ?? value ?? ''}
           placeholder={fallback || '#000000'}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            const raw = e.target.value
+            setDraft(raw)
+            if (!accepts || accepts(raw)) onChange(raw)
+          }}
+          onBlur={() => {
+            if (accepts && draft !== null && !draft.trim()) onChange('')
+            setDraft(null)
+          }}
         />
       </div>
     </div>

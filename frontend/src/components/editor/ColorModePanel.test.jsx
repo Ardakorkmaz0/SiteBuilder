@@ -202,6 +202,40 @@ describe('showing the other palette', () => {
   })
 })
 
+describe('typing a color of the other palette', () => {
+  const field = () => screen.getByRole('textbox', { name: 'Text color', exact: true })
+
+  it('keeps every key and stores only a whole color', async () => {
+    open({ colorMode: { theme: { textColor: '#eeeeee' }, followDevice: false } })
+    const user = userEvent.setup()
+
+    await user.clear(field())
+    expect(field()).toHaveValue('')
+    expect(saved().theme.textColor).toBe('#eeeeee')
+    for (const typed of ['#', '#7', '#7a']) {
+      await user.keyboard(typed.at(-1))
+      expect(field()).toHaveValue(typed)
+      expect(saved().theme.textColor).toBe('#eeeeee')
+    }
+    await user.keyboard('2e12')
+
+    expect(field()).toHaveValue('#7a2e12')
+    expect(saved().theme.textColor).toBe('#7a2e12')
+  })
+
+  it('goes back to the color in use when left half typed', async () => {
+    open({ colorMode: { theme: { textColor: '#eeeeee' }, followDevice: false } })
+    const user = userEvent.setup()
+
+    await user.clear(field())
+    await user.keyboard('#7a')
+    await user.tab()
+
+    expect(field()).toHaveValue('#eeeeee')
+    expect(saved().theme.textColor).toBe('#eeeeee')
+  })
+})
+
 describe('colors that are hard to read', () => {
   it('says nothing about what it suggests', () => {
     open()
