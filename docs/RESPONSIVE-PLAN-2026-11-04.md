@@ -1,170 +1,185 @@
-# Ekran boyutu değişince içerik: plan
+# Ekran boyutu değişince içerik: plan (2. sürüm)
 
-Yazan: Claude, 4 Kasım 2026. Durum: taslak, kod yazılmadı. Sahibin kararı ve ChatGPT'nin kontrolü bekleniyor.
+Yazan: Claude, 4 Kasım 2026. Durum: kod yazılmadı, sahibin onayı bekleniyor. Bu sürüm ChatGPT'nin
+[incelemesinden](RESPONSIVE-PLAN-REVIEW-2026-11-04.md) sonra yazıldı. İlk sürüm `d70bc09` commit'indedir.
 
 ## Sorun
 
-Serbest tuval sayfası bugün gerçekten uyarlanmıyor. Sayfa iki sabit çizimden oluşuyor: 1000 piksel PC ve 390
-piksel telefon. Geçiş 768 pikselde. Ekran çizimden darsa bütün sayfa `transform: scale()` ile küçülüyor, genişse
-çizim ortada duruyor. Blokların yerleşimi hiçbir genişlikte değişmiyor.
+Serbest tuval sayfası bugün gerçekten uyarlanmıyor. Sayfa iki sabit çizimden oluşuyor: 1000 piksel PC ve 390 piksel
+telefon. Geçiş 768 pikselde. Ekran çizimden darsa bütün sayfa `transform: scale()` ile küçülüyor, genişse çizim ortada
+duruyor. Blokların yerleşimi hiçbir genişlikte değişmiyor. Boş tuvalle başlanan her sayfa bu modda. 500 şablon ise HTML
+belgesi ve kendi `@media` kurallarını taşıyor.
 
-Boş tuvalle başlanan her sayfa bu modda (`flowMode: false` varsayılan). 500 şablonun tamamı ise HTML belgesi ve
-kendi `@media` kurallarını taşıyor, yani onlar ayrı ve çok daha iyi durumda.
+İki bağımsız ölçümde aynı tablo çıktı (örnekler farklı, sayılar bu yüzden tam tutmuyor):
 
-## Ölçümler
-
-Yöntem: `schemaToSingleHtml` çıktısı Chromium'da 14 genişlikte ölçüldü (320-2560), dış istekler kapalı. Düzenek repo
-dışında. Tuval örneği elle yazılmış tek bir sayfa: menü, başlık, paragraf ve düğme solda, görsel sağda, bant, üç kart,
-alt metin. **Gerçek kullanıcı sayfası değil.** Tuval sayıları bu tek örneğe aittir.
-
-Serbest tuval, yayımlanan sayfa:
-
-| Genişlik | Ölçek | Yazı boyu (ortanca) | Yazı ve görsellerin kullandığı genişlik |
+| Genişlik | Ölçek | Yazı boyu (ortanca) | Ana içeriğin kullandığı genişlik (Claude / ChatGPT) |
 |---|---|---|---|
-| 320 | 0,82 | 14,8 px (tasarım 18) | %100 |
-| 390 | 1 | 18 px | %100 |
-| 600 | 1 | 18 px | %65 |
-| 768 | 1 | 18 px | **%51**, tablette telefon sütunu ortada kalıyor |
-| 769 | **0,77** | **12,3 px** (tasarım 16) | %100 |
-| 900 | 0,90 | 14,4 px | %100 |
-| 1024 | 1 | 16 px | %98 |
-| 1920 | 1 | 16 px | %52 |
-| 2560 | 1 | 16 px | %39 |
+| 320 | 0,82 | 14,8 / 13,1 px | %100 / %92 |
+| 768 | 1 | 18 / 16 px | **%51 / %47** |
+| 769 | **0,77** | **12,3 / 12,3 px** | %100 / %92 |
+| 1920 | 1 | 16 / 16 px | %52 / %48, ortalı sütun, hata sayılmıyor |
 
-768'den 769'a bir piksel gidince sayfa bambaşka bir çizime ve 0,77 ölçeğe atlıyor.
+İkisinin de doğruladığı hatalar:
 
-Diğer yazıcılarda ve sırada görülenler:
+1. **Telefon sırası:** sol sütunda başlık, paragraf, düğme, sağda görsel varsa sıra başlık, görsel, paragraf, düğme oluyor.
+2. **HTML'e çevirme:** aynı sol sütun yan yana dört sütuna dağılıyor (`readingRows`).
+3. **Proje dışa aktarımı:** 900 pikselde 100 piksel yatay taşma.
+4. **Geçiş ölçüsü:** görüntüleyici `el.clientWidth < 768`, yayımlanan sayfa `innerWidth <= 768` kullanıyor. Çizim 768'de ve
+   kaydırma çubuklu pencerede farklı seçiliyor.
 
-1. **Telefonda okuma sırası bozuluyor.** Sol sütunda başlık, paragraf, düğme, sağda görsel varken telefon sırası
-   başlık, görsel, paragraf, düğme oluyor. `autoMobileLayout` yalnızca üst kenarlara bakıyor, sütun bilmiyor.
-2. **HTML'e çevirme aynı sütunu dağıtıyor.** 1024 pikselde başlık (x=36), paragraf (346), düğme (646) ve görsel (788)
-   yan yana dört sütun oluyor (`readingRows`, `responsiveHtml.js`). Bu kalıp gerçek sitelerde çok yaygın.
-3. **Dışa aktarılan proje 900 pikselde 100 piksel yatay kayıyor.** `styles.css` sayfaya sabit `width: 1000px` veriyor,
-   ölçek betiği yok.
-4. **Geçiş noktası iki yerde farklı (yalnızca kod okuyarak).** Uygulama içi görüntüleyici `width < 768`
-   (`PreviewPage.jsx:47`), yayımlanan sayfa `screenW <= 768`. 768 genişliğindeki bir tablette ikisi farklı çizim seçer.
-5. **Akış modu (`enableFlowMode`) bu hali çözmüyor.** Örnek serbest çizimden çevrildi: 1920'de menü 1000 piksele
-   ortalı kalırken gövde tüm genişliğe yayılıyor, kenarlar hizalanmıyor. Adil bir akış örneği olmadığı için bu kısım
-   kesin hüküm değil.
+Yalnızca Claude'un taradığı, ChatGPT'nin tekrarlamadığı: 320 pikselde 227 şablonda 4 piksellik kayma ve 360 pikselde 41
+şablonda ekran dışına çıkan öğe. Bu ayrı bir iş, tuval planına bağlı değil.
 
-HTML şablonları (500 belge):
+## İncelemeden sonra ne değişti
 
-- 360 ve üstünde sayfa yatay kaymıyor. 320'de **227 belge tam 4 piksel** kayıyor; sabit fark ortak bir CSS kuralına işaret
-  ediyor.
-- 41 belgede 360 pikselde ekran dışına çıkan öğe var. Örnek baktıklarım karşılaştırma tablosu ve kayan yazı gibi duruyor;
-  kasıtlı olup olmadıkları kontrol edilmedi.
-- Metin üst üste binme ölçümüm iç içe öğeleri de saydığı için güvenilir değil (491 belge). Bu sayıyı kullanmayın.
+Her iddiayı kodda kontrol ettim:
 
-## Hedef
-
-Bloklar her genişlikte yerleşsin, küçültülmesin. Editörde çizilen PC tasarımı kendi genişliğinde bugünkü gibi görünsün.
-
-| Ölçüt | Bugün (örnek) | Hedef |
+| Bulgu | Sonuç | Bu plandaki karşılığı |
 |---|---|---|
-| 320-768'de ölçek | 0,82-1 | her yerde 1 |
-| 769-1000'de ölçek | 0,77-1 | her yerde 1 |
-| 768'de kullanılan genişlik | %51 | en az %80 |
-| 769'da yazı boyu | 12,3 px | tasarımdaki boy |
-| Dışa aktarımda yatay kayma | 100 px | 0 |
-| Yan yana sütun, telefonda sıra | bozuk | sütun sütun okunur |
-| Tasarım genişliğinde blok konumu | referans | sapma en fazla 1 px, yazı kutusuna sığıyorsa |
-| Üretilen sayfanın boyutu | 13 KB bütçe | bütçe aşılmaz |
+| Kesilemeyen ama çakışmayan düzen (P1) | Doğru. Beş kartlık düzende boş şerit yok. | **XY-cut yazımdan çıktı**, yerine düz CSS Grid |
+| Otomatik telefon değişimi eski sayfaları da değiştirir (P1) | Doğru, benim hatam. `normalizePage` yüklerken yeniden üretiyor (`editorStore.js:1203`). | Yeni sıra yalnızca geçiş yapmış sayfalarda |
+| Geometri okuma niyetini kanıtlamaz (P2) | Doğru. | Ağaç yok, şemada ebeveyn değişmiyor; sıra yalnızca DOM sırasını belirler |
+| Fixed ve sticky aynı şey değil (P2) | Doğru. Sticky bugün JS ile kaydırma yapıyor. | Fixed ekran katmanında kalır, sticky hücresinde yerini tutar |
+| Ortak genişlik tanımı gerekli (P2) | Doğru. | Tek kural: belgenin kendi `@media` sorgusu |
+| Eşdeğerlik ve önizleme geç geliyor (P2) | Doğru. | Aşama sırası değişti |
+| 1 piksel ölçütü koşulsuz söz olamaz | Doğru. | Ölçüt yeniden yazıldı |
+| Tek mi çift mi DOM ağacı | İlk planda atlamıştım. | Tek DOM, iki yerleşim |
 
-## Yaklaşım
+Bir bulgunun açtığı yeni riski de ekledim: Grid sütunları `dir="rtl"` sayfada ters sıralanır, mutlak konum sıralanmaz.
 
-Veri modeli ve editör tuvali aynı kalır: PC ve telefon için iki çizim, mutlak koordinatlar. Değişen, sayfanın nasıl
-yazıldığıdır. Koordinatlardan bir yerleşim ağacı çıkarılır, sayfa satır ve sütunlarla yazılır.
+## Yaklaşım: düz CSS Grid
 
-**Yerleşim ağacı (XY-cut).** Saf bir fonksiyon, `utils/layoutTree.js`. Blok dikdörtgenlerini boş yatay şeritlerden
-satırlara, sonra boş dikey şeritlerden sütunlara böler, tekrar eder:
+Editör tuvali ve kayıtlı koordinatlar aynı kalır: PC ve telefon için iki çizim. Değişen, sayfanın yazılışıdır.
 
-```text
-menü
-[ başlık + paragraf + düğme ] | görsel     <- bugünkü readingRows bunu dört sütun yapıyor
-bant
-kart | kart | kart
-alt metin
+Blokların kenarları ızgara çizgilerine dönüşür. DOM düz kalır: bütün bloklar `.page` altında, bugünkü sınıflarıyla durur.
+Bir `@media` kuralı aynı blokları telefon ızgarasına taşır:
+
+```css
+.page { display: grid; width: min(100%, 1000px); margin: 0 auto;
+  grid-template-columns: minmax(0, 40fr) minmax(0, 420fr) minmax(0, 80fr) minmax(0, 420fr) minmax(0, 40fr);
+  grid-template-rows: minmax(min(72px, 7.2cqw), auto) ...; }
+.c-heading { grid-column: 2 / 3; grid-row: 2 / 3; }
+@media (max-width: 768px) { .page { width: 100%; grid-template-columns: ...; } .c-heading { grid-column: ...; } }
 ```
 
-- Bir bölüme (`section`, `region`) oturan bloklar o bölümün çocuğu sayılır; `autoMobileLayout` bu ayrımı zaten yapıyor.
-- **Bölünemeyen, gerçekten üst üste binen bloklar** (görsel üstünde yazı) bir katman düğümü olur: içeride mutlak kalır, grup
-  olarak mevcut `data-pwb-container-width` mekanizmasıyla ölçeklenir. Yalnızca o küçük grup ölçeklenir, sayfa değil.
-- Sabit ve yapışkan bloklar ağaca girmez, ekrana bağlı katmanda kalır.
+Bu yapı incelemenin itirazlarının çoğunu aynı anda karşılıyor:
 
-**Yazım.** Satırlar flex ile yazılır. Sütun genişliği tasarım oranından yüzde olarak, boşluklar tasarımdaki boşluktan gelir.
-Yükseklik `min-height` olur, yazı uzarsa alttakini aşağı iter. Bugün üst üste biner.
+- **Kesilemeyen düzen özel bir durum değil.** Beş kartlık düzen de sıradan bir ızgaradır.
+- **Gerçek çakışma da özel değil.** Görsel üstündeki yazı aynı hücreleri paylaşır, ayrı ölçek gerekmez.
+- **Yazı uzarsa** satırı büyür ve alttakini iter. Bugün üst üste biniyor.
+- **Tasarım genişliğinde** ızgara çizgileri tam koordinatlara denk gelir.
+- **Tek DOM:** yinelenen id, iki kez yüklenen iframe veya kaybolan form değeri riski doğmuyor.
+- **`.page > .c-id` yapısı korunur**, sahibin kodu için risk azalır ama sıfırlanmaz.
+- **Ek bir kırılma mantığı yok.** 769-1000 arasında sütunlar orantılı daralır, 768 ve altında telefon çizimi devreye girer.
 
-**Genişlik basamakları:**
+Görseller `aspect-ratio` ile büyür. Satırların alt sınırı tasarımın altında orantılı küçülür, üstünde büyümez.
 
-| Genişlik | Ne olur |
-|---|---|
-| tasarımdan geniş | bugünkü gibi: çizim ortada, bantlar kenardan kenara |
-| 769 - tasarım | PC ağacı oranlarla daralır, sütun çok daralınca alt alta geçer, ölçek yok |
-| 320 - 768 | telefon ağacı tüm genişliği kullanır, ölçek yok |
+**Bedeli:** kaynak okunabilirliği. `minmax(min(72px,7.2cqw),auto)` listesi, bir geliştiricinin yazacağı satır ve sütun koduna
+benzemiyor. Çok önem verdiğiniz bir konu olduğu için açıkça yazıyorum. Değişkenlerle ve yakın çizgileri 1 piksele kadar
+birleştirerek kısaltılabilir, ama hedef görünüm doğruluğu, en güzel kaynak değil. Ölçek betiği ve bloğa özel mutlak konum
+kuralları ise kalkar. Net boyut farkını gerçek yazıcıyla henüz ölçmedim.
 
-768 geçişi korunur, çünkü "telefonda gizle", `stylesMobile` ve menü düğmesi ona bağlı. Tablette telefon çiziminin mi yoksa
-daralan PC ağacının mı daha iyi durduğu aşama 3'te ölçülüp kararlaştırılır.
+## Prototip
 
-Yan kazanç: `<div class="row">` yapısı `data-builder-layout` ölçek betiğini ve blok başına konum kurallarını kaldırır.
-Kaynak, geliştiricinin yazacağı koda yaklaşır. Boyutu ölçmeden iddia etmiyorum.
+Fikri yazmadan önce denedim: `docs/review-evidence/responsive-grid-prototype-2026-11-04/` (`proto.cjs`, `results.txt`, üç görüntü).
+ChatGPT'nin kendi örnekleri kullanıldı. Chromium 156, 14 genişlik (320-1920).
 
-**Yapılmayacaklar:** üçüncü bir tablet çizimi, her özellik için genişliğe özel ayar, editör tuvalini yeniden yazmak.
-Bunlar sahibine ek iş çıkarır ve projenin büyüklüğünü aşar.
+| Örnek | Yatay taşma | Beklenmeyen çakışma | Kesilen blok | Tasarım genişliğinde en büyük sapma |
+|---|---|---|---|---|
+| Sol sütun + görsel | 0 | 0 | 0 | 0 px |
+| Aynısı, çok uzun metin ve bölünmeyen adres | 0 | 0 | 0 | 67 px, beklenen: yazı kutuya sığmıyor ve alttakini itiyor |
+| Beş kart | 0 | 0 | 0 | 0 px |
+| Görsel üstünde yazı | 0 | 0, tek çakışma tasarımdaki | 0 | 0 px |
+| 60 blok | 0 | 0 | 0 | 0 px |
+
+Sticky: bugünkü kaydırma mantığının aynısı ızgarada çalıştı, 800 piksel kaydırmada blok ekranın üstünde kaldı.
+
+**Bu prototip neyi kanıtlamaz:** bloklar düz kutu. Gerçek bileşen, gerçek yazıcı, konteyner, sekme, bölge, HTML bloğu, `boxFit`,
+hareket, RTL, Firefox ve Safari denenmedi. 60 bloğun telefon çizimi yoktu, yani o satırın 768 altı sonucu anlamsız. `cqw` ve
+`min()` 2023'ten beri tarayıcılarda; eski tarayıcıda ne olduğu ölçülmedi. Kısacası yön doğrulandı, uygulama değil.
+
+## Ortak kurallar
+
+**Genişlik.** Çizim seçimini belgenin `@media (max-width: 768px)` sorgusu yapar, başka bir JS hesabı olmaz. Görüntüleyici, önizleme
+ve iframe aynı belgeyi açar. React yolu (`ResponsiveSite`) bu sayfalarda kullanılmaz.
+
+**DOM sırası.** PC çiziminin okuma sırası. Yalnızca sıralama için, sütunları tanıyan bir fonksiyon kullanılır: bölünebiliyorsa sütun
+sütun, bölünemiyorsa üstten alta ve soldan sağa. Yanlış tahminin bedeli bozuk yerleşim değil, farklı bir Tab sırasıdır. Telefon
+çizimi elle farklı sıralanmışsa görsel sıra ile Tab sırası ayrılabilir; bu kabul edilen bir sınırdır.
+
+**Sayfa sürümü.** `page.layoutVersion: 2`. Alanın yokluğu eski davranış demektir ve yükleme, düzenleme, çevirme, önizleme, yayımlama
+aynı koşula bakar. Backend izin listesine eklenir (`validators.py`), yoksa kaydederken silinir. Eski sekme bu sayfayı eski yazıcıyla
+yeniden gönderebilir; aşama 4'te ele alınır. Elle yapılmış telefon çizimi korunur.
+
+**Bloklar:**
+- Fixed: ekran katmanında kalır, ölçeksiz.
+- Sticky: kendi hücresinde yer tutar, bugünkü kaydırma mantığı sürer.
+- Gizli blok: ızgaraya girmez. Boşluğu kalıp kalmayacağı testle kararlaştırılır.
+- Tam genişlik bant: `--design-offset` ile kenardan kenara, içerik sütun hizasında.
+- RTL: ızgara soldan sağa sabitlenir, blok içeriği RTL kalır.
+
+## Kabul ölçütleri
+
+Her sabit örnek şu genişliklerde ölçülür: 320, 360, 390, 600, 767, 768, 769, 780, tasarım ±1, 1024, 1920. Ek olarak klasik kaydırma
+çubuğu, dar kapsayıcı, iç iframe, elle telefon çizimi ve farklı tasarım genişlikleri.
+
+- **Ölçek:** hiçbir genişlikte sayfa ölçeği yok. Yazı boyu tasarımdaki boydur.
+- **Taşma:** kök `scrollWidth` yetmez, `overflow: hidden` içeriği kesebilir. Yaprak blokların sınırları ayrıca ölçülür; kasıtlı taşma
+  (kayan içerik, iç kaydırma) örnekte elle işaretlenir.
+- **Çakışma:** tasarımda çakışmayan iki yaprak blok hiçbir genişlikte çakışmaz. Üst ve alt öğe sayılmaz.
+- **Kullanılan genişlik:** 768'de yazı ve görsellerin kapladığı alan en az %80. Menü ve bant sayılmaz.
+- **Tasarım genişliğinde konum:** temsil edilen örnekte her blok için x, y, w, h sapması en fazla 1 CSS pikseli. Koşullar: aynı tarayıcı,
+  yüklü font ve görsel, yazı kutuya sığıyor. Ortalama yetmez. Farklı tarayıcı ve fontta satır kırılması garanti edilmez.
+- **Eşdeğerlik:** tek belge, görüntüleyici, proje çıktısı ve editör önizlemesinde aynı genişlikte aynı konumlar.
+- **Boyut:** bütçenin hangi örneğe ve hangi dosyalara ait olduğu yazılır, boyut gerçek yazıcıyla önce ve sonra ölçülür.
 
 ## Aşamalar
 
-Her aşama ayrı onaylanır ve ayrı canlıya çıkar.
+Her aşama ayrı onaylanır, canlıya çıkış ayrıca izin ister. Aşama 4'e kadar sayfaların görünümü değişmez.
 
-**Aşama 0: Ölçüm ve küçük düzeltmeler.** Görünen davranışta yalnızca hatalar düzelir.
-- Yukarıdaki ölçümler sabit örnek sayfalarla e2e testine dönüşür (`e2e/responsive-widths.spec.js`), metin binme ölçümü
-  düzeltilir. Sahibin gösterdiği gerçek örnek de buraya eklenir.
-- Tek geçiş noktası (`<=` ile `<` farkı), şablonlardaki 4 piksellik kayma, 41 belgenin kontrolü.
+**Aşama 0: Ölçüm ve sözleşme.** Sabit örnekler: sol sütun ve görsel, beş kart, çakışma, uzun metin, gizli blok, elle telefon, RTL, bölge,
+konteyner, sekme, HTML bloğu, sticky, fixed. Mevcut davranışı kaydeden testler, ürün davranışı değişmez. Sahibin gösterdiği gerçek sayfa
+da buraya eklenir.
 
-**Aşama 1: Yerleşim ağacı.** `layoutTree.js` ve elle yazılmış beklenen değerli birim testleri. Uygulandığı yerler:
-- HTML'e çevirme (`readingRows` yerine, bulgu 2).
-- Telefon sırası (`autoMobileLayout`, bulgu 1). Otomatik telefon çizimi bir sonraki düzenlemede değişir, elle düzenlenmiş
-  (`mobileManual`) sayfaya dokunulmaz.
+**Aşama 1: Saf yerleşim ve gerçek yazıcı.** `utils/gridLayout.js` (çizgiler, yerleşim, okuma sırası), elle yazılmış beklenen değerlerle.
+`layoutVersion: 2` sayfasını `schemaToSingleHtml` yazar. Gerçek bileşenlerle 1 piksel ölçütü burada gösterilir. Tutmazsa plan burada değişir.
 
-**Aşama 2: Telefon yazımı.** `schemaToSingleHtml` ve görüntüleyici telefon tarafında ağaçtan yazar. 320-768 ölçeksiz.
+**Aşama 2: Her yerde aynı belge.** Görüntüleyici, editör önizlemesi ve proje çıktısı aynı sözleşmeye geçer. Sürüm 2 sayfası için genişlik
+seçimli gerçek belge önizlemesi. Geçişin önizlemesi buna bağlı olduğu için erkene alındı.
 
-**Aşama 3: PC yazımı.** 769 ile tasarım genişliği arasında ağaç, ölçek betiği kalkar. En riskli aşama. Tablet kararı burada.
+**Aşama 3: Bütün bloklar.** Konteyner, sekme, bölge, HTML bloğu yüksekliği, `boxFit`, sticky, fixed, çapa, hareket, RTL, uzun metin, `NEEDS`
+uyumu, Firefox ve Safari'nin elde edilebilen kısmı. Tablet kararı burada verilir: 600-768'de telefon çizimi mi, daralan PC çizimi mi.
 
-**Aşama 4: Aynı sonuç her yerde.** Dışa aktarım (`schemaToFiles`, bulgu 3), editörün telefon önizlemesi ve görüntüleyicinin
-React yolu (`ResponsiveSite`). Görüntüleyici yolu kaldırılıp tek yazıcıya inilebilir mi, burada değerlendirilir.
+**Aşama 4: Geçiş.** Yeni sayfalar sürüm 2 başlar. Mevcut sayfa önizlemeyle tek tıkla geçer, geri alınabilir. Telefon sırası düzeltmesi yalnızca
+geçen sayfalarda çalışır. Eski sekme, kayıt ve revizyon, sahibin kodu, içe ve dışa aktarma denenir. Sahibin sayfalarıyla onay alınır.
 
-**Aşama 5: Editörde görmek.** Önizlemede genişlik seçimi (telefon, tablet, dizüstü, geniş ekran), yayımlanacak belgenin kendisiyle.
-Bölünemeyen katman varsa sahibine kısa bir not.
+**Ayrı iş 1: HTML'e çevirme.** Dört sütun hatası tuval planını beklemek zorunda değil. Okuma sırası hazır olunca düzeltilir: çıktı için
+satır ve sütun mu, yoksa aynı ızgara mı kullanılacağı o zaman kararlaştırılır.
 
-**İsteğe bağlı:** çok geniş ekran (1920'de %52). Ortada sütun normal bir site görünümü olduğu için hata saymıyorum. Yeni
-sayfaların 1200 piksel başlaması ayrı bir karar.
+**Ayrı iş 2: Şablon taramaları.** 4 piksellik kayma ve 41 belgenin kontrolü. Bağımsız ve küçük.
 
-## Riskler
+**Yapılmayacaklar:** üçüncü bir tablet çizimi, her özellik için genişliğe özel ayar, editör tuvalini yeniden yazmak, görsel çıkarımla
+şemada ebeveyn değiştirmek.
 
-Her biri denenerek kapatılacak, henüz hiçbiri denenmedi:
+## Kalan riskler
 
-- **Tasarım genişliğinde kayma.** En önemli söz bu. Metin kutuya sığıyorsa konum sapması en fazla 1 piksel olmalı; test bunu
-  gerçek tarayıcıda ölçer.
-- **Sahibin `customCss` ve `customJs` kodu.** `.c-<id>` sınıfları kalır, ama `.page` ölçeğine veya mutlak konuma bağlı kod bozulabilir.
-- **`boxFit` yakınlaştırması.** Blok içeriği kutuya göre büyüyüp küçülüyor; yüzdeli genişlik bu hesabı değiştirir.
-- **Konteyner, sekme ve bölgeler.** İçlerinde kendi mini tuvalleri var, her biri ağaca alınmalı ya da katman kalmalı.
-- **HTML bloğu yüksekliği** (`--pwb-embed-height`, `usePhoneEmbedHeights.js`), çapa kaydırması, giriş animasyonları.
-- **Kod azaltma.** Yeni çıktı `NEEDS` ve `withoutUnusedRules` ile uyumlu olmalı, `generatedSize.test.js` bütçesi geçerli.
-- **Eski tarayıcı sekmeleri ve eski sayfalar.** Şema değişmediği için API uyumlu kalır. Canlıdaki sayfalar yeniden gönderilene kadar
-  değişmez. Yeni bir sayfa alanı gerekirse `validators.py` izin listesine de eklenmeli, yoksa kaydederken silinir.
+Hiçbiri gerçek yazıcıyla denenmedi:
+
+- **Sahibin kodu.** `.c-<id>` ve `.page > .c-<id>` korunur, ama mutlak konuma, `offsetParent`'a veya ölçeğe bağlı kod değişebilir.
+- **Satırların birbirini etkilemesi.** Izgarada bir sütunda uzayan blok, yandaki sütunun aynı satırdaki bloğunu da aşağı itebilir.
+  Çakışma yerine fazladan boşluk çıkar. İç içe ağaçtan bu yönüyle kötü, gerçek sayfalarda ne kadar göründüğü ölçülecek.
+- **Dar sütun.** 769'da sütunlar %77'ye iner. Dar sütundaki uzun kelimeli başlık kötü görünebilir; yazı boyu küçültülmediği için uzar.
+- **`boxFit`** içeriği kutuya göre büyütüp küçültüyor. **Konteyner ve sekme** kendi mini tuvallerini taşıyor. **HTML bloğu** yüksekliği iframe'den geliyor.
+- **Dinamik yükseklik:** sekme açılınca veya iframe büyüyünce çapa konumu.
 
 ## Sahibin kararları
 
-1. **Mevcut sayfalar.** Önerim: yeni sayfalar yeni düzenle başlar, mevcut sayfalar `page.fluid` ile önizleyerek tek tıkla geçer.
-   Geçiş bir süre geri alınabilir. Sessizce değiştirmek, yeniden gönderilen sayfanın görünümünü sahibine sormadan değiştirir.
-2. **Sorunun nerede görüldüğü.** Ölçümler benim örneğime dayanıyor. Sahibin kendi gördüğü sayfa ve genişlik planın önceliğini
-   değiştirebilir. Özellikle: serbest tuval mi, HTML şablonu mu, HTML'e çevrilmiş sayfa mı?
+1. **Mevcut sayfalar.** Önerim ve incelemenin de önerisi: yeni sayfalar yeni düzenle başlar, mevcut sayfalar önizlemeyle tek tıkla geçer.
+2. **Sorunun nerede görüldüğü.** Serbest tuval mi, HTML şablonu mu, HTML'e çevrilmiş sayfa mı? Ölçümler örnek sayfalara dayanıyor.
+3. **Kaynak okunabilirliği bedeli** kabul mü? Yukarıda "Bedeli" başlığında.
+4. **Aşama 0 ve 1 başlasın mı?** Bu ikisi canlıdaki hiçbir sayfanın görünümünü değiştirmez.
 
-## ChatGPT'den istenen kontrol
+## ChatGPT'den istenecek kontrol
 
-Kod yok, bu bir tasarım incelemesi. Lütfen raporu `docs/RESPONSIVE-PLAN-REVIEW-2026-11-04.md` olarak yazın ve üretim koduna
-dokunmayın.
-
-1. Ölçümleri bağımsız tekrarlayın: özellikle 768, 769, HTML'e çevirmedeki dört sütun, dışa aktarımda 900 piksel ve iki geçiş noktası.
-2. XY-cut bu veriye uyuyor mu? Editörden üretilebilen, ağacın yanlış böleceği gerçek bir sayfa arayın.
-3. "Tasarım genişliğinde en fazla 1 piksel sapma" hedefi gerçekçi mi? Sapma nerede kaçınılmaz?
-4. Risk listesinde eksik ne var? Aşama sırası doğru mu?
+Hazır olduğunda, aşama 1 sonucuyla birlikte, tasarımı değil gerçek çıktıyı kontrol etmesi daha değerli olur. `41978ae` düzeltmelerinin kontrolü
+de hâlâ yapılmadı: inceleme raporu bu commit'i onaylamadığını açıkça yazıyor.
