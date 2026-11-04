@@ -298,12 +298,19 @@ function ImageLibrary({ value, onPick }) {
 // `accepts` is for a setting that can hold nothing but a colour. Only what it
 // accepts goes out while typing, and an emptied field goes out on leaving: for
 // a gradient stop, emptying drops the gradient the new colour is being typed for.
-export function LabeledColor({ label, value, onChange, fallback, accepts }) {
+// `subject` names what the value belongs to, for a field that can change hands
+// while it is being typed in.
+export function LabeledColor({ label, value, onChange, fallback, accepts, subject }) {
   const { t } = useLanguage()
   const labelId = useId()
   // What the person is typing ("#7a") until they leave the field; the value that
   // comes back from the page would otherwise overwrite it.
   const [draft, setDraft] = useState(null)
+  const [draftSubject, setDraftSubject] = useState(subject)
+  if (subject !== draftSubject) {
+    setDraftSubject(subject)
+    setDraft(null)
+  }
   const shown = value || fallback || ''
   const hex = /^#[0-9a-fA-F]{6}$/.test(shown) ? shown : '#000000'
   return (
