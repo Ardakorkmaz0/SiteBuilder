@@ -1,48 +1,58 @@
+<p align="center">
+  <img src="frontend/public/sitebuilder-logo.png" alt="SiteBuilder logo" width="96">
+</p>
 
-<!-- Use align="left" on the image to prevent table borders -->
-<img src="frontend/public/sitebuilder-logo.png" alt="Screenshot Description" width="200" align="left">
+<h1 align="center">SiteBuilder</h1>
 
-<!-- Use <h3> (###) instead of <h1> (#) to avoid GitHub's default bottom border -->
-<br>
-<br>
+<p align="center">
+  <strong>An open-source website builder that outputs real, readable HTML.</strong><br>
+  Edit a page by clicking on it, read the code it writes, publish it, and run it on your own server.
+</p>
 
-### SiteBuilder
+<p align="center">
+  <a href="https://sitebuilt.app"><strong>Open the live site</strong></a> ·
+  <a href="#installation--setup">Run it yourself</a> ·
+  <a href="LICENSE">AGPL-3.0</a>
+</p>
 
-<!-- Short description right next to the logo -->
+<p align="center">
+  <a href="https://github.com/Ardakorkmaz0/SiteBuilder/actions/workflows/test.yml"><img src="https://github.com/Ardakorkmaz0/SiteBuilder/actions/workflows/test.yml/badge.svg" alt="Test status"></a>
+</p>
 
-<!-- Clear the alignment so the rest of your README continues normally below -->
-<br clear="left"/>
+<p align="center">
+  <img src="docs/screenshots/demo.gif" alt="Changing a heading's text and colour by clicking on the page, checking it on a phone, reading the HTML it wrote, publishing it and opening the published page" width="960">
+</p>
 
-<!-- Add a line break to clear the alignment for subsequent content -->
-<br clear="left"/>
+## What makes it different
 
-A  site builder with two editing paths:
+Many visual builders keep your page inside them. Here the page is an HTML document you can read, edit by hand and take with you.
 
-- Build from ready-made components on a free canvas, then tune desktop/mobile
-  layouts independently.
-- Import an existing HTML project directly in the editor. Uploaded HTML is kept
-  as real HTML, with matching CSS/JS/assets inlined when they are uploaded
-  together, so view mode can run the page's JavaScript in an isolated sandbox.
+- **Readable output.** A page carries only the code it uses: a simple page is about 210 lines and 11 KB.
+- **Your own HTML works.** Upload an existing page with its CSS, JavaScript and assets. It stays real HTML, and you can click on it and edit it.
+- **Code and canvas together.** Every page has a source view with colored code, and you can see what each visual change wrote.
+- **Nothing locks you in.** Export a site as an editable project or a single file, or host the whole builder yourself.
 
-Imported HTML sites can be viewed, lightly edited in-place, tested against common
-desktop/tablet/phone viewport presets, saved as drafts, and published to a public
-URL.
+## Features
+
+- A free canvas with ready-made blocks, or one of 500 templates
+- Separate desktop and phone layouts
+- Light and dark palettes visitors can switch, including following their device
+- Drafts kept apart from the live site, with saved versions you can go back to
+- Publishing to a public address, with a form inbox and visit counts
 
 ## Screenshots
 
-<img width="1280" alt="Login" src="docs/screenshots/login.png?v=296681b0" />
+<img width="1280" alt="Editing a heading on the page, with its text color in the panel" src="docs/screenshots/editor-html.png" />
 <br>
-<img width="1280" alt="Dashboard" src="docs/screenshots/dashboard.png" />
+<img width="1280" alt="The same page in the phone view" src="docs/screenshots/editor-phone.png" />
 <br>
-<img width="1280" alt="Editor: theme" src="docs/screenshots/editor-theme.png" />
-<br>
-<img width="1280" alt="Editor: mobile layout" src="docs/screenshots/editor-mobile-animation.png" />
-<br>
-<img width="1280" alt="AI design assistant" src="docs/screenshots/ai.png" />
-<br>
-<img width="1280" alt="Site preview" src="docs/screenshots/preview.png" />
-<br>
-<img width="1280" alt="Admin overview" src="docs/screenshots/admin.png" />
+<img width="1280" alt="The source view with colored HTML" src="docs/screenshots/editor-source.png" />
+
+## Status
+
+Under active development. Every push runs about 3,100 frontend tests, 1,000 backend tests and an end-to-end suite in Chromium and Firefox.
+
+One known limit: canvas pages are drawn at two fixed designs, and between them a page scales instead of reflowing. HTML pages use their own CSS and do not have this limit. Reworking this is the next big piece of work.
 
 ## Tech stack
 
@@ -194,7 +204,7 @@ on every push.
 ## Going to production
 
 The app runs the same code in dev and prod — production hardening (Postgres,
-HTTPS/HSTS, CSP, rate limiting, and the local-AI proxy disabled outside DEBUG)
+HTTPS/HSTS, CSP and rate limiting)
 turns on automatically when `DJANGO_DEBUG=False`. See **[DEPLOY.md](DEPLOY.md)**
 for the launch checklist (secrets, hosts, TLS, Redis for shared throttling) and
 the deferred items (email password-reset, S3 media, JWT) with how to wire each.
