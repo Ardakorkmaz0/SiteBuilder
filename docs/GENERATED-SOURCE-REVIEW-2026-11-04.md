@@ -529,7 +529,7 @@ Gerçek `colorModeFor` / `withColorModeComponents`, önceki sürümle aynı gird
 
 Gerçek `highlightCode` çıktısı JSDOM'da parse edildi. `<!--><p>x</p>`, `<!---><p>x</p>`,
 `<!--x--!><p>x</p>` üçlüsünde sonraki iki tag tokenı literal `['p','p']` çıktı. Ters eğik çizgi +
-gerçek newline taşıyan `const a="x\\\ny"; let n=3` için `new Function` sonucu `{a:'xy',n:3}`,
+gerçek newline içeren önceki JS kod bloğunda `new Function` sonucu `{a:'xy',n:3}`,
 keyword tokenları `['const','let']`; metin round-trip aynı kaldı. Bunlar yeni kaynakta yeşil.
 
 Script-title kontrolü gerçek `runtimeNeeds → withBuilderInteractiveHtml → JSDOM(runScripts)`
@@ -621,7 +621,7 @@ Ek denemelerde 195 bin karakter boşluk, boşluk + slash ve kapanmayan regex gö
 
 ### A-F1 sınırı — marker adının noktalama eki hâlâ tam ad sayılabiliyor
 
-Kaynak: `frontend/src/utils/htmlRuntime.js:857`, `(?![\\w-])` sınırı.
+Kaynak: `frontend/src/utils/htmlRuntime.js:857`, `(?![\w-])` sınırı.
 `data-builder-layout.foo`, `data-builder-layout:foo`, `data-builder-layout@foo` gerçek parser'da
 bu tam adlarla **ayrı attribute**; hiçbiri `data-builder-layout` değil.
 Ancak regex bunları da builder marker'ı sayıyor. Yukarıdaki dinamik form betiğinin script'ine
