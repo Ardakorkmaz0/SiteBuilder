@@ -286,3 +286,33 @@ describe('schemaToResponsiveHtml a bar or a band inside another block', () => {
     expect(doc.querySelector('.rh-rail-page')).toBeNull()
   })
 })
+
+describe('schemaToResponsiveHtml a pinned block', () => {
+  const styleOf = (props) => new JSDOM(schemaToResponsiveHtml({ theme: {}, pages: [{ id: 'p1', name: 'Home', components: [box('b', 'button', { text: 'x', href: '#', ...props })] }] })).window.document.getElementById('b').getAttribute('style')
+
+  it('stands at its offsets from the corner it is pinned to', () => {
+    const style = styleOf({ scrollBehavior: 'fixed', pinX: 'right', pinOffsetX: 20, pinY: 'bottom', pinOffsetY: 30 })
+    expect(style).toContain('right:20px')
+    expect(style).toContain('bottom:30px')
+  })
+
+  it('from the top left as well, and past the edge', () => {
+    const style = styleOf({ scrollBehavior: 'sticky', pinOffsetX: 15, pinOffsetY: -8 })
+    expect(style).toContain('left:15px')
+    expect(style).toContain('top:-8px')
+  })
+
+  it('keeps a layer as a plain number', () => {
+    expect(styleOf({ scrollBehavior: 'fixed', pinZIndex: 7, pinOffsetX: 15 })).toContain('z-index:7;')
+  })
+
+  it('writes an edge it touches as it did', () => {
+    const style = styleOf({ scrollBehavior: 'fixed' })
+    expect(style).toContain('top:0;')
+    expect(style).toContain('left:0;')
+  })
+
+  it('keeps the offset from the middle', () => {
+    expect(styleOf({ scrollBehavior: 'fixed', pinX: 'center', pinOffsetX: 20 })).toContain('left:calc(50% + 20px)')
+  })
+})
