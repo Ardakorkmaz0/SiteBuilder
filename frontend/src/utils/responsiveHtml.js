@@ -108,10 +108,26 @@ function phoneRule(c) {
 // The hook that rule names. Only on a block that has one.
 const phoneClass = (c) => (phoneRule(c) ? ` rh-phone-${esc(c.id)}` : '')
 
+// A navbar's phone menu and a section's button take their colours from the block,
+// on a part of it written inline: its phone colours have to reach them too.
+function phonePartRules(c) {
+  const over = phoneOverrides(c)
+  const p = c.props || {}
+  const own = `        .rh-phone-${esc(c.id)}`
+  if (c.type === 'navbar' && over.backgroundColor && p.navLayout !== 'vertical' && p.mobileNavMode !== 'stack') {
+    return [`${own} > .rh-nav-inner { --rh-nav-menu-bg:${cssVal(over.backgroundColor)} !important; }`]
+  }
+  if (c.type === 'section' && p.buttonText && (over.color || over.backgroundColor)) {
+    const { color, bg } = sectionButtonColors({ ...c.styles, ...over })
+    return [`${own} > .rh-container > a { background:${color} !important;color:${bg} !important; }`]
+  }
+  return []
+}
+
 function phoneRules(components) {
   return shown(components).flatMap((c) => {
     const rule = phoneRule(c)
-    return [...(rule ? [`        .rh-phone-${esc(c.id)} { ${rule}; }`] : []), ...phoneRules(c.children)]
+    return [...(rule ? [`        .rh-phone-${esc(c.id)} { ${rule}; }`] : []), ...phonePartRules(c), ...phoneRules(c.children)]
   })
 }
 
@@ -181,10 +197,14 @@ function safeInlineCss(value, fallback = '') {
   return String(value || fallback).replace(/[;{}<]/g, '').trim()
 }
 
+// A section's button wears the section's colours the other way round.
+function sectionButtonColors(styles = {}) {
+  return { color: safeInlineCss(styles.color, '#1d1d1f'), bg: safeInlineCss(styles.backgroundColor, '#ffffff') }
+}
+
 function sectionInnerHtml(props = {}, styles = {}) {
   const href = sanitizeUrl(props.buttonHref)
-  const color = safeInlineCss(styles.color, '#1d1d1f')
-  const bg = safeInlineCss(styles.backgroundColor, '#ffffff')
+  const { color, bg } = sectionButtonColors(styles)
   return `<div class="rh-container">${
     props.eyebrow
       ? `<p style="margin:0 0 10px;font-size:.78em;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.72">${multiline(props.eyebrow)}</p>`

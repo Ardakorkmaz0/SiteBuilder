@@ -199,10 +199,14 @@ function linkAttrs(href) {
   return /^https?:\/\//i.test(href) ? ' target="_blank" rel="noopener noreferrer"' : ''
 }
 
+// A section's button wears the section's colours the other way round.
+function sectionButtonColors(styles = {}) {
+  return { color: safeCssProp(styles.color, '#1d1d1f'), bg: safeCssProp(styles.backgroundColor, '#ffffff') }
+}
+
 function sectionInnerHtml(props = {}, styles = {}) {
   const href = sanitizeUrl(props.buttonHref)
-  const color = safeCssProp(styles.color, '#1d1d1f')
-  const bg = safeCssProp(styles.backgroundColor, '#ffffff')
+  const { color, bg } = sectionButtonColors(styles)
   return `<div class="section-inner">${
     props.eyebrow
       ? `<p style="margin:0 0 10px;font-size:.78em;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.72">${multiline(props.eyebrow)}</p>`
@@ -325,6 +329,22 @@ function inlinePhoneRule(c) {
 // (see openTag).
 function inlinePhoneHook(c) {
   return inlinePhoneRule(c) ? ` class="ci-${esc(c.id)}"` : ''
+}
+
+// A navbar's phone menu and a section's button take their colours from the block,
+// on a part of it written inline: its phone colours have to reach them too. `own`
+// is the selector of the block's node.
+function phonePartRule(c, own) {
+  const over = phoneOverrides(c)
+  const p = c.props || {}
+  if (c.type === 'navbar' && over.backgroundColor && p.navLayout !== 'vertical' && p.mobileNavMode !== 'stack') {
+    return `  ${own} > .nav-inner { --builder-nav-menu-bg: ${cssValue(over.backgroundColor)} !important; }\n`
+  }
+  if (c.type === 'section' && p.buttonText && (over.color || over.backgroundColor)) {
+    const { color, bg } = sectionButtonColors({ ...c.styles, ...over })
+    return `  ${own} > .section-inner > a { background: ${color} !important; color: ${bg} !important; }\n`
+  }
+  return ''
 }
 
 function linkWrap(c, html) {
@@ -880,6 +900,7 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
       const mobileStyles =
         c.stylesMobile && !INLINE_NODE_TYPES.has(c.type) && !fitted ? ` ${styleBlock(c.stylesMobile)}` : ''
       if (fitted && c.stylesMobile) css += `  .ci-${c.id} { ${styleBlock(c.stylesMobile)} }\n`
+      css += phonePartRule(c, fitted ? `.ci-${c.id}` : `.c-${c.id}`)
       if (page.flowMode) {
         const fixed = FLOW_FIXED_HEIGHT_TYPES.has(c.type)
         css += `  .c-${c.id} { ${styleObjectBlock(wrapperStyle(c, 'mobile', mw, true))} overflow:${fixed ? 'hidden' : 'visible'};${mobileStyles}${hide} }\n`
@@ -921,6 +942,7 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
     for (const c of inlineNodesOf(page.components)) {
       const rule = inlinePhoneRule(c)
       if (rule) css += `  .ci-${esc(c.id)} { ${rule} }\n`
+      css += phonePartRule(c, `.ci-${esc(c.id)}`)
     }
   }
   css += `  .nav-inner:not(.nav-vertical):not(.nav-mobile-stack) { position:relative; flex-direction:row; align-items:center; justify-content:space-between; gap:10px; flex-wrap:nowrap; }\n`

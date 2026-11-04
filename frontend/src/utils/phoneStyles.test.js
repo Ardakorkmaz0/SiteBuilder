@@ -321,3 +321,110 @@ describe('a colour judged on the phone surface', () => {
     expect(onPhone(node, 'color')).toBe('rgb(136, 136, 136)')
   })
 })
+
+// A navbar's phone menu and a section's button take their colours from the block,
+// on a part of it that is written inline. A phone colour on the block has to reach
+// them too, or the Renderer's dark text on a white menu is dark text on a dark one.
+describe('the colours of a part of a block', () => {
+  const BAR = { backgroundColor: '#111111', color: '#ffffff' }
+  const LIGHT = { backgroundColor: '#ffffff', color: '#222222' }
+  const bar = (extra = {}, props = {}) => block('x', 'navbar', BAR, { props: { brand: 'B', links: [{ label: 'H', href: '#' }], ...props }, stylesMobile: LIGHT, ...extra })
+  const band = (extra = {}, props = {}) => block('x', 'section', BAR, { props: { heading: 'H', buttonText: 'Go', buttonHref: '#', ...props }, stylesMobile: LIGHT, ...extra })
+  const WHITE = 'rgb(255, 255, 255)'
+  const DARK = 'rgb(34, 34, 34)'
+  const menuRules = (doc) => phoneRules(doc).filter((rule) => rule.selectorText.endsWith('nav-inner') && rule.style.getPropertyValue('--builder-nav-menu-bg') + rule.style.getPropertyValue('--rh-nav-menu-bg'))
+  const buttonRules = (doc) => phoneRules(doc).filter((rule) => rule.selectorText.endsWith('> a'))
+
+  describe.each([
+    ['published', (component, extra) => published(site([component], {}, extra)), '.nav-inner', '.section-inner a', '--builder-nav-menu-bg'],
+    ['converted to HTML', (component, extra) => open(schemaToResponsiveHtml(site([component], {}, extra))), '.rh-nav-inner', '.rh-section a', '--rh-nav-menu-bg'],
+  ])('%s', (name, write, menu, button, variable) => {
+    it('the menu takes the phone background', () => {
+      const doc = write(bar())
+      const inner = doc.querySelector(menu)
+      expect(inlineValue(inner, variable)).toBe('#111111')
+      const [rule] = menuRules(doc)
+      expect(inner.matches(rule.selectorText)).toBe(true)
+      expect(rule.style.getPropertyValue(variable)).toBe('#ffffff')
+      expect(rule.style.getPropertyPriority(variable)).toBe('important')
+    })
+
+    it('a menu it does not have writes nothing', () => {
+      // A script of the owner keeps every rule on the page, so nothing is tidied up after the writer.
+      expect(menuRules(write(bar({}, { mobileNavMode: 'stack' }), { customJs: 'go()' }))).toEqual([])
+      expect(menuRules(write(bar({}, { navLayout: 'vertical' }), { customJs: 'go()' }))).toEqual([])
+    })
+
+    it('a phone style that is not the background writes nothing for the menu', () => {
+      expect(menuRules(write(bar({ stylesMobile: { color: '#222222' } })))).toEqual([])
+    })
+
+    it('the button takes the phone colours, as the Renderer draws them', () => {
+      const component = band()
+      const node = write(component).querySelector(button)
+      const drawn = drawnOnPhone(component).querySelector('a')
+      expect(inlineValue(drawn, 'background')).toBe('#222222')
+      expect(inlineValue(drawn, 'color')).toBe('#ffffff')
+      expect(onPhone(node, 'background')).toBe(DARK)
+      expect(onPhone(node, 'color')).toBe(WHITE)
+    })
+
+    it('the button keeps what the phone does not change', () => {
+      const component = band({ stylesMobile: { color: '#222222' } })
+      const node = write(component).querySelector(button)
+      expect(inlineValue(drawnOnPhone(component).querySelector('a'), 'color')).toBe('#111111')
+      expect(onPhone(node, 'background')).toBe(DARK)
+      expect(onPhone(node, 'color')).toBe('rgb(17, 17, 17)')
+    })
+
+    it('a button it does not have writes nothing', () => {
+      expect(buttonRules(write(band({}, { buttonText: '' })))).toEqual([])
+    })
+
+    it('a phone style that is no colour writes nothing for the button', () => {
+      expect(buttonRules(write(band({ stylesMobile: { fontSize: '14px' } })))).toEqual([])
+    })
+
+    it('a value that tries to leave the stylesheet stays in it', () => {
+      const value = 'red;}</style><script>window.bad=1</script><style>a{'
+      for (const component of [bar({ stylesMobile: { backgroundColor: value } }), band({ stylesMobile: { color: value } })]) {
+        expect(write(component).querySelector('script:not([data-builder-interactive]):not([data-builder-layout])')).toBeNull()
+      }
+    })
+  })
+
+  it('the button of a section that fits its box', () => {
+    const doc = published(site([band({}, { fit: 'box' })]))
+    const node = doc.querySelector('.ci-x .section-inner a')
+    expect(onPhone(node, 'background')).toBe(DARK)
+    expect(onPhone(node, 'color')).toBe(WHITE)
+  })
+
+  it('the parts of a block inside another', () => {
+    const doc = published(site([block('box', 'container', {}, { children: [band()] })]))
+    const node = doc.querySelector('#x .section-inner a')
+    expect(onPhone(node, 'background')).toBe(DARK)
+    expect(onPhone(node, 'color')).toBe(WHITE)
+  })
+
+  it('on a flow page too', () => {
+    const doc = published(site([band()], { flowMode: true }))
+    expect(onPhone(doc.querySelector('.section-inner a'), 'background')).toBe(DARK)
+    expect(menuRules(published(site([bar()], { flowMode: true })))).toHaveLength(1)
+  })
+
+  it('reaches the stylesheet of an exported project', () => {
+    const css = schemaToFiles(site([bar()])).find((file) => file.name === 'styles.css').content
+    expect(css).toContain('.c-x > .nav-inner { --builder-nav-menu-bg: #ffffff !important; }')
+  })
+
+  it('a phone colour that follows the palette keeps following it', () => {
+    const themed = (component) => ({
+      theme: { ...DEFAULT_THEME, headerColor: '#abcdef' },
+      colorMode: { start: 'dark', theme: { backgroundColor: '#111317', headerColor: '#22262e' } },
+      pages: [{ id: 'home', name: 'Home', components: [component] }],
+    })
+    const html = publishedPagesFor(themed(bar({ stylesMobile: { backgroundColor: '#abcdef' } })))[0].html
+    expect(html).toContain('.c-x > .nav-inner { --builder-nav-menu-bg: var(--pwb-alt-header, #abcdef) !important; }')
+  })
+})
