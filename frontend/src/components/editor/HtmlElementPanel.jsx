@@ -14,7 +14,7 @@ import PanelGroup from './PanelGroup.jsx'
 import PanelTabs from './PanelTabs.jsx'
 import { CodeIcon, CopyIcon, MoreHorizontalIcon, TrashIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
-import { FONT_CHOICES } from '../../utils/htmlElementEdit.js'
+import { FONT_CHOICES, isCssColor } from '../../utils/htmlElementEdit.js'
 
 const TAG_LABELS = {
   h1: 'Heading 1', h2: 'Heading 2', h3: 'Heading 3', h4: 'Heading 4',
@@ -444,12 +444,12 @@ export default function HtmlElementPanel({
               </div>
             </PanelGroup>
             <PanelGroup id="html-colors" title={t('Colors')} defaultOpen>
-              <LabeledColor label={t('Text color')} value={info.color || '#000000'} onChange={(value) => onChange({ color: value })} />
-              <LabeledColor label={t('Background')} value={info.background || '#ffffff'} onChange={(value) => onChange({ background: value })} />
+              <LabeledColor label={t('Text color')} value={info.color || '#000000'} accepts={isCssColor} onChange={(value) => onChange({ color: value })} />
+              <LabeledColor label={t('Background')} value={info.background || '#ffffff'} accepts={isCssColor} onChange={(value) => onChange({ background: value })} />
             </PanelGroup>
             <PanelGroup id="html-background" title={t('Background image & gradient')}>
-              <LabeledColor label={t('Gradient from')} value={info.gradientFrom || '#ffffff'} onChange={(value) => onChange({ gradientFrom: value })} />
-              <LabeledColor label={t('Gradient to')} value={info.gradientTo || '#000000'} onChange={(value) => onChange({ gradientTo: value })} />
+              <LabeledColor label={t('Gradient from')} value={info.gradientFrom || '#ffffff'} accepts={isCssColor} onChange={(value) => onChange({ gradientFrom: value })} />
+              <LabeledColor label={t('Gradient to')} value={info.gradientTo || '#000000'} accepts={isCssColor} onChange={(value) => onChange({ gradientTo: value })} />
               <LabeledNumber label={t('Gradient angle (deg)')} value={info.gradientAngle} onChange={(value) => onChange({ gradientAngle: value })} />
               <LabeledImage label={t('Background image')} value={info.backgroundImage} onChange={(value) => onChange({ backgroundImage: value })} />
               <LabeledSelect label={t('Image fit')} value={info.backgroundSize} onChange={(value) => onChange({ backgroundSize: value })} options={translatedOptions(BACKGROUND_SIZE_OPTIONS)} />
@@ -471,7 +471,7 @@ export default function HtmlElementPanel({
             </PanelGroup>
             <PanelGroup id="html-border" title={t('Border')}>
               <LabeledNumber label={t('Border width (px)')} value={info.borderWidth} onChange={(value) => onChange({ borderWidth: value })} />
-              <LabeledColor label={t('Border color')} value={info.borderColor || '#000000'} onChange={(value) => onChange({ borderColor: value })} />
+              <LabeledColor label={t('Border color')} value={info.borderColor || '#000000'} accepts={isCssColor} onChange={(value) => onChange({ borderColor: value })} />
               <LabeledSelect label={t('Border style')} value={info.borderStyle} onChange={(value) => onChange({ borderStyle: value })} options={translatedOptions(BORDER_STYLE_OPTIONS)} />
             </PanelGroup>
             <PanelGroup id="html-effects" title={t('Effects')}>

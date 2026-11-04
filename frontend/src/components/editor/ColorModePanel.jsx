@@ -6,7 +6,7 @@ import PanelGroup from './PanelGroup.jsx'
 import { LabeledCheckbox, LabeledColor } from './controls.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
-import { colorModeFor, contrastProblems, hasThemeToggle, pagesWithoutThemeToggle, siteStart } from '../../utils/colorMode.js'
+import { colorModeFor, contrastProblems, hasThemeToggle, normalizeHex, pagesWithoutThemeToggle, siteStart } from '../../utils/colorMode.js'
 import { moveInRadioGroup } from '../../ui/radioGroupKeys.js'
 
 const ROLES = [
@@ -144,6 +144,7 @@ export default function ColorModePanel({ htmlMode = false, htmlMap = NO_HTML }) 
           <LabeledColor
             label={t(label)}
             value={other[role]}
+            accepts={normalizeHex}
             onChange={(value) => updateColorMode({ theme: { [role]: value } })}
           />
           {problems.filter((problem) => problem.role === role).map((problem) => (

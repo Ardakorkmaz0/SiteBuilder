@@ -13,6 +13,7 @@ import {
   elementLinkHref,
   ensureAnchor,
   ensureElementId,
+  isCssColor,
   linkSectionsInDocument,
   moveElement,
   nearestAnchor,
@@ -51,6 +52,20 @@ describe('resolveSelectableElement', () => {
     expect(resolveSelectableElement(document.body, document.body)).toBeNull()
     expect(resolveSelectableElement(document.documentElement, document.body)).toBeNull()
     expect(resolveSelectableElement(null, document.body)).toBeNull()
+  })
+})
+
+describe('isCssColor', () => {
+  it('takes whole colours in the forms a person pastes', () => {
+    for (const value of ['#7a2', '#7a2e12', '#7A2E12', 'red', 'transparent', 'rgb(122, 46, 18)', 'rgba(122, 46, 18, 0.5)']) {
+      expect(isCssColor(value), value).toBe(true)
+    }
+  })
+
+  it('refuses what a colour passes through while it is typed, and what is none at all', () => {
+    for (const value of ['', ' ', '#', '#7', '#7a', '#7a2e1', '#7a2e123', 'rgb(', 'not-a-colour', null, undefined]) {
+      expect(isCssColor(value), String(value)).toBe(false)
+    }
   })
 })
 

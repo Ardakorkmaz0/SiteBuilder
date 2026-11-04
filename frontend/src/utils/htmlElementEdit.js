@@ -279,6 +279,15 @@ export function cssColorToHex(value) {
   return `#${hex(m[1])}${hex(m[2])}${hex(m[3])}`
 }
 
+// Does the browser read this as a colour? A half-typed code does not, and the
+// writers cannot be left to refuse it: a phone value goes into a CSS variable,
+// which holds whatever it is given.
+export function isCssColor(value) {
+  const probe = document.createElement('span').style
+  probe.color = String(value ?? '')
+  return probe.color !== ''
+}
+
 // The curated families the panel offers. Each is a Google Font (bar the system
 // stack), so picking one also means fetching it — see ensureFontLink.
 export const FONT_CHOICES = [
