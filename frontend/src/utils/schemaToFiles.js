@@ -39,6 +39,7 @@ import {
   flowGap,
   flowItemStyle,
   flowSidePad,
+  phoneOverrides,
   pinnedLayoutStyle,
   stylesFor,
 } from '../components/renderer/layout.js'
@@ -311,6 +312,21 @@ const INLINE_NODE_TYPES = new Set([
   'region', 'container', 'tabs', 'select', 'alert', 'accordion', 'html',
 ])
 
+// The phone's rule for a node whose look is written inline, which only
+// !important outranks. Empty when the block has no phone styles.
+function inlinePhoneRule(c) {
+  return Object.entries(phoneOverrides(c))
+    .map(([k, v]) => `${kebab(k)}: ${cssValue(v)} !important;`)
+    .join(' ')
+}
+
+// The hook that rule names. Only on a block that has one, so the markup of every
+// other design stays as it was. A nested block of the other types has it already
+// (see openTag).
+function inlinePhoneHook(c) {
+  return inlinePhoneRule(c) ? ` class="ci-${esc(c.id)}"` : ''
+}
+
 function linkWrap(c, html) {
   const href = !NON_WRAP_LINK.has(c.type) ? sanitizeUrl((c.props || {}).href) : ''
   if (!href) return html
@@ -369,6 +385,23 @@ function nestedWithVisibility(components) {
   return out
 }
 
+// Every node on a page with its look written inline: a top-level block of these
+// types, and everything nested at any depth.
+function inlineNodesOf(components) {
+  const out = []
+  const walk = (kids) => {
+    for (const ch of kids) {
+      out.push(ch)
+      walk(visibleChildren(ch))
+    }
+  }
+  for (const c of components || []) {
+    if (INLINE_NODE_TYPES.has(c.type)) out.push(c)
+    walk(visibleChildren(c))
+  }
+  return out
+}
+
 // `classedChildren` says a stylesheet already carries this region's per-child
 // geometry (see regionChildCss), so the inline copy is dropped and the mobile
 // media query can reposition the children. Only top-level regions get those
@@ -376,6 +409,7 @@ function nestedWithVisibility(components) {
 function inlineNode(c, classedChildren = false, { fit = false } = {}) {
   const p = c.props || {}
   const styleStr = styleBlock(c.styles)
+  const hook = inlinePhoneHook(c)
   if (c.type === 'region') {
     const kids = visibleChildren(c)
     const designW = regionContentWidth(c)
@@ -384,7 +418,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
       const geometry = classedChildren ? '' : ` style="${regionChildInlineStyle(ch, designW)}"`
       return `<div id="${esc(elementIdFor(ch))}" class="region-child region-${esc(c.id)}-${esc(ch.id)}${nestedClass(ch)}"${geometry}>${linkWrap(filled, boxedNode(filled))}</div>`
     }).join('')
-    return `<section style="position:relative;width:100%;height:100%;overflow:hidden;${styleStr}"><div class="region-inner" style="position:relative;width:100%;max-width:${designW}px;height:100%;margin:0 auto;overflow:hidden">${inner}</div></section>`
+    return `<section${hook} style="position:relative;width:100%;height:100%;overflow:hidden;${styleStr}"><div class="region-inner" style="position:relative;width:100%;max-width:${designW}px;height:100%;margin:0 auto;overflow:hidden">${inner}</div></section>`
   }
   if (c.type === 'container') {
     const kids = visibleChildren(c)
@@ -398,7 +432,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
           return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="${childCss}">${linkWrap(filled, inlineNode(filled))}</div>`
         })
         .join('')
-      return `<div style="${autoCss};${styleStr}">${inner}</div>`
+      return `<div${hook} style="${autoCss};${styleStr}">${inner}</div>`
     }
     const h = absoluteChildrenHeight(kids, Math.round(c.layout?.h || 160))
     const inner = kids
@@ -417,10 +451,10 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
         return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}">${linkWrap(filled, boxedNode(filled))}</div>`
       })
       .join('')
-    if (!kids.length) return `<div style="display:block;position:relative;min-height:${h}px;${styleStr}"></div>`
+    if (!kids.length) return `<div${hook} style="display:block;position:relative;min-height:${h}px;${styleStr}"></div>`
     const designW = containerDesignWidth(c)
     const scale = Math.min(1, Math.max(1, Number(c.layout?.w) || designW) / designW)
-    return `<div data-pwb-container-width="${designW}" data-pwb-container-height="${h}" style="display:block;position:relative;min-height:${h * scale}px;${styleStr}"><div data-pwb-container-root style="position:absolute;left:0;top:0;width:${designW}px;height:${h}px;transform-origin:0 0${scale === 1 ? '' : `;transform:scale(${scale})`}">${inner}</div></div>`
+    return `<div${hook} data-pwb-container-width="${designW}" data-pwb-container-height="${h}" style="display:block;position:relative;min-height:${h * scale}px;${styleStr}"><div data-pwb-container-root style="position:absolute;left:0;top:0;width:${designW}px;height:${h}px;transform-origin:0 0${scale === 1 ? '' : `;transform:scale(${scale})`}">${inner}</div></div>`
   }
   if (c.type === 'tabs') {
     const tabs = (Array.isArray(p.tabs) ? p.tabs : []).filter((t) => t && t.id)
@@ -456,17 +490,17 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
         return `<div role="tabpanel" data-builder-panel="${esc(t.id)}" data-pwb-container-width="${designW}" data-pwb-container-height="${panelH}"${hidden} style="display:block;position:relative;min-height:${panelH}px"><div data-pwb-container-root style="position:absolute;left:0;top:0;width:${designW}px;height:${panelH}px;transform-origin:0 0">${inner}</div></div>`
       })
       .join('')
-    return `<div data-builder-tabs="${esc(c.id)}" style="display:flex;flex-direction:column;${tabsCssVars(p)};${styleStr}"><div role="tablist">${strip}</div>${panels}</div>`
+    return `<div${hook} data-builder-tabs="${esc(c.id)}" style="display:flex;flex-direction:column;${tabsCssVars(p)};${styleStr}"><div role="tablist">${strip}</div>${panels}</div>`
   }
   if (c.type === 'select') {
-    return `<div style="display:flex;flex-direction:column;min-width:0;${styleStr}">${fieldHtml('select', p, c.id)}</div>`
+    return `<div${hook} style="display:flex;flex-direction:column;min-width:0;${styleStr}">${fieldHtml('select', p, c.id)}</div>`
   }
   if (c.type === 'alert') {
     const v = ALERT_VARIANTS[p.variant] || ALERT_VARIANTS.info
-    return `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;border:1px solid ${v.border};background:${v.bg};color:${v.color};${styleStr}">${iconSvg(p.icon || 'check')}<span>${multiline(p.text)}</span></div>`
+    return `<div${hook} style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;border:1px solid ${v.border};background:${v.bg};color:${v.color};${styleStr}">${iconSvg(p.icon || 'check')}<span>${multiline(p.text)}</span></div>`
   }
   if (c.type === 'accordion') {
-    return `<details style="border:1px solid #e5e7eb;border-radius:10px;padding:2px 16px;${styleStr}"><summary style="cursor:pointer;font-weight:600;padding:12px 0">${multiline(p.title)}</summary><div style="padding-bottom:14px;color:#4b5563">${multiline(p.text)}</div></details>`
+    return `<details${hook} style="border:1px solid #e5e7eb;border-radius:10px;padding:2px 16px;${styleStr}"><summary style="cursor:pointer;font-weight:600;padding:12px 0">${multiline(p.title)}</summary><div style="padding-bottom:14px;color:#4b5563">${multiline(p.text)}</div></details>`
   }
   if (c.type === 'html') {
     const code = typeof p.code === 'string' ? p.code : ''
@@ -484,15 +518,16 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
     // moderator's takedown can remove it from the published page too
     // (backend shared_marks.py), not only from the draft.
     const shared = Number.isInteger(p._sharedFrom) && p._sharedFrom > 0 ? ` data-pwb-shared-from="${p._sharedFrom}"` : ''
-    return `<iframe${shared} srcdoc="${safe}" scrolling="no" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" style="display:block;width:100%;border:0;background:transparent;${styleStr};overflow:hidden;height:var(--pwb-embed-height,${h}px)"></iframe>`
+    return `<iframe${hook}${shared} srcdoc="${safe}" scrolling="no" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" style="display:block;width:100%;border:0;background:transparent;${styleStr};overflow:hidden;height:var(--pwb-embed-height,${h}px)"></iframe>`
   }
   const tag = tagFor(c.type, p)
   const base = baseRules(c.type)
   if (tag === 'img') {
     const src = sanitizeImageSrc(p.src)
-    const onBase = p._otherSrc ? ` class="pwb-on-${esc(p._baseMode)}"` : ''
+    const phone = hook ? `ci-${esc(c.id)} ` : ''
+    const onBase = p._otherSrc ? ` class="${phone}pwb-on-${esc(p._baseMode)}"` : hook
     const other = p._otherSrc
-      ? `<img class="pwb-on-${esc(p._otherMode)}" src="${esc(sanitizeImageSrc(p._otherSrc))}" alt="${esc(p.alt)}" loading="lazy" style="${base} ${styleStr} max-width:100%;" />`
+      ? `<img class="${phone}pwb-on-${esc(p._otherMode)}" src="${esc(sanitizeImageSrc(p._otherSrc))}" alt="${esc(p.alt)}" loading="lazy" style="${base} ${styleStr} max-width:100%;" />`
       : ''
     return `<img${onBase} src="${esc(src)}" alt="${esc(p.alt)}" style="${base} ${styleStr} max-width:100%;" />${other}`
   }
@@ -841,7 +876,7 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
       // Per-breakpoint style overrides (stylesMobile) ride the same media
       // block — the cascade merges them over the desktop rule above. Skipped for
       // inlineNode types for the same reason their desktop `styles` are: the
-      // look lives on the inner node, not on this wrapper.
+      // look lives on the inner node, not on this wrapper (see inlinePhoneRule).
       const mobileStyles =
         c.stylesMobile && !INLINE_NODE_TYPES.has(c.type) && !fitted ? ` ${styleBlock(c.stylesMobile)}` : ''
       if (fitted && c.stylesMobile) css += `  .ci-${c.id} { ${styleBlock(c.stylesMobile)} }\n`
@@ -882,6 +917,10 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
     for (const ch of nestedWithVisibility(page.components || [])) {
       if (ch.hiddenMobile) css += `  .n-${esc(ch.id)} { display:none; }
 `
+    }
+    for (const c of inlineNodesOf(page.components)) {
+      const rule = inlinePhoneRule(c)
+      if (rule) css += `  .ci-${esc(c.id)} { ${rule} }\n`
     }
   }
   css += `  .nav-inner:not(.nav-vertical):not(.nav-mobile-stack) { position:relative; flex-direction:row; align-items:center; justify-content:space-between; gap:10px; flex-wrap:nowrap; }\n`
