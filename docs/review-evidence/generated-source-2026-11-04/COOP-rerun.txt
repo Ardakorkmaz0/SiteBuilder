@@ -1,9 +1,0 @@
-Run 41686410758, attempt 2; only Firefox rerun
-End-to-end (firefox)	Run	2026-11-03T23:23:13.0511019Z   ✘   21 [firefox] › e2e/dark-mode-browser-probe.spec.js:179:1 › records the emulated device with and without Cross-Origin-Opener-Policy (1.5m)
-End-to-end (firefox)	Run	2026-11-03T23:23:16.1522184Z COOP_DEVICE_PROOF firefox [{"path":"plain","palette":"dark","darkAfterLoad":true},{"path":"coop","palette":"light","darkAfterLoad":false}]
-End-to-end (firefox)	Run	2026-11-03T23:23:16.1683887Z   ✓   22 [firefox] › e2e/dark-mode-browser-probe.spec.js:179:1 › records the emulated device with and without Cross-Origin-Opener-Policy (retry #1) (1.9s)
-End-to-end (firefox)	Run	2026-11-03T23:23:33.8383884Z   ✓   27 [firefox] › e2e/dark-mode-published-review.spec.js:274:1 › review: a real published page follows a dark device from its first request in both browsers (2.8s)
-End-to-end (firefox)	Run	2026-11-03T23:35:08.6177412Z   1) [firefox] › e2e/dark-mode-browser-probe.spec.js:179:1 › records the emulated device with and without Cross-Origin-Opener-Policy 
-End-to-end (firefox)	Run	2026-11-03T23:35:08.6204859Z   1 flaky
-End-to-end (firefox)	Run	2026-11-03T23:35:08.6205543Z     [firefox] › e2e/dark-mode-browser-probe.spec.js:179:1 › records the emulated device with and without Cross-Origin-Opener-Policy 
-End-to-end (firefox)	Run	2026-11-03T23:35:08.6206146Z   129 passed (14.9m)
