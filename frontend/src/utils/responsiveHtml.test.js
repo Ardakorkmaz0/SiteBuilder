@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { JSDOM } from 'jsdom'
 import { schemaToResponsiveHtml } from './responsiveHtml.js'
 
 describe('schemaToResponsiveHtml multiline copy', () => {
@@ -170,5 +171,118 @@ describe('blocks hidden on one screen size', () => {
     const css = html.replace(/\s+/g, ' ')
     expect(css).toMatch(/@media \(min-width: 769px\) \{ \.rh-off-pc \{ display: none !important; \} \}/)
     expect(css).toMatch(/\.rh-off-mobile \{ display: none !important; \}/)
+  })
+})
+
+describe('schemaToResponsiveHtml vertical navbar', () => {
+  const links = [{ label: 'Home', href: '#top' }, { label: 'Blog', href: '#blog' }]
+  const rail = (props = {}, extra = {}) => box('rail', 'navbar', { brand: 'Studio', links, navLayout: 'vertical', ...props }, { layout: { x: 0, y: 0, w: 220, h: 700 }, ...extra })
+  const content = [
+    box('one', 'heading', { text: 'One', level: 'h1' }, { layout: { x: 260, y: 40, w: 700, h: 60 } }),
+    box('two', 'text', { text: 'Two' }, { layout: { x: 260, y: 140, w: 700, h: 60 } }),
+  ]
+  const write = (components, extra = {}) => new JSDOM(schemaToResponsiveHtml({ theme: {}, ...extra, pages: [{ id: 'p1', name: 'Home', canvasWidth: 1000, components }] })).window.document
+  const slotOf = (doc) => doc.getElementById('rail').parentElement
+
+  it('is on the page, with its brand and its links', () => {
+    const bar = write([rail(), ...content]).getElementById('rail')
+    expect(bar.querySelector('.rh-brand').textContent).toBe('Studio')
+    expect([...bar.querySelectorAll('.rh-links a')].map((link) => link.textContent)).toEqual(['Home', 'Blog'])
+    expect(bar.querySelector('.rh-nav-vertical')).not.toBeNull()
+  })
+
+  it('stands beside the page, whose blocks keep their own rows', () => {
+    const doc = write([rail(), ...content])
+    const page = slotOf(doc).parentElement
+    expect(page.classList.contains('rh-rail-page')).toBe(true)
+    const main = page.querySelector(':scope > .rh-rail-main')
+    expect(main.querySelector('#one')).not.toBeNull()
+    // It overlaps both of them in height: a row shared with it would make columns of them.
+    expect(doc.getElementById('one').parentElement).not.toBe(doc.getElementById('two').parentElement)
+    expect(main.querySelector('#rail')).toBeNull()
+  })
+
+  it('keeps its width and its height for a wide screen', () => {
+    const style = slotOf(write([rail()])).getAttribute('style')
+    expect(style).toContain('--rh-rail-w:220px')
+    expect(style).toContain('--rh-rail-h:700px')
+  })
+
+  it.each([['fixed'], ['sticky']])('%s: pinned by a rule of the wide screen, which leaves a phone alone', (scrollBehavior) => {
+    const doc = write([rail({ scrollBehavior, pinOffsetY: 12, pinZIndex: 7 })])
+    const slot = slotOf(doc)
+    expect(slot.classList.contains('rh-rail-pinned')).toBe(true)
+    expect(slot.getAttribute('style')).toContain('--rh-rail-top:12px')
+    expect(slot.getAttribute('style')).toContain('--rh-rail-z:7')
+    expect(doc.getElementById('rail').getAttribute('style') || '').not.toContain('position')
+    const wide = [...doc.styleSheets].flatMap((sheet) => [...sheet.cssRules]).find((rule) => rule.media?.mediaText.includes('min-width') && [...rule.cssRules].some((inner) => inner.selectorText === '.rh-rail-pinned > .rh-navbar'))
+    expect([...wide.cssRules].find((inner) => inner.selectorText === '.rh-rail-pinned > .rh-navbar').style.getPropertyValue('position')).toBe('fixed')
+  })
+
+  it('a bar that is not pinned stays in the flow', () => {
+    expect(slotOf(write([rail()])).classList.contains('rh-rail-pinned')).toBe(false)
+  })
+
+  it('stands on the side it is on', () => {
+    const onRight = (component) => slotOf(write([component])).classList.contains('rh-rail-right')
+    expect(onRight(rail())).toBe(false)
+    expect(onRight(rail({}, { layout: { x: 780, y: 0, w: 220, h: 700 } }))).toBe(true)
+    expect(onRight(rail({ scrollBehavior: 'fixed', pinX: 'right' }))).toBe(true)
+    expect(onRight(rail({ scrollBehavior: 'fixed' }, { layout: { x: 780, y: 0, w: 220, h: 700 } }))).toBe(false)
+  })
+
+  it('takes its slot with it when it is hidden on one size', () => {
+    expect(slotOf(write([rail({}, { hidden: true })])).classList.contains('rh-off-pc')).toBe(true)
+    expect(slotOf(write([rail({}, { hiddenMobile: true })])).classList.contains('rh-off-mobile')).toBe(true)
+  })
+
+  it('leaves nothing behind when it is hidden on both', () => {
+    const doc = write([rail({}, { hidden: true, hiddenMobile: true }), ...content])
+    expect(doc.getElementById('rail')).toBeNull()
+    expect(doc.querySelector('.rh-rail-page')).toBeNull()
+  })
+
+  it('keeps its hover motion and its phone styles on the bar', () => {
+    const bar = write([rail({ animHover: 'lift' }, { stylesMobile: { backgroundColor: '#fafafa' } })]).getElementById('rail')
+    expect(bar.className).toContain('pwb-hover')
+    expect(bar.className).toContain('rh-phone-rail')
+  })
+
+  it('leaves a page without one as it was', () => {
+    // A script of the owner keeps every rule on the page, so nothing is tidied up after the writer.
+    const html = schemaToResponsiveHtml({ theme: {}, customJs: 'go()', pages: [{ id: 'p1', name: 'Home', components: content }] })
+    expect(html).not.toContain('rh-rail')
+  })
+})
+
+describe('schemaToResponsiveHtml a bar or a band inside another block', () => {
+  const write = (kid, props = {}) => new JSDOM(schemaToResponsiveHtml({ theme: {}, pages: [{ id: 'p1', name: 'Home', components: [box('parent', 'container', props, { layout: { x: 0, y: 0, w: 600, h: 400 }, children: [kid] })] }] })).window.document
+  const brand = { brand: 'Studio', links: [{ label: 'Home', href: '#top' }] }
+
+  it.each([
+    ['a vertical navbar', box('kid', 'navbar', { ...brand, navLayout: 'vertical' }), 'Studio'],
+    ['a boxed navbar', box('kid', 'navbar', { ...brand, widthMode: 'boxed' }), 'Studio'],
+    ['a section', box('kid', 'section', { heading: 'Band' }), 'Band'],
+    ['a section band', box('kid', 'region', {}, { children: [box('deep', 'text', { text: 'Deep' })] }), 'Deep'],
+  ])('%s is kept', (name, kid, text) => {
+    for (const props of [{}, { flow: 'column' }]) {
+      const node = write(kid, props).getElementById('kid')
+      expect(node).not.toBeNull()
+      expect(node.textContent).toContain(text)
+    }
+  })
+
+  it('a divider is kept', () => {
+    expect(write(box('kid', 'divider', {})).getElementById('kid').tagName).toBe('HR')
+  })
+
+  it('is placed like any other child of a free container', () => {
+    const style = write(box('kid', 'navbar', { ...brand, navLayout: 'vertical' }, { layout: { x: 30, y: 40, w: 200, h: 300 } })).getElementById('kid').getAttribute('style')
+    expect(style).toContain('position:absolute;left:30px;top:40px;width:200px;height:300px')
+  })
+
+  it('is no slot of its own: it is not the page\'s rail', () => {
+    const doc = write(box('kid', 'navbar', { ...brand, navLayout: 'vertical' }))
+    expect(doc.querySelector('.rh-rail-page')).toBeNull()
   })
 })

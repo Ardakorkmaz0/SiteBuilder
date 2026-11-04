@@ -22,8 +22,10 @@ import { colorModeHeadTags, withColorModePage } from './colorMode.js'
 
 const FULL_WIDTH = new Set(['navbar', 'section', 'region', 'divider'])
 
+const isRail = (c) => c?.type === 'navbar' && c.props?.navLayout === 'vertical'
+
 function isFullWidthComponent(c) {
-  return FULL_WIDTH.has(c?.type) && !(c?.type === 'navbar' && c.props?.navLayout === 'vertical')
+  return FULL_WIDTH.has(c?.type) && !isRail(c)
 }
 // Visual styles we keep on elements; layout/box metrics come from the flow.
 const DROP_STYLES = new Set([
@@ -223,7 +225,7 @@ function iconA11yAttrs(props = {}) {
   return label ? ` role="img" aria-label="${esc(label)}" title="${esc(label)}"` : ''
 }
 
-function navbar(c) {
+function navbar(c, extra = '') {
   const p = c.props || {}
   const layout = ['vertical', 'centered', 'twoRow'].includes(p.navLayout) ? p.navLayout : 'horizontal'
   const links = (Array.isArray(p.links) ? p.links : [])
@@ -248,7 +250,7 @@ function navbar(c) {
   // export — this writer used to ignore the setting entirely.
   const mobileMode = p.mobileNavMode === 'stack' ? 'stack' : 'menu'
   const menuBg = cssVal(c.styles?.backgroundColor || '#1d1d1f')
-  return `<header class="rh-navbar"${styleAttr(c)}>
+  return `<header class="rh-navbar"${styleAttr(c, extra)}>
       <div class="rh-container rh-nav-inner rh-nav-${layout} rh-nav-mobile-${mobileMode}" data-builder-mobile-nav style="--rh-nav-menu-bg:${menuBg}"${attr(placed?.row)}>
         <span class="rh-brand"${attr(placed?.brand)}>${multiline(p.brand)}</span>
         <button type="button" class="rh-nav-toggle" data-builder-mobile-nav-toggle aria-label="Open navigation menu" aria-expanded="false">☰</button>
@@ -257,9 +259,9 @@ function navbar(c) {
     </header>`
 }
 
-function section(c) {
+function section(c, extra = '') {
   const p = c.props || {}
-  return `<section class="rh-section"${styleAttr(c)}>
+  return `<section class="rh-section"${styleAttr(c, extra)}>
       ${sectionInnerHtml(p, c.styles || {})}
     </section>`
 }
@@ -272,7 +274,7 @@ function section(c) {
 // Without this the type fell through to the switch's default and the entire
 // band — background, children and all — rendered as an empty string, which is
 // what made a Section-built site show up blank in the dashboard thumbnails.
-function regionBand(c) {
+function regionBand(c, extra = '') {
   const kids = shown(c.children)
   const rows = readingRows(kids)
     .map((row) => {
@@ -280,10 +282,40 @@ function regionBand(c) {
       return `<div class="rh-row">${row.map((ch) => item(ch, multi)).join('')}</div>`
     })
     .join('')
-  return `<section class="rh-region"${styleAttr(c)}>
+  return `<section class="rh-region"${styleAttr(c, extra)}>
       <div class="rh-container"><div class="rh-wrap">${rows}</div></div>
     </section>`
 }
+
+// A vertical navbar on the page is a rail: a column beside the page, in a slot
+// that holds its place. In the reading rows it would share a row with every block
+// it overlaps in height, and make columns of them. Its pin lives in a rule of the
+// wide screen (see RAIL_CSS): on a phone it stands above the page, where a pinned
+// 200px bar would cover half the screen. A fixed box without a `left` stays where
+// its slot put it, on either side.
+function railHtml(c, pageWidth) {
+  const p = c.props || {}
+  const l = c.layout || {}
+  const w = Math.max(1, Math.round(l.w || 200))
+  const pinned = ['fixed', 'sticky'].includes(p.scrollBehavior)
+  const right = pinned ? p.pinX === 'right' : (l.x || 0) + w / 2 > pageWidth / 2
+  const vars = [`--rh-rail-w:${w}px`, `--rh-rail-h:${Math.round(l.h || 0)}px`]
+  if (pinned) vars.push(`--rh-rail-top:${Number(p.pinOffsetY) || 0}px`, `--rh-rail-z:${Number(p.pinZIndex) || 100}`)
+  const bar = navbar({ ...c, props: { ...p, scrollBehavior: undefined } })
+  return `<div class="rh-rail-slot${pinned ? ' rh-rail-pinned' : ''}${right ? ' rh-rail-right' : ''}${visibilityClass(c)}" style="${vars.join(';')}">
+    ${withClassSuffix(withHoverMotion(bar, p), phoneClass(c))}
+    </div>`
+}
+
+const RAIL_CSS = `
+      @media (min-width: 769px) {
+        .rh-rail-page { display: flex; align-items: flex-start; }
+        .rh-rail-main { flex: 1 1 0; min-width: 0; }
+        .rh-rail-slot { flex: 0 0 var(--rh-rail-w); }
+        .rh-rail-right { order: 1; }
+        .rh-rail-slot > .rh-navbar { min-height: var(--rh-rail-h); }
+        .rh-rail-pinned > .rh-navbar { position: fixed; top: var(--rh-rail-top); bottom: 0; width: var(--rh-rail-w); z-index: var(--rh-rail-z); overflow-y: auto; }
+      }`
 
 const LINKABLE = new Set(['heading', 'text', 'image', 'card', 'list', 'quote', 'badge', 'icon', 'alert'])
 
@@ -388,6 +420,15 @@ function itemElHtml(c, multi, colOverride) {
     }
     case 'tabs':
       return tabsHtml(c, cls, col)
+    // The page body lays these out itself; inside another block they come here.
+    case 'navbar':
+      return navbar(c, col)
+    case 'section':
+      return section(c, col)
+    case 'region':
+      return regionBand(c, col)
+    case 'divider':
+      return `<hr class="rh-divider"${styleAttr(c, col)} />`
     case 'html':
       return htmlEmbed(c, cls, col)
     default:
@@ -464,10 +505,11 @@ function tabsHtml(c, cls, col) {
 export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = null } = {}) {
   const page = withColorModePage(schema?.pages?.[0] || {}, colorMode)
   const components = shown(page.components)
+  const rails = components.filter(isRail)
   const bg = cssVal(page.background || '#ffffff')
   const maxW = Math.max(320, Math.min(1280, Math.round(page.canvasWidth || 1120)))
 
-  const rows = readingRows(components)
+  const rows = readingRows(components.filter((c) => !isRail(c)))
   let body = ''
   let buffer = []
   const flush = () => {
@@ -503,6 +545,9 @@ export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = 
       flushInline()
     }
     flush()
+    if (rails.length) {
+      body = `\n    <div class="rh-rail-page">\n    ${rails.map((c) => railHtml(c, page.canvasWidth || 1000)).join('\n    ')}\n    <div class="rh-rail-main">${body}\n    </div>\n    </div>`
+    }
   })
 
   const runtimeSource = `${body}${customJsBlock(schema?.customJs)}${colorMode ? ' data-pwb-color-mode' : ''}`
@@ -565,7 +610,7 @@ ${withoutUnusedRules(`      ${themeVariablesCss(pageTheme(schema, page))}
         .rh-nav-mobile-menu:not(.rh-nav-vertical) .rh-links a { display: block; width: 100%; padding: 10px 12px; border-radius: 8px; }
         .rh-section { padding: 40px 0; }
         .rh-wrap { gap: 24px; padding: 28px 0; }${phoneRules(page.components).map((rule) => `\n${rule}`).join('')}
-      }`, `${runtimeSource}${schema?.customCss || ''}`)}
+      }${rails.length ? RAIL_CSS : ''}`, `${runtimeSource}${schema?.customCss || ''}`)}
       ${customCssBlock(schema?.customCss)}
     </style>${colorMode ? `\n    ${colorModeHeadTags(colorMode)}` : ''}
   </head>
