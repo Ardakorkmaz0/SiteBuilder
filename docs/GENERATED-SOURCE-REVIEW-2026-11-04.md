@@ -2,7 +2,7 @@
 
 Başlangıç HEAD `180bc6639823cc1656f8f0a09b30e1e4ef5da6ad`. İncelenen aralık `7b109fe..77a59e2`; HEAD'in bunun üzerindeki tek farkı inceleme planıdır. Başlangıçta çalışma ağacı temiz, `git pull --ff-only`: Already up to date.
 
-Çalıştırılarak bulunan ürün sorunları: **A-F1/A-F2/D-F1/E-F2 P2**, **D-F2/E-F1 P3**. B-F1/B-F2 ayrıca test kapsamındaki kayıplardır; üretim hatası diye sayılmadı. Kanıt kaynakları, JSON'lar, test çıktıları ve ekran görüntüleri `docs/review-evidence/generated-source-2026-11-04/` altındadır. Bulgular yazara bırakıldı; düzeltme uygulanmadı.
+Çalıştırılarak bulunan ürün sorunları: **A-F1/A-F2/D-F1/E-F2 P2**, **D-F2/E-F1 P3**. B-F1/B-F2 ayrıca test kapsamındaki kayıplardır; üretim hatası diye sayılmadı. Kanıt kaynakları, JSON'lar, test çıktıları ve ekran görüntüleri `docs/review-evidence/generated-source-2026-11-04/` altındadır. Bulgular yazara bırakıldı; düzeltme uygulanmadı. Bu ilk incelemenin özetidir; düzeltmelerin yeniden kontrolü aşağıdaki **41978ae kontrolü** bölümündedir.
 
 Üretim sunucusuna istek gönderilmedi; üretim verisi kullanılmadı. Bozma denemeleri ayrı `/tmp` kaynak kopyalarında yapılıyor ve özgün byte'lar geri yükleniyor. Ana checkout'ta üretim kodu değiştirilmiyor. Kaynak kopyaları arşivden, bağımlılıklar mevcut node_modules'den; paket kurulumu yok.
 
@@ -186,3 +186,319 @@ A–E'nin yukarıda belirtilen kontrolleri tamamlandı ve her bölümün sonunda
 Ana checkout'ta `git diff -- frontend/src backend` boş; `git diff --check` geçti. `git status --short` yalnız bu rapor ve inceleme kanıt dizinini gösterdi. Native UI deneme sekmesi kapatıldı, viewport sıfırlandı, bozulmuş storage descriptor'ı ve özgün tercih geri kondu. Başlatılan yerel Vite durduruldu; 5173/8001 portları boş. Uygulama hesabı veya ayrı kalıcı SQLite oluşturulmadı; backend işlemleri normal izole pytest veritabanı ve DB'siz validator çağrılarıydı.
 
 Planın her alt sorusunun bütün kombinasyonları tüketildi diye bir iddia yok. Çalıştırılmayanlar ilgili bölümde açıkça listelendi: özellikle A tam undo→yeniden yayın yaşam döngüsü ve tüm customHead/CSS sözdizimleri; C lazy/bfcache, ekran okuyucu/yazdırma ve kütüphane uçtan uca akışları; D eski color-mix desteği; E gerçek yatay scrollbar ve diğer tarayıcı/fontlar. Safari hiç denenmedi. Bu alanlar bir sonraki inceleme için açıktır; burada sağlıklı diye işaretlenmedi.
+
+## 41978ae kontrolü
+
+Son karar: altı ilk karşı örnek düzeldi. D-F1 için yeni bir **P2 kontrast gerilemesi**,
+E-F2 için iki **P3 renk doğruluğu gerilemesi** bulundu. A-F1’in script dalında ise önceki
+sürümden kalan yanlış negatif/yavaş girdi sınırı sürüyor. Testlerin yeşil olması bu sınırları kapatmıyor.
+
+Tarih: 4 Kasım 2026. Bu bölüm ilk incelemenin devamıdır; yukarıdaki ilk rapor değiştirilmedi.
+`git pull --ff-only`: güncel; başlangıç HEAD `4e8cd8b`, incelenen üretim kodu `41978ae`.
+Önce duyarlı yerleşim planının incelemesi ve farklı tuval örnekleri tamamlanıp kendi raporuna
+kaydedildi; ardından bu düzeltme kontrolüne geçildi.
+
+Bütün bozma denemeleri `git archive 41978ae frontend` ile oluşturulan bağımsız `/tmp` kopyalarında
+çalıştı. Kaynak düzeltmesi uygulanmadı, üretim sunucusuna istek gönderilmedi. A/E kontrolleri
+ayrı inceleme kopyalarında paralel yürütüldü; aşağıdaki çalıştırma sonuçları bunların kayıtlarından
+birleştirildi. Kod, test veya yeni kanıt dosyası commit edilmiyor; bu devamın kanıt girdileri,
+komutları ve sonuçları raporun içinde veriliyor.
+
+### A-F1: bildirilen handler hatası düzeldi; eski script dalında sınır sürüyor
+
+Yeni handler dalı `frontend/src/utils/htmlRuntime.js:857` üzerinde gerçek `runtimeNeeds` ve
+`withBuilderInteractiveHtml` ile çalıştırıldı; sonuç JSDOM'da scriptler etkin olarak yürütüldü.
+Başlangıç belgesinde gerçek form yok; Add işleyicisi entity ile kodlanmış formu ekliyor.
+Düğmeye click ve oluşan forma cancelable submit gönderildi.
+
+Double/single quoted `title="a>b"`, mixedcase, newline/tab/eşittir boşlukları, slash separator,
+bitişik quoted attribute ve title içinde tag/quote benzeri metin dahil **8/8** örnekte ihtiyaçlar
+true, form gerçekten oluşuyor ve submit prevented=true. Aynı gerçek eski fonksiyonla ilk yedi
+örnekte form oluşuyor fakat needs=false ve submit prevented=false. Sekizinci örneği eski regex
+de yakalıyordu. Slash ve bitişik attribute örnekleri tarayıcı parser'ının toparladığı yazımlardır;
+hepsini standartlara uygun HTML diye nitelemiyorum. Bu örneklemde yeni handler dalının yanlış
+negatifi bulunmadı; bütün HTML/JS sözdizimi için garanti verilmiyor.
+
+**Önceden var olan P2 sınır:** İlk, değişmeyen script alternatifi marker'ı gerçek attribute
+olmadan quoted title içinde de görüyor. Tekrar girdisi:
+
+```html
+<!doctype html><html><head></head><body><script title="data-builder-layout">document.body.insertAdjacentHTML("beforeend",String.fromCharCode(60)+"form>"+String.fromCharCode(60)+"input name=email>"+String.fromCharCode(60)+"/form>")</script></body></html>
+```
+
+Script'te builder attribute'u yok. Gerçek `runtimeNeeds` dokuz ihtiyacı da false sayıyor;
+`withBuilderInteractiveHtml` çalıştırılınca form oluşuyor fakat submit prevented=false.
+Yalnız title değerini `plain` yapınca needs=true ve submit prevented=true. Aynı kontrol
+`41978ae^` ve `41978ae` üzerinde aynı sonucu verdi: **yeni regresyon değil**, A-F1'in bildirilen
+`>` hatasının düzeltmesini geçersiz kılmayan, yazar betiği algılamasının açık kalan sınırı.
+
+Yeni handler için sekiz adversarial 30.003–285.000 karakterlik quote/tag girdisi alt süreçte,
+6 saniye sınırıyla ölçüldü; son seride **0,44–1,69 ms**. Ancak eski script alternatifi için şu
+**tek script** olarak parse edilen quoted-title girdisi yavaş yolu tetikliyor:
+
+```js
+'<script title="' + '<script '.repeat(n) + 'data-builder-layout"></script>'
+```
+
+Gerçek `runtimeNeeds(source)` çağrısı; her gözlem ayrı Node sürecinde, 6 saniyede kesilerek:
+
+| n / karakter | 41978ae | Eski sürüm |
+|---|---:|---:|
+| 1000 / 8045 | 2,30 ms | 1,29 ms |
+| 5000 / 40045 | 44,10 ms | 22,35 ms |
+| 10000 / 80045 | 174,39 ms | 131,71 ms |
+| 25000 / 200045 | 1140,02 ms | 586,69 ms |
+| 50000 / 400045 | 4494,15 ms | 2580,87 ms |
+| 75000 / 600045 | 6 sn timeout | 6 sn timeout |
+
+Bu tek makine/tek seri, paralel işler olabilir; “yeni regex tam iki kat yavaş” sonucu çıkarmıyorum.
+İki sürümde de tekrar taramasıyla karesel büyüyen örnek var. Yeni kısa broken-page testi bu
+script ailesini içermiyor; testin yeşilliği global hız garantisi değil. Encoded `javascript:`
+adreslerinin raw regex sınırı da incelendi; normal link gezinmesine müdahale nedeniyle çalışan
+ürün hatası gösterilemedi, bulgu sayılmadı.
+
+### A-F2: draft'a göre runtime üretimi gerçek akışlarda doğrulandı
+
+Custom CSS/JS olmayan boş canvas kaynağına, Apply yapmadan
+`<form><input name="email"><button>Send</button></form>` ekleme karşı örneği kullanıldı.
+Gerçek store/CodePanel, gerçek `zipFiles` ve ZIP'in gerçekten açılan dosyaları üzerinden çalıştı;
+spy yalnız dosyaları yakaladı, üreticinin kendisi yürütüldü. HTML+asset'ler gerçek
+`inlineProjectHtml` ile birleştirildi, JSDOM'da cancelable submit prevented=true beklendi.
+Ağ teslimatı veya üretim API'si sınanmadı.
+
+Bağımsız **7/7** yeşil: `{documents}` kullanan writer belgeyi ve gereken `.card-title` CSS'sini
+koruyor; draft helper, gerçek project ZIP, single website file, optimized publication,
+Apply ve pending Apply çıktılarının tümü form submit'ini işliyor.
+Panel kapalıyken EditorPage fallback için ayrı **1/1** yeşil: gerçek sayfa ve mock API ile,
+kaynakta form eklenip panel unmount edildikten sonra kayda giden HTML'de form/runtime ve çalışan
+submit doğrulandı. Bu gerçek sunucuya kayıt veya tarayıcı E2E koşusu değildir.
+
+Mevcut yeni testlerin bozma kanıtı; her deneme ayrı `/tmp` sürecinde:
+
+| Bozma | Mevcut hedef test sonucu |
+|---|---:|
+| Yalnız `htmlRuntime.js` eski sürüm | generatedSize: 2 kırmızı / 53 yeşil |
+| Yalnız `schemaToFiles.js` eski sürüm (`documents` yok) | Üç dosya: 5 kırmızı / 65 yeşil |
+| `componentDraftHtml` içinden documents aktarımı çıkarıldı | Helper+panel: 1 kırmızı / 14 yeşil |
+| Yalnız project ZIP çağrısı eski asset kopyalamaya döndü | CodePanel.htmlPages: 1 kırmızı / 7 yeşil |
+| ZIP fix'i dururken standalone/Apply çağrıları eski stale helper'a döndü | İlgili beş dosya: **85/85 yeşil** |
+| Yalnız EditorPage unmounted fallback eski helper'a döndü | sourceBreakpoint: **5/5 yeşil** |
+
+Yeni ZIP/helper testleri literal `postToInbox` ve inlining beklentileriyle anlamlı şekilde kırılıyor.
+Fakat bu mevcut ZIP testinde zipFiles mock ve submit çalıştırılmıyor; yukarıdaki bağımsız gerçek
+ZIP kontrolü bunun ötesine geçti. Son iki mutasyon **mevcut test kapsamı boşluğu**; şu an çalışan
+ürün hatası diye sunulmuyor.
+
+Aynı son iki sınır ve helper, bağımsız davranış testlerimde tekrar bozuldu:
+
+| Bozma | Bağımsız sonuç | Restore |
+|---|---:|---:|
+| Helper documents aktarımı çıkarıldı | 5/7 kırmızı | 7/7 yeşil |
+| Standalone/Apply çağrıları eski helper'a döndü | 4/7 kırmızı | 7/7 yeşil |
+| EditorPage fallback eski helper'a döndü | 1/1 kırmızı | 1/1 yeşil |
+
+Başlangıç mevcut üç dosya **70/70**, restorasyondan sonra altı mevcut dosya **90/90**;
+mevcut + bağımsız son sekiz dosya **98/98**, 6,29 s.
+`npx vitest run src/utils/generatedSize.test.js src/utils/componentSourceDrafts.test.js src/components/editor/CodePanel.htmlPages.test.jsx`
+başlangıç paketidir; bütün çağrılarda Node 26 webstorage seçeneği kullanıldı.
+702 izlenen frontend dosyası sonunda `41978ae` arşiviyle SHA-256 olarak eşleşti;
+manifest özeti `4dc1622dfc2edcaef96ab656235d38c3498edceed88069930095b5195894ab9d`.
+
+### D-F1: ilk karşı örnek düzeldi; yeni karşı örnek var — P2
+
+Dosya: `frontend/src/utils/colorMode.js:422–425,441`; etkisi `mapStyles` ve `mapForeground` üzerinden.
+Yeni `tintReads`, bloktaki gerçek yazı rolünün yerine daima **`mode.other.textColor`** kullanıyor.
+Bu kontrolün reddetmesi, özgün yazıyı korumanın daha okunur olacağını göstermiyor.
+
+İlk rapordaki sarı zemin örneği tekrar çalıştırıldı. Önceki (`41978ae^`) ve yeni gerçek
+`withColorModeComponents` çıktıları aynı Chromium belgesinde, düz tek alpha katmanı üzerinde çizildi:
+
+| Girdi / durum | Önceki yazı | Yeni yazı | Bağımsız kontrast hesabı |
+|---|---|---|---|
+| `rgba(255,255,0,.49)`, gövde `#111317`, diğer yazı `#e8edf4` | rgb(232,237,244) | rgb(17,17,17) | **3,27056 → 4,90792** |
+
+Bu ilk örnek düzeldi. Yeni, normal boyutlu karşı örneği tekrar etmek için:
+
+1. Tasarlanan tema: `backgroundColor:'#ffffff'`, `textColor:'#111111'`,
+   `mutedColor:'#54595f'`; diğer roller `DEFAULT_THEME`.
+2. `colorMode:{start:'dark',theme:{backgroundColor:'#111317',textColor:'#888888',mutedColor:'#ffffff'}}`.
+3. Bir `card`: `backgroundColor:'rgba(255,100,0,.3)'`, `color:'#54595f'`,
+   `props:{title:'Review',text:'A normal readable card'}`, kutu (40,80,500,180).
+4. Gerçek `colorModeFor` ve `withColorModeComponents` ile öncesini/sonrasını üretin.
+   Eski çıktı `color:'var(--pwb-alt-muted, #54595f)'`, yeni çıktı **`color:'#54595f'`**.
+5. Tam sayfa kontrolü için `schemaToSingleHtml(schema,title,{colorMode:colorModeFor(schema,page)})`
+   açın. Bu üçüncü seçenek gereklidir; seçenek verilmeden üretilen tek paletli belge bu deneyin
+   koyu tema kontrolü değildir.
+
+Gerçek Chromium'da tam yeni belge: `data-pwb-theme='dark'`, body `rgb(17,19,23)`, kart zemini
+`rgba(255,100,0,.3)`, paragraf **rgb(84,89,95)**, 16 px. Ayrı öncesi/sonrası kontrolünde eski
+çıktının yazısı **rgb(255,255,255)** idi; aynı zemin kullanıldı.
+
+Bağımsız sRGB alpha bileşimi: zemin `(88.4,43.3,16.1)`; yazı kontrastı **11,82214 → 1,67264**.
+Bu yalnızca baştan kötü bir palet seçmek değil: tasarlanan açık görünümde aynı kart **5,03847**,
+koyu sayfada genel `#888888` yazı **5,24549**, önceki koyu kart **11,82214** sağlıyor.
+Kontrolün baktığı genel yazı ise bu özel tint üzerinde **3,33498** verdiği için yeni dal yanlış
+kararla gerçek `mutedColor` dönüşümünü durduruyor. Beklenen: çalışan bir rol eşlemesi, ilgisiz
+bir yazı rolünün kontrastı yüzünden 4,5'in çok altına indirilmemeli. Düzeltme yazara bırakıldı.
+
+Ek sınır: diğer textColor `#b0b0b0`, 32 px yazı, `rgba(255,255,0,.25)` örneğinde de sabit 4,5
+kontrolü yazıyı değiştiriyor; ölçülen oran **4,01884 → 2,16653**. Bu ikinci örnek ilki kadar
+kuvvetli bir normal metin kabulü olarak sunulmuyor; boyuttan bağımsız eşik kararının ayrıca
+incelenmesi gerektiğini gösteriyor.
+
+Hesap screenshot pikselinden yapılmadı: native computed renkler, bilinen tek alpha katmanı ve
+bağımsız sRGB luminance formülü kullanıldı. Filtre/karışım modu olmayan düz örneklerdir.
+
+Geçici bağımsız Vitest: eski kontrol + yeni rol beklentisi + beş açı örneği + tam belge üretimi
+**7 geçti / 1 kırıldı**. Kırılan testin literal beklentisi `var(--pwb-alt-muted, #54595f)`,
+alınan `#54595f`; eski gerçek fonksiyonla aynı literal beklenti geçti. Mevcut ürün paketi ise
+**146/146 yeşil**: yeni karşı örnek mevcut testte yok.
+
+### D-F2 ve D testlerinin bozma kanıtı
+
+`NODE_OPTIONS=--no-experimental-webstorage npx vitest run src/utils/colorMode.test.js`:
+önce **146/146**, her bozma ayrı işlemde, sonunda yine **146/146**.
+
+| `/tmp` içindeki tek bozma | Kırmızı / yeşil | Yakaladığı şey |
+|---|---:|---|
+| `faint` kararından `&& tintReads(color,mode)` çıkarıldı | 1 / 145 | Yeni güçlü sarı tint testi |
+| `hueOf(parts[0])` yerine `parseFloat(parts[0])` | 3 / 143 | `.5turn`, `200grad`, pi-rad literal beklentileri |
+| Yalnız `tintReads` eşiği 4,5 yerine 20 yapıldı | 1 / 145 | Mevcut zayıf tint'in yazısının takip etmesi |
+
+Her bozma sonrası `colorMode.js` özgün byte'larına döndü. Bu testler ilk düzeltmeyi yakalıyor;
+fakat rol değişikliğiyle daha kötü kontrast üreten yukarıdaki sayfayı yakalamıyorlar.
+
+Kendi beş ek açı girdimin hex sonuçları elle yazılmış literal beklentilerle geçti;
+son girdinin alpha 0,5 değeri ayrıca fonksiyon çıktısında görüldü:
+
+| Girdi | Sonuç |
+|---|---|
+| `hsl(-.25turn 100% 50%)` | `#8000ff` |
+| `hsl(1.5turn 100% 50%)` | `#00ffff` |
+| `hsl(100grad 100% 50%)` | `#80ff00` |
+| `hsl(-3.141592653589793rad 100% 50%)` | `#00ffff` |
+| `HSL(0.5TURN 100% 50% / 50%)` | `#00ffff`, alpha 0,5 |
+
+Native Chromium negatif çeyrek turu `rgb(128,0,255)` çizdi. D-F2 ilk hatası bu kapsamda kapandı;
+bütün CSS Color sözdiziminin desteklendiği sonucu çıkarılmıyor.
+
+### E-F1: engellenen storage altında seçim artık çalışıyor
+
+Mevcut `CodeField.test.jsx` + `syntaxHighlight.test.js`: **28/28 yeşil**.
+Yalnız `useCodeColors.js` eski byte'larına dönünce CodeField paketi **1 kırmızı / 9 yeşil**:
+yeni `CodeField.test.jsx:91` testi `aria-pressed=false` beklerken true aldı. Geri yüklenince geçti.
+Test yalnızca storage API'sini engelliyor; gerçek düğme, hook ve katmanın varlığı sınanıyor.
+Beklenen değerler üretim kodundan türetilmemiş literal true/false.
+
+Bağımsız ek kontroller: get/set birlikte hata verirken CodeField ve CodeText'in birlikte
+kapanması, remount sonrası seçimin korunması, storage tekrar erişilebilir olunca `on` yazılması;
+`localStorage` global getter'ının kendisi SecurityError atarken kapanma. Yeni kaynakta yeşil.
+Gerçek tarayıcı gizlilik ayarı veya iki sekme arası storage olayı bu devamda denenmedi.
+
+### E-F2: ağır girdiler düzeldi; yeni testler anlamlı biçimde kırılabiliyor
+
+Yalnız `syntaxHighlight.js` eski sürümüne dönünce **2 kırmızı / 16 yeşil**: yeni kısa yorum tokenı
+ve 700 ms sınırı. İlk ağır CSS girdisi bu yüklü Vitest koşusunda 9609 ms sürdü; bu sayıyı yalın
+benchmark olarak kullanmıyorum.
+
+`npx vitest run src/utils/syntaxHighlight.test.js` içinde yeni iki testi hedefleyerek ayrı bozma:
+
+| Bozma | Yeni testlerin sonucu |
+|---|---|
+| STRING kapanışı yeniden zorunlu | Kısa string ve hız testi kırmızı |
+| JS yorum/template kapanışı yeniden zorunlu | Kısa JS yorum ve hız kırmızı |
+| CSS yorum kapanışı yeniden zorunlu | Kısa CSS yorum ve hız kırmızı |
+| HTML yorum/doctype kapanışı yeniden zorunlu | Kısa HTML yorum ve hız kırmızı |
+| Yalnız template kapanışı zorunlu | Hız kırmızı, kısa anlam testi yeşil |
+| Yalnız doctype `>` zorunlu | Hız kırmızı, kısa anlam testi yeşil |
+
+İlk dört bozmanın her birinde **2 kırmızı / 16 atlanan** test; son ikisinde yeni hız testi
+kırıldı. Böylece ilk örüntüde duran tek performans testinin sonraki dalları örtmesi önlendi.
+Her deneme ayrı işlem/timeout ve `finally` restorasyonuyla yapıldı.
+
+Bağımsız sağlıklı kısa yorum/string/template/doctype devamı, metin round-trip ve escaping
+kontrolleri de dahil son sağlam koşu **42/42 yeşil**. Bu sayı yeni karşı örneklerin kırmızı
+olduğu ayrı dosyayı içermez. Aşağıdaki P3 bulgularında o dosya özellikle çalıştırıldı.
+
+Ayrı Node alt süreçleriyle eski/yeni karşılaştırması, her girdi/boyut/sürüm için üç tekrar;
+her süreçte 8 saniye sınırı. Büyük girdi küçük girdinin dört katı. Medyan ms:
+
+| Örüntü | Büyük girdi karakteri | Eski küçük / büyük | Yeni küçük / büyük |
+|---|---:|---:|---:|
+| CSS `'/*x'` tekrarı | 198000 | 89,826 / 1768,283 | 0,084 / 0,247 |
+| JS `'/*x'` tekrarı | 198000 | 90,981 / 1482,892 | 0,085 / 0,309 |
+| HTML `'<!--x'` tekrarı | 195000 | 86,382 / 1367,083 | 1,354 / 5,351 |
+| HTML `'<!doctype '` tekrarı | 190000 | 124,615 / 2031,403 | 0,611 / 5,962 |
+| JS çift tırnak + a + ters eğik çizgi | 198000 | 663,645 / 3/3 timeout | 0,242 / 1,267 |
+| JS backtick + a + ters eğik çizgi | 198000 | 661,638 / 3/3 timeout | 0,286 / 1,216 |
+| Yazarın CSS `a{b:"c\` tekrarı | 196000 | 3,380 / 13,316 | 4,346 / 16,429 |
+
+Alt süreç gerçek `highlightCode` modülünü yükleyip kısa ısınmadan sonra tek çağrıyı ölçtü;
+DOM parse veya gerçek klavye gecikmesi ölçülmedi. Son CSS örneği eski sürümde de hızlıdır;
+tek başına o fixture CSS string gerilemesini kanıtlamaz. Ortak STRING bozmasını JS örneği yakalıyor.
+Küçük süreler JIT/makine yükünden etkilenir; bu sonlu ölçümlerden bütün girdilere asimptotik garanti
+çıkarmıyorum. Eski büyük JS örneklerinin toplam altı süreci 8 saniyede kesildi; yeni gözlemler tamamlandı.
+
+### E-F2 ek bulgu — P3: HTML yorumunun hata kurtarma bitişi sonraki etiketleri yutuyor
+
+Dosya: `frontend/src/utils/syntaxHighlight.js:58`.
+
+Üç ayrı girdi: `<!--><p>x</p>`, `<!---><p>x</p>`, `<!--x--!><p>x</p>`.
+Gerçek JSDOM HTML parser'ı her birinde `p` öğesi ve literal `x` metni oluşturuyor.
+Yeni `highlightCode` ise bütün girdiyi tek yorum span'i yapıyor; sonraki p etiketleri için tag
+span'i yok. Eski sürüm p tag'larını renklendiriyordu. Bunlar geçersiz HTML'den kurtarma sınırları;
+“tarayıcı gibi EOF'a yorum” açıklaması bu girdilere genişletilemez.
+Metin değişmiyor ve kaynak çalıştırılmıyor; sorun yalnız kaynak renkleri.
+
+### E-F2 ek bulgu — P3: geçerli JS satır devamından sonraki kod string sayılıyor
+
+Dosya: `frontend/src/utils/syntaxHighlight.js:13`.
+
+Girdi (ters eğik çizginin ardından gerçek yeni satır):
+
+```js
+const a="x\
+y"; let n=3
+```
+
+`new Function(source + ';return {a,n}')()` literal `{a:'xy',n:3}` döndürüyor: geçerli JS.
+Yeni highlighter sondaki `"; let n=3` kısmını string yapıp yalnız `const` keyword'ünü çıkarıyor.
+Önceki highlighter devamlı string'i bütünüyle doğru tanımıyordu, fakat `const` ve `let` ikisini de
+renklendiriyordu. Kapanışı isteğe bağlı yapmak, mevcut kaçışlı newline sınırıyla birleşerek artık
+sonraki geçerli kodu da yutuyor. Beklenen keyword dizisi elle `['const','let']` yazıldı.
+
+Bu bir önceki üç HTML girdisiyle aynı bağımsız dosyada çalıştırıldı: **yeni kaynak 4 kırmızı;
+eski kaynak aynı testlerde 4 yeşil**. Düzeltme uygulanmadı. E-F2'nin ilk donma sorununun kapandığını
+geçersiz kılmayan, iki ayrı düşük önem dereceli renk doğruluğu gerilemesidir.
+
+E restorasyonu: arşivdeki **652 frontend/src dosyasıyla sıfır fark**. Özgün SHA-256:
+`useCodeColors.js = cbb93524df226a6a73e076bb47613df63d7a83ac7f3e72be98cf164b8ecf0d26`,
+`syntaxHighlight.js = ba5d51cd36a7d8c27ba380f5c3f694b8f12bdb96b521aeffdb58691c557eebae`.
+
+### Bu devamın genel doğrulaması, sınırlar ve bitiş durumu
+
+Ana klasörde üretim kaynakları `41978ae` ile aynıyken (HEAD yalnız önceki rapor commit'iyle
+ileride), aşağıdaki normal kontroller yeniden çalıştırıldı:
+
+| Komut | Sonuç |
+|---|---|
+| `frontend: npm run lint` | Geçti |
+| `frontend: NODE_OPTIONS=--no-experimental-webstorage npm run test:run` | **317 dosya / 3129 test geçti**, 68,82 s |
+| `frontend: npm run build` | Geçti; mevcut büyük parça uyarısı var |
+| `backend: .venv-linux/bin/python -m pytest -q` | **998 geçti / 766 uyarı**, 199,85 s |
+| `git diff --check` | Geçti |
+
+Node 26.13.0, kurulu Vitest 4.1.11. Bağımsız yeni karşı örnekler bu normal paketlere eklenmedi;
+bunların ayrı kırmızı sonuçları yukarıda verildi. Tam paketin yeşilliği yeni bulguların yokluğu anlamına gelmez.
+D kopyasında da 702 izlenen frontend dosyası byte karşılaştırmasıyla `41978ae` ile aynı;
+`colorMode.js` SHA-256 `b20b06cc9e30f7a8cc539ff2b62d985647c459b8476ecc74d4936c5b4bc26bee`.
+
+Bu devamda CI/E2E yeniden koşulmadı veya CI yeşil diye doğrulanmadı; E2E dosyası değiştirilmedi.
+Firefox/Safari, gerçek storage gizlilik ayarı, native klavye gecikmesi, ağ üzerinden form
+mesajının teslimi ve gerçek yayımlama yaşam döngüsü çalıştırılmadı. İlk rapordaki önceki CI
+sonuçları bu commit için yeni koşu olarak okunmamalı. Kod düzeltmeleri yapılmadı.
+
+İki istek de tamamlandı. Yalnızca kendi iki rapor dosyam değişti; yeni test/fixture/kanıt dosyası
+commit'e alınmadı. Geçici kopyalardaki üretim dosyaları önce restore edilip doğrulandı; ardından
+geçici inceleme dosyaları temizlendi. Açılan yerel tarayıcı sekmeleri kapatıldı ve yalnız bu
+incelemede başlatılan sunucular durduruldu. Üretim sunucusuna hiç istek gönderilmedi; canlıya alınmadı.

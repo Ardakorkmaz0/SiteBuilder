@@ -2,6 +2,8 @@
 
 Tarih: 4 Kasım 2026. İncelenen plan: `RESPONSIVE-PLAN-2026-11-04.md`, `d70bc09`.
 Ölçülen kaynak: `b998b6c755627007383801aa09f1063923789730`.
+Ek sayfa ölçümleri: `41978ae` (aşağıdaki devam incelemesi). İlk rapor `4e8cd8b` ile kaydedildi;
+önceki ölçümler tekrarlanmadı veya yeni commit'te alınmış gibi gösterilmedi.
 
 ## Karar
 
@@ -315,6 +317,85 @@ Asgari genişlik matrisi: 320, 360, 390, 600, 767, 768, 769, 780, tasarım geni�
 genişlikleri eklenmeli. Bu matris gelecekteki uygulama için öneridir; hepsini yeni düzen üzerinde
 çalıştırmış değilim.
 
+## Devam incelemesi: farklı tuval sayfaları, 41978ae
+
+Yeni istekte `git status --short` temiz, `git pull --ff-only` günceldi; HEAD `4e8cd8b`, yani
+`41978ae` sonrasındaydı. Önceki hero ve A–E karşı örneğini baştan almadım.
+`b998b6c → 41978ae` farkında `editorStore.js`, `responsiveHtml.js` ve `PreviewPage.jsx` aynı Git
+blob'larını taşıyor; tek belge ölçek hesabı değişmemiş. `schemaToFiles` yalnızca `documents`
+seçeneğiyle kaynağı düzenlenmiş belgeyi kullanabiliyor. Önceki `schemaToFiles(schema)` ham tuval
+ölçümünü değiştirmiyor; bunu düzenlenmiş HTML belgelerinin dışa aktarımına genellemiyorum.
+
+### İki ek sayfa nasıl oluşturuldu?
+
+`41978ae` arşivinin `/tmp` kopyasında gerçek depo işlemlerini kullandım:
+`loadSchema → addComponent → updateStyles`, ardından ikinci sayfada `setViewport('mobile') → setLayout`.
+Tarayıcıda sürükleme taklidi veya sunucuya kayıt yapılmadı. Geçici fixture testinde altı kartın
+varlığı, ilk sayfanın otomatik, ikinci sayfanın manuel telefon olması doğrulandı: **1/1 geçti**.
+İki sayfada da PC 1200, telefon 360; font Arial, PC beyaz, telefon açık mavi; özel CSS/JS yok.
+
+Yeniden üretme girdileri (x/y/w/h, CSS px):
+
+- **Altı kart:** `card` türünde `Card 1`–`Card 6`; açıklama `A separate card with a short description.`
+  İki satır, üç sütun. `x = 40 + sütun*380`, `y = 80 + satır*220`, `w=340`, `h=180`.
+  Telefon çizimi otomatik. Varsayılan kart özellikleri ve stilleri kullanıldı; yazı tipi Arial yapıldı.
+- **Manuel afiş:** boş başlıklı/açıklamalı `card` panel (40,100,1120,340), zemin `#d9e8ff`, köşe 12;
+  `heading` (80,140,600,90), metin `A deliberately layered poster`, seviye h1;
+  `button` (80,270,200,50), metin `View details`, href `#`;
+  `text` (40,530,1120,60), metin `The footer is outside the deliberately overlapping panel.`
+  Telefon kutuları sırasıyla (16,80,328,240), (32,110,290,80), (32,220,180,44), (16,360,328,70).
+  Bunlar `setLayout` ile girildi; sonuçta `mobileManual=true` oldu. Panel/başlık/düğme çakışması
+  bilinçli, footer bu grubun dışında.
+
+### Gerçek Chromium sonucu
+
+Her iki sayfanın gerçek `schemaToSingleHtml` çıktısı 1100 piksel yükseklikte açılıp her genişlikte
+yeniden yüklendi. DOM kutuları, dönüşüm ve kök yatay taşma okundu. Sonuçlar aşağıda;
+her iki sayfada bütün bu genişliklerde kök `scrollWidth-clientWidth` **0 px** çıktı.
+
+| Pencere | İki sayfanın ölçeği | İlk kartın görünen genişliği | Afiş panelinin görünen genişliği |
+|---:|---:|---:|---:|
+| 320 | 0,888889 | 291,56 | 291,56 |
+| 360 | 1 | 328,00 | 328,00 |
+| 600 | 1 | 328,00 | 328,00 |
+| 768 | 1 | 328,00 | 328,00 |
+| 769 | 0,640833 | 217,88 | 717,73 |
+| 900 | 0,75 | 255,00 | 840,00 |
+| 1200 | 1 | 340,00 | 1120,00 |
+| 1920 | 1 | 340,00 | 1120,00 |
+
+768'de telefon kartı/paneli x=220, genişliği 328; pencerenin **%42,71**'ini kaplıyor. 769'da
+1200'lük PC çizimine atlanıp **0,640833×** oluyor. Dolayısıyla önceki 0,769 değeri evrensel
+sabit değil, 1000'lik tasarımın sonucu; daha geniş tasarımda sıçrama daha büyük.
+
+1200'de ilk kartın kutusu (40,80,340,180), ikinci kartınki (420,80,340,180);
+afiş paneli (40,100,1120,340), başlığı (80,140,600,90). Mevcut yazıcı referans geometriyi burada
+korudu. 360'ta afişin dört manuel telefon kutusu da yukarıda verilen koordinatlarla aynı çıktı.
+1920'de PC kutuları 360 piksel ortalama payı eklenerek duruyor: ilk kart x=400, panel x=400,
+afiş başlığı x=440. Geniş ekrandaki azami içerik genişliğini tek başına hata saymıyorum.
+
+900'de gerçek `schemaToFiles` proje çıktısında **iki sayfa için de** clientWidth=900,
+scrollWidth=1200, pageWidth=1200 ve transform=none: taşma **300 px**. Bu da önceki 100 px
+bulgusunun tasarım genişliğine bağlı olduğunu doğruluyor.
+
+1200'de HTML'e çevirme:
+
+- Altı kart: `.rh-row` çocuk sayıları **[3,3]**, Card 1–3 ve Card 4–6 doğru satırlarında.
+  Mevcut `readingRows` bu örnekte beklenen basit satır ayrımını yapıyor; her sayfada bozuk demiyorum.
+- Afiş: çocuk sayıları **[3,1]**. Panel, üstündeki başlık ve düğme tek satırın üç kardeşi oluyor;
+  footer ayrı satırda. Yeni çıkarıcıda gerçek katman grubunu koruma gereksinimi var.
+
+### Tasarım kararına etkisi
+
+Önceki karar değişmedi. Artık yalnız hero örneği yok: altı kartlı olağan düzen, bilinçli katmanlı
+manuel telefon düzeni ve önceki çakışmasız/kesilemez A–E örneği farklı sınıfları kapsıyor.
+Bu sayı bütün editör sayfalarını temsil eden bir örneklem değil. Yeni XY-cut uygulaması olmadığı
+için yeni ağacın tarayıcıda başarıyla çalıştığı iddia edilmiyor.
+
+Ek ölçümler ve bu sonuçlar kaydedilince ana tasarım incelemesi tamamlandı; bundan sonra ikinci
+istekteki `41978ae` düzeltme incelemesine geçildi. Bu devamda yalnız rapor dosyaları commit edilecek;
+yeni fixture kodu, ham JSON veya ekran görüntüsü depoya eklenmeyecek.
+
 ## Genel kontroller ve temizlik
 
 | Kontrol | Çalıştırılan kaynak | Sonuç |
@@ -342,3 +423,16 @@ Bu görevde E2E değiştirilmedi; CI E2E sonucu veya tarayıcılar arası uyumlu
 başlatılan 5173 sunucusu durduruldu. Son port kontrolünde 5173 ve 8001'de dinleyici yoktu.
 Yerel hesap veya veritabanı kaydı oluşturulmadı. İnceleme kanıtları dışındaki geçici düzenek
 üretim klasörüne taşınmadı. Plan ve üretim dosyaları bu incelemenin değişiklikleri arasında değil.
+
+### Devam isteğinin son kontrolü
+
+`41978ae` üretim kaynağıyla ana klasörde genel kontroller tekrarlandı: lint geçti,
+**317 dosya / 3129 Vitest geçti** (68,82 s), build geçti (büyük parça uyarısı),
+**998 pytest geçti / 766 uyarı** (199,85 s). Model ve üretim kodu değişmedi.
+Bu devamda yeni E2E yok; CI sonucu doğrulandı diye sunulmuyor. İlk tablodaki 3114 test
+başlangıç `b998b6c` kopyasına aittir; iki farklı kaynak sonucu karıştırılmamalı.
+
+İkinci isteğin altı düzeltme kontrolü de tamamlandı ve
+`GENERATED-SOURCE-REVIEW-2026-11-04.md` içindeki **41978ae kontrolü** bölümüne yazıldı.
+Yalnızca iki rapor dosyası commit ediliyor; geçici girdiler ve testler `/tmp` kopyalarında kaldı
+ve inceleme bitince temizlendi. Üretim sunucusuna istek gönderilmedi, canlıya alınmadı.
