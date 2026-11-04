@@ -313,6 +313,91 @@ describe('a colour however it is written', () => {
       expect(themed({ textColor: '#b0b0b0' }, { backgroundColor: 'rgba(255,255,0,.25)', color: '#111111' }))
         .toBe('var(--pwb-alt-text, #111111)')
     })
+
+    describe('inside another block', () => {
+      const TINT = 'rgba(255,0,0,.1)'
+      const card = (color = '#54595f', backgroundColor = TINT) => block('card', { backgroundColor, color })
+      const box = (styles, children) => block('container', styles, { children })
+      const nested = (other, tree) => {
+        const schema = {
+          theme: { ...DEFAULT_THEME, backgroundColor: '#ffffff', textColor: '#111111', mutedColor: '#54595f', surfaceColor: '#fafafa' },
+          colorMode: { start: 'dark', theme: { backgroundColor: '#111317', ...other } },
+          pages: [{ id: 'home', name: 'Home', components: [] }],
+        }
+        return withColorModeComponents([tree], colorModeFor(schema, schema.pages[0]))[0]
+      }
+      // A pale surface in a dark palette, with dark muted text meant for it: on
+      // the page itself that text cannot be read, on the surface it reads at 8.5:1.
+      const PALE = { surfaceColor: '#bbbbbb', textColor: '#e8edf4', mutedColor: '#111111' }
+
+      it('judges the text on the surface it stands on, not on the page', () => {
+        const outer = nested(PALE, box({ backgroundColor: '#fafafa' }, [card()]))
+        expect(outer.children[0].styles.color).toBe('var(--pwb-alt-muted, #54595f)')
+      })
+
+      it('keeps the owner\'s text when following only reads on the page', () => {
+        const outer = nested({ surfaceColor: '#e0e0e0', textColor: '#e8edf4' }, box({ backgroundColor: '#fafafa' }, [card('#111111')]))
+        expect(outer.children[0].styles.color).toBe('#111111')
+      })
+
+      it('looks through a block that paints nothing', () => {
+        const outer = nested(PALE, box({ backgroundColor: '#fafafa' }, [box({}, [card()])]))
+        expect(outer.children[0].children[0].styles.color).toBe('var(--pwb-alt-muted, #54595f)')
+      })
+
+      it('looks through a block with no styles at all', () => {
+        const outer = nested(PALE, box({ backgroundColor: '#fafafa' }, [box(undefined, [card()])]))
+        expect(outer.children[0].children[0].styles.color).toBe('var(--pwb-alt-muted, #54595f)')
+      })
+
+      it('looks through a transparent block too', () => {
+        const outer = nested(PALE, box({ backgroundColor: '#fafafa' }, [box({ backgroundColor: 'transparent' }, [card()])]))
+        expect(outer.children[0].children[0].styles.color).toBe('var(--pwb-alt-muted, #54595f)')
+      })
+
+      it('counts a tint between the surface and the block, by how strong it is', () => {
+        const other = { surfaceColor: '#555555', mutedColor: '#111111' }
+        const under = (tint) => nested(other, box({ backgroundColor: '#fafafa' }, [box({ backgroundColor: tint }, [card()])])).children[0].children[0].styles.color
+        const direct = nested(other, box({ backgroundColor: '#fafafa' }, [card()]))
+        expect(direct.children[0].styles.color).toBe('var(--pwb-alt-muted, #54595f)')
+        // A little black leaves the surface light enough for the darker text.
+        expect(under('rgba(0,0,0,.1)')).toBe('var(--pwb-alt-muted, #54595f)')
+        // This much makes it so dark that the owner's lighter text reads better.
+        expect(under('rgba(0,0,0,.49)')).toBe('#54595f')
+      })
+
+      it('uses the surface of the palette the block is shown in, not the designed one', () => {
+        // On the designed #fafafa the following text would read, on #223344 it
+        // does not: a dark surface with dark text.
+        const outer = nested({ surfaceColor: '#223344', mutedColor: '#333333', textColor: '#e8edf4' }, box({ backgroundColor: '#fafafa' }, [card()]))
+        expect(outer.children[0].styles.color).toBe('#54595f')
+      })
+
+      it('still reads a block directly on the page against the page', () => {
+        const direct = nested(PALE, card('#111111'))
+        expect(direct.styles.color).toBe('var(--pwb-alt-text, #111111)')
+      })
+
+      it('leaves the text alone inside a box with a colour of the owner\'s own', () => {
+        const outer = nested(PALE, box({ backgroundColor: '#123456' }, [card()]))
+        expect(outer.children[0].styles.color).toBe('#54595f')
+      })
+
+      it('judges a phone style on the same surface', () => {
+        const child = { ...card(), stylesMobile: { backgroundColor: TINT, color: '#54595f' } }
+        const outer = nested(PALE, box({ backgroundColor: '#fafafa' }, [child]))
+        expect(outer.children[0].stylesMobile.color).toBe('var(--pwb-alt-muted, #54595f)')
+      })
+
+      it('writes the followed text in the real published page', () => {
+        const schema = {
+          theme: { ...DEFAULT_THEME, backgroundColor: '#ffffff', textColor: '#111111', mutedColor: '#54595f', surfaceColor: '#fafafa' },
+          colorMode: { start: 'dark', theme: { backgroundColor: '#111317', ...PALE } },
+          pages: [{ id: 'home', name: 'Home', background: '#ffffff', components: [box({ backgroundColor: '#fafafa' }, [{ ...card(), props: { title: 'Review', text: 'Readable' } }])] }],
+        }
+        expect(publishedPagesFor(schema)[0].html).toContain('color: var(--pwb-alt-muted, #54595f)')
+      })
+    })
   })
 
   it('takes a text on a solid role colour to that colour\'s own text role', () => {

@@ -415,17 +415,18 @@ function wrap(role, token, alpha = 1) {
 }
 
 // Under this a background is a tint over what is behind it, not a colour of
-// its own: the text on it still reads against the page. Unless it does not: over
-// the other palette's page a strong tint can be too close to the text the block
+// its own: the text on it still reads against that. Unless it does not: over
+// what is behind it in the other palette (`behind`, the page unless the block
+// stands on another one) a strong tint can be too close to the text the block
 // has there. Then, if the owner's own text reads better on it, that stays.
 const FAINT = 0.5
 
-function tintReads(color, mode, { text, hint } = {}) {
-  const page = normalizeHex(mode.other?.backgroundColor)
+function tintReads(color, mode, { text, hint, behind = mode.other?.backgroundColor } = {}) {
+  const surface = normalizeHex(behind)
   const owner = parseColor(text)?.hex || mode.light.textColor
   const follows = normalizeHex(mode.other?.[(owner && roleOf(owner, 'fg', mode, hint)) || 'textColor'])
-  if (!page || !owner || !follows) return true
-  const tint = mix(page, color.hex, color.alpha)
+  if (!surface || !owner || !follows) return true
+  const tint = mix(surface, color.hex, color.alpha)
   const reads = contrast(follows, tint)
   return reads >= 4.5 || reads >= contrast(owner, tint)
 }
@@ -436,6 +437,7 @@ function tintReads(color, mode, { text, hint } = {}) {
 function mapValue(value, context, mode, hint, onTint) {
   if (typeof value !== 'string' || !value || value.includes('var(--pwb-alt-')) return { value, role: null, paints: paints(value) }
   let first
+  let painted = null
   let faint = false
   const out = value.replace(COLOR_TOKEN, (token) => {
     const color = parseColor(token)
@@ -443,11 +445,18 @@ function mapValue(value, context, mode, hint, onTint) {
     const role = roleOf(color.hex, context, mode, hint)
     if (first === undefined) {
       first = role
+      painted = color
       faint = color.alpha < FAINT && tintReads(color, mode, onTint)
     }
     return role ? wrap(role, token, color.alpha) : token
   })
-  return { value: out, role: first || null, paints: paints(value) && !(faint && !first) }
+  return { value: out, role: first || null, color: painted, paints: paints(value) && !(faint && !first) }
+}
+
+// What a block's background makes of what is behind it, in the other palette.
+function surfaceOver(behind, { color, role }, mode) {
+  const own = normalizeHex(role && mode.other?.[role]) || color.hex
+  return behind ? mix(behind, own, color.alpha) : own
 }
 
 // A text colour on a solid role colour (a button's white) follows that
@@ -468,17 +477,20 @@ function mapForeground(value, { boxRole, fixed, mode, hint }) {
 }
 
 // One block's styles. `inside` is true under a box with a colour of the
-// owner's own, whose text stays as designed.
-function mapStyles(styles, type, mode, inside) {
-  if (!styles || typeof styles !== 'object') return { styles, fixed: inside }
+// owner's own, whose text stays as designed. `behind` is what the block stands
+// on in the other palette; `surface` is what its children stand on.
+function mapStyles(styles, type, mode, inside, behind) {
+  if (!styles || typeof styles !== 'object') return { styles, fixed: inside, surface: behind }
   const hints = TYPE_HINTS[type] || {}
   const out = { ...styles }
   let boxRole = null
   let custom = false
+  let surface = behind
   for (const key of ['backgroundColor', 'background']) {
     if (typeof styles[key] !== 'string') continue
-    const mapped = mapValue(styles[key], 'bg', mode, hints.bg, { text: styles.color, hint: hints.fg })
+    const mapped = mapValue(styles[key], 'bg', mode, hints.bg, { text: styles.color, hint: hints.fg, behind })
     out[key] = mapped.value
+    if (mapped.color) surface = surfaceOver(behind, mapped, mode)
     if (mapped.role) boxRole = boxRole || mapped.role
     else if (mapped.paints) custom = true
   }
@@ -491,7 +503,7 @@ function mapStyles(styles, type, mode, inside) {
       if (typeof styles[key] === 'string') out[key] = mapValue(styles[key], 'border', mode).value
     }
   }
-  return { styles: out, fixed, boxRole }
+  return { styles: out, fixed, boxRole, surface }
 }
 
 const FIELD_FOREGROUNDS = ['labelColor', 'helpColor', 'choiceColor', 'revealColor']
@@ -542,11 +554,11 @@ function mapTabProps(props, mode, fixed) {
   return out
 }
 
-function mapComponent(component, mode, inside = false) {
+function mapComponent(component, mode, inside = false, behind = mode.other?.backgroundColor) {
   if (!component || typeof component !== 'object') return component
-  const { styles, fixed } = mapStyles(component.styles, component.type, mode, inside)
+  const { styles, fixed, surface } = mapStyles(component.styles, component.type, mode, inside, behind)
   const next = { ...component, styles }
-  if (component.stylesMobile) next.stylesMobile = mapStyles(component.stylesMobile, component.type, mode, inside).styles
+  if (component.stylesMobile) next.stylesMobile = mapStyles(component.stylesMobile, component.type, mode, inside, behind).styles
   if (component.type === 'input' || component.type === 'select') next.props = mapFieldProps(component.props || {}, mode, fixed)
   if (component.type === 'tabs') next.props = mapTabProps(component.props || {}, mode, fixed)
   // The writers show one of two images; each says which palette it belongs to.
@@ -566,7 +578,7 @@ function mapComponent(component, mode, inside = false) {
       _colorModeCss: embedCss(mode),
     }
   }
-  if (Array.isArray(component.children)) next.children = component.children.map((child) => mapComponent(child, mode, fixed))
+  if (Array.isArray(component.children)) next.children = component.children.map((child) => mapComponent(child, mode, fixed, surface))
   return next
 }
 
