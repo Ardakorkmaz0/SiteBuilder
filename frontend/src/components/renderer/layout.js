@@ -1,3 +1,6 @@
+import { isAutoLayout } from '../../utils/autoLayout.js'
+import { sanitizeStyles } from '../../utils/sanitize.js'
+
 const FLOW_GAP = 20
 const FLOW_MOBILE_GAP = 16
 const FLOW_SIDE_PAD = 24
@@ -107,6 +110,20 @@ export function stylesFor(component, viewport = 'pc') {
   const over = component?.stylesMobile
   if (viewport !== 'mobile' || !over) return base
   return { ...base, ...over }
+}
+
+// What the Renderer settles by itself on these blocks, whatever their styles say.
+const SETTLED_STYLES = {
+  html: ['display', 'width', 'height', 'border', 'overflow'],
+  tabs: ['display', 'overflow'],
+}
+
+// A block's phone styles as a writer lays them over a look it wrote inline: they
+// outrank that look, so what the Renderer never lets them change is left out.
+export function phoneOverrides(component) {
+  const auto = component?.type === 'container' && isAutoLayout(component.props)
+  const settled = component?.type === 'container' ? ['display', ...(auto ? ['gap', 'height'] : [])] : SETTLED_STYLES[component?.type] || []
+  return Object.fromEntries(Object.entries(sanitizeStyles(component?.stylesMobile)).filter(([key]) => !settled.includes(key)))
 }
 
 export function isHidden(component, viewport) {

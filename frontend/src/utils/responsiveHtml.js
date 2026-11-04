@@ -16,7 +16,7 @@ import { navLinkLabel, navbarLinkGap, navbarPlacement } from './navbarLayout.js'
 import { autoLayoutChildCss, autoLayoutContainerCss, isAutoLayout } from './autoLayout.js'
 import { motionClassSuffix, motionCssVars, motionHeadTags, motionRevealAttr } from './motion.js'
 import { pageBehaviourStyleTag, pageDirAttr, pageLanguage, pageSeoTitle, seoHeadTags } from './seoTags.js'
-import { pinnedLayoutStyle } from '../components/renderer/layout.js'
+import { phoneOverrides, pinnedLayoutStyle } from '../components/renderer/layout.js'
 import { elementIdFor } from './anchors.js'
 import { colorModeHeadTags, withColorModePage } from './colorMode.js'
 
@@ -95,6 +95,25 @@ function styleAttr(component, extra = '') {
 // is left out; the rest carry a class the two media rules below act on.
 const shown = (list) => (Array.isArray(list) ? list : []).filter((c) => c && !(c.hidden && c.hiddenMobile))
 const visibilityClass = (c) => (c?.hidden ? ' rh-off-pc' : c?.hiddenMobile ? ' rh-off-mobile' : '')
+
+// A block's phone styles, kept to what this writer keeps on a wide screen. Its
+// looks are all inline, which only !important outranks.
+function phoneRule(c) {
+  return Object.entries(phoneOverrides(c))
+    .filter(([k]) => !DROP_STYLES.has(k))
+    .map(([k, v]) => `${kebab(k)}:${cssVal(v)} !important`)
+    .join(';')
+}
+
+// The hook that rule names. Only on a block that has one.
+const phoneClass = (c) => (phoneRule(c) ? ` rh-phone-${esc(c.id)}` : '')
+
+function phoneRules(components) {
+  return shown(components).flatMap((c) => {
+    const rule = phoneRule(c)
+    return [...(rule ? [`        .rh-phone-${esc(c.id)} { ${rule}; }`] : []), ...phoneRules(c.children)]
+  })
+}
 
 // Hover motion rides on the class list, and every case below builds its own
 // class attribute — so it is folded into the element's FIRST tag on the way
@@ -260,7 +279,7 @@ function item(c, multi, colOverride) {
 }
 
 function itemEl(c, multi, colOverride) {
-  return withClassSuffix(withHoverMotion(itemElHtml(c, multi, colOverride), c?.props), visibilityClass(c))
+  return withClassSuffix(withHoverMotion(itemElHtml(c, multi, colOverride), c?.props), `${visibilityClass(c)}${phoneClass(c)}`)
 }
 
 function itemElHtml(c, multi, colOverride) {
@@ -284,7 +303,7 @@ function itemElHtml(c, multi, colOverride) {
       const src = sanitizeImageSrc(p.src)
       if (!p._otherSrc) return `<img class="${cls} rh-img" src="${esc(src)}" alt="${esc(p.alt)}"${styleAttr(c, col)} />`
       return `<img class="${cls} rh-img pwb-on-${esc(p._baseMode)}" src="${esc(src)}" alt="${esc(p.alt)}"${styleAttr(c, col)} />`
-        + `<img class="${cls} rh-img pwb-on-${esc(p._otherMode)}" src="${esc(sanitizeImageSrc(p._otherSrc))}" alt="${esc(p.alt)}" loading="lazy"${styleAttr(c, col)} />`
+        + `<img class="${cls} rh-img pwb-on-${esc(p._otherMode)}${phoneClass(c)}" src="${esc(sanitizeImageSrc(p._otherSrc))}" alt="${esc(p.alt)}" loading="lazy"${styleAttr(c, col)} />`
     }
     case 'card':
       return `<div class="${cls} rh-card"${styleAttr(c, col)}>${
@@ -459,7 +478,7 @@ export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = 
           : c.type === 'section' ? section(c)
             : c.type === 'region' ? regionBand(c)
               : `<hr class="rh-divider"${styleAttr(c)} />`
-        body += '\n    ' + withClassSuffix(withHoverMotion(band, c.props), visibilityClass(c))
+        body += '\n    ' + withClassSuffix(withHoverMotion(band, c.props), `${visibilityClass(c)}${phoneClass(c)}`)
       }
       flushInline()
     }
@@ -525,7 +544,7 @@ ${withoutUnusedRules(`      ${themeVariablesCss(pageTheme(schema, page))}
         .rh-nav-mobile-menu:not(.rh-nav-vertical)[data-mobile-open="true"] .rh-links { display: flex; }
         .rh-nav-mobile-menu:not(.rh-nav-vertical) .rh-links a { display: block; width: 100%; padding: 10px 12px; border-radius: 8px; }
         .rh-section { padding: 40px 0; }
-        .rh-wrap { gap: 24px; padding: 28px 0; }
+        .rh-wrap { gap: 24px; padding: 28px 0; }${phoneRules(page.components).map((rule) => `\n${rule}`).join('')}
       }`, `${runtimeSource}${schema?.customCss || ''}`)}
       ${customCssBlock(schema?.customCss)}
     </style>${colorMode ? `\n    ${colorModeHeadTags(colorMode)}` : ''}
