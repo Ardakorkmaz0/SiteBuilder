@@ -45,6 +45,10 @@ import { SYSTEM_PROMPT } from './aiSystemPrompt.js'
 import { aiSystemAddendum, getAiPreferences, temperatureFor } from './aiPreferences.js'
 import { loadAiPolicy } from './aiPolicy.js'
 import { DEFAULT_PROPS_TR } from './componentDefaults.js'
+import { checkLinks, checkPropsPatch, checkStylePatch, checkTabs, checkThemePatch, propKeysFor } from './aiPatch.js'
+import { ALLOWED_STYLE_KEYS } from './sanitize.js'
+import { DEFAULT_THEME } from './theme.js'
+import { isAutoLayout } from './autoLayout.js'
 
 // ---------------------------------------------------------------------------
 // Re-exports: stable public surface for AiBar / AiChatPanel / PropertiesPanel
@@ -122,16 +126,29 @@ function schemaSnapshot() {
           h: Math.round(l.h || 0),
         }
       : null
-  const walk = (comps) =>
+  // A block's own look. Without it the model could not see a colour or a
+  // size: "a bit bigger" and "the same blue as the button" were guesses.
+  const briefStyles = (c) => {
+    const out = {}
+    for (const [k, v] of Object.entries(c.styles || {})) {
+      if (v === '' || (typeof v !== 'string' && typeof v !== 'number')) continue
+      out[k] = typeof v === 'string' && v.length > 40 ? v.slice(0, 37) + '...' : v
+    }
+    return Object.keys(out).length ? out : undefined
+  }
+  // Styles are listed for the page being edited only: edits reach no other
+  // page, and theirs would be read for nothing.
+  const walk = (comps, withStyles) =>
     (comps || []).map((c) => ({
       id: c.id,
       type: c.type,
       tabId: c.tabId,
       props: briefProps(c),
+      styles: withStyles ? briefStyles(c) : undefined,
       layout: briefLayout(c.layout),
       hidden: c.hidden || undefined,
       hiddenMobile: c.hiddenMobile || undefined,
-      children: Array.isArray(c.children) ? walk(c.children) : undefined,
+      children: Array.isArray(c.children) ? walk(c.children, withStyles) : undefined,
     }))
   // What the user is looking at and pointing at. Without this the model has to
   // guess what "this" means in "make this red" — the single most common way a
@@ -159,7 +176,7 @@ function schemaSnapshot() {
       background: p.background,
       seoTitle: p.seoTitle || undefined,
       seoDescription: p.seoDescription || undefined,
-      components: walk(p.components),
+      components: walk(p.components, p.id === s.currentPageId),
     })),
     theme: s.schema.theme,
     customCss: (s.schema.customCss || '').length > 0,
@@ -368,7 +385,7 @@ function toolDeclarations() {
     },
     {
       name: 'updateProps',
-      description: 'Update the props of a component. Only the keys in patch are changed.',
+      description: 'Update the props of a component. Only the keys in patch are changed. Each type has its own props (the snapshot shows the ones a block has); a prop the type does not have is refused with the list of the ones it has. Colours and sizes are styles, not props.',
       parameters: {
         type: 'object',
         properties: {
@@ -380,7 +397,7 @@ function toolDeclarations() {
     },
     {
       name: 'updateStyles',
-      description: 'Update the inline styles of a component. CSS keys must be camelCase (backgroundColor, fontSize, ...).',
+      description: `Update the inline styles of a component (the snapshot shows the ones a block has). Only these keys are drawn; any other is refused: ${[...ALLOWED_STYLE_KEYS].join(', ')}. No url() values.`,
       parameters: {
         type: 'object',
         properties: {
@@ -421,7 +438,7 @@ function toolDeclarations() {
     },
     {
       name: 'duplicateComponent',
-      description: 'Duplicate a component (with a fresh id), pasted next to the original.',
+      description: 'Duplicate a component, pasted next to the original. Returns the id of the copy.',
       parameters: {
         type: 'object',
         properties: { id: { type: 'string' } },
@@ -520,7 +537,7 @@ function toolDeclarations() {
     {
       name: 'updateTheme',
       description:
-        'Patch the site theme (primaryColor, textColor, backgroundColor, fontFamily, radius, etc.). Subsequent applyTheme writes the change into already-placed components.',
+        `Patch the site theme and apply it to the blocks already placed. Only these keys exist; any other is refused: ${Object.keys(DEFAULT_THEME).join(', ')}.`,
       parameters: {
         type: 'object',
         properties: { patch: { type: 'object' } },
@@ -530,7 +547,7 @@ function toolDeclarations() {
     {
       name: 'centerHorizontally',
       description:
-        "Centre a component horizontally inside the page artboard (sets layout.x so that x + w/2 == canvasWidth/2). Use this for requests like 'center the heading'.",
+        "Centre a component horizontally in what holds it: its container, or the page for a top-level block. Returns the new x. Same as alignComponent with mode centerH.",
       parameters: {
         type: 'object',
         properties: { id: { type: 'string' } },
@@ -577,7 +594,7 @@ function toolDeclarations() {
     {
       name: 'setTabs',
       description:
-        "Replace the tabs array on a tabs widget. Each tab is { id, label }; ids must match the tabId on existing children to keep them attached. Pass new ids to create fresh tabs (children with the old ids will be orphaned).",
+        "Replace the tabs of a tabs block. Each tab is { id, label }; an id is letters, digits, - or _. Keep a tab's id to keep the blocks inside it; blocks of a tab you leave out move to the first tab. Returns the ids as stored.",
       parameters: {
         type: 'object',
         properties: {
@@ -753,6 +770,47 @@ function toolDeclarations() {
 // Exported so AiChatPanel's prompt-intent rescue can execute a recovered
 // tool call directly (bypassing the model) when the model emits nothing
 // usable. Returns the same {ok, ...} shape the in-loop dispatch returns.
+// Align a block in what holds it and answer with where it now is. The store
+// leaves a block alone when there is nothing to align it in, and that used to
+// be reported as done: a top-level block on a page that stacks its blocks has
+// no x or y, a block in an auto-layout container is placed by the container,
+// and a page, which grows with its content, has no middle or bottom.
+function alignBlock(id, mode) {
+  const store = useEditorStore.getState()
+  const here = selectCurrentPage(store)
+  const topLevel = here.components.some((c) => c.id === id)
+  const parent = topLevel ? null : parentOf(here.components, id)
+  if (topLevel && here.flowMode) {
+    return { ok: false, error: 'This page stacks its blocks in a column, so a top-level block has no x or y to align. To centre its content use updateStyles with { "textAlign": "center" }; to change its place in the column use moveToStart, moveToEnd, moveForward or moveBackward.' }
+  }
+  if (parent?.type === 'container' && isAutoLayout(parent.props)) {
+    return { ok: false, error: `"${id}" is placed by its container "${parent.id}", which lays its blocks out as a ${parent.props.flow}. Change how the container aligns them with updateProps on "${parent.id}": align (start, center, end, stretch) and justify (start, center, end, between, around).` }
+  }
+  if (topLevel && (mode === 'middleV' || mode === 'bottom')) {
+    return { ok: false, error: `A page grows with its content, so it has no ${mode === 'bottom' ? 'bottom' : 'middle'} to align a top-level block to. Set y with setLayout instead.` }
+  }
+  store.alignComponent(id, mode)
+  const state = useEditorStore.getState()
+  const moved = findDeep(state.schema, id)
+  const key = state.viewport === 'mobile' && (topLevel || parent?.type === 'region') ? 'mobileLayout' : 'layout'
+  const placed = moved?.[key] || moved?.layout || {}
+  return { ok: true, x: Math.round(placed.x || 0), y: Math.round(placed.y || 0) }
+}
+
+function parentOf(components, id) {
+  for (const c of components || []) {
+    if ((c.children || []).some((kid) => kid.id === id)) return c
+    const deeper = parentOf(c.children, id)
+    if (deeper) return deeper
+  }
+  return null
+}
+
+// The sizes the page keeps (safeCustomCss and safeCustomJs in theme.js, and
+// the server's own limits): longer code is cut, mid-rule, without a word.
+const CUSTOM_CSS_LIMIT = 20000
+const CUSTOM_JS_LIMIT = 50000
+
 export function executeTool(rawName, args) {
   const store = useEditorStore.getState()
   const a = args || {}
@@ -776,8 +834,19 @@ export function executeTool(rawName, args) {
           return { ok: false, error: `Component "${a.parentId}" is a ${parent?.type} and cannot hold other components. Only a container, a tabs block or a section (addSection) can be a parentId.` }
         }
       }
+      // A coordinate that is not a number was stored as NaN, and 0 (the left
+      // or top edge) was read as "none given" and became 24.
+      const at = {}
+      for (const key of ['x', 'y']) {
+        const raw = a[key]
+        const n = raw === undefined || raw === null || raw === '' ? 24 : Number(raw)
+        if (!Number.isFinite(n)) {
+          return { ok: false, error: `addComponent ${key} must be a number in design pixels, got ${JSON.stringify(raw)}. Leave it out to let the editor place the block.` }
+        }
+        at[key] = Math.round(n)
+      }
       const before = collectIds(store.schema)
-      store.addComponent(a.type, Math.round(a.x || 24), Math.round(a.y || 24), a.parentId || null)
+      store.addComponent(a.type, at.x, at.y, a.parentId || null)
       const newId = firstNewId(collectIds(useEditorStore.getState().schema), before)
       if (!newId) return { ok: false, error: `The ${a.type} could not be added.` }
       return { ok: true, id: newId }
@@ -811,10 +880,25 @@ export function executeTool(rawName, args) {
         note: left.length ? `${left.length} step(s) still to do.` : 'Plan complete.',
       }
     }
-    case 'updateProps':
-      return checkId(a.id) || (store.updateProps(a.id, a.patch || {}), { ok: true })
-    case 'updateStyles':
-      return checkId(a.id) || (store.updateStyles(a.id, a.patch || {}), { ok: true })
+    // Both patches are checked before they are merged: the store keeps any
+    // key it is given, the server drops the ones it does not know on the next
+    // save, and the model was told "ok" either way.
+    case 'updateProps': {
+      const bad = checkId(a.id)
+      if (bad) return bad
+      const checked = checkPropsPatch(findDeep(store.schema, a.id), a.patch)
+      if (checked.error) return { ok: false, error: `updateProps changed nothing: ${checked.error}` }
+      store.updateProps(a.id, checked.patch)
+      return { ok: true, applied: Object.keys(checked.patch) }
+    }
+    case 'updateStyles': {
+      const bad = checkId(a.id)
+      if (bad) return bad
+      const checked = checkStylePatch(a.patch)
+      if (checked.error) return { ok: false, error: `updateStyles changed nothing: ${checked.error}` }
+      store.updateStyles(a.id, checked.patch)
+      return { ok: true, applied: Object.keys(checked.patch) }
+    }
     case 'setLayout': {
       const bad = checkId(a.id)
       if (bad) return bad
@@ -841,10 +925,18 @@ export function executeTool(rawName, args) {
     }
     case 'removeComponent':
       return checkId(a.id) || (store.removeComponent(a.id), { ok: true })
-    case 'duplicateComponent':
-      return checkId(a.id) || (store.duplicateComponent(a.id) === false
-        ? { ok: false, error: `The parent of "${a.id}" already holds as many components as it can.` }
-        : { ok: true })
+    case 'duplicateComponent': {
+      const bad = checkId(a.id)
+      if (bad) return bad
+      const before = collectIds(store.schema)
+      if (store.duplicateComponent(a.id) === false) {
+        return { ok: false, error: `The parent of "${a.id}" already holds as many components as it can.` }
+      }
+      // Without the copy's id the model could only edit the copy by guessing.
+      const newId = firstNewId(collectIds(useEditorStore.getState().schema), before)
+      if (!newId) return { ok: false, error: `"${a.id}" could not be duplicated.` }
+      return { ok: true, id: newId }
+    }
     // Store names are bringToFront / sendToBack but those are confusing in a
     // flow-mode (vertical document) context — expose them to the model as
     // moveToEnd / moveToStart instead.
@@ -870,15 +962,28 @@ export function executeTool(rawName, args) {
       store.setActiveTab(a.id, a.tabId)
       return { ok: true }
     }
+    // Both REPLACE what the site has. A call without its code (arguments cut
+    // short, or an object where the text belongs) used to empty the site's CSS
+    // or JS and report success.
     case 'setCustomCss':
-      store.setCustomCss(a.code || '')
-      return { ok: true }
-    case 'setCustomJs':
-      store.setCustomJs(a.code || '')
-      return { ok: true }
+    case 'setCustomJs': {
+      const limit = name === 'setCustomCss' ? CUSTOM_CSS_LIMIT : CUSTOM_JS_LIMIT
+      if (typeof a.code !== 'string') {
+        return { ok: false, error: `${name} needs the whole code as a string in "code" (an empty string clears it). Nothing was changed.` }
+      }
+      if (a.code.length > limit) {
+        return { ok: false, error: `${name}: the code is ${a.code.length} characters and the limit is ${limit}. Nothing was changed; send a shorter version.` }
+      }
+      if (name === 'setCustomCss') store.setCustomCss(a.code)
+      else store.setCustomJs(a.code)
+      return { ok: true, length: a.code.length }
+    }
     case 'addPage': {
+      if (a.name !== undefined && typeof a.name !== 'string' && typeof a.name !== 'number') {
+        return { ok: false, error: `addPage name must be text, got ${JSON.stringify(a.name)}.` }
+      }
       const before = useEditorStore.getState().schema.pages.map((p) => p.id)
-      store.addPage(a.name || 'New page')
+      store.addPage(String(a.name ?? '').trim() || 'New page')
       const after = useEditorStore.getState().schema.pages.map((p) => p.id)
       const newId = after.find((id) => !before.includes(id))
       return { ok: true, id: newId }
@@ -891,39 +996,56 @@ export function executeTool(rawName, args) {
       store.selectPage(a.id)
       return { ok: true }
     }
-    case 'updateTheme':
-      store.updateTheme(a.patch || {})
+    case 'updateTheme': {
+      // A key the theme does not have (primary, accentColour) changed nothing
+      // and still came back "ok, applied".
+      const checked = checkThemePatch(a.patch)
+      if (checked.error) return { ok: false, error: `updateTheme changed nothing: ${checked.error}` }
+      store.updateTheme(checked.patch)
       // The store ships theme variables via CSS — but already-placed
       // components keep their hard-coded styles until applyTheme rewrites
       // them. Auto-apply so "make everything blue" actually colours the
       // existing canvas instead of just changing future drops.
       try { store.applyTheme() } catch { /* applyTheme is optional */ }
-      return { ok: true, autoApplied: true }
+      return { ok: true, autoApplied: true, applied: Object.keys(checked.patch) }
+    }
     case 'centerHorizontally': {
       const badCenter = checkId(a.id)
       if (badCenter) return badCenter
-      const node = findDeep(store.schema, a.id)
-      const page = store.schema.pages.find((p) => p.components.some((c) => c.id === a.id))
-      const canvasW = page?.canvasWidth || 1000
-      const w = Math.round(node.layout?.w || 200)
-      const newX = Math.max(0, Math.round((canvasW - w) / 2))
-      store.setLayout(a.id, { x: newX })
-      return { ok: true, x: newX }
+      // Centred in what holds the block. The page's width was used for every
+      // block, so a child of a 400 px container was sent to x = 450.
+      const centred = alignBlock(a.id, 'centerH')
+      return centred.ok ? { ok: true, x: centred.x } : centred
     }
     case 'setLinks': {
       const badLinks = checkId(a.id, 'Navbar')
       if (badLinks) return badLinks
-      const links = Array.isArray(a.links) ? a.links.map((l) => ({
-        label: String(l?.label || ''),
-        href: String(l?.href || ''),
-      })) : []
-      store.updateProps(a.id, { links })
-      return { ok: true, count: links.length }
+      const node = findDeep(store.schema, a.id)
+      if (node.type !== 'navbar') {
+        return { ok: false, error: `Component "${a.id}" is a ${node.type}, not a navbar. setLinks only applies to navbars; for a single link set href with updateProps.` }
+      }
+      // Anything but a list of { label, href } used to empty the navbar, or
+      // fill it with blank links, and report success.
+      const checked = checkLinks(a.links)
+      if (checked.error) return { ok: false, error: `setLinks changed nothing: ${checked.error}` }
+      store.updateProps(a.id, { links: checked.links })
+      return { ok: true, count: checked.links.length }
     }
     case 'setSelectOptions': {
       const badSelect = checkId(a.id)
       if (badSelect) return badSelect
-      const opts = Array.isArray(a.options) ? a.options.map((s) => String(s)) : []
+      const node = findDeep(store.schema, a.id)
+      if (!['select', 'input'].includes(node.type)) {
+        return { ok: false, error: `Component "${a.id}" is a ${node.type}. setSelectOptions applies to a select, or an input that offers choices.` }
+      }
+      const given = Array.isArray(a.options) ? a.options : null
+      const opts = (given || [])
+        .filter((option) => typeof option === 'string' || typeof option === 'number')
+        .map((option) => String(option).trim())
+        .filter(Boolean)
+      if (!given || !opts.length || opts.length !== given.length) {
+        return { ok: false, error: `setSelectOptions changed nothing: options must be an array of non-empty strings, for example ["Small","Large"], got ${JSON.stringify(a.options)}.` }
+      }
       const patch = { options: opts.join('\n') }
       if (typeof a.placeholder === 'string') patch.placeholder = a.placeholder
       store.updateProps(a.id, patch)
@@ -932,23 +1054,50 @@ export function executeTool(rawName, args) {
     case 'setTabs': {
       const badTabs = checkId(a.id)
       if (badTabs) return badTabs
-      const tabs = Array.isArray(a.tabs) ? a.tabs.map((t) => ({
-        id: String(t?.id || ''),
-        label: String(t?.label || ''),
-      })).filter((t) => t.id) : []
-      const patch = { tabs }
-      if (typeof a.activeId === 'string') patch.activeId = a.activeId
-      else if (tabs.length) patch.activeId = tabs[0].id
-      store.updateProps(a.id, patch)
-      return { ok: true, count: tabs.length }
+      const node = findDeep(store.schema, a.id)
+      if (node.type !== 'tabs') {
+        return { ok: false, error: `Component "${a.id}" is a ${node.type}, not a tabs block.` }
+      }
+      const checked = checkTabs(a.tabs)
+      if (checked.error) return { ok: false, error: `setTabs changed nothing: ${checked.error}` }
+      const ids = checked.tabs.map((tab) => tab.id)
+      if (typeof a.activeId === 'string' && !ids.includes(a.activeId)) {
+        return { ok: false, error: `setTabs changed nothing: activeId ${JSON.stringify(a.activeId)} is not one of the tabs (${ids.join(', ')}).` }
+      }
+      // A block inside a tab that no longer exists would be on no tab at all:
+      // on the page, but in no panel. Like the properties panel when a tab is
+      // removed, it moves to the first tab.
+      const kids = node.children || []
+      const stranded = kids.filter((kid) => kid.tabId && !ids.includes(kid.tabId))
+      const current = node.props?.activeId
+      const activeId = typeof a.activeId === 'string' ? a.activeId : (ids.includes(current) ? current : ids[0])
+      store.updateProps(a.id, { tabs: checked.tabs, activeId })
+      if (stranded.length) {
+        store.setTabsChildren(a.id, kids.map((kid) => (stranded.includes(kid) ? { ...kid, tabId: ids[0] } : kid)))
+      }
+      return {
+        ok: true,
+        count: ids.length,
+        tabIds: ids,
+        ...(stranded.length ? { note: `${stranded.length} block(s) were in a tab that is gone and are now in "${ids[0]}".` } : {}),
+      }
     }
     case 'replaceComponentText': {
       const badText = checkId(a.id)
       if (badText) return badText
       const node = findDeep(store.schema, a.id)
+      // A field the block does not have (title on a heading) wrote a prop no
+      // one reads, and a call without its text emptied the block.
+      const fields = propKeysFor(node.type)
+      if (a.field && a.field !== 'auto' && !fields.includes(a.field)) {
+        return { ok: false, error: `A ${node.type} has no "${a.field}" field. Leave field out, or use one of: ${fields.join(', ') || '(none)'}.` }
+      }
       const field = pickTextField(node.type, a.field || 'auto')
       if (!field) return { ok: false, error: `No editable text field on ${node.type}` }
-      store.updateProps(a.id, { [field]: String(a.text || '') })
+      if (typeof a.text !== 'string' && typeof a.text !== 'number') {
+        return { ok: false, error: `replaceComponentText needs the new text as a string in "text", got ${JSON.stringify(a.text)}. Nothing was changed.` }
+      }
+      store.updateProps(a.id, { [field]: String(a.text) })
       return { ok: true, field }
     }
     case 'setHidden': {
@@ -968,16 +1117,26 @@ export function executeTool(rawName, args) {
       if (!modes.includes(a.mode)) {
         return { ok: false, error: `Unknown mode ${JSON.stringify(a.mode)}. Choose one of: ${modes.join(', ')}.` }
       }
-      store.alignComponent(a.id, a.mode)
-      return { ok: true }
+      return alignBlock(a.id, a.mode)
     }
     case 'distributeSiblings': {
       if (a.parentId) {
         const bad = checkId(a.parentId, 'Parent')
         if (bad) return bad
       }
-      store.distributeSiblings(a.parentId || null, a.axis === 'x' ? 'x' : 'y')
-      return { ok: true }
+      if (a.axis !== 'x' && a.axis !== 'y') {
+        return { ok: false, error: `axis must be "x" (side by side) or "y" (stacked), got ${JSON.stringify(a.axis)}.` }
+      }
+      // The store leaves fewer than three blocks where they are: there is no
+      // gap to even out. That is not a change to report as made.
+      const siblings = a.parentId
+        ? findDeep(store.schema, a.parentId)?.children || []
+        : selectCurrentPage(store).components
+      if (siblings.length < 3) {
+        return { ok: false, error: `distributeSiblings needs three or more blocks side by side; there ${siblings.length === 1 ? 'is 1' : `are ${siblings.length}`} here. Position them with setLayout instead.` }
+      }
+      store.distributeSiblings(a.parentId || null, a.axis)
+      return { ok: true, count: siblings.length }
     }
     case 'clearPage': {
       const before = useEditorStore.getState()
@@ -1071,6 +1230,11 @@ export function executeTool(rawName, args) {
       return { ok: true, applied: patch }
     }
     case 'addSection': {
+      // Checked before the band exists, so a refused colour leaves no band.
+      const background = a.background === undefined || a.background === null || a.background === ''
+        ? null
+        : checkStylePatch({ background: a.background })
+      if (background?.error) return { ok: false, error: `addSection made nothing: ${background.error}` }
       const before = collectIds(store.schema)
       store.addComponent('region', 0, 0, null)
       const newId = firstNewId(collectIds(useEditorStore.getState().schema), before)
@@ -1078,9 +1242,7 @@ export function executeTool(rawName, args) {
       // A band's background is a STYLE on the region, not a prop — props go
       // through the server's allowlist and a `background` key would be dropped
       // on the next save, leaving the colour to vanish on reload.
-      if (typeof a.background === 'string' && a.background) {
-        store.updateStyles(newId, { backgroundColor: a.background })
-      }
+      if (background) store.updateStyles(newId, background.patch)
       if (Number.isFinite(Number(a.height))) {
         store.setLayout(newId, { h: Math.max(80, Math.round(Number(a.height))) })
       }
@@ -1125,11 +1287,15 @@ export function executeTool(rawName, args) {
       // 4) build the component tree top-down. Track newest id so we can patch
       // props after creation.
       const created = {}
+      // Every block the template made. Only the ones a later step refers to
+      // carry an alias, so counting aliases reported "0 components created".
+      let made = 0
       for (const step of tpl.steps || []) {
         const beforeIds = collectIds(useEditorStore.getState().schema)
         store.addComponent(step.type, step.x || 0, step.y || 0, step.parentId ? created[step.parentId] : null)
         const newId = firstNewId(collectIds(useEditorStore.getState().schema), beforeIds)
         if (newId) {
+          made += 1
           if (step.alias) created[step.alias] = newId
           if (step.props) store.updateProps(newId, step.props)
           if (step.styles) store.updateStyles(newId, step.styles)
@@ -1141,7 +1307,7 @@ export function executeTool(rawName, args) {
         template: resolvedName,
         requestedName: wanted,
         topicFallback: resolvedName !== wanted ? resolvedName : undefined,
-        componentsCreated: Object.keys(created).length,
+        componentsCreated: made,
       }
     }
     default:
@@ -1634,9 +1800,13 @@ async function callOpenAICompatible(history, currentTurnText, opts) {
       const parts = []
       if (Array.isArray(choice.tool_calls)) {
         for (const tc of choice.tool_calls) {
-          let args
-          try { args = tc.function?.arguments ? JSON.parse(tc.function.arguments) : {} } catch { args = {} }
-          parts.push({ functionCall: { name: tc.function?.name || '', args } })
+          let args = {}
+          let argsError = false
+          // Arguments that do not parse (most often cut off at the length
+          // limit) are not an empty call: run as {}, setCustomCss emptied the
+          // site's CSS. The loop answers the call with an error instead.
+          try { args = tc.function?.arguments ? JSON.parse(tc.function.arguments) : {} } catch { argsError = true }
+          parts.push({ functionCall: { name: tc.function?.name || '', args, ...(argsError ? { argsError } : {}) } })
         }
       }
       const content = stripThinking(typeof choice.content === 'string' ? choice.content : '')
@@ -2414,7 +2584,9 @@ async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress
   // We ship the snapshot in turn 1 only. Subsequent rounds reuse the model's
   // memory of it — the function-call tool results we feed back already tell
   // it what changed, so reshipping the full schema is pure token waste.
-  const initialPromptText = `Current schema snapshot:\n${JSON.stringify(snapshot, null, 2)}\n\nUser request: ${prompt}`
+  // Written without indentation: the spaces were close to half of it, and
+  // the first turn is sent again with every round.
+  const initialPromptText = `Current schema snapshot:\n${JSON.stringify(snapshot)}\n\nUser request: ${prompt}`
 
   let finalText = ''
   const calls = []
@@ -2480,7 +2652,7 @@ async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress
             + '\n\nDo them now with real tool calls, then mark each with completePlanStep. '
             + 'If a step turned out to be unnecessary, mark it complete and say why in your final message.\n\n'
             + 'Current schema:\n'
-            + JSON.stringify(schemaSnapshot(), null, 2),
+            + JSON.stringify(schemaSnapshot()),
         })
         continue
       }
@@ -2516,7 +2688,7 @@ async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress
             + 'Do it now by emitting real function calls against the ids in this snapshot. '
             + 'If the request truly needs no change, say so in one sentence and call nothing.\n\n'
             + 'Current schema:\n'
-            + JSON.stringify(schemaSnapshot(), null, 2),
+            + JSON.stringify(schemaSnapshot()),
         })
         continue
       }
@@ -2543,11 +2715,21 @@ async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress
       })),
     })
 
+    // A replay is a call repeated from an EARLIER response. The same call
+    // several times in one response is the model asking for several: three
+    // identical addComponent calls are three cards, and two of them used to
+    // be skipped under a sentence saying three were added.
+    const appliedBefore = new Set(appliedOnce.keys())
     const toolResults = functionCalls.map(({ functionCall }) => {
       const args = functionCall.args || {}
       let result
       const fingerprint = `${normaliseToolName(functionCall.name)}:${JSON.stringify(args)}`
-      if (appliedOnce.has(fingerprint)) {
+      if (functionCall.argsError) {
+        result = {
+          ok: false,
+          error: 'The arguments of this call were not valid JSON (they may have been cut off), so it was NOT run and nothing changed. Send the call again with complete JSON arguments; for long code, send less at a time.',
+        }
+      } else if (appliedBefore.has(fingerprint)) {
         result = {
           ok: true,
           skipped: true,
@@ -2622,7 +2804,7 @@ async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress
           + 'title) using the NEW IDs from this snapshot so the page actually reflects the user\'s topic. '
           + 'Do not stop until every default placeholder string has been replaced.\n\n'
           + 'New schema:\n'
-          + JSON.stringify(freshSnapshot, null, 2),
+          + JSON.stringify(freshSnapshot),
       })
     } else if (staleCalls.length > 0 && !repairedIds) {
       // Stale IDs without a template: the model invented an id, or reused one
@@ -2636,7 +2818,7 @@ async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress
           `${staleCalls.length} of your tool calls targeted component IDs that do not exist, so those changes did NOT happen. `
           + 'Never invent ids. Re-emit those calls using ids from this snapshot, and skip any that no longer make sense.\n\n'
           + 'Current schema:\n'
-          + JSON.stringify(schemaSnapshot(), null, 2),
+          + JSON.stringify(schemaSnapshot()),
       })
     } else if (otherFailures.length > 0 && !repairedArgs) {
       repairedArgs = true
@@ -2788,21 +2970,30 @@ async function completeWithFailover(systemPrompt, userText, { signal } = {}) {
   throw lastErr || aiError('All AI providers are out of quota or unreachable.')
 }
 
+const UPLOADED_FILE = '(an uploaded file)'
+
 // Ask the model to edit a SINGLE component (component-canvas mode). Returns
 // { styles, props } (either may be empty).
 export async function aiEditComponent(component, instruction) {
   if (!component || !instruction || !instruction.trim()) return { styles: {}, props: {} }
+  // An uploaded picture is its whole file in one prop. The model cannot use
+  // it, and it was sent, megabytes of it, with every edit of that block.
+  const withoutFiles = (key, value) => (typeof value === 'string' && value.startsWith('data:') ? UPLOADED_FILE : value)
   const userText = [
     `Component type: ${component.type}`,
-    `Current props: ${JSON.stringify(component.props || {})}`,
+    `Current props: ${JSON.stringify(component.props || {}, withoutFiles)}`,
     `Current styles: ${JSON.stringify(component.styles || {})}`,
+    `Props a ${component.type} has: ${propKeysFor(component.type).join(', ') || '(none)'}`,
+    `Style keys the page draws: ${[...ALLOWED_STYLE_KEYS].join(', ')}`,
     `Instruction: ${instruction.trim()}`,
   ].join('\n')
   const patch = extractJsonObject(await completeWithFailover(COMPONENT_EDIT_SYSTEM, userText)) || {}
-  return {
-    styles: patch.styles && typeof patch.styles === 'object' ? patch.styles : {},
-    props: patch.props && typeof patch.props === 'object' ? patch.props : {},
-  }
+  // One answer, no second round to correct it in: what the page cannot show
+  // is left out, so "2 fields are ready to apply" counts fields that will
+  // change something, and an answer made of nothing else is "no change".
+  const props = checkPropsPatch(component, patch.props).patch
+  for (const key of Object.keys(props)) if (props[key] === UPLOADED_FILE) delete props[key]
+  return { styles: checkStylePatch(patch.styles).patch, props }
 }
 
 const HTML_ELEMENT_EDIT_SYSTEM = `You restyle / rewrite ONE HTML element inside a website builder. You get the element's tag + its current properties, plus a user instruction. Return ONLY a JSON object with any of these keys you want to change — no prose, no markdown fence:

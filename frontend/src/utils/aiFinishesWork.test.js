@@ -186,3 +186,60 @@ describe('a model that repeats itself', () => {
     expect(skipped[0].result.note).toMatch(/already made this exact call/i)
   })
 })
+
+describe('the same call several times in one answer', () => {
+  it('is run every time: three cards asked for are three cards', async () => {
+    scriptModel([
+      {
+        parts: [
+          { functionCall: { name: 'addComponent', args: { type: 'card' } } },
+          { functionCall: { name: 'addComponent', args: { type: 'card' } } },
+          { functionCall: { name: 'addComponent', args: { type: 'card' } } },
+        ],
+      },
+      say('Three cards added.'),
+    ])
+
+    const res = await runAiPrompt('add three cards', { maxRounds: 5 })
+
+    expect(page().components.filter((c) => c.type === 'card')).toHaveLength(3)
+    expect(res.calls.filter((c) => c.result?.skipped)).toHaveLength(0)
+    expect(new Set(res.calls.map((c) => c.result.id)).size).toBe(3)
+  })
+})
+
+describe('what the model is shown of the page', () => {
+  // The first user message of the first request: the snapshot and the prompt.
+  const firstMessage = () => requests[0].contents.at(-1).parts.map((part) => part.text).join('')
+
+  it('is written without indentation', async () => {
+    scriptModel([say('Nothing to do.')])
+
+    await runAiPrompt('what is on the page?', { maxRounds: 1 })
+
+    expect(firstMessage()).toContain('Current schema snapshot:\n{"currentPageId":"page_home"')
+    expect(firstMessage()).not.toContain('\n  "')
+  })
+
+  it('has the look of each block on the page being edited, and of no other page', async () => {
+    const heading = (id, color) => ({
+      id, type: 'heading', props: { text: 'Hello', level: 'h1' }, layout: { x: 0, y: 0, w: 300, h: 60 },
+      styles: { color, fontSize: '48px', boxShadow: '', backgroundImage: `linear-gradient(90deg, ${'#000000, '.repeat(8)}#ffffff)` },
+    })
+    useEditorStore.getState().loadSchema({
+      theme: {},
+      pages: [
+        { id: 'page_home', name: 'Home', components: [heading('h_home', '#ff0000')] },
+        { id: 'page_about', name: 'About', components: [heading('h_about', '#00ff00')] },
+      ],
+    })
+    scriptModel([say('Nothing to do.')])
+
+    await runAiPrompt('what colour is the heading?', { maxRounds: 1 })
+
+    // An emptied field is left out, and a long value is cut.
+    expect(firstMessage()).toContain('"styles":{"color":"#ff0000","fontSize":"48px","backgroundImage":"linear-gradient(90deg, #000000, #0000..."}')
+    expect(firstMessage()).toContain('"id":"h_about"')
+    expect(firstMessage()).not.toContain('#00ff00')
+  })
+})
