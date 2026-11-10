@@ -578,7 +578,11 @@ export default function AiChatPanel({
         // apply the most plausible intent directly via the store — bypassing
         // the model entirely. Better than handing the user a wall of red
         // failures with no path forward.
-        const needsRescue = callsArr.length === 0 || allFailed
+        // Only for a request to change something. A question the model
+        // answered in words ("which font does this site use?") has no tool
+        // calls either, and it was "rescued" too: its answer was dropped and
+        // the user was offered a template in place of their whole page.
+        const needsRescue = (callsArr.length === 0 || allFailed) && looksLikeChangeRequest(trimmed)
         if (needsRescue) {
           const intent = recoverIntentFromPrompt(trimmed)
           if (intent) {
