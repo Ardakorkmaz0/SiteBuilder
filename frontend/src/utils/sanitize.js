@@ -57,6 +57,10 @@ export function sanitizeStyles(styles) {
     if (!ALLOWED_STYLE_KEYS.has(key)) continue
     if (typeof val !== 'string' && typeof val !== 'number') continue
     const s = String(val)
+    // A field the owner emptied is stored as ''. That is no declaration at all:
+    // written out, it would clear the look the block has by itself for that
+    // property, on the canvas, and leave `color: ;` in the page's source.
+    if (!s.trim()) continue
     const low = s.toLowerCase()
     if (low.includes('javascript:') || low.includes('expression(') || low.includes('url(')) continue
     out[key] = s
