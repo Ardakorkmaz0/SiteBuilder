@@ -2866,20 +2866,21 @@ export const useEditorStore = create((set, get) => ({
           // scales too, via the box-scale renderers). Mobile in AUTO mode
           // skips this — its layout re-derives from the PC design below.
           const factor = np[wKey] / oldW
-          if (
-            Math.abs(factor - 1) > 0.001 &&
+          const scaled = Math.abs(factor - 1) > 0.001 &&
             !p.flowMode &&
-            (p.components || []).length &&
+            (p.components || []).length > 0 &&
             (!isMobile || p.mobileManual)
-          ) {
+          if (scaled) {
             np.components = scaleLayoutTree(np.components, factor, isMobile ? 'mobileLayout' : 'layout')
           }
           // Re-fit the auto mobile layout to the new phone width.
           // Sections included: their blocks are laid out for the phone's width
           // too, and left as they were they stuck out of a narrower phone
-          // until the next edit.
-          if (isMobile && !p.mobileManual) {
-            np.components = applyAutoMobileLayouts(np.components, np.mobileWidth)
+          // until the next edit. The same after the PC boxes were scaled: the
+          // phone layout reads their sizes, and kept the old ones until the
+          // next edit made every embedded block jump.
+          if (!p.mobileManual && (isMobile || scaled)) {
+            np.components = applyAutoMobileLayouts(np.components, np.mobileWidth || MOBILE_CANVAS_WIDTH)
           }
           return np
         }),
