@@ -695,6 +695,45 @@ describe('setCanvasPreset proportional rescale', () => {
     const back = selectCurrentPage(useEditorStore.getState())
     expect(back.components.find((c) => c.id === 'btn').layout).toMatchObject({ x: 100, y: 50, w: 500, h: 100 })
   })
+
+  const pictureOn = (page) => ({
+    theme: {},
+    pages: [{
+      id: 'p1', name: 'Home', canvasWidth: 1000, ...page, components: [{
+        id: 'pic', type: 'html', props: { html: '<img src="a.png">', _paletteType: 'image' }, styles: {},
+        layout: { x: 100, y: 50, w: 300, h: 200 },
+        ...(page.mobileManual ? { mobileLayout: { x: 20, y: 30, w: 150, h: 100 } } : {}),
+      }],
+    }],
+  })
+
+  it('the phone layout follows the scaled design at once, not at the next edit', () => {
+    useEditorStore.getState().loadSchema(pictureOn({}))
+    useEditorStore.getState().selectPage('p1')
+    useEditorStore.getState().setViewport('pc')
+    // A 300px picture fits the 390px phone as it is, centred between the 16px edges.
+    expect(selectCurrentPage(useEditorStore.getState()).components[0].mobileLayout)
+      .toEqual({ x: 45, y: 16, w: 300, h: 200 })
+
+    useEditorStore.getState().setCanvasPreset({ width: 2000, fold: 0 })
+
+    const picture = selectCurrentPage(useEditorStore.getState()).components[0]
+    expect(picture.layout).toMatchObject({ w: 600, h: 400 })
+    // 600px no longer fits: the phone narrows it to its 358px and keeps 3:2.
+    expect(picture.mobileLayout).toEqual({ x: 16, y: 16, w: 358, h: 239 })
+  })
+
+  it('a phone layout arranged by hand is not rearranged by a new PC width', () => {
+    useEditorStore.getState().loadSchema(pictureOn({ mobileManual: true }))
+    useEditorStore.getState().selectPage('p1')
+    useEditorStore.getState().setViewport('pc')
+
+    useEditorStore.getState().setCanvasPreset({ width: 2000, fold: 0 })
+
+    const picture = selectCurrentPage(useEditorStore.getState()).components[0]
+    expect(picture.layout).toMatchObject({ w: 600, h: 400 })
+    expect(picture.mobileLayout).toEqual({ x: 20, y: 30, w: 150, h: 100 })
+  })
 })
 
 describe('align/distribute hardening', () => {
