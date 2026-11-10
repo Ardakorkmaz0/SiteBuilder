@@ -773,3 +773,64 @@ def test_an_html_block_keeps_its_measured_phone_height():
     assert phone({'w': 358, 'h': 64, 'key': 'abc123'}) == {'w': 358, 'h': 64, 'key': 'abc123'}
     assert phone({'w': 358, 'h': 64, 'key': '"><script>'}) is None
     assert phone({'w': 358, 'h': 2}) is None
+
+
+# The editor lets a page grow as long as its content, lets the page be up to
+# 4000 px wide and lets a block be as tall as what is in it. The save gate used
+# to hold a block to y 20000, width 2000 and height 5000: a block below, wider
+# or taller than that was moved or cut on save, and the editor showed the
+# change only after the site was opened again.
+def test_a_block_far_down_a_long_page_stays_where_it_was_put():
+    saved = _one_component({
+        'id': 'card_1', 'type': 'card', 'props': {}, 'styles': {},
+        'layout': {'x': 40, 'y': 20320, 'w': 290, 'h': 480},
+        'mobileLayout': {'x': 16, 'y': 31400, 'w': 358, 'h': 420},
+    })
+    assert saved['layout'] == {'x': 40, 'y': 20320, 'w': 290, 'h': 480}
+    assert saved['mobileLayout'] == {'x': 16, 'y': 31400, 'w': 358, 'h': 420}
+
+
+@pytest.mark.parametrize('width', [2560, 4000])
+def test_a_block_as_wide_as_a_wide_page_keeps_its_width(width):
+    page = validate_and_clean_schema({'pages': [{
+        'id': 'p1', 'name': 'Home', 'canvasWidth': width,
+        'components': [{
+            'id': 'image_1', 'type': 'image', 'props': {}, 'styles': {},
+            'layout': {'x': 0, 'y': 0, 'w': width, 'h': 900},
+        }],
+    }]})['pages'][0]
+    assert page['canvasWidth'] == width
+    assert page['components'][0]['layout'] == {'x': 0, 'y': 0, 'w': width, 'h': 900}
+
+
+def test_a_block_taller_than_five_screens_keeps_its_height():
+    saved = _one_component({
+        'id': 'band_1', 'type': 'region', 'props': {}, 'styles': {},
+        'layout': {'x': 0, 'y': 0, 'w': 1000, 'h': 8200},
+        'mobileLayout': {'x': 0, 'y': 0, 'w': 390, 'h': 14600},
+        'children': [],
+    })
+    assert saved['layout'] == {'x': 0, 'y': 0, 'w': 1000, 'h': 8200}
+    assert saved['mobileLayout'] == {'x': 0, 'y': 0, 'w': 390, 'h': 14600}
+
+
+def test_a_long_html_block_keeps_the_sizes_it_was_measured_at():
+    props = _one_component({
+        'id': 'embed_1', 'type': 'html', 'styles': {},
+        'props': {
+            'code': '<p>x</p>',
+            '_baseSize': {'w': 900, 'h': 6400},
+            '_phoneH': {'w': 358, 'h': 9100, 'key': 'abc123'},
+        },
+        'layout': {'x': 0, 'y': 0, 'w': 900, 'h': 6400},
+    })['props']
+    assert props['_baseSize'] == {'w': 900, 'h': 6400}
+    assert props['_phoneH'] == {'w': 358, 'h': 9100, 'key': 'abc123'}
+
+
+def test_a_box_is_still_held_to_a_limit():
+    saved = _one_component({
+        'id': 'card_1', 'type': 'card', 'props': {}, 'styles': {},
+        'layout': {'x': 9000000, 'y': 9000000, 'w': 9000000, 'h': 9000000},
+    })
+    assert saved['layout'] == {'x': 5000, 'y': 200000, 'w': 4000, 'h': 100000}
