@@ -104,7 +104,7 @@ function TabsRender({ component, style, viewport, boxScale = 1, editorPreview = 
     ...TAB_STYLES.tabActive,
     background: p.activeTabBackgroundColor || p.tabBackgroundColor || 'transparent',
     color: p.activeTabColor || TAB_STYLES.tabActive.color,
-    borderBottomColor: p.activeTabBorderColor || TAB_STYLES.tabActive.borderBottomColor,
+    borderColor: p.activeTabBorderColor || TAB_STYLES.tabActive.borderColor,
   }
   const panelStyle = {
     ...TAB_STYLES.panel,

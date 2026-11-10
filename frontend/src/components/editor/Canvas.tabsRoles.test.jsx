@@ -51,4 +51,27 @@ describe('tabs on the canvas', () => {
     expect(within(strip).getByRole('tab', { name: 'Two' })).toHaveAttribute('aria-selected', 'true')
     expect(within(strip).getByRole('tab', { name: 'One' })).toHaveAttribute('aria-selected', 'false')
   })
+
+  // The tab that was open kept a line under it, in its text colour, once
+  // another tab was opened: two tabs looked open until the page was reloaded.
+  it('underline only the tab being edited, after another tab was opened', async () => {
+    render(
+      <LanguageProvider>
+        <DndContext>
+          <Canvas />
+        </DndContext>
+      </LanguageProvider>,
+    )
+    const strip = screen.getByRole('tablist')
+    const one = within(strip).getByRole('tab', { name: 'One' })
+    const two = within(strip).getByRole('tab', { name: 'Two' })
+    expect(one.style.borderBottomColor).toBe('rgb(37, 99, 235)')
+    expect(two.style.borderBottomColor).toBe('transparent')
+
+    await act(async () => two.click())
+    expect(two.style.borderBottomColor).toBe('rgb(37, 99, 235)')
+    expect(one.style.borderBottomColor).toBe('transparent')
+    expect(one.style.borderBottomWidth).toBe('2px')
+    expect(one.style.borderTopWidth).toBe('0px')
+  })
 })
