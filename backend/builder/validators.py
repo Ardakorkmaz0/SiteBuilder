@@ -206,6 +206,14 @@ def sanitize_styles(styles):
     return clean
 
 
+def _optional_link(props):
+    """The "Wrap in a link" address of a list, a quote or an alert. Absent until
+    the owner sets one, so what these blocks already store does not change and
+    their page stays live as it was sent."""
+    href = sanitize_url(props.get('href'))
+    return {'href': href} if href else {}
+
+
 def sanitize_props(ctype, props):
     if not isinstance(props, dict):
         props = {}
@@ -295,9 +303,10 @@ def sanitize_props(ctype, props):
         return {
             'text': _str(props.get('text')),
             'ordered': '1' if props.get('ordered') else '',
+            **_optional_link(props),
         }
     if ctype == 'quote':
-        return {'text': _str(props.get('text')), 'author': _str(props.get('author'))}
+        return {'text': _str(props.get('text')), 'author': _str(props.get('author')), **_optional_link(props)}
     if ctype == 'badge':
         return {'text': _str(props.get('text')), 'href': sanitize_url(props.get('href'))}
     if ctype == 'icon':
@@ -346,6 +355,7 @@ def sanitize_props(ctype, props):
             'text': _str(props.get('text')),
             'variant': variant if variant in ('success', 'info', 'warning', 'danger') else 'info',
             'icon': _str(props.get('icon'))[:40],
+            **_optional_link(props),
         }
     if ctype == 'accordion':
         return {'title': _str(props.get('title')), 'text': _str(props.get('text'))}
