@@ -28,7 +28,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ErrorDetail, ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -47,6 +47,7 @@ from .ai_policy import local_ai_available, provider_refusal, public_ai_policy
 from .shared_marks import insert_before_body_end, strip_marked, wrap_marked
 from .access import SHARE_OPEN, SHARE_PRIVATE, is_public, is_reachable, public_sites, share_access
 from .accounts import normalise_username
+from .parsers import ObjectJSONParser
 from .throttles import PublicFormRateThrottle, ScopedIPRateThrottle
 from .models import (
     _domain_verification_token,
@@ -297,6 +298,9 @@ BAD_CREDENTIALS = 'Unable to log in with provided credentials.'
 
 class LoginView(ObtainAuthToken):
     permission_classes = [AllowAny]
+    # DRF's token view names its own parsers; without this line sign-in alone
+    # would read a JSON body the old way.
+    parser_classes = [ObjectJSONParser, FormParser, MultiPartParser]
     throttle_classes = [ScopedIPRateThrottle]
     throttle_scope = 'auth'
 
@@ -553,7 +557,7 @@ class ProfileView(APIView):
     image uploader."""
 
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    parser_classes = [MultiPartParser, FormParser, ObjectJSONParser]
 
     def _profile(self, request):
         prof, _ = Profile.objects.get_or_create(user=request.user)
