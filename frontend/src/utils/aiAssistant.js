@@ -1930,6 +1930,29 @@ async function callLocal(apiKey, history, currentTurnText, signal) {
 // call as JSON, as a JS-like function call, or in prose with the function
 // name mentioned. We try several patterns in order of specificity.
 // Exported so tests can pin the regression set for each pattern.
+// The arguments of a call a model wrote out as text. Small models write them
+// the way JavaScript does as often as the way JSON does: {id: 'h1', patch:
+// {color: '#f00'}}. Arguments that can be read neither way are no call at
+// all: they used to be run as {}, an empty call under the model's tool name.
+function parseWrittenArgs(source) {
+  const read = (text) => {
+    try {
+      const value = JSON.parse(text)
+      return value && typeof value === 'object' && !Array.isArray(value) ? value : null
+    } catch {
+      return null
+    }
+  }
+  const strict = read(source)
+  if (strict || source.includes('"')) return strict
+  return read(
+    source
+      .replace(/'([^'\\]*)'/g, '"$1"')
+      .replace(/([{,]\s*)([A-Za-z_]\w*)\s*:/g, '$1"$2":')
+      .replace(/,\s*([}\]])/g, '$1'),
+  )
+}
+
 export function extractTextCalls(text) {
   const out = []
   if (typeof text !== 'string') return out
@@ -1941,20 +1964,18 @@ export function extractTextCalls(text) {
   const jsonRe = /\{\s*"name"\s*:\s*"([a-zA-Z_][\w]*)"\s*,\s*"(?:parameters|arguments|args)"\s*:\s*(\{[\s\S]*?\})\s*\}/g
   let m
   while ((m = jsonRe.exec(text)) !== null) {
-    let args = {}
-    try { args = JSON.parse(m[2]) } catch { /* skip malformed */ }
+    const args = parseWrittenArgs(m[2])
     const n = norm(m[1])
-    if (isReal(n)) out.push({ name: n, args })
+    if (args && isReal(n)) out.push({ name: n, args })
   }
   if (out.length) return out
 
   // Pattern B — JS-like call: applyTemplate({...}) / addComponent({...})
   const callRe = /\b([a-zA-Z_][\w]*)\s*\(\s*(\{[\s\S]*?\})\s*\)/g
   while ((m = callRe.exec(text)) !== null) {
-    let args = {}
-    try { args = JSON.parse(m[2]) } catch { /* skip malformed */ }
+    const args = parseWrittenArgs(m[2])
     const n = norm(m[1])
-    if (isReal(n)) out.push({ name: n, args })
+    if (args && isReal(n)) out.push({ name: n, args })
   }
   if (out.length) return out
 
@@ -2208,6 +2229,30 @@ THE LATEST USER MESSAGE IS THE PRIMARY INTENT. Older turns are reference only. I
 // transport plumbing. Unlike runAiPromptOnce there are no tools and no rounds
 // — the model's first text response IS the answer.
 const HTML_MAX_TOKENS = 8192
+// The most of a page the model is given. It is also about the most it can
+// send back inside HTML_MAX_TOKENS, and the answer has to be the whole page.
+const HTML_INPUT_LIMIT = 30_000
+
+// An uploaded page carries its pictures and fonts inside itself, as data:
+// URIs tens of thousands of characters long (htmlFiles.js). The model cannot
+// read them and could not write them back, and one of them alone took the
+// page past what the model is given. Each is set aside under a short name,
+// and put back in the answer wherever the model kept that name.
+export function setAsideEmbeddedFiles(html) {
+  const files = []
+  const slim = String(html || '').replace(
+    /data:[\w.+-]+\/[\w.+-]+(?:;[\w=.+-]+)*;base64,[A-Za-z0-9+/=]{200,}/g,
+    (uri) => {
+      if (!files.includes(uri)) files.push(uri)
+      return `pwb-embedded-file-${files.indexOf(uri) + 1}`
+    },
+  )
+  return {
+    html: slim,
+    count: files.length,
+    restore: (text) => String(text || '').replace(/pwb-embedded-file-(\d+)/g, (name, n) => files[Number(n) - 1] || name),
+  }
+}
 
 // The one request shape every key-based OpenAI-compatible provider shares;
 // `providerId` picks the address and the credentials. Gemini has its own.
@@ -2240,8 +2285,18 @@ async function callHtmlModeOnce(prompt, { history = [], currentHtml = '', signal
     .slice(-10)
     .map((m) => `${m.role === 'model' || m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.text}`)
     .join('\n')
-  const seed = currentHtml && currentHtml.trim()
-    ? `\n\nCurrent HTML (rewrite this):\n${currentHtml.slice(0, 30_000)}\n`
+  const page = setAsideEmbeddedFiles(currentHtml && currentHtml.trim() ? currentHtml : '')
+  // The page used to be cut at the limit without a word. The model then
+  // rewrote the part it was given, and that answer, taken as the whole page,
+  // dropped everything below the cut.
+  if (page.html.length > HTML_INPUT_LIMIT) {
+    throw aiError(
+      'This page is too long for the assistant to rewrite as a whole (about {size} KB; it can take about {limit} KB), so nothing was changed. Select the part you want to change on the page and use "Ask AI to edit this".',
+      { size: Math.round(page.html.length / 1024), limit: Math.round(HTML_INPUT_LIMIT / 1024) },
+    )
+  }
+  const seed = page.html
+    ? `\n\nCurrent HTML (rewrite this):\n${page.html}\n${page.count ? '\nA src, href or url() written as pwb-embedded-file-N is a file the user uploaded. Keep each one exactly as written.\n' : ''}`
     : ''
   // Edits of an existing document get an intent-specific contract appended —
   // weak models otherwise "helpfully" rewrite the whole page on an "add a
@@ -2299,7 +2354,7 @@ async function callHtmlModeOnce(prompt, { history = [], currentHtml = '', signal
   if (cutShort) {
     throw aiError('The answer was cut off before the page was complete (it hit the length limit), so nothing was changed. Ask for a smaller change, or for one section at a time.')
   }
-  return cleanHtmlResponse(stripThinking(text))
+  return page.restore(cleanHtmlResponse(stripThinking(text)))
 }
 
 // Models often wrap the document in a ```html ... ``` fence even when told
@@ -2691,6 +2746,12 @@ async function runAiPromptOnce(prompt, { maxRounds = 5, history = [], onProgress
             + JSON.stringify(schemaSnapshot()),
         })
         continue
+      }
+      // No words and no calls, in a turn that changed nothing, is no answer
+      // (a response the provider blocked or could not finish). It used to be
+      // shown as "Done.".
+      if (!textParts.length && calls.length === 0) {
+        throw aiError('{provider} sent back an empty answer, so nothing was changed. Try again, or choose another model in the AI settings.', { provider: providerLabel(provider) })
       }
       if (finalText) turns.push({ role: 'model', text: finalText })
       break
