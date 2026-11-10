@@ -1037,57 +1037,14 @@ function normalize(components, mobileWidth = MOBILE_CANVAS_WIDTH) {
           : fallback,
       hidden: !!c.hidden,
       hiddenMobile: !!c.hiddenMobile,
-      // Containers / tabs: normalize their nested children too (they flow inside).
+      // Nested blocks get the same. Their places are kept as saved: blocks that
+      // share a corner, (0, 0) included, were put there by hand. A reload once
+      // took them for a design from before nested blocks had places and spread
+      // them out one under the other.
       ...(PARENT_TYPES.has(c.type)
-        ? {
-            children: normalizeAbsoluteChildren(
-              c,
-              normalize(Array.isArray(c.children) ? c.children : [], mobileWidth),
-              mobileWidth,
-            ),
-          }
+        ? { children: normalize(Array.isArray(c.children) ? c.children : [], mobileWidth) }
         : {}),
     }
-  })
-}
-
-function normalizeAbsoluteChildren(parent, children, mobileWidth = MOBILE_CANVAS_WIDTH) {
-  if (parent.type === 'region') {
-    const needsMobileStack = children.length > 1 && children.every((child) => {
-      const layout = child.mobileLayout || {}
-      return (layout.x || 0) === 0 && (layout.y || 0) === 0
-    })
-    if (!needsMobileStack) return children
-    let mobileY = MOBILE_PAD
-    return children.map((child) => {
-      const layout = child.mobileLayout || child.layout || {}
-      const width = Math.min(Math.max(8, Math.round(layout.w || 200)), mobileWidth - MOBILE_PAD * 2)
-      const next = {
-        ...child,
-        mobileLayout: {
-          ...layout,
-          x: MOBILE_PAD,
-          y: mobileY,
-          w: width,
-          h: Math.max(4, Math.round(layout.h || 80)),
-        },
-      }
-      mobileY += next.mobileLayout.h + MOBILE_GAP
-      return next
-    })
-  }
-  if (parent.type !== 'container' || children.length <= 1) return children
-  const hasPositionedChild = children.some((child) => {
-    const l = child.layout || {}
-    return (l.x || 0) !== 0 || (l.y || 0) !== 0
-  })
-  if (hasPositionedChild) return children
-  let y = 12
-  return children.map((child) => {
-    const l = child.layout || {}
-    const next = { ...child, layout: { ...l, x: 12, y } }
-    y += Math.max(4, Math.round(l.h || 80)) + 12
-    return next
   })
 }
 
