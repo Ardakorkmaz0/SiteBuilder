@@ -1118,6 +1118,28 @@ function componentLayoutKey(page, id, viewport) {
   return viewport === 'mobile' && parent?.type === 'region' ? 'mobileLayout' : 'layout'
 }
 
+// A copy inside a section, box or tab panel is placed by that parent's own
+// coordinates. It gets the nudge a copy on the page gets, kept inside the
+// parent: left exactly on its original, a duplicate looks as if nothing
+// happened.
+function offsetNestedCopy(component, page) {
+  const parent = findParentInTree(page.components, component.id)
+  const offset = (key) => {
+    const base = component[key] || { x: 0, y: 0, w: 200, h: 80 }
+    return clampLayout(
+      { ...base, x: (base.x || 0) + 24, y: (base.y || 0) + 24 },
+      layoutBoundsFor(page, component.id, key, parent),
+    )
+  }
+  return {
+    layout: offset('layout'),
+    // Only a section keeps a phone place of its own for its blocks.
+    ...(parent?.type === 'region' && component.mobileLayout
+      ? { mobileLayout: offset('mobileLayout') }
+      : {}),
+  }
+}
+
 // Single and batch sizing express the same user intent: HTML auto-fit stops,
 // and a native box fits its content unless the owner explicitly turned it off.
 function markManualSizing(component, next, base, patch) {
@@ -2000,6 +2022,7 @@ export const useEditorStore = create((set, get) => ({
         } else {
           // A block inside a container is placed by that container's own
           // coordinates: its copy belongs in there, beside it.
+          Object.assign(copy, offsetNestedCopy(src, page))
           components = insertAfterInTree(components, src.id, copy)
         }
       }
@@ -2890,10 +2913,10 @@ export const useEditorStore = create((set, get) => ({
       const src = findInTree(page.components, id)
       if (!src) return {}
       const [copy] = cloneTrees([src])
-      // Nudge a top-level free-canvas copy so it doesn't sit exactly on the original.
-      if (isTopLevel(page.components, id)) {
-        Object.assign(copy, offsetPageCopy(src, page))
-      }
+      // Nudge the copy so it doesn't sit exactly on the original.
+      Object.assign(copy, isTopLevel(page.components, id)
+        ? offsetPageCopy(src, page)
+        : offsetNestedCopy(src, page))
       const components = insertAfterInTree(page.components, id, copy)
       return {
         schema: withComponents(state.schema, page.id, components),
