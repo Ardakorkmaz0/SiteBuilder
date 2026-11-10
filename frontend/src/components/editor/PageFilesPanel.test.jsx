@@ -105,3 +105,25 @@ describe('renaming a page', () => {
     expect(document.activeElement).toHaveAttribute('data-page-button', 'home')
   })
 })
+
+// File.text() reads every file as UTF-8: an old page saved in the Turkish
+// Windows encoding arrived with "�" in place of each Turkish letter.
+describe('importing an HTML file into a page', () => {
+  it('hands over the letters of a page saved in the Turkish Windows encoding', async () => {
+    const onImportInto = vi.fn()
+    const user = open({ mode: 'html', onImportInto })
+    // '<meta charset="windows-1254"><p>şığİ</p>' as that encoding writes it.
+    const saved = new Uint8Array([
+      ...[...'<meta charset="windows-1254"><p>'].map((letter) => letter.charCodeAt(0)),
+      0xfe, 0xfd, 0xf0, 0xdd,
+      ...[...'</p>'].map((letter) => letter.charCodeAt(0)),
+    ])
+    const file = new File([saved], 'eski.html', { type: 'text/html' })
+
+    await user.click(screen.getByRole('button', { name: 'Import an HTML file into this page: Home' }))
+    await user.upload(document.querySelector('input[type="file"]'), file)
+
+    await vi.waitFor(() => expect(onImportInto).toHaveBeenCalledTimes(1))
+    expect(onImportInto).toHaveBeenCalledWith('home', '<meta charset="utf-8"><p>şığİ</p>')
+  })
+})

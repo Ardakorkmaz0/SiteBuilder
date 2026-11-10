@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEditorStore } from '../../store/editorStore.js'
+import { readFileText } from '../../utils/fileText.js'
 import { pageFileName } from '../../utils/pageFiles.js'
 import { countLinksToPage } from '../../utils/pageLinks.js'
 import { FileIcon, FileCodeIcon, FolderIcon, LinkIcon, LayersIcon } from '../icons.jsx'
@@ -342,7 +343,7 @@ export default function PageFilesPanel({
           const file = e.target.files?.[0]
           e.target.value = ''
           if (!file || !importTarget.current) return
-          onImportInto?.(importTarget.current, await file.text())
+          onImportInto?.(importTarget.current, await readFileText(file))
         }}
       />
 

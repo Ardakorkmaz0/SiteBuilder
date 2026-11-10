@@ -49,6 +49,24 @@ describe('opening a local project', () => {
     expect(skipped.values).not.toHaveBeenCalled()
   })
 
+  it('reads a project file saved in the Turkish Windows encoding with its letters intact', async () => {
+    // 'a{content:"şığİ"}' as windows-1254 writes it; a stylesheet names no encoding.
+    const saved = new Uint8Array([
+      ...[...'a{content:"'].map((letter) => letter.charCodeAt(0)),
+      0xfe, 0xfd, 0xf0, 0xdd,
+      ...[...'"}'].map((letter) => letter.charCodeAt(0)),
+    ])
+    const onDisk = { arrayBuffer: async () => saved.buffer, text: async () => new TextDecoder().decode(saved) }
+    const sheet = { name: 'site.css', kind: 'file', getFile: vi.fn(async () => onDisk) }
+    vi.stubGlobal('navigator', { languages: ['tr-TR'], language: 'tr-TR' })
+
+    const project = await readProject(directory('site', [sheet]))
+
+    expect(project.files.map(({ path, content }) => ({ path, content }))).toEqual([
+      { path: 'site.css', content: 'a{content:"şığİ"}' },
+    ])
+  })
+
   it.each(['getFile', 'text'])('rejects an unreadable document at %s instead of replacing it with empty text', async (failureAt) => {
     const blocked = file('protected.html')
     const error = new DOMException('Access denied', 'NotAllowedError')
