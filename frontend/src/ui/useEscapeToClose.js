@@ -29,6 +29,13 @@ function onKeyDown(event) {
   close()
 }
 
+// Whether a dialog or a menu is open on top of the page. The editor's canvas
+// keys stand down while one is: Delete or an arrow would otherwise change a
+// block the dialog covers.
+export function escapeLayerOpen() {
+  return stack.length > 0
+}
+
 // What had focus lately, newest last: where a menu item's menu button is.
 const recentFocus = []
 const RECENT_FOCUS = 4

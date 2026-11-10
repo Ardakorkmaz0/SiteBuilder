@@ -76,6 +76,23 @@ export function shouldForwardIframeShortcut(event = {}, { designMode = 'off', ty
   return !typing && (key === 'z' || key === 'y')
 }
 
+// Whether the canvas arrange keys (select all, copy, cut, paste, duplicate,
+// Delete, Esc and the arrow nudges) are live. They change the selected block,
+// so they act only while the user can see it: on the Edit canvas, with no
+// dialog or menu on top. A selection survives a switch to View or Source and
+// an opened dialog; Delete used to remove that block behind the preview, the
+// source or the shortcuts sheet, and an arrow moved it.
+export function canvasArrangeKeysLive(
+  event,
+  { canvasMode = 'edit', fullscreen = false, layerOpen = false, doc = globalThis.document } = {},
+) {
+  if (canvasMode !== 'edit' || fullscreen || layerOpen) return false
+  // A modal dialog that keeps no place on the Esc stack (the leave question,
+  // the two-tabs question) still covers the canvas, wherever focus is.
+  if (doc?.querySelector?.('[aria-modal="true"]')) return false
+  return !event?.target?.closest?.('[role="dialog"], [role="alertdialog"], [role="menu"]')
+}
+
 // Whether Ctrl+C / Ctrl+X / Ctrl+V on the component canvas belong to the
 // editor's own component clipboard. They used to be taken unconditionally —
 // preventDefault ran before anything checked there was something to copy — so

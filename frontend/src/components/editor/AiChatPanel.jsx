@@ -752,8 +752,10 @@ export default function AiChatPanel({
 
   return (
     <div
+      // Not modal: the compact panel floats beside the canvas, and the page
+      // under it stays in use. Calling it modal told a screen reader the rest
+      // of the editor was out of reach.
       role={workspacePresentation ? 'complementary' : 'dialog'}
-      aria-modal={workspacePresentation ? undefined : 'true'}
       aria-label={t('AI Assistant')}
       className={workspacePresentation
         ? 'studio-theme-surface relative z-20 flex h-full w-[clamp(380px,32vw,520px)] shrink-0 flex-col overflow-hidden border-l border-[var(--studio-border)] bg-[var(--studio-panel)]'
