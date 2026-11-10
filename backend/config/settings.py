@@ -248,6 +248,13 @@ if _TRUSTED_PROXY_COUNT < 0:
 REST_FRAMEWORK = {
     'NUM_PROXIES': _TRUSTED_PROXY_COUNT,
     'EXCEPTION_HANDLER': 'builder.api_errors.structured_exception_handler',
+    # A JSON body is an object, of a sane depth and without NUL characters
+    # (builder/parsers.py). The form parsers are DRF's own.
+    'DEFAULT_PARSER_CLASSES': [
+        'builder.parsers.ObjectJSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
     ],

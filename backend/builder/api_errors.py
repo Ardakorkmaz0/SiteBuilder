@@ -1,9 +1,14 @@
+import logging
+
+from django.db import DataError
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
 from .upload_limits import UploadLimitExceeded
+
+logger = logging.getLogger(__name__)
 
 
 STATUS_CODES = {
@@ -54,12 +59,32 @@ def _database_behind_code(exc):
     )
 
 
+def _value_not_storable(exc, context):
+    """The database refused a value: a NUL character in a search or a form
+    field, a number past its column, a text longer than its column. Every one
+    arrived in the request, so the answer is a refusal, not a server error. It
+    is logged all the same: a value that reached the database unchecked is a
+    validation gap worth closing where it entered.
+
+    PostgreSQL only in practice: SQLite, which the tests run on, stores almost
+    anything it is handed.
+    """
+    request = context.get('request') if context else None
+    logger.warning(
+        'Database refused a value on %s %s: %s',
+        getattr(request, 'method', '?'), getattr(request, 'path', '?'), exc,
+    )
+    return error_response('validation_error', 'A value in the request cannot be stored.')
+
+
 def structured_exception_handler(exc, context):
     """Add stable codes to every DRF error without breaking existing field payloads."""
     if isinstance(exc, UploadLimitExceeded):
         return error_response('upload_too_large', str(exc), status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
     response = exception_handler(exc, context)
     if response is None:
+        if isinstance(exc, DataError):
+            return _value_not_storable(exc, context)
         return _database_behind_code(exc)
 
     original = response.data
