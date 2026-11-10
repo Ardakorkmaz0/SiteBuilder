@@ -147,4 +147,17 @@ describe('sanitizeStyles', () => {
     expect(cleaned.animation).toBeUndefined()
     expect(cleaned.content).toBeUndefined()
   })
+
+  // The Properties panel stores a field the owner emptied as ''. Written out as
+  // it is, that clears the block's own look for the property (an alert loses its
+  // border when its border width is emptied) and leaves `color: ;` in the page.
+  it('drops a field that was emptied, and keeps zero', () => {
+    expect(sanitizeStyles({
+      color: '',
+      backgroundColor: '   ',
+      borderWidth: '0',
+      opacity: 0,
+      padding: '12px',
+    })).toEqual({ borderWidth: '0', opacity: '0', padding: '12px' })
+  })
 })

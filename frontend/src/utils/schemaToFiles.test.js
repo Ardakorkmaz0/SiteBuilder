@@ -756,3 +756,39 @@ describe('schemaToSingleHtml navbar width from the px field', () => {
     expect(html).toMatch(/\.c-nav > \.nav-inner, \.c-nav > \.section-inner \{ max-width:1200px/)
   })
 })
+
+// A style field the owner emptied is stored as ''. It is not a declaration:
+// written out it left `color:;` in the stylesheet of the published page and in
+// the style attributes of a converted one.
+describe('a style field that was emptied', () => {
+  const schema = {
+    theme: {},
+    pages: [{
+      id: 'p1',
+      name: 'Home',
+      canvasWidth: 1000,
+      components: [{
+        id: 'note',
+        type: 'alert',
+        props: { text: 'Saved', variant: 'info' },
+        styles: { color: '', backgroundColor: '  ', fontSize: '18px' },
+        stylesMobile: { color: '', fontSize: '15px' },
+        layout: { x: 0, y: 0, w: 300, h: 60 },
+      }],
+    }],
+  }
+  it('writes nothing into the published page', () => {
+    const files = schemaToFiles(schema)
+    const html = files.find((file) => file.name === 'index.html').content
+    expect(/class="ci-note" style="([^"]*)"/.exec(html)[1])
+      .toBe('display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;border:1px solid #60a5fa;background:#eff6ff;color:#1e40af;font-size: 18px;')
+    expect(files.find((file) => file.name === 'styles.css').content).toContain('.ci-note { font-size: 15px !important; }')
+  })
+
+  it('writes nothing into a converted page', () => {
+    const html = schemaToResponsiveHtml(schema)
+    const style = /id="note" style="([^"]*)"/.exec(html)[1]
+    expect(style).toContain('font-size:18px')
+    expect(style.split(';').filter((part) => !/^[a-z-]+:.+$/.test(part))).toEqual([])
+  })
+})
