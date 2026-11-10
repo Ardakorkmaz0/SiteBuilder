@@ -131,3 +131,36 @@ describe('an AI proposal drawn on the canvas', () => {
     expect(s().pastAt).toHaveLength(s().past.length)
   })
 })
+
+// When a model makes no tool call, the panel reads the request itself and
+// runs the likeliest action. That is for a request to change something. It
+// also ran for questions: any that named the site, a page or a look.
+describe('a question the model answers in words', () => {
+  it('is answered, not turned into a template over the whole page', async () => {
+    openPanel()
+    await ask('Which font does this site use?')
+    await waitFor(() => expect(run.finish).not.toBeNull())
+
+    await act(async () => {
+      run.finish.resolve({ text: 'It uses the system font.', toolCallCount: 0, calls: [], say: [] })
+    })
+
+    expect(screen.getByText('It uses the system font.')).toBeTruthy()
+    expect(screen.queryByText('Accept')).toBeNull()
+    expect(s().schema.pages[0].components.map((c) => c.id)).toEqual(['h1'])
+  })
+
+  it('still gets the likeliest action when it asks for a change and the model makes no call', async () => {
+    openPanel()
+    await ask('Build me a bakery site')
+    await waitFor(() => expect(run.finish).not.toBeNull())
+
+    await act(async () => {
+      run.finish.resolve({ text: 'Sure!', toolCallCount: 0, calls: [], say: [] })
+    })
+
+    expect(screen.getByText('Accept')).toBeTruthy()
+    // Offered, not applied: the page is still the user's own.
+    expect(s().schema.pages[0].components.map((c) => c.id)).toEqual(['h1'])
+  })
+})
