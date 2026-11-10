@@ -27,8 +27,13 @@ export const TAB_STYLES = {
   tab: {
     appearance: 'none',
     background: 'transparent',
-    border: '0',
-    borderBottom: '2px solid transparent',
+    // The underline, in the three properties the open tab's colour shares:
+    // written as `border-bottom` with only its colour changed on the open tab,
+    // a tab that was open kept an underline in its text colour once another
+    // tab was opened.
+    borderWidth: '0 0 2px',
+    borderStyle: 'solid',
+    borderColor: 'transparent',
     padding: '8px 14px',
     font: 'inherit',
     fontWeight: 500,
@@ -38,7 +43,7 @@ export const TAB_STYLES = {
   },
   tabActive: {
     color: '#1d1d1f',
-    borderBottomColor: '#2563eb',
+    borderColor: '#2563eb',
   },
   panel: {
     minWidth: 0,
