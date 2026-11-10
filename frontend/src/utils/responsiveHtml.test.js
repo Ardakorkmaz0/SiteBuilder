@@ -316,3 +316,65 @@ describe('schemaToResponsiveHtml a pinned block', () => {
     expect(styleOf({ scrollBehavior: 'fixed', pinX: 'center', pinOffsetX: 20 })).toContain('left:calc(50% + 20px)')
   })
 })
+
+// A block that is drawn with a look of its own (an alert's colours, an
+// accordion's border, a quote's bar) had that look written after its owner's
+// styles, so "Convert to HTML" silently put the block's defaults back.
+describe('schemaToResponsiveHtml a look its owner changed', () => {
+  const block = (type, props, styles = {}) => new JSDOM(render([box('b', type, props, { styles })])).window.document.getElementById('b')
+  const drawn = (...args) => block(...args).style
+
+  it('keeps an alert in the colours, border and padding its owner chose', () => {
+    const style = drawn('alert', { text: 'x', variant: 'info' }, { backgroundColor: '#ff0000', borderColor: '#0000ff', borderWidth: '3px', padding: '30px', borderRadius: '2px', color: '#00ff00' })
+    expect(style.backgroundColor).toBe('rgb(255, 0, 0)')
+    expect(style.borderTopColor).toBe('rgb(0, 0, 255)')
+    expect(style.borderTopWidth).toBe('3px')
+    expect(style.paddingLeft).toBe('30px')
+    expect(style.borderRadius).toBe('2px')
+    expect(style.color).toBe('rgb(0, 255, 0)')
+  })
+
+  it('draws an alert nobody styled in the colours of its kind', () => {
+    const style = drawn('alert', { text: 'x', variant: 'info' })
+    expect(style.backgroundColor).toBe('rgb(239, 246, 255)')
+    expect(style.borderTopColor).toBe('rgb(96, 165, 250)')
+    expect(style.borderTopWidth).toBe('1px')
+    expect(style.paddingLeft).toBe('16px')
+    expect(style.display).toBe('flex')
+  })
+
+  it('keeps the border and padding of an accordion', () => {
+    const style = drawn('accordion', { title: 'q', text: 'a' }, { borderColor: '#ff0000', padding: '20px' })
+    expect(style.borderTopColor).toBe('rgb(255, 0, 0)')
+    expect(style.borderTopWidth).toBe('1px')
+    expect(style.paddingTop).toBe('20px')
+    expect(drawn('accordion', { title: 'q', text: 'a' }).borderTopColor).toBe('rgb(229, 231, 235)')
+  })
+
+  it('keeps the border and background of an HTML block, at its size', () => {
+    const style = drawn('html', { code: '<p>x</p>' }, { borderWidth: '3px', borderStyle: 'solid', borderColor: '#ff0000', backgroundColor: '#00ff00' })
+    expect(style.borderTopWidth).toBe('3px')
+    expect(style.borderTopStyle).toBe('solid')
+    expect(style.borderTopColor).toBe('rgb(255, 0, 0)')
+    expect(style.backgroundColor).toBe('rgb(0, 255, 0)')
+    expect(style.width).toBe('100%')
+    expect(style.height).toBe('60px')
+    const plain = block('html', { code: '<p>x</p>' })
+    expect(plain.style.borderTopStyle).toBe('none')
+    // jsdom does not read `background: transparent`; the source says it.
+    expect(plain.getAttribute('style')).toBe('border:0;background:transparent;flex:1 1 100%;width:100%;height:60px;overflow:hidden')
+  })
+
+  it('keeps a quote upright when its owner chose so, and its bar', () => {
+    const style = drawn('quote', { text: 'x' }, { fontStyle: 'normal' })
+    expect(style.fontStyle).toBe('normal')
+    expect(style.borderLeftWidth).toBe('4px')
+    expect(drawn('quote', { text: 'x' }).fontStyle).toBe('italic')
+  })
+
+  // In the source: jsdom reads a longhand after its shorthand as the shorthand.
+  it('keeps the padding of a list', () => {
+    expect(block('list', { text: 'a\nb' }, { padding: '30px' }).getAttribute('style')).toBe('margin:0;padding-left:1.4em;padding:30px;flex:1 1 100%')
+    expect(drawn('list', { text: 'a\nb' }).paddingLeft).toBe('1.4em')
+  })
+})
