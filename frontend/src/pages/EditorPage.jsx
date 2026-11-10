@@ -117,6 +117,7 @@ import { readEditorRecovery, writeEditorRecovery } from '../utils/editorRecovery
 import { aiWizardOffered, markAiWizardOffered } from '../utils/aiWizardOffer.js'
 import RecoveryDialog from '../components/editor/RecoveryDialog.jsx'
 import SiteConflictDialog from '../components/editor/SiteConflictDialog.jsx'
+import UnsavedLeaveDialog from '../components/editor/UnsavedLeaveDialog.jsx'
 import {
   clearLocalFileHandle,
   downloadHtmlFile,
@@ -266,54 +267,6 @@ function parseDiscoveryTags(value) {
     .map((tag) => tag.trim())
     .filter(Boolean)
     .slice(0, 8)
-}
-
-function UnsavedLeaveDialog({ open, saving, onSave, onDiscard, onStay }) {
-  const { t } = useLanguage()
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 z-[160] grid place-items-center bg-black/40 p-4" role="presentation">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="unsaved-leave-title"
-        className="w-full max-w-md rounded-2xl border border-[#e5e7eb] bg-white p-5 shadow-2xl"
-      >
-        <h2 id="unsaved-leave-title" className="text-base font-bold text-[#111827]">
-          {t('Save before leaving?')}
-        </h2>
-        <p className="mt-2 text-sm leading-relaxed text-[#6b7280]">
-          {t('You have unsaved changes. Save them manually before leaving this editor.')}
-        </p>
-        <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={onStay}
-            disabled={saving}
-            className="rounded-lg border border-[#d1d5db] px-3 py-2 text-sm font-medium text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-50"
-          >
-            {t('Stay')}
-          </button>
-          <button
-            type="button"
-            onClick={onDiscard}
-            disabled={saving}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-[#b91c1c] hover:bg-red-50 disabled:opacity-50"
-          >
-            {t('Leave without saving')}
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="rounded-lg bg-[#4f46e5] px-3 py-2 text-sm font-semibold text-white hover:bg-[#4338ca] disabled:opacity-50"
-          >
-            {saving ? t('Saving…') : t('Save and leave')}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // Slim vertical strip shown in place of a collapsed side rail — click to
