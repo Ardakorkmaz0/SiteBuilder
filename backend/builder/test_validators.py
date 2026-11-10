@@ -556,6 +556,37 @@ def test_icon_keeps_its_accessible_label():
     assert clean['props']['label'] == 'Favourite'
 
 
+@pytest.mark.parametrize('ctype', ['list', 'quote', 'alert'])
+def test_a_link_around_a_list_a_quote_or_an_alert_survives_a_save(ctype):
+    """The editor offers "Wrap in a link" on these three and the published page
+    writes it, but the save gate dropped it, so the link was gone on reload."""
+    clean = _one_component({
+        'id': 'c1', 'type': ctype,
+        'props': {'text': 'Read more', 'href': 'https://example.com/more'},
+        'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 300, 'h': 80},
+    })
+    assert clean['props']['href'] == 'https://example.com/more'
+
+
+@pytest.mark.parametrize('ctype', ['list', 'quote', 'alert'])
+def test_a_link_around_a_list_a_quote_or_an_alert_goes_through_the_url_guard(ctype):
+    clean = _one_component({
+        'id': 'c1', 'type': ctype,
+        'props': {'text': 'Read more', 'href': 'javascript:alert(1)'},
+        'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 300, 'h': 80},
+    })
+    assert 'href' not in clean['props']
+
+
+@pytest.mark.parametrize('ctype', ['list', 'quote', 'alert'])
+def test_a_list_a_quote_or_an_alert_without_a_link_stores_what_it_did_before(ctype):
+    clean = _one_component({
+        'id': 'c1', 'type': ctype, 'props': {'text': 'Plain'},
+        'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 300, 'h': 80},
+    })
+    assert 'href' not in clean['props']
+
+
 def test_page_editor_mode_survives_an_emptied_html_document():
     """`mode` was not stored, so it was re-derived from the html on load: an
     HTML page whose document had been cleared silently turned back into a
