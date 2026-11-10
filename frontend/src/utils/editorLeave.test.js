@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   EDITOR_AUTO_SAVE_DELAY_MS,
+  canvasArrangeKeysLive,
   canvasClipboardOwnsShortcut,
   hasDocumentTextSelection,
   shouldForwardIframeShortcut,
@@ -168,5 +169,46 @@ describe('canvasClipboardOwnsShortcut — component clipboard vs the browser', (
     expect(hasDocumentTextSelection({ getSelection: () => ({ toString: () => '' }) })).toBe(false)
     expect(hasDocumentTextSelection({ getSelection: () => { throw new Error('no') } })).toBe(false)
     expect(hasDocumentTextSelection(null)).toBe(false)
+  })
+})
+
+describe('canvasArrangeKeysLive — Delete and the arrows act only on a canvas the user can see', () => {
+  const page = () => {
+    const doc = document.implementation.createHTMLDocument('editor')
+    doc.body.innerHTML = '<main><button id="tool">Tool</button></main>'
+    return doc
+  }
+  const keyOn = (doc, selector) => ({ target: doc.querySelector(selector) })
+
+  it('is live on the Edit canvas with nothing on top', () => {
+    const doc = page()
+    expect(canvasArrangeKeysLive(keyOn(doc, 'body'), { canvasMode: 'edit', doc })).toBe(true)
+    expect(canvasArrangeKeysLive(keyOn(doc, '#tool'), { canvasMode: 'edit', doc })).toBe(true)
+  })
+
+  it('stands down in View, in Source and in the fullscreen preview', () => {
+    const doc = page()
+    expect(canvasArrangeKeysLive(keyOn(doc, 'body'), { canvasMode: 'view', doc })).toBe(false)
+    expect(canvasArrangeKeysLive(keyOn(doc, 'body'), { canvasMode: 'source', doc })).toBe(false)
+    expect(canvasArrangeKeysLive(keyOn(doc, 'body'), { canvasMode: 'edit', fullscreen: true, doc })).toBe(false)
+  })
+
+  it('stands down while a dialog or a menu is on the Esc stack', () => {
+    const doc = page()
+    expect(canvasArrangeKeysLive(keyOn(doc, 'body'), { canvasMode: 'edit', layerOpen: true, doc })).toBe(false)
+  })
+
+  it('stands down under a modal dialog even when focus stayed on the page', () => {
+    const doc = page()
+    doc.body.insertAdjacentHTML('beforeend', '<div role="alertdialog" aria-modal="true"><button>Stay</button></div>')
+    expect(canvasArrangeKeysLive(keyOn(doc, '#tool'), { canvasMode: 'edit', doc })).toBe(false)
+  })
+
+  it('stands down for a key typed inside a panel that floats beside the canvas, and stays live outside it', () => {
+    const doc = page()
+    doc.body.insertAdjacentHTML('beforeend', '<div role="dialog"><button id="send">Send</button></div><div role="menu"><button id="item">Item</button></div>')
+    expect(canvasArrangeKeysLive(keyOn(doc, '#send'), { canvasMode: 'edit', doc })).toBe(false)
+    expect(canvasArrangeKeysLive(keyOn(doc, '#item'), { canvasMode: 'edit', doc })).toBe(false)
+    expect(canvasArrangeKeysLive(keyOn(doc, '#tool'), { canvasMode: 'edit', doc })).toBe(true)
   })
 })

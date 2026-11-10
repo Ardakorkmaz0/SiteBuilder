@@ -106,6 +106,7 @@ import { fitHtmlEmbedLayout } from '../utils/htmlEmbedMeasure.js'
 import { pageHasMotion } from '../utils/motion.js'
 import { htmlSnippetSize } from '../utils/htmlSnippetSizing.js'
 import {
+  canvasArrangeKeysLive,
   canvasClipboardOwnsShortcut,
   editorShortcutScope,
   hasDocumentTextSelection,
@@ -132,7 +133,7 @@ import { useLanguage } from '../i18n/useLanguage.js'
 import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 import { accountName } from '../utils/accountName.js'
 import { useUiTheme } from '../ui/useUiTheme.js'
-import { useEscapeToClose } from '../ui/useEscapeToClose.js'
+import { escapeLayerOpen, useEscapeToClose } from '../ui/useEscapeToClose.js'
 import MobileEditorPreview from '../components/editor/MobileEditorPreview.jsx'
 import SiteControlCenter from '../components/editor/SiteControlCenter.jsx'
 import { moveInRadioGroup } from '../ui/radioGroupKeys.js'
@@ -1131,6 +1132,7 @@ function SiteEditor() {
 
       // Everything below is the component-canvas arrange layer — not HTML pages.
       if (htmlHistoryRef.current.currentPageIsHtml) return
+      if (!canvasArrangeKeysLive(e, { canvasMode, fullscreen, layerOpen: escapeLayerOpen() })) return
       const state = useEditorStore.getState()
 
       if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); state.selectAll(); return }
@@ -1167,7 +1169,7 @@ function SiteEditor() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo])
+  }, [undo, redo, canvasMode, fullscreen])
 
   // The component link tool only applies to the Empty-mode Edit canvas. Drop it
   // whenever we leave that surface (View/Source, or an HTML page) so it can't
