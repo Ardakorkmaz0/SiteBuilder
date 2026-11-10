@@ -7,6 +7,8 @@ enforced again here, and the tests below are written so that removing the server
 check turns them red.
 """
 
+import json
+
 import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
@@ -75,6 +77,33 @@ class TestSharing:
 
     def test_anonymous_cannot_share(self, db):
         assert APIClient().post(reverse('share-component'), GOOD, format='json').status_code in (401, 403)
+
+    def test_remembers_the_site_the_block_came_from(self, author):
+        mine = Site.objects.get(slug='mine')
+        res = share(client_for(author), source_site_id=mine.pk)
+        assert res.status_code == 201
+        assert SharedComponent.objects.get().source_site_id == mine.pk
+
+    def test_somebody_elses_site_is_not_recorded_as_the_source(self, author, taker):
+        theirs = Site.objects.get(slug='theirs')
+        res = share(client_for(author), source_site_id=theirs.pk)
+        assert res.status_code == 201
+        assert SharedComponent.objects.get().source_site_id is None
+
+    @pytest.mark.parametrize('source', ['mine', 'abc', '1; drop', [1], {'id': 1}])
+    def test_a_source_that_is_not_a_site_id_is_left_empty(self, author, source):
+        # The id went straight into a query; a word in its place was a server
+        # error. The source is a courtesy link, so the block is shared without it.
+        res = share(client_for(author), source_site_id=source)
+        assert res.status_code == 201, res.content
+        assert SharedComponent.objects.get().source_site_id is None
+
+    def test_a_source_too_large_to_be_a_number_is_left_empty(self, author):
+        # JSON reads 1e999 as infinity, which is a number and still no id.
+        body = json.dumps(GOOD)[:-1] + ', "source_site_id": 1e999}'
+        res = client_for(author).generic('POST', reverse('share-component'), body, content_type='application/json')
+        assert res.status_code == 201, res.content
+        assert SharedComponent.objects.get().source_site_id is None
 
 
 class TestRefusals:

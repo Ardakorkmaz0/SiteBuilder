@@ -2168,8 +2168,13 @@ class ShareComponentView(APIView):
                 status.HTTP_403_FORBIDDEN,
             )
 
+        # The site the block came from is a courtesy link: an id that is not one
+        # of the author's sites, or not a number at all, leaves it empty.
         source = None
-        source_id = request.data.get('source_site_id')
+        try:
+            source_id = int(request.data.get('source_site_id') or 0)
+        except (TypeError, ValueError, OverflowError):
+            source_id = 0
         if source_id:
             source = Site.objects.filter(pk=source_id, owner=request.user).first()
 
