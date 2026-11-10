@@ -34,6 +34,16 @@ ANCHOR_RE = re.compile(r'^[a-z0-9](?:[a-z0-9_-]{0,58}[a-z0-9])?$')
 MAX_NESTING_DEPTH = 4
 MAX_CHILDREN = 60
 
+# The largest box a block can be saved with. The editor holds a box to the same
+# numbers (LAYOUT_LIMITS in frontend/src/store/editorStore.js): a box this gate
+# changed would move a block the editor still shows where it was put. They are
+# a guard against junk, set far past a real design: a page can be 4000 wide
+# and grows as long as its content, and a block is as tall as what is in it.
+MAX_LAYOUT_X = 5000
+MAX_LAYOUT_Y = 200000
+MAX_LAYOUT_W = 4000
+MAX_LAYOUT_H = 100000
+
 ALLOWED_STYLE_KEYS = {
     'backgroundColor', 'backgroundImage', 'color', 'fontSize', 'fontWeight',
     'fontFamily', 'fontStyle', 'textAlign', 'textDecoration', 'textTransform',
@@ -411,13 +421,13 @@ def sanitize_props(ctype, props):
         phone = props.get('_phoneH')
         if isinstance(phone, dict) and isinstance(phone.get('key'), str) and re.fullmatch(r'[a-z0-9]{1,16}', phone['key']):
             w = _num(phone.get('w'), 0, 0, 1200)
-            h = _num(phone.get('h'), 0, 0, 5000)
+            h = _num(phone.get('h'), 0, 0, MAX_LAYOUT_H)
             if w >= 8 and h >= 8:
                 out['_phoneH'] = {'w': w, 'h': h, 'key': phone['key']}
         base = props.get('_baseSize')
         if isinstance(base, dict):
-            w = _num(base.get('w'), 0, 0, 4000)
-            h = _num(base.get('h'), 0, 0, 5000)
+            w = _num(base.get('w'), 0, 0, MAX_LAYOUT_W)
+            h = _num(base.get('h'), 0, 0, MAX_LAYOUT_H)
             if w >= 8 and h >= 8:
                 out['_baseSize'] = {'w': w, 'h': h}
         # Appearance overrides (Properties panel): plain CSS values that the
@@ -563,10 +573,10 @@ def sanitize_layout(layout):
     if not isinstance(layout, dict):
         layout = {}
     return {
-        'x': _num(layout.get('x'), 0, 0, 5000),
-        'y': _num(layout.get('y'), 0, 0, 20000),
-        'w': _num(layout.get('w'), 200, 8, 2000),
-        'h': _num(layout.get('h'), 80, 4, 5000),
+        'x': _num(layout.get('x'), 0, 0, MAX_LAYOUT_X),
+        'y': _num(layout.get('y'), 0, 0, MAX_LAYOUT_Y),
+        'w': _num(layout.get('w'), 200, 8, MAX_LAYOUT_W),
+        'h': _num(layout.get('h'), 80, 4, MAX_LAYOUT_H),
     }
 
 

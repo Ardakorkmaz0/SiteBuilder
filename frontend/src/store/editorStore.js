@@ -1055,11 +1055,18 @@ function normalize(components, mobileWidth = MOBILE_CANVAS_WIDTH) {
 // - if a drag would push x past the right, slide x back so x+w == maxX.
 // Same logic on the Y axis when maxY is supplied. Width/height keep a small
 // minimum so the box stays interactable.
+//
+// Every box also stays inside LAYOUT_LIMITS, the largest one the server stores
+// (MAX_LAYOUT_* in backend/builder/validators.py; change both together). A box
+// past them was changed by the save while the editor went on showing it where
+// it was put, until the site was opened again.
+const LAYOUT_LIMITS = { x: 5000, y: 200000, w: 4000, h: 100000 }
+
 function clampLayout(l, bounds = {}) {
-  let x = Math.max(0, Math.round(l.x))
-  let y = Math.max(0, Math.round(l.y))
-  let w = Math.max(8, Math.round(l.w))
-  let h = Math.max(4, Math.round(l.h))
+  let x = Math.min(LAYOUT_LIMITS.x, Math.max(0, Math.round(l.x)))
+  let y = Math.min(LAYOUT_LIMITS.y, Math.max(0, Math.round(l.y)))
+  let w = Math.min(LAYOUT_LIMITS.w, Math.max(8, Math.round(l.w)))
+  let h = Math.min(LAYOUT_LIMITS.h, Math.max(4, Math.round(l.h)))
   if (bounds.maxWidth !== undefined) w = Math.min(w, bounds.maxWidth)
   if (bounds.maxX) {
     const maxX = Math.max(8, Math.round(bounds.maxX))
@@ -1098,8 +1105,8 @@ function layoutBoundsFor(page, id, key, parentOverride = null) {
   const parentLayout = key === 'mobileLayout' ? parent.mobileLayout || parent.layout : parent.layout
   // A copied container may already have a larger child design than its box.
   // Its fitted canvas can grow with a move; clamping to yesterday's extent
-  // would make a left nudge impossible to reverse. Keep the server's limits
-  // independently: x can reach 5000, while the box width cannot exceed 2000.
+  // would make a left nudge impossible to reverse. It still stays inside what
+  // the server stores: x can reach 5000, and a box in here is at most 2000 wide.
   const fittedContainer = parent.type === 'container' && maxX > Math.round(parent.layout?.w || 600)
   return {
     maxX,
