@@ -131,3 +131,57 @@ describe('CreateSiteWizard importing a file', () => {
     expect(screen.getByPlaceholderText('Paste your HTML code here…')).toHaveValue('<meta charset="utf-8"><p>şığİ</p>')
   })
 })
+
+// "Your own HTML" could only be chosen with the file already in hand: Next
+// stayed off until something was uploaded or pasted. A blank canvas opens with
+// nothing; an HTML page now does too, and the code is added in the editor.
+describe('CreateSiteWizard starting an HTML page with no file yet', () => {
+  async function chooseOwnHtml() {
+    localStorage.setItem('pwb_language', 'en')
+    useAuthStore.setState({ user: { id: 1, username: 'ada', is_guest: false } })
+    const onCreated = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <LanguageProvider>
+          <CreateSiteWizard open onClose={() => {}} onCreated={onCreated} />
+        </LanguageProvider>
+      </MemoryRouter>,
+    )
+    await user.type(screen.getByPlaceholderText('e.g. My Portfolio'), 'Olive Café')
+    await user.click(screen.getByRole('button', { name: 'Next →' }))
+    await user.click(screen.getByRole('button', { name: /Your own HTML/ }))
+    return { user, onCreated }
+  }
+
+  it('opens the editor on an empty HTML page, and leaves the AI wizard closed', async () => {
+    createSite.mockClear()
+    const { user, onCreated } = await chooseOwnHtml()
+
+    expect(screen.getByText(/No file yet\?/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next →' }))
+    expect(screen.getByText('Empty HTML page')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Create and open editor' }))
+    await vi.waitFor(() => expect(onCreated).toHaveBeenCalledWith({ id: 42 }))
+
+    const sent = createSite.mock.lastCall[1]
+    expect(sent.html).toBe('')
+    expect(sent.schema.pages[0]).toMatchObject({ mode: 'html', html: '', components: [] })
+    expect(aiWizardOffered(42)).toBe(true)
+  })
+
+  it('still carries pasted code into the site', async () => {
+    createSite.mockClear()
+    const { user, onCreated } = await chooseOwnHtml()
+
+    await user.type(screen.getByPlaceholderText('Paste your HTML code here…'), '<h1>Hello</h1>')
+    expect(screen.queryByText(/No file yet\?/)).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Next →' }))
+    expect(screen.getByText('Pasted code')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Create and open editor' }))
+    await vi.waitFor(() => expect(onCreated).toHaveBeenCalledWith({ id: 42 }))
+
+    expect(createSite.mock.lastCall[1].html).toBe('<h1>Hello</h1>')
+    expect(createSite.mock.lastCall[1].schema.pages[0]).toMatchObject({ mode: 'html', html: '<h1>Hello</h1>' })
+  })
+})
