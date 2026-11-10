@@ -61,7 +61,7 @@ describe('the language the assistant writes in', () => {
     expect(system).toContain('use the language the request is written in')
     expect(system).toContain('match the language of that copy')
     // The page's own language setting is in what the model sees.
-    expect(bodies[0].messages.at(-1).content).toContain('"language": "tr"')
+    expect(bodies[0].messages.at(-1).content).toContain('"language":"tr"')
   })
 
   it('writes in the language the user fixed in the settings', () => {
@@ -178,5 +178,30 @@ describe('a model that takes too long', () => {
     localStorage.removeItem('pwb_gemini_key')
     const err = await runAiPrompt('neler yapabilirsin?', { maxRounds: 1 }).catch((e) => e)
     expect(err.message).toBe('Groq · Llama took too long to answer. Try again, or ask for something smaller.')
+  })
+})
+
+describe('a tool call whose arguments do not parse', () => {
+  it('is answered with an error instead of being run with no arguments', async () => {
+    useEditorStore.getState().setCustomCss('body { color: red; }')
+    const replies = [
+      // Cut off at the length limit: the JSON never closes.
+      { choices: [{ message: { tool_calls: [{ id: 'c1', function: { name: 'setCustomCss', arguments: '{"code":"body { color: blue; } .hero { padding: 40' } }] } }] },
+      { choices: [{ message: { content: 'Tamam.' } }] },
+    ]
+    globalThis.fetch = vi.fn(async (url, options = {}) => {
+      bodies.push(JSON.parse(options.body))
+      const json = replies.shift()
+      return { ok: true, status: 200, json: async () => json, text: async () => JSON.stringify(json) }
+    })
+
+    const res = await runAiPrompt('siteyi mavi yap', { maxRounds: 3 })
+
+    expect(useEditorStore.getState().schema.customCss).toBe('body { color: red; }')
+    expect(res.calls).toHaveLength(1)
+    expect(res.calls[0].result.ok).toBe(false)
+    expect(res.calls[0].result.error).toContain('not valid JSON')
+    // The model is told, so it can send the call again.
+    expect(JSON.stringify(bodies[1].messages)).toContain('not valid JSON')
   })
 })
