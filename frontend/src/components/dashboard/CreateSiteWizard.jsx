@@ -32,11 +32,12 @@ const RECOMMENDED_TEMPLATES = 4
 
 // Every type also offers these alternative starting points besides the
 // recommended templates: an empty drag-and-drop canvas, or the user's own
-// HTML (uploaded file or pasted code).
+// HTML (an uploaded file, pasted code, or an empty HTML page to fill in the
+// editor).
 const START_MODES = [
   { id: 'template', icon: PaletteIcon, name: 'Ready template', desc: 'Pick a designed starting point and edit it.' },
   { id: 'blank', icon: LayersIcon, name: 'Blank canvas', desc: 'Start empty and drag components onto the canvas yourself.' },
-  { id: 'import', icon: FileCodeIcon, name: 'Your own HTML', desc: 'Upload an .html file or paste code.' },
+  { id: 'import', icon: FileCodeIcon, name: 'Your own HTML', desc: 'Upload an .html file, paste code, or start with an empty HTML page.' },
 ]
 
 function MiniPreview({ html, title }) {
@@ -123,10 +124,13 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
     effectiveMode === 'template' && selectedTemplate
       ? localizeTemplateHtml(selectedTemplate.build(previewTitle), contentLanguage)
       : ''
+  // "Your own HTML" needs no file in hand: like a blank canvas, an HTML page
+  // can open empty, and the editor offers upload, paste and write there.
   const canLeaveStartStep =
     effectiveMode === 'blank' ||
-    (effectiveMode === 'template' && !!selectedTemplate) ||
-    (effectiveMode === 'import' && !!importHtml.trim())
+    effectiveMode === 'import' ||
+    (effectiveMode === 'template' && !!selectedTemplate)
+  const emptyImport = effectiveMode === 'import' && !importHtml.trim()
 
   if (!open) return null
 
@@ -173,7 +177,9 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
           // part of the saved schema, so a Turkish site opened with its page
           // language (lang attribute, SEO tags) still set to English.
           language: contentLanguage,
-          mode: html ? 'html' : 'empty',
+          // An HTML page with no code yet is still an HTML page: the editor
+          // opens its HTML workspace, not the component canvas.
+          mode: html || effectiveMode === 'import' ? 'html' : 'empty',
           html,
           components: [],
         }],
@@ -184,7 +190,9 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
         category: TEMPLATE_SITE_CATEGORY_MAP[category.id] || LEGACY_CATEGORY_MAP[category.id] || 'other',
         published: publishNow && !isGuest,
       })
-      if (effectiveMode === 'blank') markAiWizardOffered(site.id)
+      // Starting empty is choosing to build the page by hand, on a canvas or
+      // in HTML: the editor does not open the AI site wizard over that choice.
+      if (effectiveMode === 'blank' || emptyImport) markAiWizardOffered(site.id)
       onCreated?.(site)
     } catch (e) {
       setError(apiError(e))
@@ -197,7 +205,7 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
       ? t(selectedTemplate?.name || 'Ready template')
       : effectiveMode === 'blank'
         ? t('Blank canvas')
-        : importName || t('Pasted code')
+        : emptyImport ? t('Empty HTML page') : importName || t('Pasted code')
   const stepLabels = [t('Site title'), t('Starting point'), t('Ready to create')]
 
   return (
@@ -365,10 +373,14 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
                     placeholder={t('Paste your HTML code here…')}
                     className="studio-input w-full resize-y px-3 py-2.5 font-mono text-xs leading-relaxed"
                   />
-                  {importHtml.trim() && (
+                  {importHtml.trim() ? (
                     <div className="overflow-hidden rounded-xl border border-[var(--studio-border)]">
                       <iframe title={t('Imported HTML preview')} srcDoc={importHtml} sandbox="" className="h-[240px] w-full border-0 bg-[var(--studio-panel-raised)]" />
                     </div>
+                  ) : (
+                    <p className="rounded-xl border border-dashed border-[var(--studio-border-strong)] bg-[var(--studio-panel-muted)] p-4 text-sm leading-6 text-[var(--studio-text-muted)]">
+                      {t('No file yet? Continue without one: the editor opens an empty HTML page where you can upload, paste or write your code.')}
+                    </p>
                   )}
                 </div>
               )}
@@ -394,9 +406,11 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
                   </label>
                 )}
               </div>
-              {effectiveMode === 'blank' ? (
+              {effectiveMode === 'blank' || emptyImport ? (
                 <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[var(--studio-border-strong)] bg-[var(--studio-panel-muted)] p-6 text-center text-sm text-[var(--studio-text-faint)]">
-                  {t('Empty canvas: you will design this page from scratch in the editor.')}
+                  {emptyImport
+                    ? t('Empty HTML page: you will upload, paste or write its code in the editor.')
+                    : t('Empty canvas: you will design this page from scratch in the editor.')}
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-xl border border-[var(--studio-border)] bg-[var(--studio-control)]">
