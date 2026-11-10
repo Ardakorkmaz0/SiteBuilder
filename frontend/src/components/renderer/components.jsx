@@ -8,6 +8,7 @@ import { useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 
 import { sanitizeUrl, sanitizeImageSrc } from '../../utils/sanitize.js'
 import { ICONS } from '../../utils/icons.js'
 import { ALERT_VARIANTS } from './constants.js'
+import { layerStyles } from './layerStyles.js'
 import { withBuilderInteractiveHtml } from '../../utils/htmlRuntime.js'
 import { htmlEmbedDocument } from '../../utils/htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from '../../utils/htmlSnippetSizing.js'
@@ -166,7 +167,7 @@ export function Navbar({ props, style, viewport = 'pc', contentWidth, boxScale =
                   ? 'center'
                   : navbarLinksAlign(props) === 'right' ? 'flex-end' : 'flex-start'
                 : undefined,
-            gap: scaledPx(
+            columnGap: scaledPx(
               mobileMenu || linkColumn ? 6 : isMobile ? 16 : navbarLinkGap(props),
               boxScale,
             ),
@@ -376,7 +377,7 @@ export function List({ props, style, boxScale = 1 }) {
     .filter(Boolean)
   const Tag = props.ordered ? 'ol' : 'ul'
   return (
-    <Tag style={{ margin: 0, paddingLeft: '1.4em', ...style }}>
+    <Tag style={layerStyles({ margin: 0, paddingLeft: '1.4em' }, style)}>
       {items.map((it, i) => (
         <li key={i} style={{ marginBottom: scaledPx(6, boxScale) }}>
           {it}
@@ -389,14 +390,15 @@ export function List({ props, style, boxScale = 1 }) {
 export function Quote({ props, style, boxScale = 1 }) {
   return (
     <blockquote
-      style={{
+      style={layerStyles({
         margin: 0,
-        borderLeft: `${scaledPx(4, boxScale)} solid currentColor`,
+        borderLeftWidth: scaledPx(4, boxScale),
+        borderLeftStyle: 'solid',
+        borderLeftColor: 'currentColor',
         paddingLeft: scaledPx(18, boxScale),
         fontStyle: 'italic',
         overflowWrap: 'break-word',
-        ...style,
-      }}
+      }, style)}
     >
       <p style={{ margin: 0, ...multilineTextStyle }}>{props.text}</p>
       {props.author ? (
@@ -465,20 +467,24 @@ export function ThemeToggle({ props, style }) {
       aria-pressed={dark}
       aria-label={label}
       onClick={colorMode?.toggle || undefined}
-      style={{
+      style={layerStyles({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
         gap: '0.5em',
         cursor: 'pointer',
-        font: 'inherit',
+        fontFamily: 'inherit',
+        fontSize: 'inherit',
+        fontStyle: 'inherit',
+        fontWeight: 'inherit',
         lineHeight: 1,
-        background: 'transparent',
-        border: 0,
+        backgroundColor: 'transparent',
+        borderWidth: 0,
+        borderStyle: 'none',
+        borderColor: 'currentColor',
         padding: 0,
         color: 'inherit',
-        ...style,
-      }}
+      }, style)}
     >
       <span
         aria-hidden="true"
@@ -670,18 +676,19 @@ export function Alert({ props, style, boxScale = 1 }) {
   const d = ICONS[props.icon] || ICONS.check
   return (
     <div
-      style={{
+      style={layerStyles({
         display: 'flex',
         alignItems: 'center',
         gap: scaledPx(10, boxScale),
         padding: `${scaledPx(12, boxScale)} ${scaledPx(16, boxScale)}`,
         borderRadius: scaledPx(10, boxScale),
-        border: `${scaledPx(1, boxScale)} solid ${v.border}`,
-        background: v.bg,
+        borderWidth: scaledPx(1, boxScale),
+        borderStyle: 'solid',
+        borderColor: v.border,
+        backgroundColor: v.bg,
         color: v.color,
         fontSize: scaledPx(16, boxScale),
-        ...style,
-      }}
+      }, style)}
     >
       <svg
         viewBox="0 0 24 24"
@@ -703,7 +710,15 @@ export function Alert({ props, style, boxScale = 1 }) {
 
 export function Accordion({ props, style, boxScale = 1 }) {
   return (
-    <details style={{ border: `${scaledPx(1, boxScale)} solid #e5e7eb`, borderRadius: scaledPx(10, boxScale), padding: `${scaledPx(2, boxScale)} ${scaledPx(16, boxScale)}`, ...style }}>
+    <details
+      style={layerStyles({
+        borderWidth: scaledPx(1, boxScale),
+        borderStyle: 'solid',
+        borderColor: '#e5e7eb',
+        borderRadius: scaledPx(10, boxScale),
+        padding: `${scaledPx(2, boxScale)} ${scaledPx(16, boxScale)}`,
+      }, style)}
+    >
       <summary style={{ cursor: 'pointer', fontWeight: 600, padding: `${scaledPx(12, boxScale)} 0`, ...multilineTextStyle }}>
         {props.title}
       </summary>
@@ -766,6 +781,8 @@ export function HtmlEmbed({ props, style, boxScale = 1, editorPreview = false, f
     frame.addEventListener('load', send)
     return () => frame.removeEventListener('load', send)
   }, [palette, srcDoc])
+  const ownerStyle = { ...style }
+  delete ownerStyle.border
   return (
     <iframe
       ref={frameRef}
@@ -775,11 +792,15 @@ export function HtmlEmbed({ props, style, boxScale = 1, editorPreview = false, f
       tabIndex={editorPreview ? -1 : undefined}
       sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
       style={{
-        ...style,
+        // No border by itself. The owner's border fields decide after that;
+        // the `border` shorthand is not theirs to set (SETTLED_STYLES).
+        borderWidth: 0,
+        borderStyle: 'none',
+        borderColor: 'currentColor',
+        ...ownerStyle,
         display: 'block',
         width: '100%',
         height: '100%',
-        border: '0',
         backgroundColor: style?.backgroundColor || 'transparent',
         overflow: 'hidden',
         pointerEvents: editorPreview ? 'none' : style?.pointerEvents,
@@ -792,12 +813,9 @@ export function HtmlEmbed({ props, style, boxScale = 1, editorPreview = false, f
 export function Divider({ style, contentWidth }) {
   return (
     <div
-      style={{
-        ...style,
-        maxWidth: contentWidth || undefined,
-        marginLeft: contentWidth ? 'auto' : undefined,
-        marginRight: contentWidth ? 'auto' : undefined,
-      }}
+      style={contentWidth
+        ? { ...layerStyles({ marginLeft: 'auto', marginRight: 'auto' }, style), maxWidth: contentWidth }
+        : style}
     />
   )
 }
