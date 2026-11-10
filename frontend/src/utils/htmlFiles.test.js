@@ -22,6 +22,18 @@ const sourceFile = (path, content, type = '') => ({
   text: async () => content,
   arrayBuffer: async () => new TextEncoder().encode(content).buffer,
 })
+// A file as another encoding wrote it: asked for text, the browser reads the
+// bytes as UTF-8.
+const savedFile = (path, bytes) => ({
+  name: path.split('/').pop(),
+  webkitRelativePath: path,
+  type: '',
+  text: async () => new TextDecoder().decode(new Uint8Array(bytes)),
+  arrayBuffer: async () => new Uint8Array(bytes).buffer,
+})
+const ascii = (text) => [...text].map((letter) => letter.charCodeAt(0))
+// "ş", "ı", "ğ" and "İ" in windows-1254.
+const TURKISH_1254 = [0xfe, 0xfd, 0xf0, 0xdd]
 const assetEntry = (path, content) => ({
   path,
   kind: 'asset',
@@ -112,6 +124,27 @@ describe('portable HTML imports', () => {
     expect(doc.querySelector('#after').textContent).toBe('After')
     expect(doc.querySelector('script').textContent).toContain('<\\/script>')
     expect(doc.querySelector('style').textContent).toContain('<\\/style>')
+  })
+
+  it('keeps the letters of a site saved in the Turkish Windows encoding, in the page and the files it links', async () => {
+    const out = await htmlFilesToDocument([
+      savedFile('site/index.html', [
+        ...ascii('<html><head><meta charset="windows-1254"><link rel="stylesheet" href="site.css"></head><body><h1>'),
+        ...TURKISH_1254,
+        ...ascii('</h1><script src="site.js"></script></body></html>'),
+      ]),
+      // Neither linked file says what it is written in: the page's encoding applies.
+      savedFile('site/site.css', [...ascii('h1::after{content:"'), ...TURKISH_1254, ...ascii('"}')]),
+      savedFile('site/site.js', [...ascii('var word="'), ...TURKISH_1254, ...ascii('"')]),
+    ])
+    const imported = parseHtml(out)
+
+    expect(imported.querySelector('h1').textContent).toBe('şığİ')
+    expect(imported.querySelector('style').textContent).toBe('h1::after{content:"şığİ"}')
+    expect(imported.querySelector('script').textContent).toBe('var word="şığİ"')
+    expect(out).not.toContain('\ufffd')
+    // The imported page is UTF-8 from here on and says so.
+    expect(imported.querySelector('meta[charset]').getAttribute('charset')).toBe('utf-8')
   })
 
   it('preserves media restrictions when replacing a linked stylesheet', async () => {

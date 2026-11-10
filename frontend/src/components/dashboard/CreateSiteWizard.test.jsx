@@ -107,3 +107,27 @@ describe('CreateSiteWizard and the AI site wizard', () => {
     expect(aiWizardOffered(42)).toBe(false)
   })
 })
+
+// File.text() reads every file as UTF-8: an old page saved in the Turkish
+// Windows encoding arrived with "�" in place of each Turkish letter.
+describe('CreateSiteWizard importing a file', () => {
+  it('keeps the letters of a page saved in the Turkish Windows encoding', async () => {
+    localStorage.setItem('pwb_language', 'en')
+    const user = userEvent.setup()
+    openWizard()
+    await user.type(screen.getByPlaceholderText('e.g. My Portfolio'), 'Eski site')
+    await user.click(screen.getByRole('button', { name: 'Next →' }))
+    await user.click(screen.getByRole('button', { name: /Your own HTML/ }))
+    // '<meta charset="windows-1254"><p>şığİ</p>' as that encoding writes it.
+    const saved = new Uint8Array([
+      ...[...'<meta charset="windows-1254"><p>'].map((letter) => letter.charCodeAt(0)),
+      0xfe, 0xfd, 0xf0, 0xdd,
+      ...[...'</p>'].map((letter) => letter.charCodeAt(0)),
+    ])
+
+    await user.upload(document.querySelector('input[type="file"]'), new File([saved], 'eski.html', { type: 'text/html' }))
+
+    expect(await screen.findByText('Loaded file: eski.html')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Paste your HTML code here…')).toHaveValue('<meta charset="utf-8"><p>şığİ</p>')
+  })
+})

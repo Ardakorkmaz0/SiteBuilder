@@ -6,6 +6,7 @@ import { TEMPLATE_LAYOUTS, TEMPLATE_LIBRARY, TEMPLATE_LIBRARY_GROUPS, TEMPLATE_S
 import { localizeTemplateHtml } from '../../utils/templateLocalization.js'
 import { DEFAULT_THEME } from '../../utils/theme.js'
 import { apiError } from '../../utils/errors.js'
+import { readFileText } from '../../utils/fileText.js'
 import { CheckIcon, FileCodeIcon, LayersIcon, PaletteIcon } from '../icons.jsx'
 import { useDialogMotion } from '../../ui/useDialogMotion.js'
 import { useIsGuest } from '../../store/authStore.js'
@@ -140,7 +141,7 @@ export default function CreateSiteWizard({ open, origin, onClose, onCreated }) {
 
   function loadHtmlFile(file) {
     if (!file) return
-    file.text().then((text) => {
+    readFileText(file).then((text) => {
       setImportHtml(text)
       setImportName(file.name)
     }).catch(() => setError(t('Could not read that file. Try pasting the code instead.')))

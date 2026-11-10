@@ -1,3 +1,5 @@
+import { readFileDecoded, readFileText } from './fileText.js'
+
 const MIME_BY_EXT = {
   '.css': 'text/css',
   '.js': 'text/javascript',
@@ -217,7 +219,9 @@ export async function htmlFilesToDocument(fileList) {
   if (!htmlFile) return ''
 
   const index = buildFileIndex(files)
-  const doc = new DOMParser().parseFromString(await htmlFile.text(), 'text/html')
+  // A stylesheet or script that names no encoding is written in the page's.
+  const page = await readFileDecoded(htmlFile)
+  const doc = new DOMParser().parseFromString(page.text, 'text/html')
   const htmlDir = documentBaseDir(doc, filePath(htmlFile), index.rootDir)
 
   for (const link of [...doc.querySelectorAll('link[rel~="stylesheet"][href]')]) {
@@ -228,7 +232,7 @@ export async function htmlFilesToDocument(fileList) {
     const style = doc.createElement('style')
     copyAttributes(link, style, new Set(['href', 'rel', 'integrity', 'crossorigin']))
     style.setAttribute('data-inlined-from', href)
-    style.textContent = safeRawText(await inlineCssUrls(await file.text(), dirname(filePath(file)), index), 'style')
+    style.textContent = safeRawText(await inlineCssUrls(await readFileText(file, page.encoding), dirname(filePath(file)), index), 'style')
     link.replaceWith(style)
   }
 
@@ -244,7 +248,7 @@ export async function htmlFilesToDocument(fileList) {
     const inline = doc.createElement('script')
     copyAttributes(script, inline, new Set(['src', 'integrity', 'crossorigin']))
     inline.setAttribute('data-inlined-from', src)
-    inline.textContent = safeRawText(await file.text(), 'script')
+    inline.textContent = safeRawText(await readFileText(file, page.encoding), 'script')
     script.replaceWith(inline)
   }
 

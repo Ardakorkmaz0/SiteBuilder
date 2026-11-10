@@ -20,6 +20,23 @@ describe('linked local HTML files', () => {
     expect(picker).toHaveBeenCalledWith(expect.objectContaining({ multiple: false }))
   })
 
+  it('opens a page saved in the Turkish Windows encoding with its letters intact', async () => {
+    // '<meta charset="windows-1254"><p>şığİ</p>' as that encoding writes it.
+    const saved = new Uint8Array([
+      ...[...'<meta charset="windows-1254"><p>'].map((letter) => letter.charCodeAt(0)),
+      0xfe, 0xfd, 0xf0, 0xdd,
+      ...[...'</p>'].map((letter) => letter.charCodeAt(0)),
+    ])
+    const onDisk = { arrayBuffer: async () => saved.buffer, text: async () => new TextDecoder().decode(saved) }
+    const handle = { name: 'eski.html', getFile: vi.fn().mockResolvedValue(onDisk) }
+    vi.stubGlobal('showOpenFilePicker', vi.fn().mockResolvedValue([handle]))
+
+    // Save writes this text back to the same file as UTF-8, so it has to say so.
+    await expect(openLocalHtmlFile()).resolves.toEqual({
+      handle, name: 'eski.html', html: '<meta charset="utf-8"><p>şığİ</p>',
+    })
+  })
+
   it('propagates cancellation so callers can distinguish it from file read errors', async () => {
     const cancelled = new DOMException('Cancelled', 'AbortError')
     vi.stubGlobal('showOpenFilePicker', vi.fn().mockRejectedValue(cancelled))

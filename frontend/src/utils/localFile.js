@@ -5,6 +5,7 @@
 // to downloadHtmlFile().
 
 import { writeFileContents } from './fileWritable.js'
+import { readFileText } from './fileText.js'
 
 const HTML_TYPES = [
   { description: 'HTML file', accept: { 'text/html': ['.html', '.htm'] } },
@@ -27,7 +28,7 @@ export async function openLocalHtmlFile() {
     multiple: false,
   })
   const file = await handle.getFile()
-  return { handle, name: handle.name, html: await file.text() }
+  return { handle, name: handle.name, html: await readFileText(file) }
 }
 
 // "Save As" — creates/overwrites a file of the user's choosing and returns

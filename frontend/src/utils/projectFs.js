@@ -5,6 +5,7 @@
 // are pure so they can be unit-tested under jsdom.
 
 import { writeFileContents } from './fileWritable.js'
+import { readFileText } from './fileText.js'
 
 // Binary-ish assets — kept as handles and data-URL'd lazily when a preview
 // needs them (never read up front, so a big repo stays light).
@@ -87,7 +88,7 @@ export async function readProject(rootHandle) {
     let content = null
     if (isText) {
       try {
-        content = await (await f.handle.getFile()).text()
+        content = await readFileText(await f.handle.getFile())
       } catch (error) {
         throw new Error(`Could not read ${f.path}: ${error?.message || String(error)}`, { cause: error })
       }
