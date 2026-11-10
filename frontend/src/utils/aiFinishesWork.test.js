@@ -243,3 +243,30 @@ describe('what the model is shown of the page', () => {
     expect(firstMessage()).not.toContain('#00ff00')
   })
 })
+
+describe('an answer with nothing in it', () => {
+  const nothing = { parts: [] }
+
+  it('is said to be empty, not shown as "Done."', async () => {
+    scriptModel([nothing])
+
+    await expect(runAiPrompt('what is on the page?', { maxRounds: 3 }))
+      .rejects.toThrow('Google Gemini sent back an empty answer, so nothing was changed.')
+  })
+
+  it('is asked for once more when a change was requested, then said to be empty', async () => {
+    scriptModel([nothing, nothing])
+
+    await expect(runAiPrompt('add a heading', { maxRounds: 3 })).rejects.toThrow('empty answer')
+    expect(requests).toHaveLength(2)
+  })
+
+  it('ends the turn as done when the work before it landed', async () => {
+    scriptModel([call('addComponent', { type: 'heading' }), nothing])
+
+    const res = await runAiPrompt('add a heading', { maxRounds: 3 })
+
+    expect(res.text).toBe('Done.')
+    expect(page().components).toHaveLength(1)
+  })
+})

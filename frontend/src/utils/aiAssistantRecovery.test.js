@@ -314,3 +314,19 @@ describe('extractTextCalls — Pattern D: bare args, shape-inferred tool name', 
     expect(extractTextCalls(null)).toEqual([])
   })
 })
+
+// A small model writes its call out as text, and as often in JavaScript's
+// spelling as in JSON's. Read, it is the call; unreadable, it is no call. It
+// used to be run with no arguments at all under the tool's name.
+describe('extractTextCalls: arguments written the way JavaScript writes them', () => {
+  it('reads bare keys, single quotes and a trailing comma', () => {
+    const out = extractTextCalls("I'll call updateStyles({id: 'heading_1', patch: {color: '#ff0000', fontSize: '40px',}}) now.")
+
+    expect(out).toEqual([{ name: 'updateStyles', args: { id: 'heading_1', patch: { color: '#ff0000', fontSize: '40px' } } }])
+  })
+
+  it('makes no call out of arguments it cannot read', () => {
+    expect(extractTextCalls('Then clearPage({remove everything}) would start over.')).toEqual([])
+    expect(extractTextCalls('{"name":"setCustomCss","parameters":{"code": body{color:red} }}')).toEqual([])
+  })
+})
