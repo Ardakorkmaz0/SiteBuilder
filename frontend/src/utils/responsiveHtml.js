@@ -78,7 +78,13 @@ function tabsCssVars(props = {}) {
 // once, so this is also where it gets its id: the block's anchor (#about), else
 // its component id. This writer used to emit no ids at all, so every in-page
 // link died when a page was converted to HTML or opened in the Code panel.
-function styleAttr(component, extra = '') {
+//
+// `look` is how the block is drawn by itself, and is written first: every style
+// its owner set comes after it and is the one that counts, as on the published
+// page. `extra` is where the block sits in its row, and is written last. An
+// alert's own colours, border and padding used to ride in `extra`, so a
+// converted page lost the ones the owner had chosen.
+function styleAttr(component, extra = '', look = '') {
   const id = elementIdFor(component)
   const idAttr = id ? ` id="${esc(id)}"` : ''
   // Entrance motion is the reveal attribute the observer collects plus the two
@@ -89,7 +95,7 @@ function styleAttr(component, extra = '') {
     .map(([key, value]) => `${key}:${value}`)
     .join(';')
   const style = [extra, vars].filter(Boolean).join(';')
-  return idAttr + motionRevealAttr(component.props) + styleOnly(component, style)
+  return idAttr + motionRevealAttr(component.props) + styleOnly(component, style, look)
 }
 
 // "Hide on PC" and "Hide on mobile" are per-screen switches: a block hidden on
@@ -152,11 +158,12 @@ function withClassSuffix(html, suffix) {
   )
 }
 
-function styleOnly(component, extra = '') {
+function styleOnly(component, extra = '', look = '') {
   const clean = sanitizeStyles(component.styles || {})
-  const parts = Object.entries(clean)
+  const parts = look ? [look] : []
+  Object.entries(clean)
     .filter(([k]) => !DROP_STYLES.has(k))
-    .map(([k, v]) => `${kebab(k)}:${cssVal(v)}`)
+    .forEach(([k, v]) => parts.push(`${kebab(k)}:${cssVal(v)}`))
   Object.entries(pinnedLayoutStyle(component, {}))
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
     .forEach(([k, v]) => parts.push(`${kebab(k)}:${cssVal(typeof v === 'number' && v !== 0 && k !== 'zIndex' ? `${v}px` : v)}`))
@@ -366,14 +373,15 @@ function itemElHtml(c, multi, colOverride) {
     case 'list': {
       const items = String(p.text || '').split('\n').map((s) => s.trim()).filter(Boolean)
       const tag = p.ordered ? 'ol' : 'ul'
-      return `<${tag} class="${cls}"${styleAttr(c, `${col};margin:0;padding-left:1.4em`)}>${items
+      return `<${tag} class="${cls}"${styleAttr(c, col, 'margin:0;padding-left:1.4em')}>${items
         .map((it) => `<li>${esc(it)}</li>`)
         .join('')}</${tag}>`
     }
     case 'quote':
       return `<blockquote class="${cls}"${styleAttr(
         c,
-        `${col};border-left:4px solid currentColor;padding-left:18px;font-style:italic;margin:0`,
+        col,
+        'border-left:4px solid currentColor;padding-left:18px;font-style:italic;margin:0',
       )}><p class="rh-m0">${multiline(p.text)}</p>${
         p.author
           ? `<footer style="margin-top:8px;font-style:normal;font-size:.85em;opacity:.7">— ${multiline(p.author)}</footer>`
@@ -382,7 +390,7 @@ function itemElHtml(c, multi, colOverride) {
     case 'badge':
       return `<span class="rh-item"${styleAttr(c, colOverride || 'flex:0 0 auto;display:inline-flex;align-items:center')}>${multiline(p.text)}</span>`
     case 'icon':
-      return `<span class="rh-item"${iconA11yAttrs(p)}${styleAttr(c, colOverride || 'flex:0 0 auto;display:inline-flex;align-items:center;line-height:0')}>${iconSvg(p.name)}</span>`
+      return `<span class="rh-item"${iconA11yAttrs(p)}${styleAttr(c, colOverride || 'flex:0 0 auto;display:inline-flex;align-items:center', colOverride ? '' : 'line-height:0')}>${iconSvg(p.name)}</span>`
     case 'themeToggle':
       return `<${themeToggleTag(p)} class="rh-item ${themeToggleClass(p)}"${themeToggleAttrs(p)}${styleAttr(c, colOverride || 'flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:.5em')}>${themeToggleInner(p)}</${themeToggleTag(p)}>`
     case 'input':
@@ -390,10 +398,10 @@ function itemElHtml(c, multi, colOverride) {
       return `<div class="${cls}"${styleAttr(c, `${col};display:flex;flex-direction:column;min-width:0`)}>${fieldHtml(c.type, p, c.id)}</div>`
     case 'alert': {
       const v = ALERT_VARIANTS[p.variant] || ALERT_VARIANTS.info
-      return `<div class="${cls}"${styleAttr(c, `${col};display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;border:1px solid ${v.border};background:${v.bg};color:${v.color}`)}>${iconSvg(p.icon || 'check')}<span>${multiline(p.text)}</span></div>`
+      return `<div class="${cls}"${styleAttr(c, `${col};display:flex;align-items:center;gap:10px`, `padding:12px 16px;border-radius:10px;border:1px solid ${v.border};background:${v.bg};color:${v.color}`)}>${iconSvg(p.icon || 'check')}<span>${multiline(p.text)}</span></div>`
     }
     case 'accordion':
-      return `<details class="${cls}"${styleAttr(c, `${col};border:1px solid #e5e7eb;border-radius:10px;padding:2px 16px`)}><summary style="cursor:pointer;font-weight:600;padding:12px 0">${multiline(p.title)}</summary><div style="padding-bottom:14px;color:#4b5563">${multiline(p.text)}</div></details>`
+      return `<details class="${cls}"${styleAttr(c, col, 'border:1px solid #e5e7eb;border-radius:10px;padding:2px 16px')}><summary style="cursor:pointer;font-weight:600;padding:12px 0">${multiline(p.title)}</summary><div style="padding-bottom:14px;color:#4b5563">${multiline(p.text)}</div></details>`
     case 'container': {
       const kids = shown(c.children)
       // Auto-layout containers flow their children as flex/grid. Same shared
@@ -448,7 +456,7 @@ function htmlEmbed(c, cls, col) {
   const doc = htmlEmbedDocument(code, htmlEmbedDocumentOptions(c))
   const h = Math.max(40, Math.round(c.layout?.h || 240))
   const safeDoc = srcdocAttrValue(withBuilderInteractiveHtml(doc))
-  return `<iframe class="${cls}" srcdoc="${safeDoc}" scrolling="no" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" loading="lazy"${styleAttr(c, `${col};width:100%;height:${h}px;border:0;background:transparent;overflow:hidden`)}></iframe>`
+  return `<iframe class="${cls}" srcdoc="${safeDoc}" scrolling="no" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" loading="lazy"${styleAttr(c, `${col};width:100%;height:${h}px;overflow:hidden`, 'border:0;background:transparent')}></iframe>`
 }
 
 // Render a `tabs` widget as a tab strip + one panel per tab. The runtime JS
