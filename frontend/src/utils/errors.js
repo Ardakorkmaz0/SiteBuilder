@@ -5,6 +5,7 @@ const API_CODE_MESSAGES = {
   not_authenticated: 'Please sign in to continue.',
   permission_denied: 'You do not have permission to do that.',
   not_found: 'The requested item was not found.',
+  page_not_in_version: 'That save does not have this page.',
   method_not_allowed: 'This action is not supported.',
   throttled: 'Too many requests. Please wait and try again.',
   google_credential_missing: 'Google sign-in information is missing.',

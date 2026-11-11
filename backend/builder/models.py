@@ -497,6 +497,10 @@ class SiteVersion(models.Model):
     # Pinned rows are named "checkpoints" (Resident-Evil-style save slots): the
     # user chose to keep them, so the auto-save FIFO never evicts them.
     pinned = models.BooleanField(default=False)
+    # What this version changed against the one before it (version_summary.py):
+    # which pages, how much, and whether Undo could take it back. Null on rows
+    # older than the field; the history list fills those in when it is read.
+    summary = models.JSONField(null=True, blank=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -533,8 +537,10 @@ class SiteVersion(models.Model):
         kept until the user deletes it (or the separate checkpoint cap is hit).
         Returns the created row, or None when an auto-save was de-duped.
         """
+        from .version_summary import summarize
+
+        latest = cls.objects.filter(site=site).first()
         if not pinned and not force:
-            latest = cls.objects.filter(site=site).first()
             if (
                 latest is not None
                 and latest.schema == site.schema
@@ -548,6 +554,7 @@ class SiteVersion(models.Model):
             source=source,
             label=label,
             pinned=pinned,
+            summary=summarize(latest.schema if latest is not None else None, site.schema),
         )
         cls._prune(site)
         return row

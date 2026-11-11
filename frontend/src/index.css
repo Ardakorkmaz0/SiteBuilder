@@ -34,6 +34,11 @@
   --studio-success: #1d7049;
   --studio-success-soft: #eaf7f0;
   --studio-warning: #874a00;
+  /* History: the size of a save's change, small to large, and the changes
+     only the history can take back. */
+  --studio-change-low: #e8b923;
+  --studio-change-high: #d92d20;
+  --studio-change-hard: #15171d;
   --studio-warning-soft: #fff4ce;
   --studio-info: #3567c8;
   --studio-info-soft: #edf3ff;
@@ -278,6 +283,9 @@
   --studio-success: #34ed9d;
   --studio-success-soft: #062619;
   --studio-warning: #ffca52;
+  --studio-change-low: #ffd84d;
+  --studio-change-high: #ff5a4f;
+  --studio-change-hard: #f5f6f8;
   --studio-warning-soft: #2a1e05;
   --studio-info: #5eb5ff;
   --studio-info-soft: #071e31;
