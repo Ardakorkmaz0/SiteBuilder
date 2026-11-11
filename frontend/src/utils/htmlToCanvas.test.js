@@ -69,7 +69,7 @@ describe('a full-width part of the page', () => {
     }])
     expect(result.canvasWidth).toBe(1200)
     expect(result.background).toBe('#faf7f2')
-    expect(result.report).toEqual({ native: 3, html: 0, tooLarge: 0, scripts: 0 })
+    expect(result.report).toEqual({ native: 3, html: 0, tooLarge: 0, scripts: 0, hidden: 0 })
   })
 
   it('is looked through when it only wraps other full-width parts', () => {
@@ -350,6 +350,10 @@ describe('colours and fonts', () => {
 
   it('takes the page background from <html> when <body> has none', () => {
     expect(convert(page([], { background: [CLEAR, 'rgb(0, 0, 0)'] })).background).toBe('#000000')
+  })
+
+  it('hands on how many parts the page was not showing, and how many scripts it has', () => {
+    expect(convert(page([], { hiddenParts: 12, scripts: 5 })).report).toEqual({ native: 0, html: 0, tooLarge: 0, scripts: 5, hidden: 12 })
   })
 
   it('hands on the web fonts the document asked for', () => {
