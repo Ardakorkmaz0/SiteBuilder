@@ -94,7 +94,7 @@ import { replacePageColor } from '../utils/htmlPageColors.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
 import { measureHtmlPage } from '../utils/htmlPageMeasure.js'
-import { canvasFromMeasured } from '../utils/htmlToCanvas.js'
+import { pagesFromMeasured } from '../utils/htmlToCanvas.js'
 import { withoutBuilderShim } from '../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
 import { componentDraftHtml, componentHtmlFiles, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
@@ -2237,6 +2237,8 @@ function SiteEditor() {
   // is kept with the page (htmlBackup), so "Back to the HTML page" brings it
   // back as it was, whatever has happened on the canvas since.
   const [convertingToCanvas, setConvertingToCanvas] = useState(false)
+  // What the conversion is doing, for a page that takes a while to read.
+  const [convertNote, setConvertNote] = useState('')
   // `pageId` is the open page, or the file that was right-clicked in the list.
   async function convertHtmlToCanvas(pageId = currentPageId) {
     if (convertingToCanvas) return
@@ -2245,21 +2247,34 @@ function SiteEditor() {
     const html = currentMap[pageId] || ''
     if (!html.trim()) return
     setConvertingToCanvas(true)
+    setConvertNote(t('Reading the page…'))
     try {
-      const result = canvasFromMeasured(await measureHtmlPage(html))
-      if (!result.components.length) {
+      const measured = await measureHtmlPage(html, {
+        onProgress: (done, total) => setConvertNote(t('Reading the page: part {done} of {total}…', { done, total })),
+      })
+      const made = pagesFromMeasured(measured, { firstPageId: pageId })
+      const [result, ...more] = made
+      if (!result?.components.length) {
         setError(t('This page could not be read as blocks, so nothing was changed.'))
         return
       }
-      const { report } = result
+      const report = made.reduce((sum, page) => ({
+        native: sum.native + page.report.native,
+        html: sum.html + page.report.html,
+        tooLarge: sum.tooLarge + page.report.tooLarge,
+      }), { native: 0, html: 0, tooLarge: 0 })
+      // What is still hidden once every part a link leads to has been read.
+      const hidden = more.length ? 0 : result.report.hidden
       const lines = [
         t('Turn this page into {count} canvas blocks that you can drag, resize and edit?', { count: report.native + report.html }),
+        more.length ? t('The page shows its content in {count} parts, one at a time. Each becomes a canvas page of its own, and the links between them lead from page to page.', { count: made.length }) : '',
         report.html ? t('{count} of them stay HTML blocks: the canvas has no block of its own for them (a table, a form, a video, or text with a link inside it).', { count: report.html }) : '',
         report.tooLarge ? t('{count} parts are too large to carry over and would be left out.', { count: report.tooLarge }) : '',
-        report.scripts ? t('The page has scripts. They do not run on the canvas.') : '',
-        report.hidden ? t('{count} parts of the page are hidden until something shows them (another chapter, a closed menu, an answer). They are not put on the canvas; they stay in the HTML page that is kept.', { count: report.hidden }) : '',
+        result.report.scripts ? t('The page has scripts. They do not run on the canvas.') : '',
+        hidden ? t('{count} parts of the page are hidden until something shows them (another chapter, a closed menu, an answer). They are not put on the canvas; they stay in the HTML page that is kept.', { count: hidden }) : '',
         t('The HTML page is kept: "Back to the HTML page" in this menu brings it back as it is now.'),
       ].filter(Boolean)
+      setConvertNote('')
       if (!window.confirm(lines.join('\n\n'))) return
       // One Undo step for the schema and the document together, as in
       // "Remove HTML".
@@ -2270,6 +2285,7 @@ function SiteEditor() {
         htmlBackup: html,
         seoTitle: result.title,
         seoDescription: result.description,
+        more,
       })
       const nextMap = { ...currentMap, [pageId]: '' }
       rememberHtmlForSchema(useEditorStore.getState().schema, nextMap)
@@ -2281,6 +2297,7 @@ function SiteEditor() {
       if (pageId !== useEditorStore.getState().currentPageId) useEditorStore.getState().selectPage(pageId)
     } finally {
       setConvertingToCanvas(false)
+      setConvertNote('')
     }
   }
 
@@ -2924,6 +2941,11 @@ function SiteEditor() {
         </div>
       )}
 
+      {convertNote && (
+        <div role="status" className="border-b border-[var(--studio-border)] bg-[var(--studio-panel-muted)] px-4 py-2 text-sm text-[var(--studio-text)]">
+          {convertNote}
+        </div>
+      )}
       {error && (
         <div role="alert" className="flex flex-wrap items-center gap-3 bg-red-50 px-4 py-2 text-sm text-red-600">
           <span className="min-w-0 flex-1">{error}</span>

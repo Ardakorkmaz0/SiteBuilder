@@ -1715,12 +1715,14 @@ export const useEditorStore = create((set, get) => ({
   // with the page as `htmlBackup`, so the way back does not depend on Undo.
   // `fonts` are the web fonts the document loaded (googleFonts.js): the page
   // keeps asking for them, so its text is drawn in the faces it was measured in.
-  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, fonts } = {}) => {
+  // `more` are further canvas pages made from the same document (the parts it
+  // showed one at a time): they are added after the page, in the same step.
+  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, fonts, more = [] } = {}) => {
     const page = get().schema.pages.find((p) => p.id === id)
     if (!page || !Array.isArray(components)) return
     get().record()
     set((state) => {
-      const schema = mapPage(state.schema, id, (p) => normalizePage({
+      const converted = mapPage(state.schema, id, (p) => normalizePage({
         ...p,
         mode: 'empty',
         html: '',
@@ -1735,6 +1737,23 @@ export const useEditorStore = create((set, get) => ({
         seoDescription: p.seoDescription || seoDescription || '',
         fonts: Array.isArray(fonts) ? fonts : [],
       }))
+      const taken = new Set(converted.pages.map((p) => p.id))
+      const added = (Array.isArray(more) ? more : [])
+        .filter((extra) => extra && Array.isArray(extra.components) && extra.id && !taken.has(extra.id))
+        .map((extra) => normalizePage({
+          ...blankPage(extra.name || 'Page', page.folder || '', extra.id, 'empty', page.language),
+          components: extra.components,
+          flowMode: false,
+          mobileManual: false,
+          canvasWidth: extra.canvasWidth,
+          background: extra.background,
+          backgroundMobile: extra.background,
+          fonts: Array.isArray(extra.fonts) ? extra.fonts : [],
+        }))
+      const at = converted.pages.findIndex((p) => p.id === id) + 1
+      const schema = added.length
+        ? { ...converted, pages: [...converted.pages.slice(0, at), ...added, ...converted.pages.slice(at)] }
+        : converted
       return {
         schema,
         selectedId: null,

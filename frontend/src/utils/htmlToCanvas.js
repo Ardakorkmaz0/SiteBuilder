@@ -8,6 +8,8 @@
 // which moves and resizes like any other block. Nothing is dropped silently:
 // the report counts what was kept as HTML and what could not be carried.
 
+import { ANCHOR_RE } from './anchors.js'
+
 // Mirrors MAX_CHILDREN and MAX_HTML_EMBED in backend/builder/validators.py.
 const MAX_CHILDREN = 60
 const MAX_HTML_CODE = 50 * 1024
@@ -151,6 +153,16 @@ function block(ctx, type, props, styles, layout, children) {
   return { id: ctx.id(type), type, props, styles, layout, ...(children ? { children } : {}) }
 }
 
+// The element's id as the block's anchor, so a "#id" link on the page still
+// finds it. One block per id, and only an id the canvas can keep.
+function named(made, n, ctx) {
+  const target = made[made.length - 1]
+  if (!target || !n.id || !ANCHOR_RE.test(n.id) || ctx.anchors.has(n.id)) return made
+  ctx.anchors.add(n.id)
+  target.props = { ...target.props, anchor: n.id }
+  return made
+}
+
 // The block for a piece of the page that has no pieces inside it, or null
 // when `n` is a box to look into.
 function leaf(n, origin, ctx, href) {
@@ -267,7 +279,7 @@ function fitChildren(children, ctx) {
 function walk(n, out, origin, depth, ctx, href) {
   const made = leaf(n, origin, ctx, href)
   if (made) {
-    out.push(...made)
+    out.push(...named(made, n, ctx))
     return
   }
   const inside = n.tag === 'a' && n.href !== undefined ? n.href : href
@@ -284,7 +296,7 @@ function walk(n, out, origin, depth, ctx, href) {
     const children = [...backdrop(n, ctx)]
     kids.forEach((kid) => walk(kid, children, innerOrigin(n), depth + 1, ctx, inside))
     children.push(...edgeLines(n, ctx))
-    out.push(block(ctx, 'container', {}, styles, layout, fitChildren(children, ctx)))
+    out.push(...named([block(ctx, 'container', {}, styles, layout, fitChildren(children, ctx))], n, ctx))
     return
   }
   // Nothing inside it, or too deep (or too flat) for a box with children:
@@ -392,7 +404,7 @@ function bands(n, out, ctx) {
       continue
     }
     if (!kids.length && !isPainted(kid.s)) continue
-    out.push(section(kid, ctx))
+    out.push(...named([section(kid, ctx)], kid, ctx))
   }
 }
 
@@ -401,7 +413,7 @@ const randomId = (type) => `${type}_${Math.random().toString(36).slice(2, 8)}`
 export function canvasFromMeasured(measured, { makeId = randomId } = {}) {
   const page = measured?.root?.rect
   const width = Math.max(320, Math.min(4000, Math.round(page?.w || measured?.width || 1200)))
-  const ctx = { width, left: page?.x || 0, id: makeId, report: { native: 0, html: 0, tooLarge: 0 } }
+  const ctx = { width, left: page?.x || 0, id: makeId, anchors: new Set(), report: { native: 0, html: 0, tooLarge: 0 } }
   const components = []
   if (measured?.root) bands(measured.root, components, ctx)
   const [body, root] = measured?.background || []
@@ -415,4 +427,51 @@ export function canvasFromMeasured(measured, { makeId = randomId } = {}) {
     language: measured?.language || '',
     report: { ...ctx.report, scripts: measured?.scripts || 0, hidden: measured?.hiddenParts || 0 },
   }
+}
+
+const randomPageId = () => `page_${Math.random().toString(36).slice(2, 8)}`
+
+// Where a "#id" link should lead once the page's states are pages: to the
+// block on its own page when the id is there, else to the page that shows it.
+function retarget(pages) {
+  const owner = new Map()
+  for (const page of pages) for (const id of page.ids) if (!owner.has(id)) owner.set(id, page.id)
+  for (const page of pages) {
+    const here = new Set(page.ids)
+    const lead = (href) => {
+      if (typeof href !== 'string' || !href.startsWith('#')) return href
+      let id = href.slice(1)
+      try { id = decodeURIComponent(id) } catch { /* as written */ }
+      if (!id || here.has(id) || !owner.has(id)) return href
+      return `#${owner.get(id)}`
+    }
+    const visit = (list) => {
+      for (const c of list || []) {
+        if (typeof c.props.href === 'string') c.props.href = lead(c.props.href)
+        if (Array.isArray(c.props.links)) c.props.links = c.props.links.map((link) => ({ ...link, href: lead(link.href) }))
+        if (c.type === 'html') c.props.code = c.props.code.replace(/(href=")(#[^"]*)(")/g, (all, open, href, close) => `${open}${lead(href.replace(/&amp;/g, '&'))}${close}`)
+        visit(c.children)
+      }
+    }
+    visit(page.components)
+  }
+}
+
+// A page that shows its parts one at a time (chapters, tabs) becomes one
+// canvas page for each of them: the one it opens on first, as the page being
+// converted, and the others as new pages after it, named by their headings.
+// Links between the parts become links between the pages.
+export function pagesFromMeasured(measured, { makeId = randomId, makePageId = randomPageId, firstPageId = 'page_home' } = {}) {
+  const states = [
+    { name: '', data: measured },
+    ...(measured?.states || []).map((state) => ({ name: state.label || '', data: { ...state.data, fonts: measured.fonts, scripts: measured.scripts } })),
+  ]
+  const pages = states.map((state, index) => ({
+    id: index === 0 ? firstPageId : makePageId(),
+    name: state.name,
+    ids: Array.isArray(state.data?.ids) ? state.data.ids : [],
+    ...canvasFromMeasured(state.data, { makeId }),
+  }))
+  retarget(pages)
+  return pages
 }

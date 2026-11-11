@@ -62,6 +62,31 @@ describe('turning an HTML page into a canvas', () => {
   })
 })
 
+describe('turning an HTML page that shows its parts one at a time into canvas pages', () => {
+  const extra = (id, name) => ({ id, name, components: blocks().map((c) => ({ ...c, id: `${c.id}_${id}`, children: [] })), canvasWidth: 1200, background: '#0f172a', fonts: ['Fraunces:wght@500'] })
+
+  it('adds the other parts as canvas pages after it, in one step', () => {
+    s().convertPageToCanvas('page_home', {
+      components: blocks(), canvasWidth: 1200, background: '#0f172a', htmlBackup: DOCUMENT,
+      more: [extra('page_costs', 'Costs'), extra('page_proofs', 'Proofs'), extra('page_about', 'Taken id'), { id: 'page_bad' }],
+    })
+
+    expect(s().schema.pages.map((p) => [p.id, p.name, p.mode])).toEqual([
+      ['page_home', 'Home', 'empty'],
+      ['page_costs', 'Costs', 'empty'],
+      ['page_proofs', 'Proofs', 'empty'],
+      ['page_about', 'About', 'html'],
+    ])
+    expect(s().schema.pages[1]).toMatchObject({ canvasWidth: 1200, background: '#0f172a', flowMode: false, fonts: ['Fraunces:wght@500'] })
+    expect(s().schema.pages[1].components[0]).toMatchObject({ id: 'region_1_page_costs', type: 'region' })
+    // Only the page that was converted keeps the document.
+    expect(s().schema.pages[1].htmlBackup).toBeUndefined()
+
+    s().undo()
+    expect(s().schema.pages.map((p) => [p.id, p.mode])).toEqual([['page_home', 'html'], ['page_about', 'html']])
+  })
+})
+
 describe('going back to the HTML page', () => {
   it('hands the document back and makes the page an HTML page again', () => {
     s().convertPageToCanvas('page_home', { components: blocks(), canvasWidth: 1200, background: '#0f172a', htmlBackup: DOCUMENT })

@@ -155,6 +155,7 @@ function readPage(token, frameWindow) {
     }
     const node = { tag: tag.toLowerCase(), rect: boxOf(el.getBoundingClientRect()), s: readStyles(cs) }
     if (tag === 'A') node.href = el.getAttribute('href') || ''
+    if (el.id) node.id = el.id
 
     if (tag === 'IMG') {
       return { ...node, kind: 'image', src: el.currentSrc || el.getAttribute('src') || '', alt: el.getAttribute('alt') || '' }
@@ -265,23 +266,94 @@ function readPage(token, frameWindow) {
       // What the page's own scripts do when it opens (draw formulas, show the
       // first chapter) has had its turn by now.
       await settle(400)
-      const bodyStyle = win.getComputedStyle(doc.body)
-      const rootStyle = win.getComputedStyle(doc.documentElement)
-      const root = measureNode(doc.body)
-      return send(root && {
-        width: win.innerWidth,
-        height: Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight),
-        background: [bodyStyle.backgroundColor, rootStyle.backgroundColor],
-        fontFamily: bodyStyle.fontFamily,
-        title: doc.title || '',
-        description: doc.querySelector('meta[name="description"]')?.getAttribute('content') || '',
-        language: doc.documentElement.getAttribute('lang') || '',
-        hiddenParts: stats.hidden,
-        fontLinks: [...doc.querySelectorAll('link[rel~="stylesheet"][href]')].map((link) => link.getAttribute('href')),
-        root,
-      })
+      const first = snapshot()
+      // A page that shows its parts one at a time (chapters, tabs) links to
+      // the ones it is hiding. Each hidden part some link leads to is a state
+      // the page can be put in and read again.
+      if (first && token) {
+        const found = new Map()
+        for (const link of doc.querySelectorAll('a[href^="#"]')) {
+          let id = ''
+          try { id = decodeURIComponent(link.getAttribute('href').slice(1)) } catch { /* not an id */ }
+          const target = id ? doc.getElementById(id) : null
+          const part = target ? hiddenRoot(target) : null
+          if (!part) continue
+          const known = found.get(part)
+          if (!known || (target === part && !known.exact)) found.set(part, { part, link, exact: target === part })
+        }
+        states.push(...[...found.values()].slice(0, 30))
+        first.states = states.map(({ part, link }) => ({
+          label: (part.getAttribute('data-title') || part.querySelector('h1, h2, h3')?.textContent || link.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80),
+        }))
+        win.addEventListener('message', (event) => {
+          if (event.source !== win.parent) return
+          if (event.data?.type !== 'pwb-page-show' || event.data.token !== token) return
+          show(event.data.index)
+        })
+      }
+      return send(first)
     } catch {
       return send(null)
+    }
+  }
+
+  // The outermost thing that keeps `el` from being shown, or null.
+  function hiddenRoot(el) {
+    let root = null
+    for (let node = el; node && node !== doc.documentElement; node = node.parentElement) {
+      if (isHidden(win.getComputedStyle(node))) root = node
+    }
+    return root
+  }
+
+  // The page as it stands now, read whole.
+  function snapshot() {
+    stats.hidden = 0
+    win.scrollTo(0, 0)
+    const bodyStyle = win.getComputedStyle(doc.body)
+    const rootStyle = win.getComputedStyle(doc.documentElement)
+    const root = measureNode(doc.body)
+    return root && {
+      width: win.innerWidth,
+      height: Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight),
+      background: [bodyStyle.backgroundColor, rootStyle.backgroundColor],
+      fontFamily: bodyStyle.fontFamily,
+      title: doc.title || '',
+      description: doc.querySelector('meta[name="description"]')?.getAttribute('content') || '',
+      language: doc.documentElement.getAttribute('lang') || '',
+      hiddenParts: stats.hidden,
+      fontLinks: [...doc.querySelectorAll('link[rel~="stylesheet"][href]')].map((link) => link.getAttribute('href')),
+      // Every id that is on show: where a link to it should lead.
+      ids: [...doc.querySelectorAll('[id]')].filter((el) => !hiddenRoot(el)).map((el) => el.id),
+      root,
+    }
+  }
+
+  // Put the page in one of its states, the way its reader would (by the
+  // link), and read it. Null when the part did not come into view.
+  const states = []
+  async function show(index) {
+    const reply = (data, why = '') => { try { win.parent.postMessage({ type: 'pwb-page-state', token, index, data, why }, '*') } catch { /* no one to tell */ } }
+    try {
+      const state = states[index]
+      if (!state) return reply(null, 'no such state')
+      state.link.click()
+      await settle(350)
+      if (hiddenRoot(state.part)) {
+        // The frame's address is one the browser will not follow a "#" link
+        // on, so a page that waits for its address to change never hears of
+        // the click. The address is changed in place and the page is told.
+        const before = win.location.href
+        win.history.replaceState(null, '', state.link.getAttribute('href'))
+        win.dispatchEvent(new win.HashChangeEvent('hashchange', { oldURL: before, newURL: win.location.href }))
+        win.dispatchEvent(new win.PopStateEvent('popstate', { state: null }))
+        await settle(350)
+      }
+      if (hiddenRoot(state.part)) return reply(null, 'still hidden')
+      await Promise.race([doc.fonts?.ready || Promise.resolve(), settle(2000)])
+      return reply(snapshot())
+    } catch (error) {
+      return reply(null, String(error))
     }
   }
   if (doc.readyState === 'complete') return read()
@@ -309,25 +381,49 @@ const laidOut = (data) => !!data && typeof data === 'object' && data.root?.rect?
 // The page with its scripts running, in a frame that is not of the editor's
 // origin. Null when the browser did not lay the frame out (it does not for a
 // tab in the background) or nothing came back in time.
-function readWithScripts(html, { width, height, timeout }) {
+function readWithScripts(html, { width, height, timeout, onProgress }) {
   return new Promise((resolve) => {
     const win = window
     const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`
     let frame
     let settled = false
-    const onMessage = (event) => {
-      // Only the frame made here, and only its answer to this reading.
-      if (event.source !== frame?.contentWindow) return
-      if (event.data?.type !== 'pwb-page-measured' || event.data.token !== token) return
-      done(laidOut(event.data.data) ? event.data.data : null)
+    let timer = win.setTimeout(() => done(null), timeout)
+    let first = null
+    let asked = -1
+    // The states of the page, one after another: each is asked for when the
+    // one before it has come back (or has taken too long).
+    const next = (data, why = '') => {
+      if (asked >= 0 && first.states[asked]) {
+        first.states[asked].data = laidOut(data) ? data : null
+        if (!first.states[asked].data) first.states[asked].why = why || 'no answer'
+      }
+      asked += 1
+      win.clearTimeout(timer)
+      if (asked >= first.states.length) return done(first)
+      try { onProgress?.(asked + 1, first.states.length) } catch { /* a listener's own trouble */ }
+      timer = win.setTimeout(() => next(null), 8000)
+      frame.contentWindow.postMessage({ type: 'pwb-page-show', token, index: asked }, '*')
+      return undefined
     }
-    const timer = win.setTimeout(() => done(null), timeout)
+    const onMessage = (event) => {
+      // Only the frame made here, and only its answers to this reading.
+      if (event.source !== frame?.contentWindow || event.data?.token !== token) return
+      if (event.data.type === 'pwb-page-measured' && !first) {
+        if (!laidOut(event.data.data)) return done(null)
+        first = { ...event.data.data, states: Array.isArray(event.data.data.states) ? event.data.data.states : [] }
+        next(null)
+      } else if (event.data.type === 'pwb-page-state' && first && event.data.index === asked) {
+        next(event.data.data, event.data.why)
+      }
+    }
+    let address = ''
     function done(result) {
       if (settled) return
       settled = true
       win.clearTimeout(timer)
       win.removeEventListener('message', onMessage)
       try { frame?.remove() } catch { /* already gone */ }
+      if (address) URL.revokeObjectURL(address)
       resolve(result)
     }
     try {
@@ -339,7 +435,11 @@ function readWithScripts(html, { width, height, timeout }) {
       frame.setAttribute('aria-hidden', 'true')
       frame.setAttribute('tabindex', '-1')
       frame.style.cssText = FRAME_CSS(width, height)
-      frame.srcdoc = withReader(html, token)
+      // Given an address of its own, not written in as srcdoc: a sandboxed
+      // srcdoc frame goes blank when a "#chapter" link in it is followed,
+      // and the reader follows those to bring each chapter into view.
+      address = URL.createObjectURL(new Blob([withReader(html, token)], { type: 'text/html' }))
+      frame.src = address
       document.body.appendChild(frame)
     } catch {
       done(null)
@@ -382,13 +482,18 @@ function readWithoutScripts(html, { width, height, timeout }) {
 
 // Lay `html` out `width` pixels wide and read it. Resolves null when the page
 // cannot be read. `ranScripts` on the reading says which way it was read.
-export async function measureHtmlPage(html, { width = 1200, height = 900, timeout = 15000 } = {}) {
-  const options = { width, height, timeout }
+// `states` holds the parts the page shows one at a time, each read like the
+// page itself (`data`, null for one that did not come into view) and named.
+export async function measureHtmlPage(html, { width = 1200, height = 900, timeout = 15000, onProgress } = {}) {
+  const options = { width, height, timeout, onProgress }
   const scripted = await readWithScripts(html, options)
   const data = scripted || await readWithoutScripts(html, options)
   if (!data) return null
   return {
     ...data,
+    states: (data.states || []).filter((state) => state.data),
+    // The parts that could not be brought into view, and why.
+    unread: (data.states || []).filter((state) => !state.data).map((state) => ({ label: state.label, why: state.why })),
     ranScripts: !!scripted,
     scripts: (String(html || '').match(/<script\b/gi) || []).length,
     fonts: [...new Set((Array.isArray(data.fontLinks) ? data.fontLinks : []).flatMap((href) => fontSpecsFromHref(href)))].slice(0, MAX_PAGE_FONTS),
