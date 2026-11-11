@@ -4,7 +4,7 @@ import { useEditorStore } from '../../store/editorStore.js'
 import { readFileText } from '../../utils/fileText.js'
 import { pageFileName } from '../../utils/pageFiles.js'
 import { countLinksToPage } from '../../utils/pageLinks.js'
-import { FileIcon, FileCodeIcon, FolderIcon, LinkIcon, LayersIcon } from '../icons.jsx'
+import { CanvasPageIcon, FolderIcon, HtmlPageIcon, LinkIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
@@ -17,8 +17,11 @@ import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 //  - hover actions        → rename, per-file HTML import (HTML mode), delete
 //  - right click          → those, plus going live and staying off the public site
 //  - the file's colour    → green live, blue an older version live, red not live
-// `mode`: 'html' shows has-document dots + import; 'pages' is the component
-// editor variant (every page always "has" content).
+//  - the file's mark      → what kind of page it is: a canvas of blocks or an
+//    HTML document. It comes from the page itself, so it is the same whichever
+//    kind of page is open (the "empty" tag used to stand in for it, and went
+//    away whenever a canvas page was opened).
+// `mode`: 'html' offers the import; 'pages' is the component editor variant.
 
 // The page a chooser just created, until a page list shows and focuses it.
 let newPageToFocus = null
@@ -39,6 +42,9 @@ export default function PageFilesPanel({
   privatePages = [],
   onSendLive,
   onSetHidden,
+  // An HTML page into canvas blocks, and the way back (EditorPage owns both).
+  onConvertToCanvas,
+  onBackToHtml,
 }) {
   const { t } = useLanguage()
   const pages = useEditorStore((s) => s.schema.pages)
@@ -164,6 +170,12 @@ export default function PageFilesPanel({
         action: 'hide',
       }] : []),
       ...((onSendLive || onSetHidden) ? [{ divider: true }] : []),
+      ...(onConvertToCanvas && page.mode === 'html' && (htmlMap[page.id] || '').trim()
+        ? [{ label: t('Convert to canvas blocks'), action: 'toCanvas' }, { divider: true }]
+        : []),
+      ...(onBackToHtml && page.mode !== 'html' && (page.htmlBackup || '').trim()
+        ? [{ label: t('Back to the HTML page'), action: 'toHtml' }, { divider: true }]
+        : []),
       { label: t('Rename page'), action: 'rename' },
       ...(mode === 'html' ? [{ label: t('Import an HTML file into this page'), action: 'import' }] : []),
       ...(pages.length > 1 ? [{ label: t('Delete page'), danger: true, action: 'delete' }] : []),
@@ -172,6 +184,8 @@ export default function PageFilesPanel({
   const pickMenuItem = (action, page) => {
     if (action === 'live') onSendLive(page.id)
     if (action === 'hide') onSetHidden(page.id, !privatePages.includes(page.id))
+    if (action === 'toCanvas') onConvertToCanvas(page.id)
+    if (action === 'toHtml') onBackToHtml(page.id)
     if (action === 'rename') startRename(page)
     if (action === 'import') startImport(page)
     if (action === 'delete') confirmDelete(page, pageFileName(page, page.id === pages[0]?.id))
@@ -180,7 +194,8 @@ export default function PageFilesPanel({
   const renderFile = (page, indented) => {
     const isHome = page.id === pages[0]?.id
     const fname = pageFileName(page, isHome)
-    const hasHtml = mode === 'pages' || !!(htmlMap[page.id] || '').trim()
+    const isHtmlPage = page.mode === 'html'
+    const kind = isHtmlPage ? 'HTML page' : 'Canvas page: blocks you drag and drop'
     const active = page.id === currentPageId
     const liveState = liveStates?.[page.id]
     const hiddenFromPublic = privatePages.includes(page.id)
@@ -199,8 +214,13 @@ export default function PageFilesPanel({
         } ${active ? 'bg-[#eef2ff]' : 'hover:bg-[#f3f4f6]'}`}
       >
         {active && <span className="absolute bottom-1 left-0 top-1 w-0.5 rounded-full bg-[#4f46e5]" />}
-        <span className={`shrink-0 ${LIVE_STATE_COLOR[liveState] || 'text-[var(--studio-text-muted)]'}`}>
-          {hasHtml ? <FileCodeIcon size={14} /> : <FileIcon size={14} />}
+        <span
+          data-page-kind={isHtmlPage ? 'html' : 'canvas'}
+          title={t(kind)}
+          className={`shrink-0 ${LIVE_STATE_COLOR[liveState] || (isHtmlPage ? 'text-[var(--studio-text-muted)]' : 'text-[var(--studio-accent)]')}`}
+        >
+          {isHtmlPage ? <HtmlPageIcon size={15} /> : <CanvasPageIcon size={15} />}
+          <span className="sr-only">{t(kind)}</span>
         </span>
         {editingId === page.id ? (
           <input
@@ -259,7 +279,9 @@ export default function PageFilesPanel({
             {t('hidden')}
           </span>
         )}
-        {mode === 'html' && !(htmlMap[page.id] || '').trim() && (
+        {/* An HTML page that has no document yet. A canvas page is not
+            "empty": its mark says what it is. */}
+        {isHtmlPage && !(htmlMap[page.id] || '').trim() && (
           <span className="shrink-0 rounded bg-[#f3f4f6] px-1 text-[9px] font-bold uppercase text-[var(--studio-text-faint)]">
             {t('empty')}
           </span>
@@ -519,7 +541,7 @@ function NewPageModePrompt({ onPick, onCancel }) {
             onClick={() => onPick('empty')}
             className="flex flex-col items-start gap-1 rounded-lg border border-[#e5e7eb] bg-white p-3 text-left hover:border-[#4f46e5] hover:bg-[#eef2ff]"
           >
-            <LayersIcon size={20} className="text-[#4f46e5]" />
+            <CanvasPageIcon size={20} className="text-[#4f46e5]" />
             <span className="text-sm font-semibold text-[#111827]">{t('Empty canvas')}</span>
             <span className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
               {t('Drag-and-drop components on a blank canvas.')}
@@ -530,7 +552,7 @@ function NewPageModePrompt({ onPick, onCancel }) {
             onClick={() => onPick('html')}
             className="flex flex-col items-start gap-1 rounded-lg border border-[#e5e7eb] bg-white p-3 text-left hover:border-[#4f46e5] hover:bg-[#eef2ff]"
           >
-            <FileCodeIcon size={20} className="text-[#4f46e5]" />
+            <HtmlPageIcon size={20} className="text-[#4f46e5]" />
             <span className="text-sm font-semibold text-[#111827]">{t('HTML page')}</span>
             <span className="text-[11px] leading-snug text-[var(--studio-text-muted)]">
               {t('Upload, paste, or author a full HTML document.')}

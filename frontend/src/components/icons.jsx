@@ -45,6 +45,29 @@ export const DownloadIcon = (p) => (
   </Icon>
 )
 
+// The two kinds of page, as marks of their own beside every file: a canvas
+// page is an artboard with blocks on it, an HTML page is a document of code.
+// Their outlines differ (a square, a dog-eared sheet), so they are told apart
+// at the size of a file list, where the details inside are a few pixels.
+export const CanvasPageIcon = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="3.5" />
+    <rect x="6.7" y="6.7" width="10.6" height="4.2" rx="1.1" fill="currentColor" stroke="none" />
+    <rect x="6.7" y="13.1" width="4.4" height="4.2" rx="1.1" fill="currentColor" stroke="none" />
+    <rect x="12.9" y="13.1" width="4.4" height="4.2" rx="1.1" fill="currentColor" stroke="none" opacity="0.55" />
+  </Icon>
+)
+
+export const HtmlPageIcon = (p) => (
+  <Icon {...p}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <path d="M14 2v6h6" />
+    <path d="m9.6 12.6-2.2 2.4 2.2 2.4" />
+    <path d="m14.4 12.6 2.2 2.4-2.2 2.4" />
+    <path d="m12.7 11.9-1.4 6.2" />
+  </Icon>
+)
+
 export const FileCodeIcon = (p) => (
   <Icon {...p}>
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
