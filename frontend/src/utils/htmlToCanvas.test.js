@@ -1,7 +1,7 @@
 // A measured HTML page becomes canvas blocks. The measurements here are
 // written by hand, the way htmlPageMeasure.js reports them from a browser.
 import { describe, expect, it } from 'vitest'
-import { alphaOf, canvasFromMeasured, hexOf } from './htmlToCanvas.js'
+import { alphaOf, canvasFromMeasured, hexOf, pagesFromMeasured } from './htmlToCanvas.js'
 
 const CLEAR = 'rgba(0, 0, 0, 0)'
 const BASE = {
@@ -359,5 +359,96 @@ describe('colours and fonts', () => {
   it('hands on the web fonts the document asked for', () => {
     expect(convert(page([], { fonts: ['Fraunces:ital,wght@0,500;1,500', 'Inter'] })).fonts).toEqual(['Fraunces:ital,wght@0,500;1,500', 'Inter'])
     expect(convert(page([])).fonts).toEqual([])
+  })
+})
+
+describe('an element that links lead to', () => {
+  it('gives its id to its block as an anchor, once, and only an id the canvas can keep', () => {
+    const result = convert(page([
+      node('section', [0, 0, 1200, 400], {
+        id: 'menu',
+        kids: [
+          text('h2', [40, 40, 400, 40], 'Menu', {}, { id: 'prices' }),
+          text('p', [40, 100, 400, 24], 'Twice', {}, { id: 'prices' }),
+          text('p', [40, 140, 400, 24], 'Odd', {}, { id: 'Not An Anchor' }),
+        ],
+      }),
+    ]))
+
+    const section = result.components[0]
+    expect(section.props).toEqual({ contentWidth: 1200, anchor: 'menu' })
+    expect(section.children.map((c) => c.props)).toEqual([
+      { text: 'Menu', level: 'h2', anchor: 'prices' },
+      { text: 'Twice' },
+      { text: 'Odd' },
+    ])
+  })
+})
+
+// A page that shows its chapters one at a time: each state the reader put it
+// in is a reading of its own, with the ids that were on show in it.
+describe('a page that shows its parts one at a time', () => {
+  const link = (x, words, href) => text('a', [x, 20, 80, 24], words, {}, { href })
+  const state = (heading, ids, extra = []) => ({
+    width: 1200, height: 900, background: ['rgb(255, 255, 255)', CLEAR], fontFamily: 'Inter', title: 'Notes', description: '', language: 'en', ids,
+    root: node('body', [0, 0, 1200, 900], {
+      kids: [
+        node('section', [0, 0, 1200, 900], {
+          kids: [
+            link(40, 'Intro', '#intro'), link(140, 'Costs', '#costs'), link(240, 'Formula', '#formula'), link(340, 'Elsewhere', '#nowhere'), link(440, 'Out', 'https://example.com/'),
+            text('h1', [40, 100, 600, 60], heading, {}, { id: ids[1] }),
+            ...extra,
+          ],
+        }),
+      ],
+    }),
+  })
+  const measured = () => ({
+    ...state('Introduction', ['nav', 'intro']),
+    fonts: ['Fraunces:wght@500'],
+    scripts: 2,
+    states: [
+      { label: 'Costs and losses', data: state('Costs', ['nav', 'costs', 'formula'], [node('table', [40, 200, 400, 100], { kind: 'html', code: '<table><tr><td><a href="#intro">back</a> <a href="#formula">here</a></td></tr></table>' })]) },
+    ],
+  })
+
+  function build() {
+    let n = 0
+    let p = 0
+    return pagesFromMeasured(measured(), { firstPageId: 'page_home', makeId: (type) => `${type}_${(n += 1)}`, makePageId: () => `page_made${(p += 1)}` })
+  }
+  const hrefs = (made) => made.components[0].children.filter((c) => c.type === 'linkbutton').map((c) => c.props.href)
+
+  it('becomes a canvas page for each part, named by the part', () => {
+    const pages = build()
+
+    expect(pages.map((made) => [made.id, made.name, made.components[0].children.find((c) => c.type === 'heading').props.text])).toEqual([
+      ['page_home', '', 'Introduction'],
+      ['page_made1', 'Costs and losses', 'Costs'],
+    ])
+    // Each page asks for the fonts the document loaded.
+    expect(pages.map((made) => made.fonts)).toEqual([['Fraunces:wght@500'], ['Fraunces:wght@500']])
+  })
+
+  it('leads a link to the page that shows its target, and leaves a link to its own page alone', () => {
+    const [intro, costs] = build()
+
+    expect(hrefs(intro)).toEqual(['#intro', '#page_made1', '#page_made1', '#nowhere', 'https://example.com/'])
+    expect(hrefs(costs)).toEqual(['#page_home', '#costs', '#formula', '#nowhere', 'https://example.com/'])
+    // The heading a link on its own page leads to keeps its id as an anchor.
+    expect(costs.components[0].children.find((c) => c.type === 'heading').props.anchor).toBe('costs')
+  })
+
+  it('leads the links inside a kept HTML block the same way', () => {
+    const [, costs] = build()
+
+    expect(costs.components[0].children.find((c) => c.type === 'html').props.code)
+      .toBe('<table><tr><td><a href="#page_home">back</a> <a href="#formula">here</a></td></tr></table>')
+  })
+
+  it('is one page when the page hides nothing a link leads to', () => {
+    const pages = pagesFromMeasured({ ...state('Only', ['nav', 'intro']), states: [] }, { firstPageId: 'page_x' })
+
+    expect(pages.map((made) => made.id)).toEqual(['page_x'])
   })
 })
