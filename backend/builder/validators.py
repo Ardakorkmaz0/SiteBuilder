@@ -692,6 +692,20 @@ def sanitize_theme(theme):
     return cleaned
 
 
+# A Google Fonts family as its stylesheet address names it, with the weights
+# asked for: "Source Sans 3:wght@400;600". It is written into that address
+# and nowhere else. Mirrors PAGE_FONT_SPEC and MAX_PAGE_FONTS in
+# frontend/src/utils/googleFonts.js.
+_PAGE_FONT_RE = re.compile(r'^[A-Za-z0-9 ]{1,60}(?::[a-z,]{1,12}@[0-9;,.]{1,120})?$')
+MAX_PAGE_FONTS = 8
+
+
+def sanitize_page_fonts(value):
+    if not isinstance(value, list):
+        return []
+    return [spec for spec in value if isinstance(spec, str) and _PAGE_FONT_RE.match(spec)][:MAX_PAGE_FONTS]
+
+
 def sanitize_custom_css(value):
     css = _str(value)[:20000]
     css = re.sub(r'</style', '<\\/style', css, flags=re.IGNORECASE)
@@ -811,6 +825,13 @@ def validate_and_clean_schema(schema):
             'mode': 'html' if page.get('mode') == 'html' or _page_html(page.get('html')).strip() else 'empty',
             # Multi-page HTML sites keep one full document per page.
             'html': _page_html(page.get('html')),
+            # The document a page had before its owner turned it into a
+            # canvas: the way back. Never rendered from here; the editor moves
+            # it into `html` when the owner goes back.
+            'htmlBackup': _page_html(page.get('htmlBackup')),
+            # Web fonts the page loads beside its theme's (a page that came
+            # from an HTML document keeps the ones that document loaded).
+            'fonts': sanitize_page_fonts(page.get('fonts')),
             'components': [sanitize_component(c) for c in comps],
         })
     color_mode = sanitize_color_mode(schema.get('colorMode'))

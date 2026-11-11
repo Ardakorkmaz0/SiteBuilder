@@ -1710,6 +1710,58 @@ export const useEditorStore = create((set, get) => ({
   // Flip a page between the component canvas ('empty') and an HTML document
   // ('html'). The HTML content itself lives in EditorPage's pageHtmlMap; this
   // just records which surface the editor shows for the page.
+  // An HTML page becomes a canvas page holding `components` (what
+  // utils/htmlToCanvas.js made of the document). The document itself stays
+  // with the page as `htmlBackup`, so the way back does not depend on Undo.
+  // `fonts` are the web fonts the document loaded (googleFonts.js): the page
+  // keeps asking for them, so its text is drawn in the faces it was measured in.
+  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, fonts } = {}) => {
+    const page = get().schema.pages.find((p) => p.id === id)
+    if (!page || !Array.isArray(components)) return
+    get().record()
+    set((state) => {
+      const schema = mapPage(state.schema, id, (p) => normalizePage({
+        ...p,
+        mode: 'empty',
+        html: '',
+        htmlBackup: typeof htmlBackup === 'string' ? htmlBackup : '',
+        components,
+        flowMode: false,
+        mobileManual: false,
+        canvasWidth,
+        background,
+        backgroundMobile: background,
+        seoTitle: p.seoTitle || seoTitle || '',
+        seoDescription: p.seoDescription || seoDescription || '',
+        fonts: Array.isArray(fonts) ? fonts : [],
+      }))
+      return {
+        schema,
+        selectedId: null,
+        selectedIds: [],
+        dirty: true,
+      }
+    })
+  },
+
+  // The way back from convertPageToCanvas: the page is an HTML page again.
+  // Returns the document for the editor to show (it holds page HTML outside
+  // the store), or '' when the page has none kept. The canvas design stays in
+  // the schema, as it does under any HTML page.
+  restoreHtmlBackup: (id) => {
+    const page = get().schema.pages.find((p) => p.id === id)
+    const backup = typeof page?.htmlBackup === 'string' ? page.htmlBackup : ''
+    if (!backup.trim()) return ''
+    get().record()
+    set((state) => ({
+      schema: mapPage(state.schema, id, (p) => ({ ...p, mode: 'html', htmlBackup: '' })),
+      selectedId: null,
+      selectedIds: [],
+      dirty: true,
+    }))
+    return backup
+  },
+
   setPageMode: (id, mode) => {
     const next = mode === 'html' ? 'html' : 'empty'
     const page = get().schema.pages.find((p) => p.id === id)
