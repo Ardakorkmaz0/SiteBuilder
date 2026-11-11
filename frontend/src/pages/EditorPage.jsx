@@ -2237,11 +2237,12 @@ function SiteEditor() {
   // is kept with the page (htmlBackup), so "Back to the HTML page" brings it
   // back as it was, whatever has happened on the canvas since.
   const [convertingToCanvas, setConvertingToCanvas] = useState(false)
-  async function convertHtmlToCanvas() {
+  // `pageId` is the open page, or the file that was right-clicked in the list.
+  async function convertHtmlToCanvas(pageId = currentPageId) {
     if (convertingToCanvas) return
     flushWorkspaceDrafts()
     const currentMap = liveHtmlMap()
-    const html = currentMap[currentPageId] || ''
+    const html = currentMap[pageId] || ''
     if (!html.trim()) return
     setConvertingToCanvas(true)
     try {
@@ -2256,6 +2257,7 @@ function SiteEditor() {
         report.html ? t('{count} of them stay HTML blocks: the canvas has no block of its own for them (a table, a form, a video, or text with a link inside it).', { count: report.html }) : '',
         report.tooLarge ? t('{count} parts are too large to carry over and would be left out.', { count: report.tooLarge }) : '',
         report.scripts ? t('The page has scripts. They do not run on the canvas.') : '',
+        report.hidden ? t('{count} parts of the page are hidden until something shows them (another chapter, a closed menu, an answer). They are not put on the canvas; they stay in the HTML page that is kept.', { count: report.hidden }) : '',
         t('The HTML page is kept: "Back to the HTML page" in this menu brings it back as it is now.'),
       ].filter(Boolean)
       if (!window.confirm(lines.join('\n\n'))) return
@@ -2263,35 +2265,39 @@ function SiteEditor() {
       // "Remove HTML".
       const state = useEditorStore.getState()
       rememberHtmlForSchema(state.schema, currentMap)
-      state.convertPageToCanvas(currentPageId, {
+      state.convertPageToCanvas(pageId, {
         ...result,
         htmlBackup: html,
         seoTitle: result.title,
         seoDescription: result.description,
       })
-      const nextMap = { ...currentMap, [currentPageId]: '' }
+      const nextMap = { ...currentMap, [pageId]: '' }
       rememberHtmlForSchema(useEditorStore.getState().schema, nextMap)
       setPageHtmlMap(nextMap)
       markHtmlDirty()
-      if (localFile?.pageId === currentPageId) unlinkLocalFile()
+      if (localFile?.pageId === pageId) unlinkLocalFile()
       setHtmlSelection(null)
+      // Converted from the file list: the page that changed is the one shown.
+      if (pageId !== useEditorStore.getState().currentPageId) useEditorStore.getState().selectPage(pageId)
     } finally {
       setConvertingToCanvas(false)
     }
   }
 
-  function backToHtmlPage() {
+  function backToHtmlPage(pageId = currentPageId) {
     if (!window.confirm(t('Go back to the HTML page as it was before it became a canvas? (Undo brings the canvas back.)'))) return
+    flushWorkspaceDrafts()
     const before = useEditorStore.getState().schema
     const currentMap = liveHtmlMap()
     rememberHtmlForSchema(before, currentMap)
-    const backup = useEditorStore.getState().restoreHtmlBackup(currentPageId)
+    const backup = useEditorStore.getState().restoreHtmlBackup(pageId)
     if (!backup) return
-    const nextMap = { ...currentMap, [currentPageId]: backup }
+    const nextMap = { ...currentMap, [pageId]: backup }
     rememberHtmlForSchema(useEditorStore.getState().schema, nextMap)
     setPageHtmlMap(nextMap)
     markHtmlDirty()
     setWorkspaceSession((session) => session + 1)
+    if (pageId !== useEditorStore.getState().currentPageId) useEditorStore.getState().selectPage(pageId)
   }
 
   // Start this page as an empty HTML document: nothing on the page, only the
@@ -2785,8 +2791,8 @@ function SiteEditor() {
                   <button type="button" onClick={() => { setMoreOpen(false); setTemplateOpen(true) }} className="studio-menu-item">{t('Choose a template...')}</button>
                   <button type="button" onClick={() => { setMoreOpen(false); startBlankHtml() }} className="studio-menu-item">{t('Start blank HTML')}</button>
                   {!currentPageIsHtml && <button type="button" onClick={() => { setMoreOpen(false); convertToResponsiveHtml() }} className="studio-menu-item">{t('Convert to responsive HTML')}</button>}
-                  {currentPageIsHtml && siteHtml.trim() && <button type="button" disabled={convertingToCanvas} onClick={() => { setMoreOpen(false); convertHtmlToCanvas() }} className="studio-menu-item disabled:opacity-40">{t('Convert to canvas blocks')}</button>}
-                  {!currentPageIsHtml && (currentPage?.htmlBackup || '').trim() && <button type="button" onClick={() => { setMoreOpen(false); backToHtmlPage() }} className="studio-menu-item">{t('Back to the HTML page')}</button>}
+                  {currentPageIsHtml && siteHtml.trim() && <button type="button" disabled={convertingToCanvas} onClick={() => { setMoreOpen(false); convertHtmlToCanvas(currentPageId) }} className="studio-menu-item disabled:opacity-40">{t('Convert to canvas blocks')}</button>}
+                  {!currentPageIsHtml && (currentPage?.htmlBackup || '').trim() && <button type="button" onClick={() => { setMoreOpen(false); backToHtmlPage(currentPageId) }} className="studio-menu-item">{t('Back to the HTML page')}</button>}
                   {supportsLocalFiles() && <button type="button" onClick={() => { setMoreOpen(false); openAndLinkLocalFile() }} className="studio-menu-item">{t('Open & link HTML file...')}</button>}
                   {[['HTML file...', htmlInputRef], ['Project folder...', folderInputRef], ['Project JSON...', jsonInputRef]].map(([label, ref]) => (
                     <button key={label} type="button" onClick={() => { setMoreOpen(false); ref.current?.click() }} className="studio-menu-item">{t(label)}</button>
@@ -3002,6 +3008,8 @@ function SiteEditor() {
                       privatePages={privatePages}
                       onSendLive={sendFileLive}
                       onSetHidden={setFileHidden}
+                      onConvertToCanvas={convertHtmlToCanvas}
+                      onBackToHtml={backToHtmlPage}
                     />
                   }
                 />
@@ -3203,6 +3211,9 @@ function SiteEditor() {
                   filesPanel={
                     <PageFilesPanel
                       mode="pages"
+                      htmlMap={pageHtmlMap}
+                      onConvertToCanvas={convertHtmlToCanvas}
+                      onBackToHtml={backToHtmlPage}
                       linkArmed={linkMode && !!linkSourceId}
                       onLinkToPage={(pid) => bindLinkSourceToPage(pid)}
                       onSelect={switchToPage}

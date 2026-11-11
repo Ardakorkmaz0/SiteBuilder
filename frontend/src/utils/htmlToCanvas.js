@@ -413,6 +413,6 @@ export function canvasFromMeasured(measured, { makeId = randomId } = {}) {
     title: measured?.title || '',
     description: measured?.description || '',
     language: measured?.language || '',
-    report: { ...ctx.report, scripts: measured?.scripts || 0 },
+    report: { ...ctx.report, scripts: measured?.scripts || 0, hidden: measured?.hiddenParts || 0 },
   }
 }

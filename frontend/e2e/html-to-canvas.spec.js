@@ -1,6 +1,8 @@
 // An HTML page turned into a canvas page: every piece of it becomes a block
 // where the browser drew it, the published page shows them, and the document
 // it was comes back, byte for byte, when the owner goes back.
+// The page is read as its owner sees it, with its own scripts having run:
+// the heading below is written by one.
 import { test, expect, api, createHtmlSite, openEditor, save, publish, savedHtml, BACKEND } from './support.js'
 
 const DOCUMENT = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Olive Bakery</title>
@@ -12,8 +14,9 @@ body{margin:0;font-family:Arial,sans-serif;background:#faf7f2}
 .hero a{display:inline-block;margin-top:24px;padding:12px 24px;background:#4f46e5;color:#fff;border-radius:8px;text-decoration:none}
 .prices{padding:40px 100px}
 </style></head><body>
-<section class="hero"><h1>Fresh bread daily</h1><p>Baked every morning in our own oven.</p><a href="#order">Order now</a></section>
+<section class="hero"><h1>Loading</h1><p>Baked every morning in our own oven.</p><a href="#order">Order now</a></section>
 <section class="prices"><table><tr><td>Rye loaf</td><td>4</td></tr></table></section>
+<script>document.querySelector('.hero h1').textContent = 'Fresh bread daily'</script>
 </body></html>`
 
 const flat = (components) => components.flatMap((c) => [c, ...flat(c.children || [])])
