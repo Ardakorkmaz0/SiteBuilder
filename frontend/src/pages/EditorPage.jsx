@@ -93,6 +93,8 @@ import { applyThemeToDocument } from '../utils/htmlTheme.js'
 import { replacePageColor } from '../utils/htmlPageColors.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
+import { measureHtmlPage } from '../utils/htmlPageMeasure.js'
+import { canvasFromMeasured } from '../utils/htmlToCanvas.js'
 import { withoutBuilderShim } from '../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
 import { componentDraftHtml, componentHtmlFiles, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
@@ -840,7 +842,8 @@ function SiteEditor() {
   // attach the stylesheet to the editor's <head> so the canvas preview
   // renders the same font the published page will. Keyed by the resolved
   // href, so a colour-only theme tweak doesn't re-request the file.
-  const themeFontHref = googleFontHrefForTheme(openPageTheme || theme)
+  const openPageFonts = useEditorStore((s) => s.schema.pages.find((p) => p.id === s.currentPageId)?.fonts)
+  const themeFontHref = googleFontHrefForTheme(openPageTheme || theme, openPageFonts)
   useEffect(() => {
     let link = document.getElementById('pwb-google-font')
     if (!themeFontHref) {
@@ -1870,8 +1873,8 @@ function SiteEditor() {
     markSaved()
   }
 
-  function restoreHistoryVersion(versionId) {
-    return loadIntoDraft(() => restoreVersion(id, versionId))
+  function restoreHistoryVersion(versionId, pageId) {
+    return loadIntoDraft(() => restoreVersion(id, versionId, pageId))
   }
 
   // "Copy live to draft": the live version back in the draft, through the
@@ -2227,6 +2230,68 @@ function SiteEditor() {
       reseedWorkspace: true,
     })
     setPageMode(currentPageId, 'html')
+  }
+
+  // The other direction: the HTML page is drawn in a hidden frame, and every
+  // piece of it becomes a canvas block where the browser put it. The document
+  // is kept with the page (htmlBackup), so "Back to the HTML page" brings it
+  // back as it was, whatever has happened on the canvas since.
+  const [convertingToCanvas, setConvertingToCanvas] = useState(false)
+  async function convertHtmlToCanvas() {
+    if (convertingToCanvas) return
+    flushWorkspaceDrafts()
+    const currentMap = liveHtmlMap()
+    const html = currentMap[currentPageId] || ''
+    if (!html.trim()) return
+    setConvertingToCanvas(true)
+    try {
+      const result = canvasFromMeasured(await measureHtmlPage(html))
+      if (!result.components.length) {
+        setError(t('This page could not be read as blocks, so nothing was changed.'))
+        return
+      }
+      const { report } = result
+      const lines = [
+        t('Turn this page into {count} canvas blocks that you can drag, resize and edit?', { count: report.native + report.html }),
+        report.html ? t('{count} of them stay HTML blocks: the canvas has no block of its own for them (a table, a form, a video, or text with a link inside it).', { count: report.html }) : '',
+        report.tooLarge ? t('{count} parts are too large to carry over and would be left out.', { count: report.tooLarge }) : '',
+        report.scripts ? t('The page has scripts. They do not run on the canvas.') : '',
+        t('The HTML page is kept: "Back to the HTML page" in this menu brings it back as it is now.'),
+      ].filter(Boolean)
+      if (!window.confirm(lines.join('\n\n'))) return
+      // One Undo step for the schema and the document together, as in
+      // "Remove HTML".
+      const state = useEditorStore.getState()
+      rememberHtmlForSchema(state.schema, currentMap)
+      state.convertPageToCanvas(currentPageId, {
+        ...result,
+        htmlBackup: html,
+        seoTitle: result.title,
+        seoDescription: result.description,
+      })
+      const nextMap = { ...currentMap, [currentPageId]: '' }
+      rememberHtmlForSchema(useEditorStore.getState().schema, nextMap)
+      setPageHtmlMap(nextMap)
+      markHtmlDirty()
+      if (localFile?.pageId === currentPageId) unlinkLocalFile()
+      setHtmlSelection(null)
+    } finally {
+      setConvertingToCanvas(false)
+    }
+  }
+
+  function backToHtmlPage() {
+    if (!window.confirm(t('Go back to the HTML page as it was before it became a canvas? (Undo brings the canvas back.)'))) return
+    const before = useEditorStore.getState().schema
+    const currentMap = liveHtmlMap()
+    rememberHtmlForSchema(before, currentMap)
+    const backup = useEditorStore.getState().restoreHtmlBackup(currentPageId)
+    if (!backup) return
+    const nextMap = { ...currentMap, [currentPageId]: backup }
+    rememberHtmlForSchema(useEditorStore.getState().schema, nextMap)
+    setPageHtmlMap(nextMap)
+    markHtmlDirty()
+    setWorkspaceSession((session) => session + 1)
   }
 
   // Start this page as an empty HTML document: nothing on the page, only the
@@ -2720,6 +2785,8 @@ function SiteEditor() {
                   <button type="button" onClick={() => { setMoreOpen(false); setTemplateOpen(true) }} className="studio-menu-item">{t('Choose a template...')}</button>
                   <button type="button" onClick={() => { setMoreOpen(false); startBlankHtml() }} className="studio-menu-item">{t('Start blank HTML')}</button>
                   {!currentPageIsHtml && <button type="button" onClick={() => { setMoreOpen(false); convertToResponsiveHtml() }} className="studio-menu-item">{t('Convert to responsive HTML')}</button>}
+                  {currentPageIsHtml && siteHtml.trim() && <button type="button" disabled={convertingToCanvas} onClick={() => { setMoreOpen(false); convertHtmlToCanvas() }} className="studio-menu-item disabled:opacity-40">{t('Convert to canvas blocks')}</button>}
+                  {!currentPageIsHtml && (currentPage?.htmlBackup || '').trim() && <button type="button" onClick={() => { setMoreOpen(false); backToHtmlPage() }} className="studio-menu-item">{t('Back to the HTML page')}</button>}
                   {supportsLocalFiles() && <button type="button" onClick={() => { setMoreOpen(false); openAndLinkLocalFile() }} className="studio-menu-item">{t('Open & link HTML file...')}</button>}
                   {[['HTML file...', htmlInputRef], ['Project folder...', folderInputRef], ['Project JSON...', jsonInputRef]].map(([label, ref]) => (
                     <button key={label} type="button" onClick={() => { setMoreOpen(false); ref.current?.click() }} className="studio-menu-item">{t(label)}</button>
@@ -3574,6 +3641,8 @@ function SiteEditor() {
             autoSaveEnabled={autoSaveEnabled}
             onAutoSaveEnabled={setAutoSaveEnabled}
             onRestore={restoreHistoryVersion}
+            pageId={currentPageId}
+            pageName={currentPage?.name || ''}
             onSendLive={published ? sendHistoryVersionLive : undefined}
             liveAt={liveAt}
           />

@@ -68,7 +68,37 @@ export function googleFontHref(font) {
 // and return the href that would load it — or '' if none of our curated
 // fonts is referenced. Lets the renderer auto-inject <link> tags without
 // requiring an explicit theme.googleFont field.
-export function googleFontHrefForTheme(themeOrFontFamily) {
+// A web font a page carries by itself, beside the theme's: its family as the
+// Google Fonts address names it, with the weights it asks for
+// ("Source Sans 3:wght@400;600", "Fraunces:ital,wght@0,500;1,500"). A page
+// that came from an HTML document keeps the fonts that document loaded this
+// way, whether or not they are among the curated ones above.
+// Mirrors _PAGE_FONT_RE and MAX_PAGE_FONTS in backend/builder/validators.py.
+export const PAGE_FONT_SPEC = /^[A-Za-z0-9 ]{1,60}(?::[a-z,]{1,12}@[0-9;,.]{1,120})?$/
+export const MAX_PAGE_FONTS = 8
+
+export function pageFontSpecs(page) {
+  const list = Array.isArray(page?.fonts) ? page.fonts : []
+  return list.filter((spec) => typeof spec === 'string' && PAGE_FONT_SPEC.test(spec)).slice(0, MAX_PAGE_FONTS)
+}
+
+// The fonts a Google Fonts stylesheet address asks for, as page font specs.
+export function fontSpecsFromHref(href) {
+  let url
+  try { url = new URL(String(href || ''), 'https://fonts.googleapis.com') } catch { return [] }
+  if (url.hostname !== 'fonts.googleapis.com' || !url.pathname.startsWith('/css')) return []
+  const families = url.pathname === '/css2'
+    ? url.searchParams.getAll('family')
+    // The older address: "Open Sans:400,700|Roboto".
+    : (url.searchParams.get('family') || '').split('|').map((family) => {
+      const [name, weights = ''] = family.split(':')
+      const numbers = weights.split(',').filter((weight) => /^[0-9]{3}$/.test(weight))
+      return numbers.length ? `${name}:wght@${numbers.join(';')}` : name
+    })
+  return families.map((family) => family.trim()).filter((family) => PAGE_FONT_SPEC.test(family))
+}
+
+export function googleFontHrefForTheme(themeOrFontFamily, pageFonts = []) {
   const fontFamilies = typeof themeOrFontFamily === 'string'
     ? [themeOrFontFamily]
     : [themeOrFontFamily?.fontFamily, themeOrFontFamily?.headingFontFamily]
@@ -83,13 +113,22 @@ export function googleFontHrefForTheme(themeOrFontFamily) {
       if (re.test(fontFamily) && !matched.some((item) => item.name === font.name)) matched.push(font)
     }
   }
-  if (!matched.length) return ''
-  if (matched.length === 1) return googleFontHref(matched[0])
-  const families = matched.map((font) => {
-    const family = encodeURIComponent(font.name).replace(/%20/g, '+')
-    const weights = (font.weights || '400').replace(/[^0-9;]/g, '')
-    return `family=${family}:wght@${weights}`
-  })
+  const own = (Array.isArray(pageFonts) ? pageFonts : []).filter((spec) => typeof spec === 'string' && PAGE_FONT_SPEC.test(spec))
+  if (!matched.length && !own.length) return ''
+  if (matched.length === 1 && !own.length) return googleFontHref(matched[0])
+  const nameOf = (spec) => spec.split(':')[0].toLowerCase()
+  const families = [
+    // The page's own request for a family wins over the curated weights.
+    ...matched.filter((font) => !own.some((spec) => nameOf(spec) === font.name.toLowerCase())).map((font) => {
+      const family = encodeURIComponent(font.name).replace(/%20/g, '+')
+      const weights = (font.weights || '400').replace(/[^0-9;]/g, '')
+      return `family=${family}:wght@${weights}`
+    }),
+    ...own.map((spec) => {
+      const [name, ...rest] = spec.split(':')
+      return `family=${encodeURIComponent(name).replace(/%20/g, '+')}${rest.length ? `:${rest.join(':')}` : ''}`
+    }),
+  ]
   return `https://fonts.googleapis.com/css2?${families.join('&')}&display=swap`
 }
 
@@ -105,8 +144,8 @@ export function findFontByName(name) {
 // given theme. Returns '' if the theme doesn't reference a curated Google
 // Font. The preconnect lets the browser open the TLS handshake to Google's
 // font CDN while the stylesheet is still parsing.
-export function googleFontLinkTag(themeOrFontFamily) {
-  const href = googleFontHrefForTheme(themeOrFontFamily)
+export function googleFontLinkTag(themeOrFontFamily, pageFonts = []) {
+  const href = googleFontHrefForTheme(themeOrFontFamily, pageFonts)
   if (!href) return ''
   return (
     '<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>'

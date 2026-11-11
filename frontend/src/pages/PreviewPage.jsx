@@ -602,7 +602,7 @@ body { font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, sans-serif);
   // body since React 19 hoists it. `key` forces a remount when the font
   // changes so stale URLs don't linger.
   // The page on screen may keep its own theme ("This page only").
-  const fontHref = googleFontHrefForTheme(current?.theme || site?.schema?.theme)
+  const fontHref = googleFontHrefForTheme(current?.theme || site?.schema?.theme, current?.fonts)
   return (
     <div className="min-h-screen pt-16">
       <PublicToolbar

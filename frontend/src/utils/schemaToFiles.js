@@ -712,7 +712,7 @@ function pageHtml(
     <title>${esc(pageSeoTitle(page, fileTitle))}</title>
     ${seoHeadTags(page, fileTitle)}${pageBehaviourStyleTag(page)}
     <link rel="stylesheet" href="${cssHref}" />${customStyleLink}
-    ${googleFontLinkTag(theme)}
+    ${googleFontLinkTag(theme, page?.fonts)}
     ${runtimeHead}${colorMode ? `\n    ${colorModeHeadTags(colorMode)}` : ''}
   </head>
   <body>
@@ -1053,7 +1053,7 @@ function schemaToScaledHtml(page, title = 'My Site', schema = {}, options = {}) 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${esc(pageSeoTitle(page, title))}</title>
     ${seoHeadTags(page, title)}${pageBehaviourStyleTag(page)}
-    ${googleFontLinkTag(pageTheme(schema, page))}
+    ${googleFontLinkTag(pageTheme(schema, page), page?.fonts)}
     ${runtimeNeeds(source).motion ? motionHeadTags() : ''}
     <style>
 ${withoutUnusedRules(css, `<div class="page p-${page.id}"></div>${source}${schema?.customCss || ''}`)}

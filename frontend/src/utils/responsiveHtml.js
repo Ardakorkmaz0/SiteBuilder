@@ -566,7 +566,7 @@ export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${esc(pageSeoTitle(page, title))}</title>
     ${seoHeadTags(page, title)}${pageBehaviourStyleTag(page)}
-    ${googleFontLinkTag(pageTheme(schema, page))}
+    ${googleFontLinkTag(pageTheme(schema, page), page?.fonts)}
     ${runtimeNeeds(runtimeSource).motion ? motionHeadTags() : ''}
     <style>
 ${withoutUnusedRules(`      ${themeVariablesCss(pageTheme(schema, page))}
