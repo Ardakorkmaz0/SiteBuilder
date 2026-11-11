@@ -234,7 +234,9 @@ export function Heading({ props, style }) {
   const Tag = ['h1', 'h2', 'h3'].includes(props.level) ? props.level : 'h2'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, ...style }}>
-      <Tag style={headingTagStyle}>{props.text}</Tag>
+      {/* A heading given a line height of its own takes it; the tag's 1.15
+          is for the ones that were given none. */}
+      <Tag style={style?.lineHeight ? { ...headingTagStyle, lineHeight: 'inherit' } : headingTagStyle}>{props.text}</Tag>
     </div>
   )
 }

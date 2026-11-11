@@ -96,6 +96,8 @@ function absoluteWrapperStyle(c, layoutKey = 'layout') {
   }
 }
 
+const ownLineHeight = (c) => (c?.styles?.lineHeight ? ' style="line-height:inherit"' : '')
+
 function wrapperStyle(c, viewport, canvasWidth, flowMode, layoutKey = 'layout', railInset = null) {
   // margin:0 FIRST, so any margin the layout itself wants still wins. A
   // component box is placed by left/top, and a browser's default margin on the
@@ -589,12 +591,15 @@ function innerHtml(c) {
       const linksAlign = navbarLinksAlign(p) === 'center' ? 'center' : navbarLinksAlign(p) === 'right' ? 'flex-end' : 'flex-start'
       return `<div class="nav-inner nav-${layout} nav-mobile-${mobileMode}" data-builder-mobile-nav style="--builder-nav-menu-bg:${menuBackground};--builder-mobile-brand-align:${brandAlign};--builder-mobile-links-align:${linksAlign}">\n        <span class="brand">${multiline(p.brand)}</span>\n        <button type="button" class="mobile-nav-toggle" data-builder-mobile-nav-toggle aria-label="Open navigation menu" aria-expanded="false">☰</button>\n        <div class="links">\n          ${items}\n        </div>\n      </div>`
     }
+    // .m0 fixes the line height. A block that sets its own keeps it: the
+    // canvas draws a text block with the line height it was given, and the
+    // published page drew every one of them at 1.15.
     case 'heading': {
       const lvl = ['h1', 'h2', 'h3'].includes(p.level) ? p.level : 'h2'
-      return `<${lvl} class="m0">${multiline(p.text)}</${lvl}>`
+      return `<${lvl} class="m0"${ownLineHeight(c)}>${multiline(p.text)}</${lvl}>`
     }
     case 'text':
-      return `<p class="m0">${multiline(p.text)}</p>`
+      return `<p class="m0"${ownLineHeight(c)}>${multiline(p.text)}</p>`
     case 'button':
     case 'linkbutton':
       return iconTextHtml(p)
