@@ -8,9 +8,11 @@ export const listVersions = (siteId) =>
 // Restore the chosen version onto the live site. Returns the FULL updated
 // site (id, schema, html, …) so the editor can reload the in-memory store
 // without a second round-trip.
-export const restoreVersion = (siteId, versionId) =>
+// With `pageId`, only that page comes back from the version; the other pages
+// stay as they are.
+export const restoreVersion = (siteId, versionId, pageId) =>
   client
-    .post(`/sites/${siteId}/versions/${versionId}/restore/`)
+    .post(`/sites/${siteId}/versions/${versionId}/restore/`, pageId ? { page: pageId } : undefined)
     .then((r) => r.data)
 
 // Create a named "checkpoint" — a pinned save slot the auto-save FIFO never

@@ -10,6 +10,7 @@ import {
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { apiError } from '../../utils/errors.js'
 import { groupSiteVersions } from '../../utils/versionGroups.js'
+import { changeColor, changeLabel, versionChange } from '../../utils/versionChange.js'
 import { ClockIcon, PlusIcon } from '../icons.jsx'
 
 // Resident-Evil-style save slots. The History panel has two sections:
@@ -36,12 +37,18 @@ export default function HistoryPanel({
   hasUnsavedChanges = false,
   autoSaveEnabled = false,
   onAutoSaveEnabled,
+  // The page open in the editor: the list can be narrowed to the saves that
+  // changed it, and a load then brings back that page alone.
+  pageId = '',
+  pageName = '',
 }) {
   const { t, language } = useLanguage()
   const [rows, setRows] = useState(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [onlyPage, setOnlyPage] = useState(false)
+  const scopePage = onlyPage && pageId ? pageId : null
 
   const refresh = async () => {
     const next = await listVersions(siteId)
@@ -75,11 +82,14 @@ export default function HistoryPanel({
   }
 
   const restore = (versionId) => run(async () => {
-    if (!window.confirm(t('Load this save? Your current state is snapshotted first, so you can undo the load.'))) return
+    const question = scopePage
+      ? t('Load only “{name}” from this save? The other pages stay as they are. Your current state is snapshotted first, so you can undo the load.', { name: pageName })
+      : t('Load this save? Your current state is snapshotted first, so you can undo the load.')
+    if (!window.confirm(question)) return
     // The editor owns the queue and its live drafts. Delegating the whole load
     // keeps an older in-flight save from overwriting the restored version.
     if (onRestore) {
-      const fresh = await onRestore(versionId)
+      const fresh = await onRestore(versionId, scopePage || undefined)
       if (fresh) await refresh()
       return
     }
@@ -90,7 +100,7 @@ export default function HistoryPanel({
       const saved = await onSave?.()
       if (!saved) throw new Error(t('Save failed. Nothing was loaded.'))
     }
-    const fresh = await restoreVersion(siteId, versionId)
+    const fresh = await restoreVersion(siteId, versionId, scopePage || undefined)
     onRestored?.(fresh)
     await refresh()
   })
@@ -131,7 +141,11 @@ export default function HistoryPanel({
 
   if (!open) return null
 
-  const { manualSaves, autosaves, liveSaves, recoverySaves } = groupSiteVersions(rows)
+  // Narrowed to one page, the list holds the saves that changed that page.
+  const shown = scopePage ? (rows || []).filter((row) => versionChange(row, scopePage)) : rows
+  const { manualSaves, autosaves, liveSaves, recoverySaves } = groupSiteVersions(shown)
+  const mark = (v) => <ChangeMark change={versionChange(v, scopePage)} t={t} />
+  const what = (v) => <ChangeWords change={versionChange(v, scopePage)} t={t} />
 
   // Every send adds a row and only the oldest are pruned, so the newest row is
   // what visitors see, for as long as the site is published.
@@ -139,10 +153,11 @@ export default function HistoryPanel({
 
   const timelineRow = (v) => (
     <li key={v.id} className="flex items-center gap-2 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 transition hover:border-[var(--studio-border-strong)]">
+      {mark(v)}
       <SourceBadge source={v.source} pinned={v.pinned} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[12px] font-medium text-[var(--studio-text)]">{rowTitle(v, t)}</p>
-        <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}</p>
+        <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}{what(v)}</p>
       </div>
       {v.id === nowLiveId && (
         <span className="shrink-0 rounded-full border border-[var(--studio-success)] bg-[var(--studio-success-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--studio-success)]">
@@ -228,7 +243,7 @@ export default function HistoryPanel({
           three on the first row, two on the second, both filling the width. */}
       <div className="grid grid-cols-6 gap-1 border-b border-[var(--studio-border)] bg-[var(--studio-panel)] px-3 py-2">
         {[
-          ['all', 'All', (rows || []).length],
+          ['all', 'All', (shown || []).length],
           ['manual', 'Manual', manualSaves.length],
           ['auto', 'Automatic', autosaves.length],
           ['live', 'Live', liveSaves.length],
@@ -252,8 +267,38 @@ export default function HistoryPanel({
         ))}
       </div>
 
+      <div className="space-y-1.5 border-b border-[var(--studio-border)] bg-[var(--studio-panel)] px-3 py-2">
+        {pageId && (
+          <label className="flex cursor-pointer items-start gap-2 text-[11px] text-[var(--studio-text)]">
+            <input type="checkbox" checked={onlyPage} onChange={(event) => setOnlyPage(event.target.checked)} className="mt-0.5" />
+            <span className="min-w-0">
+              <span className="block truncate font-semibold">{t('Only this page: {name}', { name: pageName })}</span>
+              <span className="block text-[10px] leading-snug text-[var(--studio-text-muted)]">{t('Shows the saves that changed this page. Load then brings back this page alone.')}</span>
+            </span>
+          </label>
+        )}
+        {/* What the mark beside each save means. */}
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[var(--studio-text-muted)]">
+          <span>{t('Size of the change:')}</span>
+          <span className="inline-flex items-center gap-1">
+            {t('small')}
+            <span aria-hidden className="h-2 w-12 rounded-full" style={{ backgroundImage: 'linear-gradient(to right, var(--studio-change-low), var(--studio-change-high))' }} />
+            {t('large')}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span aria-hidden className="h-2 w-2 rounded-full" style={{ backgroundColor: 'var(--studio-change-hard)' }} />
+            {t('only the history takes it back')}
+          </span>
+        </p>
+      </div>
+
       <div className="flex-1 overflow-y-auto bg-[var(--studio-shell)] p-3">
         {rows === null && <p className="text-xs text-[var(--studio-text-muted)]">{t('Loading…')}</p>}
+        {rows && scopePage && shown.length === 0 && (
+          <p className="mb-3 rounded-md border border-dashed border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 text-xs leading-relaxed text-[var(--studio-text-muted)]">
+            {t('No save has changed this page yet.')}
+          </p>
+        )}
 
         {rows && (
           <>
@@ -269,10 +314,11 @@ export default function HistoryPanel({
                 {manualSaves.map((v) => (
                   <li key={v.id} className="rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 transition hover:border-[var(--studio-border-strong)]">
                     <div className="flex items-center gap-2">
+                      {mark(v)}
                       <SourceBadge source={v.source} pinned={v.pinned} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[12px] font-semibold text-[var(--studio-text)]">{v.label || t('Manual save')}</p>
-                        <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}</p>
+                        <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}{what(v)}</p>
                       </div>
                     </div>
                     <div className="mt-2.5 flex flex-wrap justify-end gap-1.5 border-t border-[var(--studio-border)] pt-2">
@@ -300,10 +346,11 @@ export default function HistoryPanel({
               <ul className="space-y-2">
                 {autosaves.map((v) => (
                   <li key={v.id} className="flex items-center gap-2 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 transition hover:border-[var(--studio-border-strong)]">
+                    {mark(v)}
                     <SourceBadge source={v.source} pinned={v.pinned} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[12px] font-medium text-[var(--studio-text)]">{rowTitle(v, t)}</p>
-                      <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}</p>
+                      <p className="text-[10px] text-[var(--studio-text-muted)]">{formatWhen(v.created_at, language)}{what(v)}</p>
                     </div>
                     <SlotBtn disabled={busy} onClick={() => togglePin(v)}>{v.pinned ? t('Unpin') : t('Pin')}</SlotBtn>
                     <SlotBtn disabled={busy} onClick={() => restore(v.id)}>{t('Load')}</SlotBtn>
@@ -407,6 +454,27 @@ function SourceBadge({ source, pinned = false }) {
 // "restored from v12"): those are its notes, not names someone gave a save,
 // so they are shown in the person's language. A save's own name is shown as
 // it was written.
+// The bar at the start of a row: its colour is the size of the change.
+function ChangeMark({ change, t }) {
+  const label = changeLabel(change)
+  return (
+    <span
+      role="img"
+      aria-label={label ? t(label) : t('No page changed')}
+      title={label ? t(label) : undefined}
+      className="h-8 w-1.5 shrink-0 rounded-full"
+      style={{ backgroundColor: changeColor(change) }}
+    />
+  )
+}
+
+function ChangeWords({ change, t }) {
+  const label = changeLabel(change)
+  if (!label) return null
+  const pages = change.pages > 1 ? ` · ${t('{count} pages', { count: change.pages })}` : ''
+  return <span>{` · ${t(label)}${pages}`}</span>
+}
+
 function rowTitle(row, translate) {
   if (row.source === 'save' || row.source === 'restore' || row.source === 'publish') return labelForSource(row.source, translate, row.label)
   return row.label || labelForSource(row.source, translate)

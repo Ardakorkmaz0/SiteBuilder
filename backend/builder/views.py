@@ -40,6 +40,7 @@ from django.db.models.functions import TruncDate
 
 from . import runtime_config
 from .api_errors import error_response
+from .version_summary import fill_missing, restore_page
 from .live_pages import (
     adopt_live_pages_into_draft, forget_live_version, restore_snapshot, send_page_live, set_page_hidden,
 )
@@ -665,7 +666,11 @@ class SiteViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='versions')
     def list_versions(self, request, pk=None):
         site = self.get_object()
-        rows = SiteVersion.objects.filter(site=site)
+        rows = list(SiteVersion.objects.filter(site=site))
+        # Rows from before versions carried a summary get one now, once.
+        filled = fill_missing(rows)
+        if filled:
+            SiteVersion.objects.bulk_update(filled, ['summary'])
         data = SiteVersionSerializer(rows, many=True, context={'request': request}).data
         return Response(data)
 
@@ -699,9 +704,16 @@ class SiteViewSet(viewsets.ModelViewSet):
             # the recovery point the load promises, and it is looked for under
             # "Recovery points". De-duplicated away, the only row there was the
             # copy of what had just been loaded.
+            page_id = request.data.get('page')
+            if isinstance(page_id, str) and page_id:
+                # One page from that version; every other page stays as it is.
+                restored = restore_page(site.schema, site.html, version.schema, page_id)
+                if restored is None:
+                    return error_response('page_not_in_version', 'That version does not have this page.', status.HTTP_404_NOT_FOUND)
+            else:
+                restored = (version.schema, version.html)
             SiteVersion.snapshot(site, source='save', label='before restore', force=True)
-            site.schema = version.schema
-            site.html = version.html
+            site.schema, site.html = restored
             site.revision += 1
             site.save(update_fields=['schema', 'html', 'revision', 'updated_at'])
             SiteVersion.snapshot(site, source='restore', label=f'restored from v{version.pk}')
