@@ -94,7 +94,7 @@ import { replacePageColor } from '../utils/htmlPageColors.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
 import { measureHtmlPage } from '../utils/htmlPageMeasure.js'
-import { pagesFromMeasured } from '../utils/htmlToCanvas.js'
+import { canvasPageFromMeasured } from '../utils/htmlToCanvas.js'
 import { safeFontFaces } from '../utils/fontFaces.js'
 import { withoutBuilderShim } from '../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
@@ -2273,26 +2273,20 @@ function SiteEditor() {
         timeout: 180000,
         onProgress: (done, total) => setConvertNote(t('Reading the page: part {done} of {total}…', { done, total })),
       })
-      const made = pagesFromMeasured(measured, { firstPageId: pageId })
-      const [result, ...more] = made
+      const result = canvasPageFromMeasured(measured)
       if (!result?.components.length) {
         setError(t('This page could not be read as blocks, so nothing was changed.'))
         return
       }
-      const report = made.reduce((sum, page) => ({
-        native: sum.native + page.report.native,
-        html: sum.html + page.report.html,
-        tooLarge: sum.tooLarge + page.report.tooLarge,
-      }), { native: 0, html: 0, tooLarge: 0 })
-      // What is still hidden once every part a link leads to has been read.
-      const hidden = more.length ? 0 : result.report.hidden
+      const { report } = result
+      const hidden = report.hidden
       const lines = [
         t('Turn this page into {count} canvas blocks that you can drag, resize and edit?', { count: report.native + report.html }),
-        more.length ? t('The page shows its content in {count} parts, one at a time. Each becomes a canvas page of its own, and the links between them lead from page to page.', { count: made.length }) : '',
+        result.parts > 1 ? t('The page shows its content in {count} parts, one at a time. On the canvas they follow one another on this one page, and the links to them lead down the page.', { count: result.parts }) : '',
         report.html ? t('{count} of them stay HTML blocks: the canvas has no block of its own for them (a table, a form, a video, or text with a link inside it).', { count: report.html }) : '',
         report.tooLarge ? t('{count} parts are too large to carry over and would be left out.', { count: report.tooLarge }) : '',
-        result.report.scripts ? t('The page has scripts. They do not run on the canvas.') : '',
-        result.report.scripts && measured && !measured.ranScripts ? t('The page could not be read with its scripts running, so what they show is missing. Keep this tab in view and try again.') : '',
+        report.scripts ? t('The page has scripts. They do not run on the canvas.') : '',
+        report.scripts && measured && !measured.ranScripts ? t('The page could not be read with its scripts running, so what they show is missing. Keep this tab in view and try again.') : '',
         hidden ? t('{count} parts of the page are hidden until something shows them (another chapter, a closed menu, an answer). They are not put on the canvas; they stay in the HTML page that is kept.', { count: hidden }) : '',
         t('The HTML page is kept: "Back to the HTML page" in this menu brings it back as it is now.'),
       ].filter(Boolean)
@@ -2308,7 +2302,6 @@ function SiteEditor() {
         seoTitle: result.title,
         seoDescription: result.description,
         fontFaces: result.fontFaces,
-        more,
       })
       const nextMap = { ...currentMap, [pageId]: '' }
       rememberHtmlForSchema(useEditorStore.getState().schema, nextMap)

@@ -471,7 +471,7 @@ export const TURKISH_TRANSLATIONS = {
   '{count} parts of the page are hidden until something shows them (another chapter, a closed menu, an answer). They are not put on the canvas; they stay in the HTML page that is kept.': 'Sayfanın {count} parçası, bir şey onları gösterene kadar gizli (başka bir bölüm, kapalı bir menü, bir cevap). Bunlar tuvale konmaz; saklanan HTML sayfasında kalır.',
   'Reading the page…': 'Sayfa okunuyor…',
   'Reading the page: part {done} of {total}…': 'Sayfa okunuyor: {total} bölümden {done}.…',
-  'The page shows its content in {count} parts, one at a time. Each becomes a canvas page of its own, and the links between them lead from page to page.': 'Sayfa içeriğini {count} bölüm hâlinde, birer birer gösteriyor. Her biri ayrı bir tuval sayfası olur; aralarındaki bağlantılar sayfadan sayfaya götürür.',
+  'The page shows its content in {count} parts, one at a time. On the canvas they follow one another on this one page, and the links to them lead down the page.': 'Sayfa içeriğini {count} bölüm hâlinde, birer birer gösteriyor. Tuvalde hepsi bu tek sayfada art arda durur; onlara giden bağlantılar sayfada aşağı götürür.',
   'The page could not be read with its scripts running, so what they show is missing. Keep this tab in view and try again.': 'Sayfa betikleri çalışırken okunamadı, bu yüzden betiklerin gösterdiği kısımlar eksik. Bu sekmeyi görünür tutup yeniden deneyin.',
   'The page has scripts. They do not run on the canvas.': 'Sayfada betikler var. Bunlar tuvalde çalışmaz.',
   'The HTML page is kept: "Back to the HTML page" in this menu brings it back as it is now.': 'HTML sayfası saklanır: bu menüdeki “HTML sayfasına geri dön” onu şimdiki hâliyle geri getirir.',

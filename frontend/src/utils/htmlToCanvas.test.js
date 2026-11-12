@@ -1,7 +1,7 @@
 // A measured HTML page becomes canvas blocks. The measurements here are
 // written by hand, the way htmlPageMeasure.js reports them from a browser.
 import { describe, expect, it } from 'vitest'
-import { alphaOf, canvasFromMeasured, hexOf, pagesFromMeasured } from './htmlToCanvas.js'
+import { alphaOf, canvasFromMeasured, canvasPageFromMeasured, hexOf } from './htmlToCanvas.js'
 
 const CLEAR = 'rgba(0, 0, 0, 0)'
 const BASE = {
@@ -395,73 +395,91 @@ describe('an element that links lead to', () => {
       { text: 'Odd' },
     ])
   })
+
+  it('that has no look of its own hands its id to the first block made from what it held', () => {
+    const result = convert(page([
+      node('article', [340, 0, 600, 300], {
+        id: 'hill',
+        kids: [text('h2', [340, 40, 600, 40], 'Hill descending'), text('p', [340, 100, 600, 24], 'Step by step')],
+      }),
+      node('article', [340, 300, 600, 300], {
+        id: 'lr',
+        kids: [text('h2', [340, 340, 600, 40], 'Learning rate', {}, { id: 'lr-title' })],
+      }),
+    ]))
+
+    expect(result.components.map((c) => [c.props.text, c.props.anchor])).toEqual([
+      ['Hill descending', 'hill'],
+      ['Step by step', undefined],
+      // Its first block answers to an id of its own already.
+      ['Learning rate', 'lr-title'],
+    ])
+  })
 })
 
 // A page that shows its chapters one at a time: each state the reader put it
 // in is a reading of its own, with the ids that were on show in it.
 describe('a page that shows its parts one at a time', () => {
-  const link = (x, words, href) => text('a', [x, 20, 80, 24], words, {}, { href })
-  const state = (heading, ids, extra = []) => ({
-    width: 1200, height: 900, background: ['rgb(255, 255, 255)', CLEAR], fontFamily: 'Inter', title: 'Notes', description: '', language: 'en', ids,
-    root: node('body', [0, 0, 1200, 900], {
-      kids: [
-        node('section', [0, 0, 1200, 900], {
-          kids: [
-            link(40, 'Intro', '#intro'), link(140, 'Costs', '#costs'), link(240, 'Formula', '#formula'), link(340, 'Elsewhere', '#nowhere'), link(440, 'Out', 'https://example.com/'),
-            text('h1', [40, 100, 600, 60], heading, {}, { id: ids[1] }),
-            ...extra,
-          ],
-        }),
-      ],
-    }),
+  const side = () => node('aside', [0, 0, 300, 900], {
+    kids: [text('a', [20, 30, 200, 24], 'Costs', {}, { href: '#costs' })],
+  }, { backgroundColor: 'rgb(242, 237, 225)', position: 'fixed' })
+  const footer = () => text('p', [340, 860, 400, 24], 'Notes 2026')
+  const state = (kids) => ({
+    width: 1200, height: 900, viewHeight: 900, background: ['rgb(255, 255, 255)', CLEAR], fontFamily: 'Inter', title: 'Notes', description: '', language: 'en',
+    root: node('body', [0, 0, 1200, 900], { kids: [side(), ...kids, footer()] }),
   })
-  const measured = () => ({
-    ...state('Introduction', ['nav', 'intro']),
+  const measured = (states) => ({
+    ...state([text('h1', [340, 40, 600, 60], 'Introduction', {}, { id: 'intro' })]),
     fonts: ['Fraunces:wght@500'],
     scripts: 2,
-    states: [
-      { label: 'Costs and losses', data: state('Costs', ['nav', 'costs', 'formula'], [node('table', [40, 200, 400, 100], { kind: 'html', code: '<table><tr><td><a href="#intro">back</a> <a href="#formula">here</a></td></tr></table>' })]) },
-    ],
+    states: states.map((kids, index) => ({ label: `Part ${index + 2}`, data: state(kids) })),
   })
-
-  function build() {
+  function build(states) {
     let n = 0
-    let p = 0
-    return pagesFromMeasured(measured(), { firstPageId: 'page_home', makeId: (type) => `${type}_${(n += 1)}`, makePageId: () => `page_made${(p += 1)}` })
+    return canvasPageFromMeasured(measured(states), { makeId: (type) => `${type}_${(n += 1)}` })
   }
-  const hrefs = (made) => made.components[0].children.filter((c) => c.type === 'text' && c.props.href !== undefined).map((c) => c.props.href)
+  const costs = () => [
+    text('h1', [340, 40, 600, 60], 'Costs', {}, { id: 'costs' }),
+    text('p', [340, 120, 600, 24], 'Also the intro', {}, { id: 'intro' }),
+  ]
 
-  it('becomes a canvas page for each part, named by the part', () => {
-    const pages = build()
+  it('stays one page, with each other part below the one it opens on', () => {
+    const page = build([costs()])
 
-    expect(pages.map((made) => [made.id, made.name, made.components[0].children.find((c) => c.type === 'heading').props.text])).toEqual([
-      ['page_home', '', 'Introduction'],
-      ['page_made1', 'Costs and losses', 'Costs'],
+    expect(page.parts).toBe(2)
+    expect(page.components.map((c) => [c.type, c.props.text ?? c.props.scrollBehavior, c.layout.y])).toEqual([
+      ['container', 'fixed', 0],
+      ['heading', 'Introduction', 40],
+      ['text', 'Notes 2026', 860],
+      // Below the footer (bottom 884), after the room the page leaves above its content (40).
+      ['heading', 'Costs', 924],
+      ['text', 'Also the intro', 1004],
     ])
-    // Each page asks for the fonts the document loaded.
-    expect(pages.map((made) => made.fonts)).toEqual([['Fraunces:wght@500'], ['Fraunces:wght@500']])
+    expect(page.fonts).toEqual(['Fraunces:wght@500'])
+    expect(page.report).toMatchObject({ native: 6, html: 0, hidden: 0, scripts: 2 })
   })
 
-  it('leads a link to the page that shows its target, and leaves a link to its own page alone', () => {
-    const [intro, costs] = build()
+  it('leads a link to its part down the same page, one block per anchor', () => {
+    const page = build([costs()])
+    const anchors = page.components.map((c) => c.props.anchor)
 
-    expect(hrefs(intro)).toEqual(['#intro', '#page_made1', '#page_made1', '#nowhere', 'https://example.com/'])
-    expect(hrefs(costs)).toEqual(['#page_home', '#costs', '#formula', '#nowhere', 'https://example.com/'])
-    // The heading a link on its own page leads to keeps its id as an anchor.
-    expect(costs.components[0].children.find((c) => c.type === 'heading').props.anchor).toBe('costs')
+    expect(page.components[0].children.find((c) => c.props.href).props.href).toBe('#costs')
+    expect(anchors).toEqual([undefined, 'intro', undefined, 'costs', undefined])
   })
 
-  it('leads the links inside a kept HTML block the same way', () => {
-    const [, costs] = build()
+  it('leaves out a part that would reach past the lowest place a block may stand, and counts it', () => {
+    const page = build([[text('p', [340, 40, 600, 199500], 'Too long')], costs()])
 
-    expect(costs.components[0].children.find((c) => c.type === 'html').props.code)
-      .toBe('<table><tr><td><a href="#page_home">back</a> <a href="#formula">here</a></td></tr></table>')
+    expect(page.parts).toBe(2)
+    expect(page.report.hidden).toBe(1)
+    expect(page.components.map((c) => c.props.text).filter(Boolean)).toEqual(['Introduction', 'Notes 2026', 'Costs', 'Also the intro'])
   })
 
-  it('is one page when the page hides nothing a link leads to', () => {
-    const pages = pagesFromMeasured({ ...state('Only', ['nav', 'intro']), states: [] }, { firstPageId: 'page_x' })
+  it('is the page as it opened when it hides nothing a link leads to', () => {
+    const page = build([])
 
-    expect(pages.map((made) => made.id)).toEqual(['page_x'])
+    expect(page.parts).toBe(1)
+    expect(page.components).toHaveLength(3)
   })
 })
 
