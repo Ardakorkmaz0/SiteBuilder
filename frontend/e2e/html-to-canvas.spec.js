@@ -137,13 +137,15 @@ test('a page of notes becomes one canvas page that shows its parts and steps as 
   expect(heading('Part two').layout.y).toBe(heading('Part one').layout.y)
   expect(home.hiddenKeys).toContain(second)
 
-  // The steps: hidden when the page opens, shown one press at a time.
-  const stepKeys = ['Square the errors first.', 'Then add them up.'].map((text) => named(text).props.shownBy[0])
+  // The steps: hidden when the page opens, shown one press at a time. (A
+  // block also carries the key of its part.)
+  const own = (text) => named(text).props.shownBy.find((key) => key !== first && key !== second)
+  const stepKeys = ['Square the errors first.', 'Then add them up.'].map(own)
   expect(home.hiddenKeys).toEqual(expect.arrayContaining(stepKeys))
   expect(named('Next step').props.onClick).toEqual([{ do: 'next', keys: stepKeys }])
 
   // What the <details> holds opens and closes with its summary.
-  const ink = named('Write your answer in ink.').props.shownBy[0]
+  const ink = own('Write your answer in ink.')
   expect(home.hiddenKeys).toContain(ink)
   expect(named('Show the paper text').props.onClick).toEqual([{ do: 'toggle', keys: [ink] }])
 
