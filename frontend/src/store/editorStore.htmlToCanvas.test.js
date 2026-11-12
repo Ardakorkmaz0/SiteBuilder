@@ -62,6 +62,33 @@ describe('turning an HTML page into a canvas', () => {
   })
 })
 
+describe('turning an HTML page that shows its parts one at a time into a canvas', () => {
+  const heading = (id, text, part) => ({ id, type: 'heading', props: { text, level: 'h1', shownBy: [part] }, styles: {}, layout: { x: 340, y: 40, w: 600, h: 60 } })
+  const menu = { id: 'menu', type: 'text', props: { text: 'Chapters' }, styles: {}, layout: { x: 0, y: 0, w: 300, h: 40 } }
+  const convertParts = () => s().convertPageToCanvas('page_home', {
+    components: [menu, heading('one', 'Part one', 'p0'), heading('two', 'Part two', 'p1')],
+    canvasWidth: 1200, background: '#ffffff', htmlBackup: DOCUMENT,
+    parts: [{ key: 'p0', label: 'Part one' }, { key: 'p1', label: 'Part two' }], hiddenKeys: ['p1', 'k1'],
+  })
+
+  it('keeps the parts and the keys hidden when the page opens', () => {
+    convertParts()
+
+    expect(home().parts).toEqual([{ key: 'p0', label: 'Part one' }, { key: 'p1', label: 'Part two' }])
+    expect(home().hiddenKeys).toEqual(['p1', 'k1'])
+  })
+
+  it('lays each part out for the phone on its own, under what the parts share', () => {
+    convertParts()
+    const phone = (id) => home().components.find((c) => c.id === id).mobileLayout.y
+
+    // Both open right under the menu, as each does on its own; read as one
+    // page, the second would have been put under the first.
+    expect(phone('one')).toBe(phone('two'))
+    expect(phone('one')).toBeGreaterThan(phone('menu'))
+  })
+})
+
 describe('going back to the HTML page', () => {
   it('hands the document back and makes the page an HTML page again', () => {
     s().convertPageToCanvas('page_home', { components: blocks(), canvasWidth: 1200, background: '#0f172a', htmlBackup: DOCUMENT })

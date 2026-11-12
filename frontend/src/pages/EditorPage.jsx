@@ -15,7 +15,7 @@ import {
 import { getSite, liveToDraft, sendPageLive, sendVersionLive, setPageHidden, swapLiveChange, updateSite } from '../api/sites.js'
 import { getVersionContent, restoreVersion } from '../api/versions.js'
 import LiveVersionView from '../components/editor/LiveVersionView.jsx'
-import { useEditorStore, selectCurrentPage, nextHistoryStamp } from '../store/editorStore.js'
+import { useEditorStore, selectCurrentPage, nextHistoryStamp, shownPartOf } from '../store/editorStore.js'
 import { useAuthStore } from '../store/authStore.js'
 import { useGuestGate } from '../utils/useGuestGate.jsx'
 import { lastPageOutside } from '../utils/lastVisited.js'
@@ -96,7 +96,7 @@ import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
 import { measureHtmlPage } from '../utils/htmlPageMeasure.js'
 import { canvasPageFromMeasured } from '../utils/htmlToCanvas.js'
 import { safeFontFaces } from '../utils/fontFaces.js'
-import { pageHasShow } from '../utils/pageShow.js'
+import { pageHasShow, pageParts } from '../utils/pageShow.js'
 import { withoutBuilderShim } from '../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
 import { componentDraftHtml, componentHtmlFiles, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
@@ -848,6 +848,9 @@ function SiteEditor() {
   // The fonts the site carries inside itself (utils/fontFaces.js), for the
   // canvas to draw its text in, as the published page will.
   const siteFontFaces = useEditorStore((s) => s.schema.fontFaces)
+  // Which part of a page shown a part at a time the canvas shows.
+  useEditorStore((s) => s.shownPart)
+  const showPart = useEditorStore((s) => s.showPart)
   useEffect(() => {
     const css = safeFontFaces(siteFontFaces)
     let tag = document.getElementById('pwb-font-faces')
@@ -2283,7 +2286,8 @@ function SiteEditor() {
       const hidden = report.hidden
       const lines = [
         t('Turn this page into {count} canvas blocks that you can drag, resize and edit?', { count: report.native + report.html }),
-        result.parts > 1 ? t('The page shows its content in {count} parts, one at a time. On the canvas they follow one another on this one page, and the links to them lead down the page.', { count: result.parts }) : '',
+        result.partCount > 1 ? t('The page shows its content in {count} parts, one at a time. The canvas page does the same: its links switch between them.', { count: result.partCount }) : '',
+        result.hiddenKeys.length > result.partCount - 1 ? t('What its buttons show and hide stays as it was: hidden until a button shows it.') : '',
         report.html ? t('{count} of them stay HTML blocks: the canvas has no block of its own for them (a table, a form, a video, or text with a link inside it).', { count: report.html }) : '',
         report.tooLarge ? t('{count} parts are too large to carry over and would be left out.', { count: report.tooLarge }) : '',
         report.scripts ? t('The page has scripts. They do not run on the canvas.') : '',
@@ -2303,6 +2307,8 @@ function SiteEditor() {
         seoTitle: result.title,
         seoDescription: result.description,
         fontFaces: result.fontFaces,
+        parts: result.parts,
+        hiddenKeys: result.hiddenKeys,
       })
       const nextMap = { ...currentMap, [pageId]: '' }
       rememberHtmlForSchema(useEditorStore.getState().schema, nextMap)
@@ -2550,6 +2556,8 @@ function SiteEditor() {
   // page as an export, and this used to run on every render of the editor —
   // every keystroke in Edit — for any page with motion or a pinned block.
   const componentViewShown = !currentPageIsHtml && (canvasMode === 'view' || fullscreen)
+  // The parts of a page shown a part at a time (utils/pageShow.js).
+  const currentParts = currentPage && !currentPageIsHtml ? pageParts(currentPage) : []
   const componentViewHtml =
     componentViewShown && componentViewNeedsIframe && currentPage
       ? schemaToSingleHtml(
@@ -3290,6 +3298,21 @@ function SiteEditor() {
                       </button>
                     ))}
                   </div>
+                  {/* A page shown a part at a time: which part the canvas
+                      shows (View opens on the first, as a visitor's does). */}
+                  {canvasMode === 'edit' && currentParts.length > 0 && (
+                    <select
+                      value={shownPartOf(currentPage)}
+                      onChange={(e) => showPart(currentPage.id, e.target.value)}
+                      aria-label={t('Part of the page on the canvas')}
+                      title={t('Part of the page on the canvas')}
+                      className="studio-input max-w-[200px] shrink-0 truncate px-2 py-1.5 text-xs font-medium"
+                    >
+                      {currentParts.map((part, index) => (
+                        <option key={part.key} value={part.key}>{part.label || t('Part {count}', { count: index + 1 })}</option>
+                      ))}
+                    </select>
+                  )}
                   {/* Device controls — moved out of the app header so it stays
                       one row; they act on the canvas this bar belongs to. Same
                       order, widths and breakpoints as the HTML workspace's bar. */}

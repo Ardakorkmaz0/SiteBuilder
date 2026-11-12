@@ -640,6 +640,25 @@ def sanitize_show_actions(value):
     return out
 
 
+def sanitize_show_rooms(value):
+    """The room each key's element took, on the block standing for it:
+    [key, from the element's top to the block's, room], in pixels."""
+    if not isinstance(value, list):
+        return []
+    out = []
+    for item in value:
+        if not isinstance(item, list) or len(item) != 3 or not isinstance(item[0], str) or not SHOW_KEY_RE.match(item[0]):
+            continue
+        if isinstance(item[1], bool) or isinstance(item[2], bool):
+            continue
+        if not isinstance(item[1], (int, float)) or not isinstance(item[2], (int, float)):
+            continue
+        out.append([item[0], _fraction(item[1], 0, 0, 100000), _fraction(item[2], 0, 0, 100000)])
+        if len(out) >= MAX_SHOWN_BY:
+            break
+    return out
+
+
 def sanitize_page_parts(value):
     if not isinstance(value, list):
         return []
@@ -664,6 +683,9 @@ def sanitize_shared_props(props):
     shown_by = _show_keys(props.get('shownBy'), MAX_SHOWN_BY)
     if shown_by:
         clean['shownBy'] = shown_by
+        rooms = sanitize_show_rooms(props.get('rooms'))
+        if rooms:
+            clean['rooms'] = rooms
     on_click = sanitize_show_actions(props.get('onClick'))
     if on_click:
         clean['onClick'] = on_click

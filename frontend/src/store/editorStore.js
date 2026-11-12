@@ -21,6 +21,7 @@ import { splitPageHtml } from '../utils/projectSnapshot.js'
 import { normalizeLanguageTag } from '../utils/languages.js'
 import { containerDesignWidth } from '../utils/containerFit.js'
 import { mergeFontFaces } from '../utils/fontFaces.js'
+import { pageParts } from '../utils/pageShow.js'
 
 const HISTORY_LIMIT = 60
 // Gap between two same-key edits that still counts as one gesture.
@@ -641,12 +642,35 @@ function orderForFlow(components) {
 // follows the PC layout. Manual mobile edits set page.mobileManual = true.
 function withComponents(schema, id, components) {
   return mapPage(schema, id, (p) => {
-    if (p.mobileManual) return { ...p, components }
+    const placed = inShownPart(p, components)
+    if (p.mobileManual) return { ...p, components: placed }
     return {
       ...p,
-      components: applyAutoMobileLayouts(components, p.mobileWidth || MOBILE_CANVAS_WIDTH),
+      components: applyAutoMobileLayouts(placed, p.mobileWidth || MOBILE_CANVAS_WIDTH, partKeys(p)),
     }
   })
+}
+
+// The part the canvas shows of a page whose parts are shown one at a time
+// (utils/pageShow.js), by page id. It is how the owner looks at the page,
+// not part of the design: changing it is no edit to save or undo.
+let shownParts = {}
+export function shownPartOf(page) {
+  const keys = partKeys(page)
+  return keys.includes(shownParts[page?.id]) ? shownParts[page.id] : keys[0] || ''
+}
+export const partOfBlock = (component, keys) => (Array.isArray(component?.props?.shownBy) ? component.props.shownBy.find((key) => keys.includes(key)) : '') || ''
+
+// A block that comes onto such a page belongs to the part on show, or it
+// would stand in every part.
+function inShownPart(page, components) {
+  const keys = partKeys(page)
+  if (!keys.length) return components
+  const key = shownPartOf(page)
+  const there = new Set((page.components || []).map((c) => c.id))
+  return components.map((c) => (there.has(c.id) || partOfBlock(c, keys)
+    ? c
+    : { ...c, props: { ...c.props, shownBy: [key, ...(Array.isArray(c.props?.shownBy) ? c.props.shownBy : [])].slice(0, 16) } }))
 }
 
 // --- Mobile auto-layout helpers ---------------------------------------------
@@ -971,11 +995,27 @@ export function autoMobileLayout(components, mobileWidth = MOBILE_CANVAS_WIDTH) 
   return out
 }
 
+const partKeys = (page) => pageParts(page).map((part) => part.key)
+
 // Apply auto-layout through responsive region trees as well as the page roots.
 // Regions are independent Wix-like content grids; their phone height must grow
 // to the newly stacked children or the region's overflow clips the last items.
-function applyAutoMobileLayouts(components, mobileWidth = MOBILE_CANVAS_WIDTH) {
+function applyAutoMobileLayouts(components, mobileWidth = MOBILE_CANVAS_WIDTH, parts = []) {
   const list = Array.isArray(components) ? components : []
+  // A page whose parts are shown one at a time (utils/pageShow.js) has them
+  // drawn in the same place: each is laid out for the phone on its own, with
+  // the blocks every part shares, or they would be read as one jumble.
+  if (parts.length) {
+    const partOf = (c) => (Array.isArray(c.props?.shownBy) ? c.props.shownBy.find((key) => parts.includes(key)) : '') || ''
+    const shared = list.filter((c) => !partOf(c))
+    const laid = new Map()
+    for (const key of parts) {
+      for (const c of applyAutoMobileLayouts([...shared, ...list.filter((item) => partOf(item) === key)], mobileWidth)) {
+        if (partOf(c) === key || !laid.has(c.id)) laid.set(c.id, c)
+      }
+    }
+    return list.map((c) => laid.get(c.id) || c)
+  }
   // Arrange inner grids first. Their resulting heights are then available while
   // laying out the page roots, so a taller first region pushes the next region
   // down instead of overlapping it.
@@ -1190,7 +1230,7 @@ function normalizePage(page) {
   // Auto mode: re-derive the phone layout from the desktop design on load too, so
   // existing sites pick up reading-order fixes without a manual re-arrange.
   if (!mobileManual) {
-    components = applyAutoMobileLayouts(components, mobileWidth)
+    components = applyAutoMobileLayouts(components, mobileWidth, partKeys(page))
   }
   // Per-page editor mode. Old/loaded data has no `mode`: a page that carries an
   // HTML document is 'html', everything else is the component canvas ('empty').
@@ -1717,8 +1757,9 @@ export const useEditorStore = create((set, get) => ({
   // `fonts` are the web fonts the document loaded (googleFonts.js): the page
   // keeps asking for them, so its text is drawn in the faces it was measured in.
   // `fontFaces` are the document's own font files (utils/fontFaces.js); the
-  // site keeps them beside the ones it already has.
-  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, fonts, fontFaces = '' } = {}) => {
+  // site keeps them beside the ones it already has. `parts` and `hiddenKeys`
+  // are what the page shows one at a time and on a click (utils/pageShow.js).
+  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, fonts, fontFaces = '', parts = [], hiddenKeys = [] } = {}) => {
     const page = get().schema.pages.find((p) => p.id === id)
     if (!page || !Array.isArray(components)) return
     get().record()
@@ -1737,6 +1778,9 @@ export const useEditorStore = create((set, get) => ({
         seoTitle: p.seoTitle || seoTitle || '',
         seoDescription: p.seoDescription || seoDescription || '',
         fonts: Array.isArray(fonts) ? fonts : [],
+        // What the page shows one at a time or on a click (utils/pageShow.js).
+        parts: Array.isArray(parts) ? parts : [],
+        hiddenKeys: Array.isArray(hiddenKeys) ? hiddenKeys : [],
       }))
       const faces = mergeFontFaces(converted.fontFaces, fontFaces)
       const schema = faces ? { ...converted, fontFaces: faces } : converted
@@ -2843,6 +2887,12 @@ export const useEditorStore = create((set, get) => ({
   // The canvas drawn in the other palette, to see it while editing. Not saved.
   colorModePreview: false,
   setColorModePreview: (on) => set({ colorModePreview: !!on }),
+  // Which part of a page shown a part at a time the canvas shows.
+  shownPart: {},
+  showPart: (pageId, key) => {
+    shownParts = { ...shownParts, [pageId]: key }
+    set({ shownPart: shownParts, selectedId: null, selectedIds: [] })
+  },
 
   setCustomCss: (css) => {
     get().record('custom-css')
@@ -2924,7 +2974,7 @@ export const useEditorStore = create((set, get) => ({
           // phone layout reads their sizes, and kept the old ones until the
           // next edit made every embedded block jump.
           if (!p.mobileManual && (isMobile || scaled)) {
-            np.components = applyAutoMobileLayouts(np.components, np.mobileWidth || MOBILE_CANVAS_WIDTH)
+            np.components = applyAutoMobileLayouts(np.components, np.mobileWidth || MOBILE_CANVAS_WIDTH, partKeys(np))
           }
           return np
         }),
@@ -2959,7 +3009,7 @@ export const useEditorStore = create((set, get) => ({
     set((state) => {
       const page = selectCurrentPage(state)
       const mobileWidth = page.mobileWidth || MOBILE_CANVAS_WIDTH
-      const components = applyAutoMobileLayouts(page.components, mobileWidth)
+      const components = applyAutoMobileLayouts(page.components, mobileWidth, partKeys(page))
       // Re-enable auto mode so mobile follows the PC design again going forward.
       return {
         schema: mapPage(state.schema, page.id, (p) => ({ ...p, components, mobileManual: false })),

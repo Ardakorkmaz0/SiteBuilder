@@ -76,39 +76,48 @@ test('an HTML page turned into a canvas keeps its pieces, publishes them, and ca
 })
 
 // A page of notes that shows one part at a time, keeps its menu on the screen
-// and hides what a button or a <details> would show: all of it becomes
-// canvas blocks on one canvas page, nothing left in an HTML block.
+// and shows the steps of a solution one press at a time. It becomes one
+// canvas page that does the same, with no HTML block left: the reading
+// learns what each button shows by pressing it.
 const NOTES = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Notes</title>
 <style>
 body{margin:0;font-family:Arial,sans-serif;background:#fbf8f1}
 .side{position:fixed;inset:0 auto 0 0;width:240px;background:#f2ede1;padding:20px;box-sizing:border-box}
 .side a{display:block;color:#1f4e8c;line-height:28px}
 main{margin-left:280px;padding:40px}
+.step p{margin:8px 0}
 .done{display:inline-flex;gap:6px;align-items:center}
 </style></head><body>
 <nav class="side"><a href="#one">Part one</a><a href="#two">Part two</a></nav>
 <main>
-<section id="one"><h1>Part one</h1><div class="step" hidden><p>Square the errors first.</p></div><button type="button">Next step</button>
+<section id="one"><h1>Part one</h1>
+<div class="step" hidden><p>Square the errors first.</p></div><div class="step" hidden><p>Then add them up.</p></div>
+<button type="button" id="next">Next step</button>
 <details><summary>Show the paper text</summary><p>Write your answer in ink.</p></details>
-<label class="done"><input type="checkbox"> Solved</label></section>
+<label class="done"><input type="checkbox"> Solved</label>
+<p>Below the solution.</p></section>
 <section id="two" hidden><h1>Part two</h1><p>The learning rate sets the step size.</p></section>
 </main>
 <script>
-document.querySelectorAll('.side a').forEach((a) => a.addEventListener('click', (event) => {
-  event.preventDefault()
-  const id = a.getAttribute('href').slice(1)
+document.getElementById('next').addEventListener('click', () => {
+  const step = document.querySelector('#one .step[hidden]')
+  if (step) step.hidden = false
+})
+const route = () => {
+  const id = location.hash.slice(1) || 'one'
   document.querySelectorAll('main > section').forEach((part) => { part.hidden = part.id !== id })
-}))
+}
+addEventListener('hashchange', route)
 </script>
 </body></html>`
 
-test('a page of notes becomes one canvas page with every part of it shown and no HTML block left', async ({ page, request }) => {
+test('a page of notes becomes one canvas page that shows its parts and steps as the page did, no HTML block left', async ({ page, request, browser }) => {
   const siteId = await createHtmlSite(request, 'E2E notes to canvas', [{ html: NOTES }])
   await openEditor(page, siteId)
 
   await page.locator('header').locator('[data-tour="more"]').click()
   await page.getByRole('button', { name: 'Convert to canvas blocks', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Part two', exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('heading', { name: 'Part one', exact: true })).toBeVisible({ timeout: 60_000 })
   await save(page)
 
   const { data } = await api(request, 'GET', `/sites/${siteId}/`)
@@ -116,24 +125,55 @@ test('a page of notes becomes one canvas page with every part of it shown and no
   const home = data.schema.pages[0]
   const blocks = flat(home.components)
   expect(blocks.filter((c) => c.type === 'html')).toHaveLength(0)
+  const named = (text) => blocks.find((c) => c.props.text === text)
 
-  // What a button or a closed <details> would have shown is on the canvas.
-  const texts = blocks.map((c) => c.props.text).filter(Boolean)
-  expect(texts).toEqual(expect.arrayContaining(['Square the errors first.', 'Write your answer in ink.', 'The learning rate sets the step size.']))
-  // The tick box is a picture of itself.
+  // The parts, each shown by its own key, the second hidden when the page opens.
+  expect(home.parts.map((part) => part.label)).toEqual(['Part one', 'Part two'])
+  const [first, second] = home.parts.map((part) => part.key)
+  const heading = (text) => blocks.find((c) => c.type === 'heading' && c.props.text === text)
+  expect(heading('Part one').props.shownBy).toContain(first)
+  expect(heading('Part two').props.shownBy).toContain(second)
+  // Drawn where each was drawn: in the same place, one at a time.
+  expect(heading('Part two').layout.y).toBe(heading('Part one').layout.y)
+  expect(home.hiddenKeys).toContain(second)
+
+  // The steps: hidden when the page opens, shown one press at a time.
+  const stepKeys = ['Square the errors first.', 'Then add them up.'].map((text) => named(text).props.shownBy[0])
+  expect(home.hiddenKeys).toEqual(expect.arrayContaining(stepKeys))
+  expect(named('Next step').props.onClick).toEqual([{ do: 'next', keys: stepKeys }])
+
+  // What the <details> holds opens and closes with its summary.
+  const ink = named('Write your answer in ink.').props.shownBy[0]
+  expect(home.hiddenKeys).toContain(ink)
+  expect(named('Show the paper text').props.onClick).toEqual([{ do: 'toggle', keys: [ink] }])
+
+  // The tick box is a picture of itself, and the menu stays on the screen.
   expect(blocks.filter((c) => c.type === 'image' && c.props.src.startsWith('data:image/png') && c.layout.h <= 24)).toHaveLength(1)
-
-  // The second part follows the first on the same page, and its link leads there.
-  const headings = blocks.filter((c) => c.type === 'heading')
-  const one = headings.find((c) => c.props.text === 'Part one')
-  const two = headings.find((c) => c.props.text === 'Part two')
-  expect(two.layout.y).toBeGreaterThan(one.layout.y)
-  expect(one.props.anchor).toBe('one')
-  expect(two.props.anchor).toBe('two')
-
-  // The menu stays on the screen, down its whole height.
   const menu = home.components.find((c) => c.props.scrollBehavior === 'fixed')
   expect(menu).toMatchObject({ type: 'container', props: { pinHeight: 'full', pinX: 'left' }, layout: { x: 0, y: 0, w: 240 } })
-  expect(flat(menu.children).filter((c) => c.props.href).map((c) => c.props.href)).toEqual(['#one', '#two'])
+
+  // The published page does what the page did.
+  const slug = await publish(page, request, siteId)
+  const viewer = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+  const visitor = await viewer.newPage()
+  await visitor.goto(`${BACKEND}/s/${slug}/`)
+  await expect(visitor.getByText('Below the solution.', { exact: true })).toBeVisible()
+  await expect(visitor.getByText('Square the errors first.', { exact: true })).toBeHidden()
+  await expect(visitor.getByText('The learning rate sets the step size.', { exact: true })).toBeHidden()
+  const below = await visitor.getByText('Below the solution.', { exact: true }).boundingBox()
+
+  await visitor.getByText('Next step', { exact: true }).click()
+  await expect(visitor.getByText('Square the errors first.', { exact: true })).toBeVisible()
+  await expect(visitor.getByText('Then add them up.', { exact: true })).toBeHidden()
+  // What followed the step moved down to make room for it.
+  expect((await visitor.getByText('Below the solution.', { exact: true }).boundingBox()).y).toBeGreaterThan(below.y + 10)
+
+  await visitor.getByText('Show the paper text', { exact: true }).click()
+  await expect(visitor.getByText('Write your answer in ink.', { exact: true })).toBeVisible()
+
+  await visitor.getByRole('link', { name: 'Part two', exact: true }).click()
+  await expect(visitor.getByText('The learning rate sets the step size.', { exact: true })).toBeVisible()
+  await expect(visitor.getByText('Below the solution.', { exact: true })).toBeHidden()
+  await viewer.close()
   await api(request, 'DELETE', `/sites/${siteId}/`)
 })
