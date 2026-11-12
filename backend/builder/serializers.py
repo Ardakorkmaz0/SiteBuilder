@@ -32,7 +32,7 @@ from .svg_images import check_svg, is_svg_upload
 from .live_pages import (
     draft_is_ahead, forget_live_version, send_draft_live_without_pages, send_site_live, statuses,
 )
-from .validators import MAX_FILE_BYTES, clean_published_pages, validate_and_clean_schema
+from .validators import MAX_FILE_BYTES, clean_published_pages, text_bytes, validate_and_clean_schema
 
 
 def password_errors(error):
@@ -721,7 +721,7 @@ class SiteSerializer(serializers.ModelSerializer):
         # allow-same-origin), so it cannot touch the app or a visitor's session.
         if not isinstance(value, str):
             return ''
-        if len(value) > MAX_FILE_BYTES:
+        if text_bytes(value) > MAX_FILE_BYTES:
             raise serializers.ValidationError('HTML is too large (max 100 MB).')
         return value
 

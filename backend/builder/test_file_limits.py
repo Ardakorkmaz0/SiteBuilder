@@ -97,3 +97,39 @@ def test_a_six_mb_picture_inside_the_page_is_kept():
 def test_two_mb_of_fonts_are_kept():
     rule = '@font-face{font-family:"Big";src:url(data:font/woff2;base64,' + 'A' * 2_000_000 + ')}'
     assert sanitize_font_faces(rule) == rule
+
+
+def test_the_limits_are_100_mb_a_file_and_room_for_more_in_a_save():
+    from django.conf import settings
+    from . import validators
+
+    assert validators.MAX_FILE_BYTES == 100 * 1024 * 1024
+    assert settings.MAX_UPLOAD_FILE_BYTES == 100 * 1024 * 1024
+    assert settings.MAX_MULTIPART_BODY_BYTES == 101 * 1024 * 1024
+    assert settings.DATA_UPLOAD_MAX_MEMORY_SIZE == 300 * 1024 * 1024
+    assert validators.MAX_PUBLISHED_PAGE_BYTES == 100 * 1024 * 1024
+    assert validators.MAX_PUBLISHED_TOTAL_BYTES == 250 * 1024 * 1024
+
+
+@pytest.mark.parametrize('html,kept', [('a' * 10, True), ('é' * 5, True), ('é' * 6, False)])
+def test_html_is_measured_in_bytes(monkeypatch, html, kept):
+    # 'é' is two bytes: six of them are twelve bytes, past a ten-byte limit.
+    from rest_framework import serializers as drf
+
+    from . import serializers as site_serializers
+    from . import validators
+
+    monkeypatch.setattr(validators, 'MAX_FILE_BYTES', 10)
+    monkeypatch.setattr(validators, 'MAX_PUBLISHED_PAGE_BYTES', 10)
+    monkeypatch.setattr(site_serializers, 'MAX_FILE_BYTES', 10)
+    checks = [
+        lambda: validators._page_html(html),
+        lambda: site_serializers.SiteSerializer().validate_html(html),
+        lambda: clean_published_pages([{'path': '', 'html': html}]),
+    ]
+    for check in checks:
+        if kept:
+            check()
+        else:
+            with pytest.raises(drf.ValidationError):
+                check()

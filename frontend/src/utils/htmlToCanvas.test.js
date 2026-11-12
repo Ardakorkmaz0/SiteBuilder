@@ -350,6 +350,16 @@ describe('more pieces than one parent may hold', () => {
     expect(groups.flatMap((g) => g.children.map((c) => c.props.text))).toHaveLength(130)
   })
 
+  it('are gathered even when nearly all of them run down the whole box', () => {
+    // Sixty bars and one label: setting the bars aside leaves as many pieces as before.
+    const bars = Array.from({ length: 60 }, (_, index) => node('div', [index * 10, 0, 5, 100], {}, { backgroundColor: 'rgb(255, 0, 0)' }))
+    const label = text('p', [700, 0, 40, 10], 'Label', { fontSize: '10px', lineHeight: '10px' })
+    const result = convert(page([node('section', [0, 0, 1200, 120], { kids: [...bars, label] }, { backgroundColor: 'rgb(255, 255, 255)' })]))
+
+    const groups = result.components[0].children
+    expect(groups.map((g) => [g.type, g.children.length])).toEqual([['container', 40], ['container', 21]])
+  })
+
   it('leave what runs down the whole box out of the groups, so no group lies over the others', () => {
     const kids = Array.from({ length: 70 }, (_, index) => text('p', [40, 20 + index * 30, 300, 24], `Line ${index + 1}`))
     const edge = node('div', [0, 0, 4, 2140], {}, { backgroundColor: 'rgb(216, 208, 191)' })

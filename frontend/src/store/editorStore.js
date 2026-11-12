@@ -662,15 +662,18 @@ export function shownPartOf(page) {
 export const partOfBlock = (component, keys) => (Array.isArray(component?.props?.shownBy) ? component.props.shownBy.find((key) => keys.includes(key)) : '') || ''
 
 // A block that comes onto such a page belongs to the part on show, or it
-// would stand in every part.
+// would stand in every part. A copy of a block of another part, pasted here,
+// leaves that part's key behind.
 function inShownPart(page, components) {
   const keys = partKeys(page)
   if (!keys.length) return components
   const key = shownPartOf(page)
   const there = new Set((page.components || []).map((c) => c.id))
-  return components.map((c) => (there.has(c.id) || partOfBlock(c, keys)
-    ? c
-    : { ...c, props: { ...c.props, shownBy: [key, ...(Array.isArray(c.props?.shownBy) ? c.props.shownBy : [])].slice(0, 16) } }))
+  return components.map((c) => {
+    if (there.has(c.id)) return c
+    const own = (Array.isArray(c.props?.shownBy) ? c.props.shownBy : []).filter((item) => !keys.includes(item))
+    return { ...c, props: { ...c.props, shownBy: [key, ...own].slice(0, 16) } }
+  })
 }
 
 // --- Mobile auto-layout helpers ---------------------------------------------

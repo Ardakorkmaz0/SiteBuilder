@@ -310,8 +310,11 @@ function fitChildren(children, ctx) {
   const width = Math.max(...children.map((c) => c.layout.x + c.layout.w)) - left
   // ...and so do the lines across its top and bottom.
   const tall = children.filter((c) => c.layout.h >= span / 2 || (c.layout.h <= 6 && c.layout.w >= width * 0.9))
-  if (tall.length && tall.length < children.length) {
-    const rest = children.filter((c) => !tall.includes(c))
+  const rest = children.filter((c) => !tall.includes(c))
+  // Only when that leaves fewer pieces: sixty edges and one word would
+  // come back as the same sixty-one, for ever.
+  const after = tall.length + (rest.length <= MAX_CHILDREN ? rest.length : Math.ceil(rest.length / GROUP_SIZE))
+  if (tall.length && rest.length && after < children.length) {
     return fitChildren([...tall, ...fitChildren(rest, ctx)], ctx)
   }
   const ordered = [...children].sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x)

@@ -24,6 +24,11 @@ MAX_HTML_EMBED = 50 * 1024
 # fonts a site carries. Mirrors MAX_FILE_BYTES in frontend/src/utils/sanitize.js.
 MAX_FILE_BYTES = 100 * 1024 * 1024
 
+
+def text_bytes(value):
+    """How many bytes a text takes as UTF-8, the size the limits speak of."""
+    return len(value) if value.isascii() else len(value.encode('utf-8'))
+
 # Component types that hold a nested child list (recursively sanitized).
 PARENT_TYPES = {'container', 'tabs', 'region'}
 MAX_TABS = 12
@@ -619,7 +624,7 @@ def _show_keys(value, limit):
         return []
     out, seen = [], set()
     for key in value:
-        if isinstance(key, str) and SHOW_KEY_RE.match(key) and key not in seen:
+        if isinstance(key, str) and SHOW_KEY_RE.fullmatch(key) and key not in seen:
             seen.add(key)
             out.append(key)
             if len(out) >= limit:
@@ -647,7 +652,7 @@ def sanitize_show_rooms(value):
         return []
     out = []
     for item in value:
-        if not isinstance(item, list) or len(item) != 3 or not isinstance(item[0], str) or not SHOW_KEY_RE.match(item[0]):
+        if not isinstance(item, list) or len(item) != 3 or not isinstance(item[0], str) or not SHOW_KEY_RE.fullmatch(item[0]):
             continue
         if isinstance(item[1], bool) or isinstance(item[2], bool):
             continue
@@ -667,7 +672,7 @@ def sanitize_page_parts(value):
         if not isinstance(item, dict):
             continue
         key = item.get('key')
-        if not isinstance(key, str) or not SHOW_KEY_RE.match(key) or key in seen:
+        if not isinstance(key, str) or not SHOW_KEY_RE.fullmatch(key) or key in seen:
             continue
         seen.add(key)
         out.append({'key': key, 'label': _str(item.get('label'))[:80]})
@@ -929,7 +934,7 @@ def _page_html(value):
     inside sandboxed iframes without allow-same-origin."""
     if not isinstance(value, str):
         return ''
-    if len(value) > MAX_FILE_BYTES:
+    if text_bytes(value) > MAX_FILE_BYTES:
         raise serializers.ValidationError('Page HTML is too large (max 100 MB).')
     return value
 
@@ -1205,9 +1210,10 @@ def clean_published_pages(value):
         html = page.get('html')
         if not isinstance(html, str):
             html = ''
-        if len(html) > MAX_PUBLISHED_PAGE_BYTES:
+        size = text_bytes(html)
+        if size > MAX_PUBLISHED_PAGE_BYTES:
             raise serializers.ValidationError('A published page is too large (max 100 MB).')
-        total += len(html)
+        total += size
         if total > MAX_PUBLISHED_TOTAL_BYTES:
             raise serializers.ValidationError('The published site is too large (max 250 MB).')
         path = _published_path(page.get('path'), taken)

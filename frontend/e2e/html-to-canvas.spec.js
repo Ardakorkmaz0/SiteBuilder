@@ -179,3 +179,51 @@ test('a page of notes becomes one canvas page that shows its parts and steps as 
   await viewer.close()
   await api(request, 'DELETE', `/sites/${siteId}/`)
 })
+
+// What a button shows is learnt even when a link points at it too, when it
+// comes a moment after the press, and when the button rewrites its own label.
+const ANSWERS = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Answers</title>
+<style>body{margin:0;font-family:Arial,sans-serif;padding:40px}</style></head><body>
+<a href="#answer">Jump to answer</a>
+<button type="button" id="show">Show answer</button>
+<div hidden id="answer"><h2>Hidden solution</h2><p>Answer is forty two.</p></div>
+<button type="button" id="late">Open later</button>
+<p hidden id="later">Shown a moment later.</p>
+<button type="button" id="relabel">Open text</button>
+<p hidden id="drawn"></p>
+<p>Footer survives.</p>
+<script>
+document.getElementById('show').addEventListener('click', () => { document.getElementById('answer').hidden = false })
+document.getElementById('late').addEventListener('click', () => { setTimeout(() => { document.getElementById('later').hidden = false }, 80) })
+document.getElementById('relabel').addEventListener('click', (event) => {
+  document.getElementById('drawn').innerHTML = '<span>Newly drawn solution</span>'
+  document.getElementById('drawn').hidden = false
+  event.currentTarget.innerHTML = '<span>Opened</span>'
+})
+</script>
+</body></html>`
+
+test('a lone answer a link points at, an answer shown a moment later and a relabelled button are learnt', async ({ page, request }) => {
+  const siteId = await createHtmlSite(request, 'E2E answers to canvas', [{ html: ANSWERS }])
+  await openEditor(page, siteId)
+
+  await page.locator('header').locator('[data-tour="more"]').click()
+  await page.getByRole('button', { name: 'Convert to canvas blocks', exact: true }).click()
+  await expect(page.getByText('Footer survives.', { exact: true })).toBeVisible({ timeout: 60_000 })
+  await save(page)
+
+  const { data } = await api(request, 'GET', `/sites/${siteId}/`)
+  const home = data.schema.pages[0]
+  const blocks = flat(home.components)
+  const named = (text) => blocks.find((c) => c.props.text === text)
+  // A link to it does not make the answer a chapter of its own.
+  expect(home.parts || []).toEqual([])
+  for (const [answer, button] of [['Answer is forty two.', 'Show answer'], ['Shown a moment later.', 'Open later'], ['Newly drawn solution', 'Open text']]) {
+    const key = named(answer).props.shownBy[0]
+    expect(home.hiddenKeys).toContain(key)
+    expect(named(button).props.onClick).toEqual([{ do: 'show', keys: [key] }])
+  }
+  // The label the page opened with, not the one a press wrote.
+  expect(named('Opened')).toBeUndefined()
+  await api(request, 'DELETE', `/sites/${siteId}/`)
+})

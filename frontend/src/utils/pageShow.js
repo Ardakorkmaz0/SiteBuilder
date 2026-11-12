@@ -78,12 +78,12 @@ export function pageShowAttrs(page) {
   if (!pageHasShow(page)) return ''
   const hidden = keysOf(page.hiddenKeys, 20000)
   const parts = pageParts(page).map((part) => part.key)
-  return ` data-pwb-keys="${hidden.join(' ')}"${parts.length ? ` data-pwb-parts="${parts.join(' ')}"` : ''}`
+  return ` data-pwb-keys="${hidden.join(' ')}"${parts.length ? ` data-pwb-parts="${parts.join(' ')}"` : ''}${page.flowMode ? ' data-pwb-flow' : ''}`
 }
 
 // The keys that are on after `actions` ran, from `on` (key -> false when off).
 export function runActions(actions, on) {
-  const next = { ...on }
+  const next = Object.assign(Object.create(null), on)
   const isOn = (key) => next[key] !== false
   for (const action of actions) {
     const keys = action.keys
@@ -135,6 +135,11 @@ export function reflowLevel(items) {
   const below = (spans, limit) => spans.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, limit) - Math.max(a, 0)), 0)
   const live = items.map((item, index) => ({ ...item, index, cut: Math.max(0, item.cut || 0) })).filter((item) => !item.gone && !item.stretch)
   const ys = items.map((item) => item.y)
+  // Nothing hidden and nothing shorter: nothing moves.
+  const changes = live.filter((item) => item.hidden || item.cut)
+  if (!changes.length) return { ys, cut: 0 }
+  // What stands above the first change cannot move.
+  const firstChange = Math.min(...changes.map((item) => item.y))
   const across = (a, b) => a.x < b.x + b.w - 0.5 && b.x < a.x + a.w - 0.5
   // What each hidden block gives up: its measured room, or down to the
   // next block under it in its column.
@@ -165,7 +170,7 @@ export function reflowLevel(items) {
     }
     return below(without(union(removed), union(kept)), b.y)
   }
-  for (const b of live) if (!b.hidden) ys[b.index] = b.y - shift(b)
+  for (const b of live) if (!b.hidden && b.y > firstChange) ys[b.index] = b.y - shift(b)
   // The box's bottom edge, as wide as the box.
   const edge = { x: -1e9, w: 2e9, y: bottom, h: 0 }
   return { ys, cut: live.length ? Math.max(0, shift(edge)) : 0 }
@@ -179,17 +184,27 @@ export function pageShowRuntime(reflow, act) {
   window.__pwbShowReady = true
   var words = function (value) { return String(value || '').split(' ').filter(Boolean) }
   var parts = words(page.getAttribute('data-pwb-parts'))
-  var isPart = {}
+  // Keyed by the page's own words: no object behind them (a key may be
+  // "__proto__").
+  var isPart = Object.create(null)
   parts.forEach(function (key) { isPart[key] = true })
-  var on = {}
+  var on = Object.create(null)
   words(page.getAttribute('data-pwb-keys')).forEach(function (key) { on[key] = false })
+  // A page laid out in flow moves what follows a hidden block by itself.
+  var flowPage = page.hasAttribute('data-pwb-flow')
   var saved = new Map()
   var STYLE = ['top', 'height', 'minHeight', 'display']
+  // The design height a box is fitted to (utils/containerFit.js) follows
+  // the box when it gets shorter, or the fitting would stretch it back.
+  var FIT = 'data-pwb-container-height'
   function remember(el) {
-    if (!saved.has(el)) saved.set(el, STYLE.map(function (name) { return el.style[name] }))
+    if (!saved.has(el)) saved.set(el, { style: STYLE.map(function (name) { return el.style[name] }), fit: el.getAttribute(FIT) })
   }
   function restore() {
-    saved.forEach(function (values, el) { STYLE.forEach(function (name, i) { el.style[name] = values[i] }) })
+    saved.forEach(function (was, el) {
+      STYLE.forEach(function (name, i) { el.style[name] = was.style[i] })
+      if (was.fit !== null) el.setAttribute(FIT, was.fit)
+    })
   }
   var LEVEL = '.page, [data-pwb-container-root], .region-inner'
   function state(el) {
@@ -211,10 +226,23 @@ export function pageShowRuntime(reflow, act) {
     var match = /scale\(([\d.]+)\)/.exec(level.style.transform || '')
     return match ? Number(match[1]) || 1 : 1
   }
+  function finish() {
+    // Every block a key hides is hidden, wherever it stands: pinned to the
+    // screen, or in a box that lays its blocks out by itself. Last, as all
+    // the rest is measured as drawn.
+    var every = document.querySelectorAll('[data-pwb-show]')
+    for (var e = 0; e < every.length; e++) {
+      if (state(every[e]) === 'shown') continue
+      remember(every[e])
+      every[e].style.display = 'none'
+    }
+    if (typeof window.__pwbApplyLayout === 'function') window.__pwbApplyLayout()
+  }
   function layout() {
     restore()
+    window.__pwbPageCut = 0
     var boxes = page.querySelectorAll('[data-pwb-show]')
-    if (!boxes.length) return
+    if (!boxes.length) return finish()
     // The boxes holding a hidden block, and every box around them.
     var levels = new Set()
     for (var i = 0; i < boxes.length; i++) {
@@ -316,10 +344,12 @@ export function pageShowRuntime(reflow, act) {
       seen.kids.forEach(function (kid, n) {
         remember(kid.el)
         if (items[n].hidden || items[n].gone) kid.el.style.display = 'none'
+        else if (level === page && flowPage) return
         else if (items[n].stretch) { if (result.cut) kid.el.style.height = Math.max(0, kid.h - result.cut) + 'px' }
         else if (Math.abs(result.ys[n] - kid.y) > 0.5) kid.el.style.top = result.ys[n] + 'px'
       })
       if (level === page) {
+        if (flowPage) return
         // The page gives up what its shown part leaves below it too: another
         // part may reach further down.
         var everything = 0
@@ -343,10 +373,11 @@ export function pageShowRuntime(reflow, act) {
         remember(link.el)
         link.el.style.height = Math.max(0, link.h - cut) + 'px'
         link.el.style.minHeight = '0px'
+        if (link.el.hasAttribute(FIT)) link.el.setAttribute(FIT, String(Math.max(0, seen.chain[0].h - result.cut)))
         if (n === seen.chain.length - 1) cuts.set(link.el, cut)
       })
     })
-    if (typeof window.__pwbApplyLayout === 'function') window.__pwbApplyLayout()
+    finish()
   }
   function partOf(target) {
     for (var el = target; el && el !== document.body; el = el.parentElement) {
