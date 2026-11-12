@@ -59,6 +59,7 @@ import {
 import { motionClassSuffix, motionCssVars, motionHeadTags, motionRevealAttr } from './motion.js'
 import { pageBehaviourStyleTag, pageDirAttr, pageLanguage, pageSeoTitle, seoHeadTags } from './seoTags.js'
 import { elementIdFor } from './anchors.js'
+import { pageShowAttrs, showAttrs } from './pageShow.js'
 import { bleedContentWidth, ownContentWidth, stretchesToViewport } from './bleedLayout.js'
 
 // Widths at or below this get the phone layout on the published site.
@@ -443,7 +444,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
     const inner = kids.map((ch) => {
       const filled = { ...ch, styles: { ...(ch.styles || {}), width: '100%', height: '100%' } }
       const geometry = classedChildren ? '' : ` style="${regionChildInlineStyle(ch, designW)}"`
-      return `<div id="${esc(elementIdFor(ch))}" class="region-child region-${esc(c.id)}-${esc(ch.id)}${nestedClass(ch)}"${geometry}>${linkWrap(filled, boxedNode(filled))}</div>`
+      return `<div id="${esc(elementIdFor(ch))}" class="region-child region-${esc(c.id)}-${esc(ch.id)}${nestedClass(ch)}"${geometry}${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
     }).join('')
     return `<section${hook} style="position:relative;width:100%;height:100%;overflow:hidden;${styleStr}"><div class="region-inner" style="position:relative;width:100%;max-width:${designW}px;height:100%;margin:0 auto;overflow:hidden">${inner}</div></section>`
   }
@@ -475,7 +476,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
           : { ...ch, styles: { ...(ch.styles || {}), width: '100%', height: '100%' } }
         const wrapH = grows ? '' : `;height:${Math.round(l.h || 80)}px`
         const wrapMinH = grows ? `;min-height:${Math.round(l.h || 80)}px` : ''
-        return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}">${linkWrap(filled, boxedNode(filled))}</div>`
+        return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}"${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
       })
       .join('')
     if (!kids.length) return `<div${hook} style="display:block;position:relative;min-height:${h}px;${styleStr}"></div>`
@@ -509,7 +510,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
               styles: { ...(ch.styles || {}), width: '100%', height: '100%' },
             }
             // nestedClass: the hook its "hide on PC / on mobile" rule names.
-            return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px;height:${Math.round(l.h || 80)}px">${linkWrap(filled, boxedNode(filled))}</div>`
+            return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px;height:${Math.round(l.h || 80)}px"${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
           })
           .join('')
         const hidden = t.id === activeId ? '' : ' hidden'
@@ -721,7 +722,7 @@ function pageHtml(
     ${runtimeHead}${colorMode ? `\n    ${colorModeHeadTags(colorMode)}` : ''}
   </head>
   <body>
-    <div class="page p-${page.id}">
+    <div class="page p-${page.id}"${pageShowAttrs(page)}>
 ${body}
     </div>
     ${runtimeBody}
@@ -757,18 +758,18 @@ function pageBodyHtml(page, fixed) {
         const node = fit
           ? fitShell(fit, inlineNode(c))
           : inlineNode(c, c.type === 'region', { fit: !page.flowMode })
-        return `      <div id="${esc(elementIdFor(c))}" class="c-${esc(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}>${linkWrap(c, node)}</div>`
+        return `      <div id="${esc(elementIdFor(c))}" class="c-${esc(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}${showAttrs(c.props)}>${linkWrap(c, node)}</div>`
       }
       const tag = tagFor(c.type, c.props)
       const fit = pageFit(c, page)
       if (fit) {
         const node = `${openTag(c, '', true)}${innerHtml(c)}</${tag}>`
-        return `      <div id="${esc(elementIdFor(c))}" class="c-${esc(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}>${linkWrap(c, fitShell(fit, node))}</div>`
+        return `      <div id="${esc(elementIdFor(c))}" class="c-${esc(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}${showAttrs(c.props)}>${linkWrap(c, fitShell(fit, node))}</div>`
       }
       const el =
         tag === 'img'
-          ? openTag(c, sticky)
-          : `${openTag(c, sticky)}${innerHtml(c) ? `\n        ${innerHtml(c)}\n      ` : ''}</${tag}>`
+          ? openTag(c, sticky + showAttrs(c.props))
+          : `${openTag(c, sticky + showAttrs(c.props))}${innerHtml(c) ? `\n        ${innerHtml(c)}\n      ` : ''}</${tag}>`
       return `      ${linkWrap(c, el)}`
     })
     .join('\n')
@@ -1075,7 +1076,7 @@ ${overlayScrollbarCss(options)}${customCssBlock(schema?.customCss)}
   <body>
     <div class="export-viewport">
       <div class="export-stage">
-        <div class="page p-${page.id}">
+        <div class="page p-${page.id}"${pageShowAttrs(page)}>
 ${mainBody}
         </div>
       </div>
@@ -1097,9 +1098,11 @@ ${fixedBody ? `      <div class="export-fixed">\n${fixedBody}\n      </div>` : '
           var left = Math.max(0, (screenW - renderW * scale) / 2);
           document.body.style.background = mode.bg;
           viewport.style.background = mode.bg;
-          stage.style.height = Math.ceil(mode.h * scale) + 'px';
+          // What blocks hidden until shown give up (utils/pageShow.js).
+          var h = Math.max(0, mode.h - (window.__pwbPageCut || 0));
+          stage.style.height = Math.ceil(h * scale) + 'px';
           page.style.width = renderW + 'px';
-          page.style.minHeight = mode.h + 'px';
+          page.style.minHeight = h + 'px';
           page.style.transform = 'scale(' + scale + ')';
           if (fixedLayer) {
             fixedLayer.style.left = Math.round(left) + 'px';
@@ -1110,6 +1113,7 @@ ${fixedBody ? `      <div class="export-fixed">\n${fixedBody}\n      </div>` : '
           }
         }
         window.addEventListener('resize', applyLayout);
+        window.__pwbApplyLayout = applyLayout;
         applyLayout();
       })();
     </script>

@@ -600,10 +600,73 @@ HOVER_TYPES = ('none', 'lift', 'grow', 'glow', 'sink', 'tilt')
 SPEED_TYPES = ('fast', 'normal', 'slow')
 
 
+# What a page shows only once something shows it (a chapter, the steps of a
+# solution, an answer): a block is shown while every key in its `shownBy` is
+# on; a page lists the keys that are off when it opens (`hiddenKeys`) and its
+# parts (chapters), and a click on a block runs its `onClick` actions on keys.
+# Mirrors frontend/src/utils/pageShow.js.
+SHOW_KEY_RE = re.compile(r'^[a-z0-9_-]{1,40}$')
+SHOW_ACTIONS = ('show', 'hide', 'toggle', 'next', 'prev')
+MAX_SHOWN_BY = 16
+MAX_ACTIONS = 8
+MAX_ACTION_KEYS = 400
+MAX_PAGE_KEYS = 20000
+MAX_PARTS = 60
+
+
+def _show_keys(value, limit):
+    if not isinstance(value, list):
+        return []
+    out, seen = [], set()
+    for key in value:
+        if isinstance(key, str) and SHOW_KEY_RE.match(key) and key not in seen:
+            seen.add(key)
+            out.append(key)
+            if len(out) >= limit:
+                break
+    return out
+
+
+def sanitize_show_actions(value):
+    if not isinstance(value, list):
+        return []
+    out = []
+    for item in value[:MAX_ACTIONS]:
+        if not isinstance(item, dict) or item.get('do') not in SHOW_ACTIONS:
+            continue
+        keys = _show_keys(item.get('keys'), MAX_ACTION_KEYS)
+        if keys:
+            out.append({'do': item['do'], 'keys': keys})
+    return out
+
+
+def sanitize_page_parts(value):
+    if not isinstance(value, list):
+        return []
+    out, seen = [], set()
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        key = item.get('key')
+        if not isinstance(key, str) or not SHOW_KEY_RE.match(key) or key in seen:
+            continue
+        seen.add(key)
+        out.append({'key': key, 'label': _str(item.get('label'))[:80]})
+        if len(out) >= MAX_PARTS:
+            break
+    return out
+
+
 def sanitize_shared_props(props):
     if not isinstance(props, dict):
         return {}
     clean = {}
+    shown_by = _show_keys(props.get('shownBy'), MAX_SHOWN_BY)
+    if shown_by:
+        clean['shownBy'] = shown_by
+    on_click = sanitize_show_actions(props.get('onClick'))
+    if on_click:
+        clean['onClick'] = on_click
     dock_x = props.get('dockX')
     if dock_x in ('auto', 'left', 'center', 'right', 'stretch'):
         clean['dockX'] = dock_x
@@ -943,6 +1006,10 @@ def validate_and_clean_schema(schema):
             # Web fonts the page loads beside its theme's (a page that came
             # from an HTML document keeps the ones that document loaded).
             'fonts': sanitize_page_fonts(page.get('fonts')),
+            # Absent on a page that shows everything it has, so older pages
+            # stay byte-identical.
+            **({'hiddenKeys': hidden_keys} if (hidden_keys := _show_keys(page.get('hiddenKeys'), MAX_PAGE_KEYS)) else {}),
+            **({'parts': parts} if (parts := sanitize_page_parts(page.get('parts'))) else {}),
             'components': [sanitize_component(c) for c in comps],
         })
     color_mode = sanitize_color_mode(schema.get('colorMode'))

@@ -20,6 +20,7 @@ import { previewDeviceWidth } from '../utils/previewDevices.js'
 import { safeCustomCss, safeCustomJs, themeVariablesCss } from '../utils/theme.js'
 import { googleFontHrefForTheme } from '../utils/googleFonts.js'
 import { fontFacesUsedBy } from '../utils/fontFaces.js'
+import { pageHasShow } from '../utils/pageShow.js'
 import PublicToolbar from '../components/preview/PublicToolbar.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
 import { isPreviewMessageSource, previewPageId } from '../utils/previewMessages.js'
@@ -425,12 +426,17 @@ export default function PreviewPage() {
     () => (site?.schema?.pages || []).some((p) => pageHasMotion(p)),
     [site?.schema?.pages],
   )
-  const useIframe = hasCustomJs || hasCustomCss || hasHtmlEmbed || hasPinnedFixed || hasMotion
+  // Blocks shown and hidden by keys run in the export's script too.
+  const hasShow = useMemo(() => (site?.schema?.pages || []).some((p) => pageHasShow(p)), [site?.schema?.pages])
+  const useIframe = hasCustomJs || hasCustomCss || hasHtmlEmbed || hasPinnedFixed || hasMotion || hasShow
   const staticMode = searchParams.get('mode') === 'static'
   const iframeHtml = useMemo(() => {
     if (!useIframe || !current?.id) return ''
     const pageSchema = {
       theme: site?.schema?.theme,
+      // The page's own fonts are written into the frame: it does not see
+      // the preview's.
+      fontFaces: site?.schema?.fontFaces,
       customCss: site?.schema?.customCss,
       customJs: staticMode ? '' : site?.schema?.customJs,
       pages: [current],
@@ -442,6 +448,7 @@ export default function PreviewPage() {
     current,
     colorMode,
     site?.schema?.theme,
+    site?.schema?.fontFaces,
     site?.schema?.customCss,
     site?.schema?.customJs,
     site?.title,
