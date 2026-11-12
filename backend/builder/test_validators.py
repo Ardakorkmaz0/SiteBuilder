@@ -628,6 +628,21 @@ def test_block_anchor_survives_on_a_pinned_block_too():
     assert props['anchor'] == 'top-bar'
 
 
+def test_a_fixed_block_made_full_height_stays_so():
+    # A side menu brought over from an HTML page runs down the whole screen.
+    props = _saved_props({'scrollBehavior': 'fixed', 'pinHeight': 'full'}, 'container')
+    assert props['pinHeight'] == 'full'
+
+
+@pytest.mark.parametrize('props', [
+    {'scrollBehavior': 'sticky', 'pinHeight': 'full'},
+    {'pinHeight': 'full'},
+    {'scrollBehavior': 'fixed', 'pinHeight': 'half'},
+])
+def test_full_height_is_kept_only_on_a_fixed_block(props):
+    assert 'pinHeight' not in _saved_props(props, 'container')
+
+
 @pytest.mark.parametrize('bad', [
     'About', 'has space', '"><script>', '-lead', 'trail-', 'top', '', 'x' * 61, 42, None,
 ])

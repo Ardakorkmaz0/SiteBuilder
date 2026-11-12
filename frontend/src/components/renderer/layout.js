@@ -67,11 +67,16 @@ export function pinnedLayoutStyle(component, baseStyle = {}, railInset = null) {
 
   // A fixed VERTICAL navbar is a full-height rail (Twitter-like): pinned to
   // its side, stretching from the top of the viewport all the way down — the
-  // page can scroll forever underneath, the rail never ends.
-  if (mode === 'fixed' && isVerticalNavbar(component)) {
+  // page can scroll forever underneath, the rail never ends. Any other fixed
+  // block does the same when it was made full height (`pinHeight: 'full'`, a
+  // side menu brought over from an HTML page); what does not fit on a short
+  // screen scrolls inside it.
+  const fullHeight = props.pinHeight === 'full'
+  if (mode === 'fixed' && (isVerticalNavbar(component) || fullHeight)) {
     pinned.top = numericProp(props.pinOffsetY, 0)
     pinned.bottom = 0
     pinned.height = 'auto'
+    if (fullHeight) pinned.overflowY = 'auto'
   }
 
   // A fixed full-width HORIZONTAL navbar is Bootstrap's fixed-top: glued to

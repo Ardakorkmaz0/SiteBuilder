@@ -161,3 +161,23 @@ describe('pinnedLayoutStyle rail inset for the fixed top bar', () => {
     expect(pinnedLayoutStyle(bar, base).width).toBe('100%')
   })
 })
+
+describe('pinnedLayoutStyle full-height fixed block', () => {
+  it('runs a fixed block made full height down the screen and lets it scroll inside', () => {
+    const style = pinnedLayoutStyle(
+      { type: 'container', props: { scrollBehavior: 'fixed', pinX: 'left', pinHeight: 'full' } },
+      { position: 'absolute', left: 0, top: 0, width: 300, height: 900 },
+    )
+    expect(style).toMatchObject({ position: 'fixed', top: 0, bottom: 0, left: 0, height: 'auto', overflowY: 'auto' })
+  })
+
+  it('keeps the height of a fixed block that was not made full height', () => {
+    const style = pinnedLayoutStyle(
+      { type: 'container', props: { scrollBehavior: 'fixed', pinX: 'left' } },
+      { position: 'absolute', left: 0, top: 0, width: 300, height: 900 },
+    )
+    expect(style.height).toBe(900)
+    expect(style.bottom).toBeUndefined()
+    expect(style.overflowY).toBeUndefined()
+  })
+})

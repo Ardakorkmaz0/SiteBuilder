@@ -34,6 +34,11 @@ describe('finding the pinned bar', () => {
     expect(pinnedTopBar([bar({ pinY: 'bottom' })])).toBe(null)
   })
 
+  it('ignores a side menu that runs down the screen', () => {
+    // It covers its own strip down the side, not the opening of the page.
+    expect(pinnedTopBar([bar({ pinHeight: 'full' }, { x: 0, y: 0, w: 300, h: 900 })])).toBe(null)
+  })
+
   it('ignores a hidden bar', () => {
     expect(pinnedTopBar([{ ...bar(), hidden: true }])).toBe(null)
   })

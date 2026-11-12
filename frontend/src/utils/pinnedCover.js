@@ -33,6 +33,7 @@ function restingBarRect(bar, layoutKey) {
   const props = bar.props || {}
   if (props.scrollBehavior !== 'fixed') return null
   if (props.pinY === 'bottom') return null // a bottom bar hides the END of the page, not the start
+  if (props.pinHeight === 'full') return null // a side menu down the screen, not a bar across it
   const top = Number(props.pinOffsetY) || 0
   return { ...r, y: top }
 }

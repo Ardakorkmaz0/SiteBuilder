@@ -645,6 +645,10 @@ def sanitize_shared_props(props):
         'pinOffsetX': _num(props.get('pinOffsetX'), 0, -20000, 20000),
         'pinZIndex': _num(props.get('pinZIndex'), 100 if mode == 'fixed' else 20, 0, 2147483647),
     })
+    # A fixed block that runs down the whole screen (a side menu); see
+    # pinnedLayoutStyle in frontend/src/components/renderer/layout.js.
+    if mode == 'fixed' and props.get('pinHeight') == 'full':
+        clean['pinHeight'] = 'full'
     return clean
 
 
