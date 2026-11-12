@@ -46,10 +46,9 @@ test('an HTML page turned into a canvas keeps its pieces, publishes them, and ca
   expect(blocks.find((c) => c.type === 'text')).toMatchObject({ props: { text: 'Baked every morning in our own oven.' }, layout: { x: 100, y: 152, h: 28 } })
   // A painted link is text that carries its link, its words aligned as the page had them.
   expect(blocks.find((c) => c.props.text === 'Order now')).toMatchObject({ type: 'text', props: { href: '#order' }, styles: { backgroundColor: 'rgb(79, 70, 229)', borderRadius: '8px' } })
-  // The canvas has no table block: it is kept as it is, in an HTML block.
-  const kept = blocks.filter((c) => c.type === 'html')
-  expect(kept).toHaveLength(1)
-  expect(kept[0].props.code).toContain('Rye loaf')
+  // A table is read cell by cell: its words are text blocks, not an HTML block.
+  expect(blocks.filter((c) => c.type === 'html')).toHaveLength(0)
+  expect(blocks.filter((c) => c.type === 'text').map((c) => c.props.text)).toEqual(expect.arrayContaining(['Rye loaf', '4']))
 
   const slug = await publish(page, request, siteId)
   const viewer = await browser.newContext({ storageState: { cookies: [], origins: [] } })
