@@ -557,6 +557,13 @@ function readPage(token, frameWindow) {
     stats.hidden = 0
     jobs = []
     win.scrollTo(0, 0)
+    // A box that scrolls by itself (a side menu) is read from its top: a
+    // script that scrolled it to the open chapter's link would otherwise
+    // leave the top of it cut off on the canvas.
+    for (const el of doc.body.querySelectorAll('*')) {
+      if (el.scrollTop) el.scrollTop = 0
+      if (el.scrollLeft) el.scrollLeft = 0
+    }
     const bodyStyle = win.getComputedStyle(doc.body)
     const rootStyle = win.getComputedStyle(doc.documentElement)
     const root = measureNode(doc.body)
@@ -576,6 +583,7 @@ function readPage(token, frameWindow) {
     }
     return root && {
       width: win.innerWidth,
+      viewHeight: win.innerHeight,
       height: Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight),
       background: [bodyStyle.backgroundColor, rootStyle.backgroundColor],
       fontFamily: bodyStyle.fontFamily,

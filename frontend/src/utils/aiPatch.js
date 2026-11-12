@@ -19,7 +19,7 @@ const UNSAFE_VALUE = /javascript:|expression\(|url\(/i
 // Props every block type keeps (sanitize_shared_props on the server).
 const SHARED_PROPS = [
   'dockX', 'anchor', 'fit', 'animIn', 'animSpeed', 'animDelay', 'animHover',
-  'scrollBehavior', 'pinY', 'pinX', 'pinOffsetY', 'pinOffsetX', 'pinZIndex',
+  'scrollBehavior', 'pinY', 'pinX', 'pinOffsetY', 'pinOffsetX', 'pinZIndex', 'pinHeight',
 ]
 
 // Props the server keeps for a type that the properties panel edits through

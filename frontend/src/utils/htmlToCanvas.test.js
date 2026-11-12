@@ -498,3 +498,33 @@ describe('a field of the page', () => {
     expect(select.props.inputType).toBeUndefined()
   })
 })
+
+describe('a box the page keeps in place on the screen', () => {
+  const side = (s = {}) => node('aside', [0, 0, 300, 900], {
+    kids: [text('a', [20, 30, 200, 48], '2021 ve 2023 Vize Çözümleri', {}, { href: '#giris' })],
+  }, { backgroundColor: 'rgb(242, 237, 225)', position: 'fixed', ...s })
+
+  it('stays down the side of the screen, at any screen height, and is hidden on a phone', () => {
+    const [panel] = convert(page([side()], { viewHeight: 900 })).components
+    expect(panel.type).toBe('container')
+    expect(panel.props).toEqual({ scrollBehavior: 'fixed', pinX: 'left', pinY: 'top', pinOffsetX: 0, pinOffsetY: 0, pinHeight: 'full' })
+    expect(panel.styles.height).toBe('100%')
+    expect(panel.hiddenMobile).toBe(true)
+    expect(panel.layout).toEqual({ x: 0, y: 0, w: 300, h: 900 })
+  })
+
+  it('keeps a small fixed box at its distance from the screen corner it sat in', () => {
+    const button = node('div', [1080, 800, 100, 60], {
+      kids: [text('a', [1090, 815, 80, 30], 'Yukarı', {}, { href: '#top' })],
+    }, { backgroundColor: 'rgb(31, 78, 140)', position: 'fixed' })
+    const [box] = convert(page([button], { viewHeight: 900 })).components
+    expect(box.props).toEqual({ scrollBehavior: 'fixed', pinX: 'right', pinY: 'bottom', pinOffsetX: 20, pinOffsetY: 40 })
+    expect(box.hiddenMobile).toBeUndefined()
+  })
+
+  it('leaves a box that scrolls with the page where it is', () => {
+    const [panel] = convert(page([side({ position: 'static' })], { viewHeight: 900 })).components
+    expect(panel.props.scrollBehavior).toBeUndefined()
+    expect(panel.hiddenMobile).toBeUndefined()
+  })
+})

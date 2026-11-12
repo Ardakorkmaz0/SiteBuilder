@@ -336,13 +336,41 @@ function walk(n, out, origin, depth, ctx, href) {
     const children = [...backdrop(n, ctx)]
     kids.forEach((kid) => walk(kid, children, innerOrigin(n), depth + 1, ctx, inside))
     children.push(...edgeLines(n, ctx))
-    out.push(...named([block(ctx, 'container', {}, styles, layout, fitChildren(children, ctx))], n, ctx))
+    const box = block(ctx, 'container', {}, styles, layout, fitChildren(children, ctx))
+    if (depth === 0 && n.s.position === 'fixed') pin(box, n, ctx)
+    out.push(...named([box], n, ctx))
     return
   }
   // Nothing inside it, or too deep (or too flat) for a box with children:
   // the box is drawn as a shape, and what it held is laid over it.
   out.push(shape(ctx, boxStyles(n.s), n.rect, origin), ...backdropOver(n, origin, ctx))
   kids.forEach((kid) => walk(kid, out, origin, depth, ctx, inside))
+}
+
+// A box the page keeps in place on the screen (position: fixed) stays there
+// on the canvas too, at the same distance from the same screen edges. One
+// that runs down the whole screen (a side menu) does so at any screen height
+// and scrolls inside itself when it does not fit; on a phone it is hidden, as
+// such a menu is on the page itself, where it would cover most of the screen.
+function pin(box, n, ctx) {
+  const view = ctx.viewHeight
+  // Measured from the screen edges it is nearer to.
+  const full = n.rect.y <= 1 && n.rect.h >= view - 2
+  const right = n.rect.x - ctx.left + n.rect.w / 2 > ctx.width / 2
+  const bottom = !full && n.rect.y + n.rect.h / 2 > view / 2
+  box.props = {
+    ...box.props,
+    scrollBehavior: 'fixed',
+    pinX: right ? 'right' : 'left',
+    pinY: bottom ? 'bottom' : 'top',
+    pinOffsetX: Math.round(right ? ctx.left + ctx.width - (n.rect.x + n.rect.w) : n.rect.x - ctx.left),
+    pinOffsetY: Math.round(bottom ? view - (n.rect.y + n.rect.h) : n.rect.y),
+    ...(full ? { pinHeight: 'full' } : {}),
+  }
+  if (full) {
+    box.styles = { ...box.styles, height: '100%' }
+    box.hiddenMobile = true
+  }
 }
 
 // As wide as the page itself (the page is its <body>, which is narrower than
@@ -453,7 +481,7 @@ const randomId = (type) => `${type}_${Math.random().toString(36).slice(2, 8)}`
 export function canvasFromMeasured(measured, { makeId = randomId } = {}) {
   const page = measured?.root?.rect
   const width = Math.max(320, Math.min(4000, Math.round(page?.w || measured?.width || 1200)))
-  const ctx = { width, left: page?.x || 0, id: makeId, anchors: new Set(), report: { native: 0, html: 0, tooLarge: 0 } }
+  const ctx = { width, left: page?.x || 0, viewHeight: Math.max(1, Number(measured?.viewHeight) || 900), id: makeId, anchors: new Set(), report: { native: 0, html: 0, tooLarge: 0 } }
   const components = []
   if (measured?.root) bands(measured.root, components, ctx)
   const [body, root] = measured?.background || []
