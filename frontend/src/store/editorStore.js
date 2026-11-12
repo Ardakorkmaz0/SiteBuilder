@@ -1716,11 +1716,9 @@ export const useEditorStore = create((set, get) => ({
   // with the page as `htmlBackup`, so the way back does not depend on Undo.
   // `fonts` are the web fonts the document loaded (googleFonts.js): the page
   // keeps asking for them, so its text is drawn in the faces it was measured in.
-  // `more` are further canvas pages made from the same document (the parts it
-  // showed one at a time): they are added after the page, in the same step.
   // `fontFaces` are the document's own font files (utils/fontFaces.js); the
   // site keeps them beside the ones it already has.
-  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, fonts, fontFaces = '', more = [] } = {}) => {
+  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, fonts, fontFaces = '' } = {}) => {
     const page = get().schema.pages.find((p) => p.id === id)
     if (!page || !Array.isArray(components)) return
     get().record()
@@ -1740,25 +1738,8 @@ export const useEditorStore = create((set, get) => ({
         seoDescription: p.seoDescription || seoDescription || '',
         fonts: Array.isArray(fonts) ? fonts : [],
       }))
-      const taken = new Set(converted.pages.map((p) => p.id))
-      const added = (Array.isArray(more) ? more : [])
-        .filter((extra) => extra && Array.isArray(extra.components) && extra.id && !taken.has(extra.id))
-        .map((extra) => normalizePage({
-          ...blankPage(extra.name || 'Page', page.folder || '', extra.id, 'empty', page.language),
-          components: extra.components,
-          flowMode: false,
-          mobileManual: false,
-          canvasWidth: extra.canvasWidth,
-          background: extra.background,
-          backgroundMobile: extra.background,
-          fonts: Array.isArray(extra.fonts) ? extra.fonts : [],
-        }))
-      const at = converted.pages.findIndex((p) => p.id === id) + 1
-      const withPages = added.length
-        ? { ...converted, pages: [...converted.pages.slice(0, at), ...added, ...converted.pages.slice(at)] }
-        : converted
-      const faces = mergeFontFaces(withPages.fontFaces, [fontFaces, ...(Array.isArray(more) ? more.map((extra) => extra?.fontFaces || '') : [])].join('\n'))
-      const schema = faces ? { ...withPages, fontFaces: faces } : withPages
+      const faces = mergeFontFaces(converted.fontFaces, fontFaces)
+      const schema = faces ? { ...converted, fontFaces: faces } : converted
       return {
         schema,
         selectedId: null,

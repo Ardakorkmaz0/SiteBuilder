@@ -170,6 +170,12 @@ function named(made, n, ctx) {
   return made
 }
 
+// A box that became no block of its own hands its id to the first block made
+// from what it held, unless that block already answers to an id of its own.
+function lendId(block, n, ctx) {
+  if (block && !block.props.anchor) named([block], n, ctx)
+}
+
 // The block for a piece of the page that has no pieces inside it, or null
 // when `n` is a box to look into.
 function leaf(n, origin, ctx, href) {
@@ -325,8 +331,11 @@ function walk(n, out, origin, depth, ctx, href) {
   const inside = n.tag === 'a' && n.href !== undefined ? n.href : href
   const kids = n.kids || []
   if (!isPainted(n.s) || n.rect.w < 1 || n.rect.h < 1) {
-    // Nothing of its own to show: what it holds stands where it stood.
+    // Nothing of its own to show: what it holds stands where it stood, and
+    // the first of it takes the box's id, so a link to the box still lands.
+    const first = out.length
     kids.forEach((kid) => walk(kid, out, origin, depth, ctx, inside))
+    lendId(out[first], n, ctx)
     return
   }
   const styles = { backgroundColor: 'transparent', ...boxStyles(n.s), padding: '0px', ...(radiusOf(n.s) ? {} : { borderRadius: '0px' }) }
@@ -463,7 +472,9 @@ function bands(n, out, ctx) {
     const kids = kid.kids || []
     const wrapper = !isPainted(kid.s) && !SEMANTIC.has(kid.tag) && kids.length > 0 && kids.every((inner) => !inner.kind && isWide(inner, ctx))
     if (wrapper) {
+      const first = out.length
       bands(kid, out, ctx)
+      lendId(out[first], kid, ctx)
       continue
     }
     const navbar = navbarFrom(kid, ctx)
@@ -499,50 +510,75 @@ export function canvasFromMeasured(measured, { makeId = randomId } = {}) {
   }
 }
 
-const randomPageId = () => `page_${Math.random().toString(36).slice(2, 8)}`
+// The lowest a block may stand on a page (MAX_LAYOUT_Y on the server).
+const MAX_PAGE_Y = 200000
 
-// Where a "#id" link should lead once the page's states are pages: to the
-// block on its own page when the id is there, else to the page that shows it.
-function retarget(pages) {
-  const owner = new Map()
-  for (const page of pages) for (const id of page.ids) if (!owner.has(id)) owner.set(id, page.id)
-  for (const page of pages) {
-    const here = new Set(page.ids)
-    const lead = (href) => {
-      if (typeof href !== 'string' || !href.startsWith('#')) return href
-      let id = href.slice(1)
-      try { id = decodeURIComponent(id) } catch { /* as written */ }
-      if (!id || here.has(id) || !owner.has(id)) return href
-      return `#${owner.get(id)}`
+const isPinned = (c) => c.props?.scrollBehavior === 'fixed'
+const bottomOf = (list) => list.reduce((low, c) => (isPinned(c) ? low : Math.max(low, c.layout.y + c.layout.h)), 0)
+const topOf = (list) => list.reduce((high, c) => (isPinned(c) ? high : Math.min(high, c.layout.y)), Infinity)
+// A block as drawn, whatever it is called.
+const look = (c) => JSON.stringify(c, (key, value) => (key === 'id' ? undefined : value))
+
+// How many blocks of each kind a list holds, as the report counts them.
+function tally(list, into) {
+  for (const c of list) {
+    into[c.type === 'html' ? 'html' : 'native'] += 1
+    if (c.children) tally(c.children, into)
+  }
+  return into
+}
+
+function keepFirstAnchors(list, seen = new Set()) {
+  for (const c of list) {
+    const anchor = c.props?.anchor
+    if (anchor) {
+      if (seen.has(anchor)) {
+        c.props = { ...c.props }
+        delete c.props.anchor
+      } else seen.add(anchor)
     }
-    const visit = (list) => {
-      for (const c of list || []) {
-        if (typeof c.props.href === 'string') c.props.href = lead(c.props.href)
-        if (Array.isArray(c.props.links)) c.props.links = c.props.links.map((link) => ({ ...link, href: lead(link.href) }))
-        if (Array.isArray(c.props.rich)) c.props.rich = c.props.rich.map((run) => (typeof run.href === 'string' ? { ...run, href: lead(run.href) } : run))
-        if (c.type === 'html') c.props.code = c.props.code.replace(/(href=")(#[^"]*)(")/g, (all, open, href, close) => `${open}${lead(href.replace(/&amp;/g, '&'))}${close}`)
-        visit(c.children)
-      }
-    }
-    visit(page.components)
+    if (c.children) keepFirstAnchors(c.children, seen)
   }
 }
 
-// A page that shows its parts one at a time (chapters, tabs) becomes one
-// canvas page for each of them: the one it opens on first, as the page being
-// converted, and the others as new pages after it, named by their headings.
-// Links between the parts become links between the pages.
-export function pagesFromMeasured(measured, { makeId = randomId, makePageId = randomPageId, firstPageId = 'page_home' } = {}) {
-  const states = [
-    { name: '', data: measured },
-    ...(measured?.states || []).map((state) => ({ name: state.label || '', data: { ...state.data, fonts: measured.fonts, fontFaces: measured.fontFaces, scripts: measured.scripts } })),
-  ]
-  const pages = states.map((state, index) => ({
-    id: index === 0 ? firstPageId : makePageId(),
-    name: state.name,
-    ids: Array.isArray(state.data?.ids) ? state.data.ids : [],
-    ...canvasFromMeasured(state.data, { makeId }),
-  }))
-  retarget(pages)
-  return pages
+// A page that shows its parts one at a time (chapters, tabs) stays one
+// page: the part it opens on comes first, as the browser drew it, and every
+// other part follows below it on the same page. What a part has in common
+// with the page as it opened (the side menu, a header) is not repeated, and
+// a "#part" link leads down the page to the part. A part that would reach
+// past the lowest place a block may stand is left out and counted as hidden;
+// it stays in the HTML page that is kept.
+export function canvasPageFromMeasured(measured, { makeId = randomId } = {}) {
+  const page = canvasFromMeasured(measured, { makeId })
+  const states = (measured?.states || []).filter((state) => state?.data?.root)
+  if (!states.length) return { ...page, parts: 1 }
+  const components = [...page.components]
+  const shared = new Set(components.map(look))
+  const report = { ...page.report, hidden: 0 }
+  // The room above the content, kept between one part and the next.
+  const gap = Math.max(24, Math.min(160, Number.isFinite(topOf(components)) ? topOf(components) : 40))
+  let parts = 1
+  for (const state of states) {
+    const part = canvasFromMeasured(state.data, { makeId })
+    const own = part.components.filter((c) => !isPinned(c) && !shared.has(look(c)))
+    if (!own.length) continue
+    const shift = bottomOf(components) + gap - topOf(own)
+    if (shift + bottomOf(own) > MAX_PAGE_Y) {
+      report.hidden += 1
+      continue
+    }
+    for (const c of own) components.push({ ...c, layout: { ...c.layout, y: c.layout.y + shift } })
+    tally(own, report)
+    // What was too large in this part and not in the page as it opened.
+    report.tooLarge += Math.max(0, part.report.tooLarge - page.report.tooLarge)
+    parts += 1
+  }
+  keepFirstAnchors(components)
+  return {
+    ...page,
+    components,
+    fontFaces: fontFacesUsedBy((measured?.fontFaces || []).map((face) => face?.css || '').join('\n'), components),
+    report,
+    parts,
+  }
 }
