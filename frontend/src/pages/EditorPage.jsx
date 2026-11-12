@@ -96,6 +96,7 @@ import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
 import { measureHtmlPage } from '../utils/htmlPageMeasure.js'
 import { canvasPageFromMeasured } from '../utils/htmlToCanvas.js'
 import { safeFontFaces } from '../utils/fontFaces.js'
+import { pageHasShow } from '../utils/pageShow.js'
 import { withoutBuilderShim } from '../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
 import { componentDraftHtml, componentHtmlFiles, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
@@ -2539,7 +2540,8 @@ function SiteEditor() {
   // must render View through the export iframe — otherwise the plain React
   // preview would show it static, disagreeing with the published page.
   const componentViewNeedsIframe =
-    hasFixedComponent(currentPage?.components) || pageHasMotion(currentPage) || Boolean(customCss?.trim() || customJs?.trim())
+    hasFixedComponent(currentPage?.components) || pageHasMotion(currentPage) || pageHasShow(currentPage)
+    || Boolean(customCss?.trim() || customJs?.trim())
   // A site with a light/dark switch: View draws both palettes, as published.
   const componentColorMode = currentPage
     ? viewColorMode({ theme, colorMode: colorModeSetting, pages: storePages }, currentPage, colorModePreview)
@@ -2555,6 +2557,9 @@ function SiteEditor() {
             theme,
             customCss,
             customJs,
+            // The page's own fonts are written into the frame: it does not see
+            // the editor's.
+            fontFaces: siteFontFaces,
             pages: [currentPage],
           },
           title || currentPage.name || 'My Site',

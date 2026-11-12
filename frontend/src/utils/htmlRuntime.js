@@ -1,3 +1,4 @@
+import { pageShowScript } from './pageShow.js'
 import { insertBeforeClosingTag } from './htmlInsert.js'
 import { FORM_FIELD_CSS } from './formField.js'
 import { THEME_TOGGLE_CSS } from './themeToggle.js'
@@ -866,12 +867,17 @@ const NEEDS = {
   sticky: /data-builder-sticky/,
   fit: /data-pwb-(?:fit|container-width)/,
   fields: /<(?:input|select|textarea)\b|pwb-(?:ph|focus|password)/i,
+  // Blocks shown and hidden by keys (utils/pageShow.js).
+  show: /data-pwb-(?:show|do)=/,
   motion: /data-anim-in|pwb-hover/,
 }
 const ALL_NEEDS = Object.fromEntries(Object.keys(NEEDS).map((need) => [need, true]))
 
 export function runtimeNeeds(source) {
-  if (typeof source !== 'string' || AUTHOR_SCRIPT.test(source)) return ALL_NEEDS
+  if (typeof source !== 'string') return ALL_NEEDS
+  // An author's script can make anything, but not the blocks the builder
+  // shows by keys: those are in the markup or nowhere.
+  if (AUTHOR_SCRIPT.test(source)) return { ...ALL_NEEDS, show: NEEDS.show.test(source) }
   return Object.fromEntries(Object.entries(NEEDS).map(([need, pattern]) => [need, pattern.test(source)]))
 }
 
@@ -908,7 +914,9 @@ function compactScript(script, needs) {
     .join('\n')
 }
 
-const interactiveJs = (needs) => compactScript(INTERACTIVE_SCRIPT, needs) + (needs.fit ? `\n${compactScript(boxFitScript(), needs)}` : '')
+const interactiveJs = (needs) => compactScript(INTERACTIVE_SCRIPT, needs)
+  + (needs.fit ? `\n${compactScript(boxFitScript(), needs)}` : '')
+  + (needs.show ? `\n${compactScript(pageShowScript(), needs)}` : '')
 
 function interactiveCss(needs) {
   return [
