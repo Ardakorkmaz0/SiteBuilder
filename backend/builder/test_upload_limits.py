@@ -25,6 +25,10 @@ def uploader(db, django_user_model, settings, tmp_path):
     settings.FILE_UPLOAD_TEMP_DIR = temporary
     # Exercise cleanup on disk too, even though ordinary small files use RAM.
     settings.FILE_UPLOAD_MAX_MEMORY_SIZE = 1
+    # The handler reads the limits from settings; small ones keep these tests
+    # quick. test_file_limits.py covers the real sizes.
+    settings.MAX_UPLOAD_FILE_BYTES = 256 * 1024
+    settings.MAX_MULTIPART_BODY_BYTES = 300 * 1024
     client = APIClient()
     client.force_authenticate(django_user_model.objects.create_user('limited-uploader'))
     return client
@@ -61,7 +65,7 @@ def test_multipart_body_limit_precedes_storage(uploader, settings, debug):
 
 
 @pytest.mark.parametrize('debug', [True, False])
-def test_image_at_the_five_mb_limit_still_uploads(uploader, settings, debug):
+def test_image_at_the_limit_still_uploads(uploader, settings, debug):
     settings.DEBUG = debug
     upload = SimpleUploadedFile('limit.png', _png(settings.MAX_UPLOAD_FILE_BYTES), 'image/png')
     response = uploader.post('/api/images/', {'file': upload}, format='multipart')
@@ -71,6 +75,7 @@ def test_image_at_the_five_mb_limit_still_uploads(uploader, settings, debug):
 
 
 def test_streamed_bytes_are_checked_even_without_a_declared_size(settings):
+    settings.MAX_UPLOAD_FILE_BYTES = 256 * 1024
     request = RequestFactory().post('/api/images/')
     handler = LimitedUploadHandler(request)
     handler.handle_raw_input(None, {}, None, b'boundary')

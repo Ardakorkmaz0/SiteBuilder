@@ -87,9 +87,11 @@ class TestPublishing:
         publish(client, site, payload=[{'path': sent, 'title': 'x', 'html': HOME}])
         assert site.published_pages.get().path == stored
 
-    def test_an_oversized_publish_is_refused_whole(self, client, site):
+    def test_an_oversized_publish_is_refused_whole(self, client, site, monkeypatch):
+        # The real limit is 100 MB; a smaller one keeps the request small.
+        monkeypatch.setattr('builder.validators.MAX_PUBLISHED_PAGE_BYTES', 1000)
         response = publish(client, site, payload=[
-            {'path': '', 'title': 'x', 'html': 'a' * 1_500_001},
+            {'path': '', 'title': 'x', 'html': 'a' * 1001},
         ])
         assert response.status_code == 400
         assert site.published_pages.count() == 0

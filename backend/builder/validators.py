@@ -20,6 +20,9 @@ ALLOWED_COMPONENT_TYPES = {
 # Custom HTML embed cap. The embed renders inside its own sandboxed iframe so
 # the runtime threat is contained; we just bound the saved size.
 MAX_HTML_EMBED = 50 * 1024
+# The most one file may hold: an image, an HTML page, a published page, the
+# fonts a site carries. Mirrors MAX_FILE_BYTES in frontend/src/utils/sanitize.js.
+MAX_FILE_BYTES = 100 * 1024 * 1024
 
 # Component types that hold a nested child list (recursively sanitized).
 PARENT_TYPES = {'container', 'tabs', 'region'}
@@ -191,7 +194,7 @@ _DATA_IMAGE_RE = re.compile(
     r'^data:image/(png|jpe?g|gif|webp|avif|svg\+xml);base64,[A-Za-z0-9+/\r\n=]+$',
     re.IGNORECASE,
 )
-_MAX_DATA_IMAGE = 5 * 1024 * 1024  # 5 MB of base64 text
+_MAX_DATA_IMAGE = MAX_FILE_BYTES  # of base64 text
 
 
 def sanitize_image_src(value):
@@ -786,7 +789,7 @@ def sanitize_page_fonts(value):
 # Fonts a site carries inside itself: @font-face rules whose font files are
 # data: URIs inside the rule. Nothing else is kept from the text. Mirrors
 # frontend/src/utils/fontFaces.js.
-MAX_FONT_FACES = 1_500_000
+MAX_FONT_FACES = MAX_FILE_BYTES
 _FONT_FACE_RE = re.compile(r'@font-face\s*\{[^{}]*\}', re.IGNORECASE)
 _FONT_FACE_BAD = re.compile(r'[<>]|javascript:|expression\(|@import', re.IGNORECASE)
 _FONT_FACE_URL = re.compile(r'url\(\s*["\']?([^)"\']*)', re.IGNORECASE)
@@ -837,8 +840,8 @@ def _page_html(value):
     inside sandboxed iframes without allow-same-origin."""
     if not isinstance(value, str):
         return ''
-    if len(value) > 2_000_000:
-        raise serializers.ValidationError('Page HTML is too large (max ~2MB).')
+    if len(value) > MAX_FILE_BYTES:
+        raise serializers.ValidationError('Page HTML is too large (max 100 MB).')
     return value
 
 
@@ -1065,8 +1068,8 @@ def sanitize_shared_component(payload):
 # even with inlined images; the cap is here so a single save cannot fill the
 # table, not because a real page ever approaches it.
 MAX_PUBLISHED_PAGES = 40
-MAX_PUBLISHED_PAGE_BYTES = 1_500_000
-MAX_PUBLISHED_TOTAL_BYTES = 10_000_000
+MAX_PUBLISHED_PAGE_BYTES = MAX_FILE_BYTES
+MAX_PUBLISHED_TOTAL_BYTES = 250 * 1024 * 1024
 _PUBLISHED_PATH_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
 
 
@@ -1110,10 +1113,10 @@ def clean_published_pages(value):
         if not isinstance(html, str):
             html = ''
         if len(html) > MAX_PUBLISHED_PAGE_BYTES:
-            raise serializers.ValidationError('A published page is too large (max ~1.5MB).')
+            raise serializers.ValidationError('A published page is too large (max 100 MB).')
         total += len(html)
         if total > MAX_PUBLISHED_TOTAL_BYTES:
-            raise serializers.ValidationError('The published site is too large (max ~10MB).')
+            raise serializers.ValidationError('The published site is too large (max 250 MB).')
         path = _published_path(page.get('path'), taken)
         taken.add(path)
         cleaned.append({
