@@ -93,9 +93,14 @@ describe('sanitizeImageSrc', () => {
     expect(sanitizeImageSrc('data:image/exe;base64,abcd')).toBe('')
   })
 
-  it('rejects oversized data: URLs (>5MB)', () => {
-    // 5MB + 1 byte of valid base64 chars
-    const oversized = 'data:image/png;base64,' + 'A'.repeat(5 * 1024 * 1024 + 1)
+  it('keeps a 6 MB data: URL, over the old 5 MB limit', () => {
+    const big = 'data:image/png;base64,' + 'A'.repeat(6 * 1024 * 1024)
+    expect(sanitizeImageSrc(big)).toBe(big)
+  })
+
+  it('rejects oversized data: URLs (>100 MB)', () => {
+    // 100 MB + 1 byte of valid base64 chars
+    const oversized = 'data:image/png;base64,' + 'A'.repeat(100 * 1024 * 1024 + 1)
     expect(sanitizeImageSrc(oversized)).toBe('')
   })
 

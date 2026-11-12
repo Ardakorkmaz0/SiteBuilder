@@ -64,7 +64,7 @@ class TestSanitizeImageSrc:
         assert sanitize_image_src('data:text/html;base64,PHNjcmlwdD4=') == ''
 
     def test_oversized_data_rejected(self):
-        oversized = 'data:image/png;base64,' + 'A' * (5 * 1024 * 1024 + 1)
+        oversized = 'data:image/png;base64,' + 'A' * (100 * 1024 * 1024 + 1)
         assert sanitize_image_src(oversized) == ''
 
     def test_non_data_falls_back_to_sanitize_url(self):

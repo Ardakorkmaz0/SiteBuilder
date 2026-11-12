@@ -69,7 +69,7 @@ def check_svg(upload, max_bytes):
     data = upload.read(max_bytes + 1)
     upload.seek(0)
     if len(data) > max_bytes:
-        raise serializers.ValidationError(f'Image too large ({len(data) // 1024} KB). Max 5 MB.')
+        raise serializers.ValidationError(f'Image too large ({len(data) // 1024} KB). Max {max_bytes // (1024 * 1024)} MB.')
     lowered = data.lower()
     # Entities are how an XML file grows a billion times over while it is read.
     if b'<!doctype' in lowered or b'<!entity' in lowered:

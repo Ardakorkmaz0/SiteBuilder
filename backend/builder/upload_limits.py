@@ -27,7 +27,7 @@ class LimitedUploadHandler(FileUploadHandler):
                 file = getattr(handler, 'file', None)
                 if file is not None:
                     file.close()
-        raise UploadLimitExceeded('Upload too large. Each image may be at most 5 MB; the request may be at most 6 MB.')
+        raise UploadLimitExceeded('Upload too large. A file may be at most 100 MB.')
 
     def handle_raw_input(self, input_data, META, content_length, boundary, encoding=None):
         if content_length is not None and content_length > settings.MAX_MULTIPART_BODY_BYTES:

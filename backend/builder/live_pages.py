@@ -236,7 +236,7 @@ def send_page_live(site, data, was_published):
         raise serializers.ValidationError(f'Too many pages to publish (max {MAX_PUBLISHED_PAGES}).')
     used = others.aggregate(total=Sum(Length('html')))['total'] or 0
     if used + len(row['html']) > MAX_PUBLISHED_TOTAL_BYTES:
-        raise serializers.ValidationError('The published site is too large (max ~10MB).')
+        raise serializers.ValidationError('The published site is too large (max 250 MB).')
     snapshot = take_snapshot(site, was_published, page_id)
     site.published_pages.filter(page_id=page_id).delete()
     row['path'] = _published_path(row['path'], set(others.values_list('path', flat=True)))

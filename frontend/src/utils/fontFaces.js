@@ -7,7 +7,9 @@
 // Only @font-face rules are kept, and only ones whose files are inside the
 // rule. Mirrors sanitize_font_faces in backend/builder/validators.py.
 
-export const MAX_FONT_FACES = 1_500_000
+import { MAX_FILE_BYTES } from './sanitize.js'
+
+export const MAX_FONT_FACES = MAX_FILE_BYTES
 
 const RULE = /@font-face\s*\{[^{}]*\}/gi
 const FAMILY = /font-family\s*:\s*(["']?)([^;"'}]+)\1/i

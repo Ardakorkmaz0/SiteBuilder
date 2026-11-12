@@ -6,6 +6,11 @@ const OKUL = '@font-face{font-family:"Okul";src:url(data:font/woff2;base64,AAAA)
 const YAZI = "@font-face{font-family:'Yazi';font-weight:700;src:url(data:font/woff2;base64,BBBB)}"
 
 describe('the rules a site keeps', () => {
+  it('keeps 2 MB of fonts, over the old 1.5 MB limit', () => {
+    const rule = '@font-face{font-family:"Big";src:url(data:font/woff2;base64,' + 'A'.repeat(2_000_000) + ')}'
+    expect(fontFaceRules(rule).map((item) => item.css)).toEqual([rule])
+  })
+
   it('are @font-face rules whose files are inside them, and nothing else', () => {
     const css = `${OKUL}body{color:red}@font-face{font-family:Bad;src:url(https://evil.example/f.woff2)}${YAZI}@font-face{font-family:X;src:url(data:font/woff2;base64,A)}</style><script>@import url(x.css);`
 

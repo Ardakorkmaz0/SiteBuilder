@@ -32,7 +32,7 @@ from .svg_images import check_svg, is_svg_upload
 from .live_pages import (
     draft_is_ahead, forget_live_version, send_draft_live_without_pages, send_site_live, statuses,
 )
-from .validators import clean_published_pages, validate_and_clean_schema
+from .validators import MAX_FILE_BYTES, clean_published_pages, validate_and_clean_schema
 
 
 def password_errors(error):
@@ -62,7 +62,9 @@ ALLOWED_IMAGE_CONTENT_TYPES = {
     'image/png', 'image/jpeg', 'image/jpg', 'image/gif',
     'image/webp', 'image/avif', 'image/svg+xml',
 }
-MAX_IMAGE_BYTES = 5 * 1024 * 1024
+MAX_IMAGE_BYTES = MAX_FILE_BYTES
+# A profile picture is shown small, so it stays small.
+MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -440,7 +442,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         return self._clean_link(value, handle_ok=True)
 
     def validate_avatar(self, file):
-        if file.size > MAX_IMAGE_BYTES:
+        if file.size > MAX_AVATAR_BYTES:
             raise serializers.ValidationError(
                 f'Image too large ({file.size // 1024} KB). Max 5 MB.',
             )
@@ -719,8 +721,8 @@ class SiteSerializer(serializers.ModelSerializer):
         # allow-same-origin), so it cannot touch the app or a visitor's session.
         if not isinstance(value, str):
             return ''
-        if len(value) > 2_000_000:
-            raise serializers.ValidationError('HTML is too large (max ~2MB).')
+        if len(value) > MAX_FILE_BYTES:
+            raise serializers.ValidationError('HTML is too large (max 100 MB).')
         return value
 
     def validate_published_pages(self, value):
@@ -995,7 +997,7 @@ class UploadedImageSerializer(serializers.ModelSerializer):
     def validate_file(self, file):
         if file.size > MAX_IMAGE_BYTES:
             raise serializers.ValidationError(
-                f'Image too large ({file.size // 1024} KB). Max 5 MB.',
+                f'Image too large ({file.size // 1024} KB). Max 100 MB.',
             )
         ctype = (getattr(file, 'content_type', '') or '').lower()
         if ctype and ctype not in ALLOWED_IMAGE_CONTENT_TYPES:

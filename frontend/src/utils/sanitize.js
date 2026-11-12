@@ -41,7 +41,10 @@ export function sanitizeUrl(value) {
 // only — never for links. Mirrors backend sanitize_image_src.
 const DATA_IMAGE_RE =
   /^data:image\/(png|jpe?g|gif|webp|avif|svg\+xml);base64,[A-Za-z0-9+/\r\n=]+$/i
-const MAX_DATA_IMAGE = 5 * 1024 * 1024
+// The most one file may hold: an image, an HTML page, a published page, the
+// fonts a site carries. Mirrors MAX_FILE_BYTES in backend/builder/validators.py.
+export const MAX_FILE_BYTES = 100 * 1024 * 1024
+const MAX_DATA_IMAGE = MAX_FILE_BYTES
 
 export function sanitizeImageSrc(value) {
   if (typeof value !== 'string') return ''

@@ -140,7 +140,9 @@ def test_an_owned_parent_url_does_not_authorize_another_sites_child(world, actio
     _assert_unchanged(before)
 
 
-def test_streamed_files_share_the_six_mb_request_budget_without_content_length():
+def test_streamed_files_share_the_request_budget_without_content_length(settings):
+    settings.MAX_UPLOAD_FILE_BYTES = 5 * 1024 * 1024
+    settings.MAX_MULTIPART_BODY_BYTES = 6 * 1024 * 1024
     request = RequestFactory().post('/api/images/')
     handler = LimitedUploadHandler(request)
     handler.handle_raw_input(None, {}, None, b'boundary')

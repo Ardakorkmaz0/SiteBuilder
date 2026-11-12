@@ -8,6 +8,7 @@ import {
   withViewportMeta,
 } from '../../utils/htmlRuntime.js'
 import { insertBeforeClosingTag } from '../../utils/htmlInsert.js'
+import { MAX_FILE_BYTES } from '../../utils/sanitize.js'
 import { liveStateDiff, withLiveState } from '../../utils/htmlLiveState.js'
 import { DEVICES, isMobileDevice, responsivePcSize } from '../../utils/htmlDevices.js'
 import PhoneFrame from './PhoneFrame.jsx'
@@ -475,7 +476,7 @@ const STATE_REPORTER_SCRIPT = `<script data-pwb-state-reporter>(function () {
       var el = styles[i]
       if (el.matches && el.matches(SKIP)) continue
       var text = el.textContent || ''
-      if (!text || total + text.length > 900000) continue
+      if (!text || total + text.length > ${MAX_FILE_BYTES}) continue
       total += text.length
       out.push(text)
     }
@@ -484,7 +485,7 @@ const STATE_REPORTER_SCRIPT = `<script data-pwb-state-reporter>(function () {
     try {
       html = document.documentElement.outerHTML || ''
     } catch (e) {}
-    if (html.length > 2000000) html = ''
+    if (html.length > ${MAX_FILE_BYTES}) html = ''
     if (css === lastCss && html === lastHtml) return
     lastCss = css
     lastHtml = html

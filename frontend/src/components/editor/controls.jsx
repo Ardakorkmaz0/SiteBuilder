@@ -10,6 +10,7 @@ import { looksLikePageLink } from '../../utils/pageLinks.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { apiError } from '../../utils/errors.js'
 import { completeExternalUrl } from '../../utils/linkTargets.js'
+import { MAX_FILE_BYTES } from '../../utils/sanitize.js'
 
 // Shared property controls inherit the active Studio theme.
 const inputCls = 'studio-input min-w-0 w-full px-2.5 py-2 text-sm'
@@ -68,8 +69,8 @@ export function LabeledImage({ label, value, onChange }) {
       setErr(t('Please choose an image file.'))
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setErr(t('Image is too large (max 5 MB).'))
+    if (file.size > MAX_FILE_BYTES) {
+      setErr(t('Image is too large (max 100 MB).'))
       return
     }
     setBusy(true)
@@ -150,7 +151,7 @@ export function LabeledImage({ label, value, onChange }) {
           ? t('Uploading…')
           : dragOver
             ? t('Drop to upload')
-            : t('Drop an image here or click to upload (max 5 MB)')}
+            : t('Drop an image here or click to upload (max 100 MB)')}
       </div>
       <input ref={fileRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
 

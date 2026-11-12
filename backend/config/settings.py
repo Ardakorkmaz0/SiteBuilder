@@ -225,14 +225,18 @@ SERVE_MEDIA = _env_bool('DJANGO_SERVE_MEDIA', DEBUG)
 
 # Multipart file bytes need an explicit streaming limit: Django's memory
 # settings only select storage and cap non-file form data, respectively.
-MAX_UPLOAD_FILE_BYTES = 5 * 1024 * 1024
-MAX_MULTIPART_BODY_BYTES = 6 * 1024 * 1024
+# A file may be up to 100 MB (builder/validators.py MAX_FILE_BYTES).
+MAX_UPLOAD_FILE_BYTES = 100 * 1024 * 1024
+MAX_MULTIPART_BODY_BYTES = 101 * 1024 * 1024
 FILE_UPLOAD_HANDLERS = [
     'builder.upload_limits.LimitedUploadHandler',
     'django.core.files.uploadhandler.MemoryFileUploadHandler',
     'django.core.files.uploadhandler.TemporaryFileUploadHandler',
 ]
-DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
+# A save carries the schema, the HTML and, when the site goes live, every
+# published page, so it has room for more than one 100 MB file.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 300 * 1024 * 1024
+# Bigger uploads are spooled to a temporary file instead of memory.
 FILE_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

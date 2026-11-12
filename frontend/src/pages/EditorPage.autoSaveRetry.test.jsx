@@ -71,7 +71,7 @@ describe('an automatic save that failed', () => {
 
   it('says why when the server refuses it for good, and does not keep asking', async () => {
     updateSite.mockRejectedValue({
-      response: { status: 400, data: { code: 'validation_error', html: ['HTML is too large (max ~2MB).'], error_codes: { html: ['invalid'] } } },
+      response: { status: 400, data: { code: 'validation_error', html: ['HTML is too large (max 100 MB).'], error_codes: { html: ['invalid'] } } },
     })
     render(
       <UiThemeProvider>
@@ -86,7 +86,7 @@ describe('an automatic save that failed', () => {
 
     await act(async () => useEditorStore.getState().updateProps('h1', { text: 'Too big' }))
 
-    expect(await screen.findByRole('alert', {}, SLOW)).toHaveTextContent('HTML is too large (max ~2MB).')
+    expect(await screen.findByRole('alert', {}, SLOW)).toHaveTextContent('HTML is too large (max 100 MB).')
     expect(updateSite).toHaveBeenCalledTimes(1)
     // Past the first retry's 5 seconds: nothing was sent again.
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 6000)) })

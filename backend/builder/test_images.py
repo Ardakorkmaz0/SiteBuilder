@@ -73,26 +73,28 @@ class TestImageUpload:
         assert body['height'] == 20
         assert body['size'] > 0
 
-    def test_upload_too_large_rejected(self, client, alice, settings, tmp_path):
+    def test_upload_too_large_rejected(self, client, alice, settings, tmp_path, monkeypatch):
         settings.MEDIA_ROOT = tmp_path
+        # The real limit is 100 MB; a smaller one keeps the fixture small.
+        monkeypatch.setattr('builder.serializers.MAX_IMAGE_BYTES', 1024 * 1024)
         _, token = alice
         _auth(client, token)
         from django.core.files.uploadedfile import SimpleUploadedFile
-        # A real PNG above the limit must be refused too. 2000x2000 RGB noise
-        # compresses badly enough to land well over 5 MB.
+        # A real PNG above the limit must be refused too. 800x800 RGB noise
+        # compresses badly enough to land well over 1 MB.
         import random
-        big = PILImage.new('RGB', (2000, 2000))
+        big = PILImage.new('RGB', (800, 800))
         big.putdata([(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-                     for _ in range(2000 * 2000)])
+                     for _ in range(800 * 800)])
         buf = io.BytesIO()
         big.save(buf, format='PNG')
-        assert buf.tell() > 5 * 1024 * 1024, f'fixture is only {buf.tell()} bytes — too small to trigger size guard'
+        assert buf.tell() > 1024 * 1024, f'fixture is only {buf.tell()} bytes — too small to trigger size guard'
         resp = client.post(
             '/api/images/',
             {'file': SimpleUploadedFile('huge.png', buf.getvalue(), 'image/png')},
             format='multipart',
         )
-        assert resp.status_code == 413
+        assert resp.status_code == 400
         assert 'too large' in str(resp.data).lower()
 
     def test_upload_wrong_mime_rejected(self, client, alice, settings, tmp_path):
