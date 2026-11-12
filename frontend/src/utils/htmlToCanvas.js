@@ -9,6 +9,7 @@
 // the report counts what was kept as HTML and what could not be carried.
 
 import { ANCHOR_RE } from './anchors.js'
+import { fontFacesUsedBy } from './fontFaces.js'
 
 // Mirrors MAX_CHILDREN and MAX_HTML_EMBED in backend/builder/validators.py.
 const MAX_CHILDREN = 60
@@ -106,12 +107,17 @@ function textStyles(s) {
   if (s.letterSpacing && s.letterSpacing !== 'normal') out.letterSpacing = s.letterSpacing
   if (s.textTransform && s.textTransform !== 'none') out.textTransform = s.textTransform
   if (s.textDecorationLine && s.textDecorationLine !== 'none') out.textDecoration = s.textDecorationLine
+  if (s.fontVariantNumeric && s.fontVariantNumeric !== 'normal') out.fontVariantNumeric = s.fontVariantNumeric
   for (const key of Object.keys(out)) if (!out[key]) delete out[key]
   return out
 }
 
+// To the hundredth: a cell padded 12.6px each side and rounded to 13 lost
+// 0.8px of its line, and a line that just fitted broke in two.
+const fine = (value) => Math.round(value * 100) / 100
+
 function paddingOf(s) {
-  const sides = SIDES.map((side) => Math.round(px(s[`padding${side}`])))
+  const sides = SIDES.map((side) => fine(px(s[`padding${side}`])))
   return sides.some(Boolean) ? sides.map((side) => `${side}px`).join(' ') : '0px'
 }
 
@@ -140,6 +146,7 @@ function shape(ctx, look, rect, origin, corner = 'left top') {
   if (w >= MIN_W && h >= MIN_H) return block(ctx, 'spacer', {}, look, layout)
   const colour = look.backgroundColor || 'transparent'
   if (corner.includes('bottom')) layout.y = Math.max(0, layout.y - (layout.h - h))
+  if (corner.includes('right')) layout.x = Math.max(0, layout.x - (layout.w - w))
   return block(ctx, 'spacer', {}, {
     backgroundImage: `linear-gradient(${colour}, ${colour})`,
     backgroundSize: `${w >= MIN_W ? '100%' : `${w}px`} ${h >= MIN_H ? '100%' : `${h}px`}`,
@@ -187,10 +194,32 @@ function leaf(n, origin, ctx, href) {
   if (n.kind === 'list') {
     return [block(ctx, 'list', { text: n.items.join('\n'), ordered: n.ordered ? '1' : '', ...link }, { ...textStyles(n.s), ...boxStyles(n.s), padding: paddingOf(n.s) }, place(n.rect, origin))]
   }
+  if (n.kind === 'field') {
+    const f = n.field
+    const s = n.s
+    const border = uniformBorder(s) || sideOf(s, 'Top')
+    const props = {
+      label: '',
+      placeholder: f.type === 'select' ? f.prompt : f.placeholder,
+      fieldBackgroundColor: alphaOf(s.backgroundColor) > 0 ? s.backgroundColor : 'transparent',
+      fieldColor: s.color,
+      fieldBorderColor: border.width && alphaOf(border.color) > 0 ? border.color : 'transparent',
+      fieldBorderWidth: `${fine(border.width)}px`,
+      fieldBorderRadius: radiusOf(s) || '0px',
+      fieldPadding: paddingOf(s),
+      fieldHeight: `${fine(n.rect.h)}px`,
+      fieldFontSize: s.fontSize,
+      ...(f.type === 'select' ? { options: f.options.join('\n') } : { inputType: f.type }),
+    }
+    return [block(ctx, f.type === 'select' ? 'select' : 'input', props, { fontFamily: s.fontFamily, fontSize: s.fontSize, color: s.color }, place(n.rect, origin))]
+  }
   if (n.kind !== 'text') return null
 
   const target = n.href !== undefined ? n.href : href
-  const pressable = n.tag === 'button' || (target !== undefined && isPainted(n.s))
+  // A button the page drew as one. A link, painted or not, is text that
+  // leads somewhere: its words keep the alignment they were given, which a
+  // button block does not (it centres them).
+  const pressable = n.tag === 'button'
   // A text block shows its words in the middle of its box. Where the page
   // drew them higher or lower than that, the block is the height of the
   // words, at the height they were drawn, and the box (if it has a look of
@@ -198,37 +227,48 @@ function leaf(n, origin, ctx, href) {
   const ink = n.ink
   const offCentre = !pressable && ink && ink.h >= 1 && Math.abs((ink.y + ink.h / 2) - (n.rect.y + n.rect.h / 2)) > 2
   const under = offCentre && isPainted(n.s) ? [shape(ctx, boxStyles(n.s), n.rect, origin)] : []
-  const sides = SIDES.map((side) => Math.round(px(n.s[`padding${side}`])))
+  const sides = SIDES.map((side) => fine(px(n.s[`padding${side}`])))
   const styles = offCentre
     ? { ...textStyles(n.s), padding: `0px ${sides[1]}px 0px ${sides[3]}px` }
     : { ...textStyles(n.s), ...boxStyles(n.s), padding: paddingOf(n.s) }
   const layout = place(offCentre ? { ...n.rect, y: ink.y, h: ink.h } : n.rect, origin, 1)
+  // A cell of a table has a line on some of its sides only.
+  under.push(...edgeLines(n, ctx, origin))
+  // Formatting inside the text: runs beside the plain text (richText.js).
+  const rich = Array.isArray(n.runs) && n.runs.length ? { rich: n.runs } : {}
   if (HEADINGS[n.tag]) {
-    return [...under, block(ctx, 'heading', { text: n.text, level: HEADINGS[n.tag], ...(target ? { href: target } : {}) }, styles, layout)]
+    return [...under, block(ctx, 'heading', { text: n.text, level: HEADINGS[n.tag], ...rich, ...(target ? { href: target } : {}) }, styles, layout)]
   }
   if (pressable) {
     // A button's words sit in the middle of it.
     return [block(ctx, 'button', { text: n.text, href: target || '', icon: '' }, { backgroundColor: 'transparent', ...styles, textAlign: 'center' }, layout)]
   }
-  if (target !== undefined) {
-    return [...under, block(ctx, 'linkbutton', { text: n.text, href: target || '', icon: '' }, styles, layout)]
-  }
-  return [...under, block(ctx, 'text', { text: n.text }, styles, layout)]
+  return [...under, block(ctx, 'text', { text: n.text, ...rich, ...(target ? { href: target } : {}) }, styles, layout)]
 }
 
 // Lines for the sides of a box whose border is not the same all the way
 // round: a block has one border or none, so a line under a header is drawn
 // as a line.
-function edgeLines(n, ctx) {
+// `inside` draws them in the box's own coordinates (for a box that holds
+// its lines); without it they stand where the box stands, beside it.
+function edgeLines(n, ctx, origin = null) {
   if (uniformBorder(n.s)) return []
   const lines = []
   const width = Math.ceil(n.rect.w)
   const height = Math.ceil(n.rect.h)
-  for (const side of ['Top', 'Bottom']) {
+  const left = origin ? n.rect.x : 0
+  const top = origin ? n.rect.y : 0
+  const from = origin || { x: 0, y: 0 }
+  for (const side of SIDES) {
     const edge = sideOf(n.s, side)
     if (!edge.width || alphaOf(edge.color) === 0) continue
     const thick = Math.max(1, Math.round(edge.width))
-    lines.push(shape(ctx, { backgroundColor: edge.color }, { x: 0, y: side === 'Top' ? 0 : Math.max(0, height - thick), w: width, h: thick }, { x: 0, y: 0 }, side === 'Top' ? 'left top' : 'left bottom'))
+    const rect = side === 'Top' ? { x: left, y: top, w: width, h: thick }
+      : side === 'Bottom' ? { x: left, y: top + Math.max(0, height - thick), w: width, h: thick }
+        : side === 'Left' ? { x: left, y: top, w: thick, h: height }
+          : { x: left + Math.max(0, width - thick), y: top, w: thick, h: height }
+    const corner = side === 'Bottom' ? 'left bottom' : side === 'Right' ? 'right top' : 'left top'
+    lines.push(shape(ctx, { backgroundColor: edge.color }, rect, from, corner))
   }
   return lines
 }
@@ -422,6 +462,8 @@ export function canvasFromMeasured(measured, { makeId = randomId } = {}) {
     canvasWidth: width,
     background: hexOf(alphaOf(body) > 0 ? body : root),
     fonts: Array.isArray(measured?.fonts) ? measured.fonts : [],
+    // The document's own font files, for the families the blocks use.
+    fontFaces: fontFacesUsedBy((measured?.fontFaces || []).map((face) => face?.css || '').join('\n'), components),
     title: measured?.title || '',
     description: measured?.description || '',
     language: measured?.language || '',
@@ -449,6 +491,7 @@ function retarget(pages) {
       for (const c of list || []) {
         if (typeof c.props.href === 'string') c.props.href = lead(c.props.href)
         if (Array.isArray(c.props.links)) c.props.links = c.props.links.map((link) => ({ ...link, href: lead(link.href) }))
+        if (Array.isArray(c.props.rich)) c.props.rich = c.props.rich.map((run) => (typeof run.href === 'string' ? { ...run, href: lead(run.href) } : run))
         if (c.type === 'html') c.props.code = c.props.code.replace(/(href=")(#[^"]*)(")/g, (all, open, href, close) => `${open}${lead(href.replace(/&amp;/g, '&'))}${close}`)
         visit(c.children)
       }
@@ -464,7 +507,7 @@ function retarget(pages) {
 export function pagesFromMeasured(measured, { makeId = randomId, makePageId = randomPageId, firstPageId = 'page_home' } = {}) {
   const states = [
     { name: '', data: measured },
-    ...(measured?.states || []).map((state) => ({ name: state.label || '', data: { ...state.data, fonts: measured.fonts, scripts: measured.scripts } })),
+    ...(measured?.states || []).map((state) => ({ name: state.label || '', data: { ...state.data, fonts: measured.fonts, fontFaces: measured.fontFaces, scripts: measured.scripts } })),
   ]
   const pages = states.map((state, index) => ({
     id: index === 0 ? firstPageId : makePageId(),

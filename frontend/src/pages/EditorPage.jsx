@@ -95,6 +95,7 @@ import { htmlFilesToDocument } from '../utils/htmlFiles.js'
 import { schemaToResponsiveHtml } from '../utils/responsiveHtml.js'
 import { measureHtmlPage } from '../utils/htmlPageMeasure.js'
 import { pagesFromMeasured } from '../utils/htmlToCanvas.js'
+import { safeFontFaces } from '../utils/fontFaces.js'
 import { withoutBuilderShim } from '../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
 import { componentDraftHtml, componentHtmlFiles, pendingComponentSourceDrafts } from '../utils/componentSourceDrafts.js'
@@ -843,6 +844,24 @@ function SiteEditor() {
   // renders the same font the published page will. Keyed by the resolved
   // href, so a colour-only theme tweak doesn't re-request the file.
   const openPageFonts = useEditorStore((s) => s.schema.pages.find((p) => p.id === s.currentPageId)?.fonts)
+  // The fonts the site carries inside itself (utils/fontFaces.js), for the
+  // canvas to draw its text in, as the published page will.
+  const siteFontFaces = useEditorStore((s) => s.schema.fontFaces)
+  useEffect(() => {
+    const css = safeFontFaces(siteFontFaces)
+    let tag = document.getElementById('pwb-font-faces')
+    if (!css) {
+      tag?.remove()
+      return undefined
+    }
+    if (!tag) {
+      tag = document.createElement('style')
+      tag.id = 'pwb-font-faces'
+      document.head.appendChild(tag)
+    }
+    if (tag.textContent !== css) tag.textContent = css
+    return () => { document.getElementById('pwb-font-faces')?.remove() }
+  }, [siteFontFaces])
   const themeFontHref = googleFontHrefForTheme(openPageTheme || theme, openPageFonts)
   useEffect(() => {
     let link = document.getElementById('pwb-google-font')
@@ -2250,6 +2269,8 @@ function SiteEditor() {
     setConvertNote(t('Reading the page…'))
     try {
       const measured = await measureHtmlPage(html, {
+        // A long page with many formulas takes a while to read and draw.
+        timeout: 180000,
         onProgress: (done, total) => setConvertNote(t('Reading the page: part {done} of {total}…', { done, total })),
       })
       const made = pagesFromMeasured(measured, { firstPageId: pageId })
@@ -2271,6 +2292,7 @@ function SiteEditor() {
         report.html ? t('{count} of them stay HTML blocks: the canvas has no block of its own for them (a table, a form, a video, or text with a link inside it).', { count: report.html }) : '',
         report.tooLarge ? t('{count} parts are too large to carry over and would be left out.', { count: report.tooLarge }) : '',
         result.report.scripts ? t('The page has scripts. They do not run on the canvas.') : '',
+        result.report.scripts && measured && !measured.ranScripts ? t('The page could not be read with its scripts running, so what they show is missing. Keep this tab in view and try again.') : '',
         hidden ? t('{count} parts of the page are hidden until something shows them (another chapter, a closed menu, an answer). They are not put on the canvas; they stay in the HTML page that is kept.', { count: hidden }) : '',
         t('The HTML page is kept: "Back to the HTML page" in this menu brings it back as it is now.'),
       ].filter(Boolean)
@@ -2285,6 +2307,7 @@ function SiteEditor() {
         htmlBackup: html,
         seoTitle: result.title,
         seoDescription: result.description,
+        fontFaces: result.fontFaces,
         more,
       })
       const nextMap = { ...currentMap, [pageId]: '' }

@@ -19,6 +19,7 @@ import { pageHasMotion } from '../utils/motion.js'
 import { previewDeviceWidth } from '../utils/previewDevices.js'
 import { safeCustomCss, safeCustomJs, themeVariablesCss } from '../utils/theme.js'
 import { googleFontHrefForTheme } from '../utils/googleFonts.js'
+import { fontFacesUsedBy } from '../utils/fontFaces.js'
 import PublicToolbar from '../components/preview/PublicToolbar.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
 import { isPreviewMessageSource, previewPageId } from '../utils/previewMessages.js'
@@ -603,6 +604,8 @@ body { font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, sans-serif);
   // changes so stale URLs don't linger.
   // The page on screen may keep its own theme ("This page only").
   const fontHref = googleFontHrefForTheme(current?.theme || site?.schema?.theme, current?.fonts)
+  // The fonts the site carries inside itself (utils/fontFaces.js).
+  const ownFonts = current?.mode === 'html' ? '' : fontFacesUsedBy(site?.schema?.fontFaces, current?.components)
   return (
     <div className="min-h-screen pt-16">
       <PublicToolbar
@@ -613,6 +616,7 @@ body { font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, sans-serif);
         device={device}
         onDeviceChange={setDevice}
       />
+      {ownFonts && <style data-pwb-fonts>{ownFonts}</style>}
       {fontHref && (
         <>
           <link rel="preconnect" href="https://fonts.googleapis.com" crossOrigin="anonymous" />

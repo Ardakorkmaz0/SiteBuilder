@@ -33,6 +33,8 @@ import {
 import { htmlEmbedDocument, srcdocAttrValue, withEmbedFont } from './htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from './htmlSnippetSizing.js'
 import { googleFontLinkTag } from './googleFonts.js'
+import { richHtml } from './richText.js'
+import { fontFaceStyleTag } from './fontFaces.js'
 import {
   absoluteChildrenHeight,
   flowCanvasHeight,
@@ -599,10 +601,10 @@ function innerHtml(c) {
     // published page drew every one of them at 1.15.
     case 'heading': {
       const lvl = ['h1', 'h2', 'h3'].includes(p.level) ? p.level : 'h2'
-      return `<${lvl} class="m0"${ownLineHeight(c)}>${multiline(p.text)}</${lvl}>`
+      return `<${lvl} class="m0"${ownLineHeight(c)}>${richHtml(p) || multiline(p.text)}</${lvl}>`
     }
     case 'text':
-      return `<p class="m0"${ownLineHeight(c)}>${multiline(p.text)}</p>`
+      return `<p class="m0"${ownLineHeight(c)}>${richHtml(p) || multiline(p.text)}</p>`
     case 'button':
     case 'linkbutton':
       return iconTextHtml(p)
@@ -696,7 +698,7 @@ function pageHtml(
   cssHref = 'styles.css',
   customJs = '',
   theme = null,
-  { externalRuntime = false, colorMode = null } = {},
+  { externalRuntime = false, colorMode = null, fontFaces = '' } = {},
 ) {
   const body = pageBody(page, { font: theme?.fontFamily })
   const source = `${body}${customJsBlock(customJs)}${colorMode ? PALETTE_ON_PAGE : ''}`
@@ -715,7 +717,7 @@ function pageHtml(
     <title>${esc(pageSeoTitle(page, fileTitle))}</title>
     ${seoHeadTags(page, fileTitle)}${pageBehaviourStyleTag(page)}
     <link rel="stylesheet" href="${cssHref}" />${customStyleLink}
-    ${googleFontLinkTag(theme, page?.fonts)}
+    ${googleFontLinkTag(theme, page?.fonts)}${fontFaceStyleTag({ fontFaces }, page)}
     ${runtimeHead}${colorMode ? `\n    ${colorModeHeadTags(colorMode)}` : ''}
   </head>
   <body>
@@ -1005,7 +1007,7 @@ function schemaToFlowHtml(page, title, schema, { colorMode = null } = {}) {
     },
     { includeCustomCss: false },
   )
-  const html = pageHtml(page, title, 'styles.css', schema?.customJs, pageTheme(schema, page), { colorMode })
+  const html = pageHtml(page, title, 'styles.css', schema?.customJs, pageTheme(schema, page), { colorMode, fontFaces: schema?.fontFaces })
   return html.replace(
     '<link rel="stylesheet" href="styles.css" />',
     `<style>\n${withoutUnusedRules(css, `${html}${schema?.customCss || ''}`)}${customCssBlock(schema?.customCss)}\n    </style>`,
@@ -1056,7 +1058,7 @@ function schemaToScaledHtml(page, title = 'My Site', schema = {}, options = {}) 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${esc(pageSeoTitle(page, title))}</title>
     ${seoHeadTags(page, title)}${pageBehaviourStyleTag(page)}
-    ${googleFontLinkTag(pageTheme(schema, page), page?.fonts)}
+    ${googleFontLinkTag(pageTheme(schema, page), page?.fonts)}${fontFaceStyleTag(schema, page)}
     ${runtimeNeeds(source).motion ? motionHeadTags() : ''}
     <style>
 ${withoutUnusedRules(css, `<div class="page p-${page.id}"></div>${source}${schema?.customCss || ''}`)}
@@ -1142,7 +1144,7 @@ export function schemaToFiles(input, { documents = {} } = {}) {
         'styles.css',
         schema?.customJs,
         pageTheme(schema, page),
-        { externalRuntime: true, colorMode: modes[i] },
+        { externalRuntime: true, colorMode: modes[i], fontFaces: schema?.fontFaces },
       ),
     })
   })

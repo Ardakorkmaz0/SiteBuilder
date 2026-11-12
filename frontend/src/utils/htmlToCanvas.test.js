@@ -109,22 +109,33 @@ describe('a piece of text', () => {
     expect(inSection(text('h5', [0, 0, 400, 40], 'Small print')).props).toEqual({ text: 'Small print', level: 'h3' })
   })
 
-  it('is a button when it is a link with a background, and a link when it has none', () => {
-    const button = inSection(text('a', [40, 40, 160, 48], 'Order now', { backgroundColor: 'rgb(79, 70, 229)', color: 'rgb(255, 255, 255)', borderTopLeftRadius: '8px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px', borderBottomLeftRadius: '8px' }, { href: '/order' }))
-    expect(button).toMatchObject({
-      type: 'button',
-      props: { text: 'Order now', href: '/order', icon: '' },
-      styles: { backgroundColor: 'rgb(79, 70, 229)', color: 'rgb(255, 255, 255)', borderRadius: '8px', textAlign: 'center' },
+  // A button block centres its words; a link, painted or not, keeps the
+  // alignment its words were given (a menu of links set to the left).
+  it('is text that carries its link when it is a link, painted or not, and a button only when it was one', () => {
+    const painted = inSection(text('a', [40, 40, 160, 48], 'Order now', { backgroundColor: 'rgb(79, 70, 229)', color: 'rgb(255, 255, 255)', textAlign: 'left', borderTopLeftRadius: '8px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px', borderBottomLeftRadius: '8px' }, { href: '/order' }))
+    expect(painted).toMatchObject({
+      type: 'text',
+      props: { text: 'Order now', href: '/order' },
+      styles: { backgroundColor: 'rgb(79, 70, 229)', color: 'rgb(255, 255, 255)', borderRadius: '8px', textAlign: 'left' },
       layout: { x: 40, y: 40, w: 161, h: 48 },
     })
 
     const link = inSection(text('a', [40, 40, 60, 24], 'About', { textDecorationLine: 'underline' }, { href: '#about' }))
-    expect(link).toMatchObject({ type: 'linkbutton', props: { text: 'About', href: '#about', icon: '' }, styles: { textDecoration: 'underline' } })
+    expect(link).toMatchObject({ type: 'text', props: { text: 'About', href: '#about' }, styles: { textDecoration: 'underline' } })
+
+    const button = inSection(text('button', [40, 40, 120, 40], 'Send', { backgroundColor: 'rgb(0, 0, 0)' }))
+    expect(button).toMatchObject({ type: 'button', props: { text: 'Send', href: '', icon: '' }, styles: { textAlign: 'center' } })
+  })
+
+  it('keeps its padding to the hundredth, so a line that just fitted still fits', () => {
+    const cell = inSection(text('th', [40, 40, 90, 39], 'Gerçek', { paddingTop: '7.2px', paddingRight: '12.6px', paddingBottom: '7.2px', paddingLeft: '12.6px' }))
+
+    expect(cell.styles.padding).toBe('7.2px 12.6px 7.2px 12.6px')
   })
 
   it('keeps the look it was written in', () => {
     const quote = inSection(text('p', [0, 0, 400, 60], 'So good.', {
-      fontStyle: 'italic', letterSpacing: '0.5px', textTransform: 'uppercase', textAlign: 'center',
+      fontStyle: 'italic', letterSpacing: '0.5px', textTransform: 'uppercase', textAlign: 'center', fontVariantNumeric: 'lining-nums tabular-nums',
       paddingTop: '8px', paddingRight: '16px', paddingBottom: '8px', paddingLeft: '16px',
       backgroundColor: 'rgb(254, 243, 199)', boxShadow: 'rgba(0, 0, 0, 0.1) 0px 1px 2px 0px', opacity: '0.8',
     }))
@@ -135,6 +146,7 @@ describe('a piece of text', () => {
       fontStyle: 'italic',
       letterSpacing: '0.5px',
       textTransform: 'uppercase',
+      fontVariantNumeric: 'lining-nums tabular-nums',
       backgroundColor: 'rgb(254, 243, 199)',
       boxShadow: 'rgba(0, 0, 0, 0.1) 0px 1px 2px 0px',
       opacity: '0.8',
@@ -166,7 +178,7 @@ describe('words that are not in the middle of their element', () => {
 
   it('stay one block when they are in the middle, as in a badge or a button', () => {
     const badge = text('span', [40, 100, 90, 28], 'New', { backgroundColor: 'rgb(254, 243, 199)' }, { ink: { x: 60, y: 103, w: 50, h: 22 } })
-    const button = text('a', [40, 200, 160, 60], 'Order', { backgroundColor: 'rgb(79, 70, 229)' }, { href: '/order', ink: { x: 80, y: 200, w: 60, h: 20 } })
+    const button = text('button', [40, 200, 160, 60], 'Order', { backgroundColor: 'rgb(79, 70, 229)' }, { ink: { x: 80, y: 200, w: 60, h: 20 } })
 
     expect(inSection(badge)).toMatchObject([{ type: 'text', layout: { x: 40, y: 100, w: 91, h: 28 }, styles: { backgroundColor: 'rgb(254, 243, 199)' } }])
     expect(inSection(button)).toMatchObject([{ type: 'button', layout: { x: 40, y: 200, w: 161, h: 60 } }])
@@ -322,7 +334,7 @@ describe('a bar of links at the top', () => {
     const result = convert(page([header([logo, link(900, 'Menu', '#menu'), link(1004, 'About', '#about')])]))
 
     expect(result.components[0].type).toBe('region')
-    expect(result.components[0].children.map((c) => c.type)).toEqual(['image', 'linkbutton', 'linkbutton'])
+    expect(result.components[0].children.map((c) => c.type)).toEqual(['image', 'text', 'text'])
   })
 })
 
@@ -417,7 +429,7 @@ describe('a page that shows its parts one at a time', () => {
     let p = 0
     return pagesFromMeasured(measured(), { firstPageId: 'page_home', makeId: (type) => `${type}_${(n += 1)}`, makePageId: () => `page_made${(p += 1)}` })
   }
-  const hrefs = (made) => made.components[0].children.filter((c) => c.type === 'linkbutton').map((c) => c.props.href)
+  const hrefs = (made) => made.components[0].children.filter((c) => c.type === 'text' && c.props.href !== undefined).map((c) => c.props.href)
 
   it('becomes a canvas page for each part, named by the part', () => {
     const pages = build()
@@ -450,5 +462,39 @@ describe('a page that shows its parts one at a time', () => {
     const pages = pagesFromMeasured({ ...state('Only', ['nav', 'intro']), states: [] }, { firstPageId: 'page_x' })
 
     expect(pages.map((made) => made.id)).toEqual(['page_x'])
+  })
+})
+
+describe('a field of the page', () => {
+  const field = (tag, rect, field, s = {}) => node(tag, rect, { kind: 'field', field }, {
+    backgroundColor: 'rgb(255, 253, 248)', color: 'rgb(31, 35, 40)', fontSize: '16.56px', fontFamily: 'Etiket, sans-serif',
+    paddingTop: '7.56px', paddingRight: '10.8px', paddingBottom: '7.56px', paddingLeft: '10.8px',
+    borderTopWidth: '1px', borderRightWidth: '1px', borderBottomWidth: '1px', borderLeftWidth: '1px',
+    borderTopStyle: 'solid', borderRightStyle: 'solid', borderBottomStyle: 'solid', borderLeftStyle: 'solid',
+    borderTopColor: 'rgb(143, 134, 114)', borderRightColor: 'rgb(143, 134, 114)', borderBottomColor: 'rgb(143, 134, 114)', borderLeftColor: 'rgb(143, 134, 114)',
+    borderTopLeftRadius: '4px', borderTopRightRadius: '4px', borderBottomRightRadius: '4px', borderBottomLeftRadius: '4px',
+    ...s,
+  })
+  const inSection = (kid) => convert(page([node('section', [0, 0, 1200, 400], { kids: [kid] })])).components[0].children[0]
+
+  it('is the canvas input block, drawn as the page drew it', () => {
+    expect(inSection(field('input', [23, 123, 239, 41.2], { type: 'search', placeholder: 'örnek: RMSE', options: [], prompt: '' }))).toMatchObject({
+      type: 'input',
+      props: {
+        label: '', placeholder: 'örnek: RMSE', inputType: 'search',
+        fieldBackgroundColor: 'rgb(255, 253, 248)', fieldColor: 'rgb(31, 35, 40)',
+        fieldBorderColor: 'rgb(143, 134, 114)', fieldBorderWidth: '1px', fieldBorderRadius: '4px',
+        fieldPadding: '7.56px 10.8px 7.56px 10.8px', fieldHeight: '41.2px', fieldFontSize: '16.56px',
+      },
+      styles: { fontFamily: 'Etiket, sans-serif', fontSize: '16.56px', color: 'rgb(31, 35, 40)' },
+      layout: { x: 23, y: 123, w: 239, h: 42 },
+    })
+  })
+
+  it('is the canvas select block with its choices, and its prompt as the placeholder', () => {
+    const select = inSection(field('select', [40, 40, 200, 40], { type: 'select', placeholder: '', options: ['MSE', 'MAE'], prompt: 'Seçin' }))
+
+    expect(select).toMatchObject({ type: 'select', props: { options: 'MSE\nMAE', placeholder: 'Seçin' } })
+    expect(select.props.inputType).toBeUndefined()
   })
 })

@@ -12,6 +12,8 @@ import { builderInteractiveTags, runtimeNeeds, withBuilderInteractiveHtml, witho
 import { htmlEmbedDocument, srcdocAttrValue, withEmbedFont } from './htmlEmbedDocument.js'
 import { htmlEmbedDocumentOptions } from './htmlSnippetSizing.js'
 import { googleFontLinkTag } from './googleFonts.js'
+import { richHtml } from './richText.js'
+import { fontFaceStyleTag } from './fontFaces.js'
 import { navLinkLabel, navbarLinkGap, navbarPlacement } from './navbarLayout.js'
 import { autoLayoutChildCss, autoLayoutContainerCss, isAutoLayout } from './autoLayout.js'
 import { motionClassSuffix, motionCssVars, motionHeadTags, motionRevealAttr } from './motion.js'
@@ -351,10 +353,10 @@ function itemElHtml(c, multi, colOverride) {
   switch (c.type) {
     case 'heading': {
       const lvl = ['h1', 'h2', 'h3'].includes(p.level) ? p.level : 'h2'
-      return `<${lvl} class="${cls} rh-m0"${styleAttr(c, col)}>${multiline(p.text)}</${lvl}>`
+      return `<${lvl} class="${cls} rh-m0"${styleAttr(c, col)}>${richHtml(p) || multiline(p.text)}</${lvl}>`
     }
     case 'text':
-      return `<p class="${cls} rh-m0"${styleAttr(c, col)}>${multiline(p.text)}</p>`
+      return `<p class="${cls} rh-m0"${styleAttr(c, col)}>${richHtml(p) || multiline(p.text)}</p>`
     case 'button':
     case 'linkbutton': {
       const href = sanitizeUrl(p.href)
@@ -568,7 +570,7 @@ export function schemaToResponsiveHtml(schema, title = 'My Site', { colorMode = 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${esc(pageSeoTitle(page, title))}</title>
     ${seoHeadTags(page, title)}${pageBehaviourStyleTag(page)}
-    ${googleFontLinkTag(pageTheme(schema, page), page?.fonts)}
+    ${googleFontLinkTag(pageTheme(schema, page), page?.fonts)}${fontFaceStyleTag(schema, page)}
     ${runtimeNeeds(runtimeSource).motion ? motionHeadTags() : ''}
     <style>
 ${withoutUnusedRules(`      ${themeVariablesCss(pageTheme(schema, page))}

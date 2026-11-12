@@ -11,6 +11,9 @@ export const ALLOWED_STYLE_KEYS = new Set([
   'transform', 'filter', 'backdropFilter', 'textShadow', 'aspectRatio',
   'objectPosition', 'backgroundSize', 'backgroundPosition', 'backgroundRepeat',
   'cursor', 'overflow',
+  // Digits of equal width (tabular-nums): they decide where a line of
+  // figures breaks.
+  'fontVariantNumeric',
 ])
 
 // The control characters are the point: a url that carries one is the attack
