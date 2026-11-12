@@ -349,6 +349,21 @@ describe('more pieces than one parent may hold', () => {
     expect(groups[1].children[0]).toMatchObject({ props: { text: 'Line 41' }, layout: { x: 0, y: 0 } })
     expect(groups.flatMap((g) => g.children.map((c) => c.props.text))).toHaveLength(130)
   })
+
+  it('leave what runs down the whole box out of the groups, so no group lies over the others', () => {
+    const kids = Array.from({ length: 70 }, (_, index) => text('p', [40, 20 + index * 30, 300, 24], `Line ${index + 1}`))
+    const edge = node('div', [0, 0, 4, 2140], {}, { backgroundColor: 'rgb(216, 208, 191)' })
+    const bottom = node('div', [0, 2136, 1200, 4], {}, { backgroundColor: 'rgb(216, 208, 191)' })
+    const result = convert(page([node('section', [0, 0, 1200, 2140], { kids: [edge, ...kids, bottom] })]))
+
+    const children = result.components[0].children
+    expect(children.map((c) => [c.type, c.layout.y, c.layout.h])).toEqual([
+      ['spacer', 0, 2140],
+      ['spacer', 2136, 4],
+      ['container', 20, 1194],
+      ['container', 1220, 894],
+    ])
+  })
 })
 
 describe('colours and fonts', () => {
@@ -424,62 +439,88 @@ describe('a page that shows its parts one at a time', () => {
     kids: [text('a', [20, 30, 200, 24], 'Costs', {}, { href: '#costs' })],
   }, { backgroundColor: 'rgb(242, 237, 225)', position: 'fixed' })
   const footer = () => text('p', [340, 860, 400, 24], 'Notes 2026')
-  const state = (kids) => ({
-    width: 1200, height: 900, viewHeight: 900, background: ['rgb(255, 255, 255)', CLEAR], fontFamily: 'Inter', title: 'Notes', description: '', language: 'en',
+  const state = (kids, offKeys = []) => ({
+    width: 1200, height: 900, viewHeight: 900, background: ['rgb(255, 255, 255)', CLEAR], fontFamily: 'Inter', title: 'Notes', description: '', language: 'en', offKeys,
     root: node('body', [0, 0, 1200, 900], { kids: [side(), ...kids, footer()] }),
   })
-  const measured = (states) => ({
-    ...state([text('h1', [340, 40, 600, 60], 'Introduction', {}, { id: 'intro' })]),
+  const measured = (states, offKeys = []) => ({
+    ...state([text('h1', [340, 40, 600, 60], 'Introduction', {}, { id: 'intro' })], offKeys),
     fonts: ['Fraunces:wght@500'],
     scripts: 2,
-    states: states.map((kids, index) => ({ label: `Part ${index + 2}`, data: state(kids) })),
+    states: states.map(([kids, off], index) => ({ label: `Part ${index + 2}`, data: state(kids, off) })),
   })
-  function build(states) {
+  function build(states, offKeys) {
     let n = 0
-    return canvasPageFromMeasured(measured(states), { makeId: (type) => `${type}_${(n += 1)}` })
+    return canvasPageFromMeasured(measured(states, offKeys), { makeId: (type) => `${type}_${(n += 1)}` })
   }
   const costs = () => [
     text('h1', [340, 40, 600, 60], 'Costs', {}, { id: 'costs' }),
     text('p', [340, 120, 600, 24], 'Also the intro', {}, { id: 'intro' }),
   ]
 
-  it('stays one page, with each other part below the one it opens on', () => {
-    const page = build([costs()])
+  it('stays one page, each part where it was drawn and shown by its own key, what all parts share once', () => {
+    const page = build([[costs()]])
 
-    expect(page.parts).toBe(2)
-    expect(page.components.map((c) => [c.type, c.props.text ?? c.props.scrollBehavior, c.layout.y])).toEqual([
-      ['container', 'fixed', 0],
-      ['heading', 'Introduction', 40],
-      ['text', 'Notes 2026', 860],
-      // Below the footer (bottom 884), after the room the page leaves above its content (40).
-      ['heading', 'Costs', 924],
-      ['text', 'Also the intro', 1004],
+    expect(page.components.map((c) => [c.type, c.props.text ?? c.props.scrollBehavior, c.layout.y, c.props.shownBy])).toEqual([
+      ['container', 'fixed', 0, undefined],
+      ['text', 'Notes 2026', 860, undefined],
+      ['heading', 'Introduction', 40, ['p0']],
+      ['heading', 'Costs', 40, ['p1']],
+      ['text', 'Also the intro', 120, ['p1']],
     ])
+    expect(page.parts).toEqual([{ key: 'p0', label: 'Introduction' }, { key: 'p1', label: 'Part 2' }])
+    expect(page.hiddenKeys).toEqual(['p1'])
+    expect(page.partCount).toBe(2)
     expect(page.fonts).toEqual(['Fraunces:wght@500'])
     expect(page.report).toMatchObject({ native: 6, html: 0, hidden: 0, scripts: 2 })
   })
 
-  it('leads a link to its part down the same page, one block per anchor', () => {
-    const page = build([costs()])
-    const anchors = page.components.map((c) => c.props.anchor)
+  it('keeps one block per anchor, so a link to a part finds the part', () => {
+    const page = build([[costs()]])
 
     expect(page.components[0].children.find((c) => c.props.href).props.href).toBe('#costs')
-    expect(anchors).toEqual([undefined, 'intro', undefined, 'costs', undefined])
+    expect(page.components.map((c) => c.props.anchor)).toEqual([undefined, undefined, 'intro', 'costs', undefined])
   })
 
-  it('leaves out a part that would reach past the lowest place a block may stand, and counts it', () => {
-    const page = build([[text('p', [340, 40, 600, 199500], 'Too long')], costs()])
+  it('opens with what a click shows hidden, in the part it opens on and in every other', () => {
+    const page = build([[costs(), ['k2', 'k1']]], ['k1'])
 
-    expect(page.parts).toBe(2)
-    expect(page.report.hidden).toBe(1)
-    expect(page.components.map((c) => c.props.text).filter(Boolean)).toEqual(['Introduction', 'Notes 2026', 'Costs', 'Also the intro'])
+    expect(page.hiddenKeys).toEqual(['p1', 'k1', 'k2'])
   })
 
   it('is the page as it opened when it hides nothing a link leads to', () => {
-    const page = build([])
+    const page = build([], ['k1'])
 
-    expect(page.parts).toBe(1)
+    expect(page.parts).toEqual([])
+    expect(page.hiddenKeys).toEqual(['k1'])
     expect(page.components).toHaveLength(3)
+  })
+})
+
+describe('what a click on the page shows and hides', () => {
+  it('rides on every block made from the element it was learnt on', () => {
+    const result = convert(page([
+      node('div', [340, 100, 600, 80], { keys: ['k1'], kids: [text('p', [340, 100, 600, 24], 'Square the errors.'), text('p', [340, 140, 600, 24], 'Then add them.')] }),
+      text('button', [340, 200, 120, 32], 'Next step', {}, { actions: [{ do: 'next', keys: ['k1', 'k2'] }] }),
+      node('div', [340, 260, 600, 80], { keys: ['k3'], kids: [text('p', [340, 270, 600, 24], 'Inside a box', {}, { keys: ['k4'] })] }, { backgroundColor: 'rgb(255, 253, 248)' }),
+    ]))
+
+    expect(result.components.map((c) => [c.props.text ?? c.type, c.props.shownBy, c.props.onClick])).toEqual([
+      ['Square the errors.', ['k1'], undefined],
+      ['Then add them.', ['k1'], undefined],
+      ['Next step', undefined, [{ do: 'next', keys: ['k1', 'k2'] }]],
+      ['container', ['k3'], undefined],
+    ])
+    // A block inside a box keeps its own key; the box's hides it with the box.
+    expect(result.components[3].children[0].props.shownBy).toEqual(['k4'])
+  })
+
+  it('carries the room its element took on the topmost of its blocks, counted from the top of the element', () => {
+    const result = convert(page([
+      node('li', [340, 100, 600, 90], { keys: ['k1'], room: 102, kids: [text('h5', [380, 110, 400, 24], 'Square the errors.'), text('p', [380, 140, 400, 48], 'Then add them.')] }),
+    ]))
+
+    expect(result.components.map((c) => c.props.rooms)).toEqual([[['k1', 10, 102]], [['k1', 0, 0]]])
   })
 })
 

@@ -27,6 +27,15 @@ export function shownBy(props) {
   return [...new Set(keysOf(props?.shownBy, 16))]
 }
 
+// The room each key's element took, on the block that stands for it:
+// [key, from the element's top to the block's, room].
+export function showRooms(props) {
+  return (Array.isArray(props?.rooms) ? props.rooms : [])
+    .filter((room) => Array.isArray(room) && SHOW_KEY.test(room[0] || '') && Number.isFinite(Number(room[1])) && Number.isFinite(Number(room[2])))
+    .slice(0, 16)
+    .map(([key, above, room]) => [key, Math.max(0, Number(above)), Math.max(0, Number(room))])
+}
+
 export function clickActions(props) {
   return (Array.isArray(props?.onClick) ? props.onClick : [])
     .slice(0, 8)
@@ -57,7 +66,9 @@ export function showAttrs(props) {
   if (!props?.shownBy && !props?.onClick) return ''
   const keys = shownBy(props)
   const actions = clickActions(props)
+  const rooms = keys.length ? showRooms(props) : []
   return (keys.length ? ` data-pwb-show="${keys.join(' ')}"` : '')
+    + (rooms.length ? ` data-pwb-room="${rooms.map((room) => room.join(':')).join(' ')}"` : '')
     + (actions.length ? ` data-pwb-do="${escAttr(JSON.stringify(actions))}"` : '')
 }
 
@@ -94,13 +105,16 @@ export function runActions(actions, on) {
 //
 // `items` are the boxes in it as drawn with everything shown: { x, y, w, h }
 // with `hidden` (hidden, its room is given up), `gone` (another part's: not
-// counted at all) and `cut` (shown, but that much shorter at its bottom, as
-// a box with hidden blocks inside is). A shown block moves up by the room
-// given up above it in its column: from the top of each hidden block down to
-// the next block under it, and the cut off bottoms, less what a shown block
-// beside them still fills (a tall picture next to the steps keeps the row as
-// tall as it was). Returns each block's new top, and how much shorter the
-// box gets.
+// counted at all), `stretch` (the box's own edge or background, as tall as
+// the box: not counted, it gets shorter with the box), `cut` (shown, but that
+// much shorter at its bottom, as a box with hidden blocks inside is) and
+// `bands` (for a hidden block, the room its element took as the reading
+// measured it, [top, bottom]; without them, from its top down to the next
+// block under it). A shown block moves up by the room given up above it in
+// its column, less what a shown block beside it still fills (a tall picture
+// next to the steps keeps the row as tall as it was). The box gets shorter
+// by what its bottom edge would move up. Returns each block's new top and
+// how much shorter the box gets.
 export function reflowLevel(items) {
   // Spans of height, as [top, bottom] pairs. Kept inside, as the published
   // page gets this function as text.
@@ -117,42 +131,45 @@ export function reflowLevel(items) {
   const without = (spans, holes) => holes.reduce((out, [ha, hb]) => out.flatMap(([a, b]) => (
     hb <= a || ha >= b ? [[a, b]] : [[a, Math.min(b, ha)], [Math.max(a, hb), b]].filter(([p, q]) => q > p)
   )), spans)
-  const lengthOf = (spans) => spans.reduce((sum, [a, b]) => sum + (b - a), 0)
-  const live = items.map((item, index) => ({ ...item, index, cut: Math.max(0, item.cut || 0) })).filter((item) => !item.gone)
+  // Within the box: from its top down to `limit`.
+  const below = (spans, limit) => spans.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, limit) - Math.max(a, 0)), 0)
+  const live = items.map((item, index) => ({ ...item, index, cut: Math.max(0, item.cut || 0) })).filter((item) => !item.gone && !item.stretch)
   const ys = items.map((item) => item.y)
   const across = (a, b) => a.x < b.x + b.w - 0.5 && b.x < a.x + a.w - 0.5
-  // Down to the next block under each hidden one, in its column.
-  const reach = new Map()
+  // What each hidden block gives up: its measured room, or down to the
+  // next block under it in its column.
+  const given = new Map()
   for (const a of live) {
     if (!a.hidden) continue
+    if (Array.isArray(a.bands)) {
+      given.set(a, a.bands)
+      continue
+    }
     let next = Infinity
     for (const c of live) {
       if (c !== a && across(c, a) && c.y >= a.y + a.h - 0.5 && c.y < next) next = c.y
     }
-    reach.set(a, next)
+    given.set(a, [[a.y, Math.max(a.y + a.h, next)]])
   }
-  for (const b of live) {
-    if (b.hidden) continue
+  const bottom = live.length ? Math.max(...live.map((item) => item.y + item.h)) : 0
+  const shift = (b) => {
     const removed = []
     const kept = []
     for (const a of live) {
       if (a === b || !across(a, b) || a.y + a.h > b.y + 0.5) continue
-      if (a.hidden) removed.push([a.y, Math.min(b.y, Math.max(a.y + a.h, reach.get(a)))])
+      if (a.hidden) removed.push(...given.get(a).map(([top, end]) => [top, Math.min(end, b.y)]))
       else {
         if (a.cut) removed.push([a.y + a.h - a.cut, a.y + a.h])
         kept.push([a.y, a.y + a.h - a.cut])
       }
     }
-    ys[b.index] = b.y - lengthOf(without(union(removed), union(kept)))
+    return below(without(union(removed), union(kept)), b.y)
   }
-  const bottom = live.length ? Math.max(...live.map((item) => item.y + item.h)) : 0
-  const shown = live.filter((item) => !item.hidden)
-  const now = shown.length
-    ? Math.max(...shown.map((item) => ys[item.index] + item.h - item.cut))
-    : (live.length ? Math.min(...live.map((item) => item.y)) : 0)
-  return { ys, cut: Math.max(0, bottom - now) }
+  for (const b of live) if (!b.hidden) ys[b.index] = b.y - shift(b)
+  // The box's bottom edge, as wide as the box.
+  const edge = { x: -1e9, w: 2e9, y: bottom, h: 0 }
+  return { ys, cut: live.length ? Math.max(0, shift(edge)) : 0 }
 }
-
 
 // The script the published page runs. It is written into the page as the text
 // of these functions, so it uses nothing from outside them.
@@ -213,6 +230,8 @@ export function pageShowRuntime(reflow, act) {
     // page is laid out once and not once for every box.
     var drawn = new Map()
     order.forEach(function (level) {
+      var height = level.offsetHeight
+      var width = level.offsetWidth
       var chain = []
       if (level !== page) {
         for (var el = level; el && el.parentElement; el = el.parentElement) {
@@ -221,23 +240,83 @@ export function pageShowRuntime(reflow, act) {
         }
       }
       drawn.set(level, {
+        h: height,
+        w: width,
         chain: chain,
         kids: boxesIn(level).map(function (el) {
           return { el: el, x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }
         }),
       })
     })
+    // Where each measured room lies on the page, so a box holding part of
+    // a split part (a long solution) can give up just the share inside it.
+    var scale = page.getBoundingClientRect().width / (page.offsetWidth || 1) || 1
+    var pageTop = function (el) { return (el.getBoundingClientRect().top + window.scrollY) / scale }
+    var spans = {}
+    for (var b = 0; b < boxes.length; b++) {
+      words(boxes[b].getAttribute('data-pwb-room')).forEach(function (entry) {
+        var bits = entry.split(':')
+        if (!Number(bits[2])) return
+        var top = pageTop(boxes[b]) - Number(bits[1])
+        spans[bits[0]] = [top, top + Number(bits[2])]
+      })
+    }
+    var levelTops = new Map()
+    order.forEach(function (level) { levelTops.set(level, pageTop(level)) })
     var cuts = new Map()
+    // A box with nothing left to show (the rest of a long solution) is a
+    // hidden block to the box around it: its room goes too.
+    var empties = new Set()
     order.forEach(function (level) {
       var seen = drawn.get(level)
+      var given = {}
+      // The keys whose room a block of this box carries. A part split over
+      // two boxes (a long solution) has it in one of them only; in the other
+      // its blocks give up their room as if none was measured.
+      var holders = {}
+      seen.kids.forEach(function (kid) {
+        words(kid.el.getAttribute('data-pwb-room')).forEach(function (entry) {
+          var bits = entry.split(':')
+          if (Number(bits[1]) || Number(bits[2])) holders[bits[0]] = true
+        })
+      })
       var items = seen.kids.map(function (kid) {
         var shown = kid.el.hasAttribute('data-pwb-show') ? state(kid.el) : 'shown'
-        return { x: kid.x, y: kid.y, w: kid.w, h: kid.h, hidden: shown === 'hidden', gone: shown === 'gone', cut: cuts.get(kid.el) || 0 }
+        var bands
+        // A box's own edge or background runs from its top to its bottom:
+        // a thin line, or something as wide as the box.
+        var stretch = level !== page && shown === 'shown' && kid.y <= 1 && kid.h >= seen.h * 0.9
+          && (kid.w <= 12 || kid.w >= seen.w * 0.95)
+        // The room measured for the keys that hide it (utils/htmlToCanvas.js marked).
+        var rooms = kid.el.getAttribute('data-pwb-room')
+        if (shown === 'hidden' && rooms) {
+          var entries = words(rooms).map(function (entry) { return entry.split(':') }).filter(function (bits) { return on[bits[0]] === false })
+          bands = []
+          var known = entries.every(function (bits) {
+            if (holders[bits[0]]) {
+              if (Number(bits[1]) || Number(bits[2])) bands.push([kid.y - Number(bits[1]), kid.y - Number(bits[1]) + Number(bits[2])])
+              return true
+            }
+            // Measured in another box: its share in this one, once.
+            var span = spans[bits[0]]
+            if (!span) return false
+            if (!given[bits[0]]) {
+              given[bits[0]] = true
+              var at = levelTops.get(level)
+              bands.push([span[0] - at, span[1] - at])
+            }
+            return true
+          })
+          if (!known) bands = undefined
+        }
+        var empty = shown === 'shown' && empties.has(kid.el)
+        return { x: kid.x, y: kid.y, w: kid.w, h: kid.h, hidden: shown === 'hidden' || empty, gone: shown === 'gone', stretch: stretch, cut: empty ? 0 : cuts.get(kid.el) || 0, bands: empty ? undefined : bands }
       })
       var result = reflow(items)
       seen.kids.forEach(function (kid, n) {
         remember(kid.el)
         if (items[n].hidden || items[n].gone) kid.el.style.display = 'none'
+        else if (items[n].stretch) { if (result.cut) kid.el.style.height = Math.max(0, kid.h - result.cut) + 'px' }
         else if (Math.abs(result.ys[n] - kid.y) > 0.5) kid.el.style.top = result.ys[n] + 'px'
       })
       if (level === page) {
@@ -251,6 +330,9 @@ export function pageShowRuntime(reflow, act) {
         })
         window.__pwbPageCut = Math.max(0, everything - reach + result.cut)
         return
+      }
+      if (!items.some(function (item) { return !item.hidden && !item.gone && !item.stretch }) && seen.chain.length) {
+        empties.add(seen.chain[seen.chain.length - 1].el)
       }
       if (!result.cut) return
       // The box gets shorter, and so does each box around it up to the

@@ -45,6 +45,37 @@ describe('where the blocks of a box stand once some are hidden', () => {
     expect(cut).toBe(120)
   })
 
+  it('does not count the edges a box is drawn with, which reach from its top to its bottom', () => {
+    const edge = { x: 0, w: 4, stretch: true }
+    const { ys, cut } = reflowLevel([box(0, 400, edge), box(20, 100, { x: 10, w: 500, hidden: true }), box(140, 40, { x: 10, w: 500 })])
+
+    expect(ys).toEqual([0, 20, 20])
+    expect(cut).toBe(120)
+  })
+
+  it('gives up the room the reading measured, not down to the next block, when it is known', () => {
+    // What a closed box held: the box keeps its padding under the title, so
+    // what follows moves up by 40, not by the 60 down to it.
+    const { ys, cut } = reflowLevel([box(0, 30), box(40, 30, { hidden: true, bands: [[40, 80]] }), box(100, 40)])
+
+    expect(ys).toEqual([0, 40, 60])
+    expect(cut).toBe(40)
+  })
+
+  it('gives up only the share inside the box of a room measured from above its top', () => {
+    // The rest of a long solution, split from its start: its room began 300px higher.
+    const { ys, cut } = reflowLevel([box(0, 50, { hidden: true, bands: [[-300, 70]] }), box(80, 40)])
+
+    expect(ys).toEqual([0, 10])
+    expect(cut).toBe(70)
+  })
+
+  it('gives up nothing for a hidden block whose room another block of its element carries', () => {
+    const { ys } = reflowLevel([box(0, 30, { hidden: true, bands: [[0, 70]] }), box(30, 30, { hidden: true, bands: [] }), box(70, 40)])
+
+    expect(ys).toEqual([0, 30, 0])
+  })
+
   it('does not count the blocks of another part at all', () => {
     // Chapters drawn in the same place: the hidden one's blocks are gone, not room given up.
     const { ys, cut } = reflowLevel([box(0, 100), box(140, 900, { gone: true }), box(140, 300)])
@@ -78,6 +109,11 @@ describe('what a block and a page carry', () => {
     expect(shownBy({ shownBy: ['k1', 'K2', 'k1', '"><b>', 'part_one'] })).toEqual(['k1', 'part_one'])
     expect(clickActions({ onClick: [{ do: 'next', keys: ['k1', 'bad key'] }, { do: 'eval', keys: ['k1'] }, { do: 'show', keys: [] }] }))
       .toEqual([{ do: 'next', keys: ['k1'] }])
+  })
+
+  it('writes the room the element of each key took, with the keys', () => {
+    expect(showAttrs({ shownBy: ['k1', 'k2'], rooms: [['k1', 8, 120.5], ['bad key', 1, 2], ['k2', 0, 0]] }))
+      .toBe(' data-pwb-show="k1 k2" data-pwb-room="k1:8:120.5 k2:0:0"')
   })
 
   it('writes them as attributes, escaped', () => {
@@ -123,7 +159,6 @@ describe('the published page', () => {
   const at = (y, h, attrs = '', inner = '') => `<div style="position:absolute;left:0px;top:${y}px;width:600px;height:${h}px"${attrs}>${inner}</div>`
   function open(html) {
     document.body.innerHTML = html
-    // eslint-disable-next-line no-new-func
     new Function(pageShowScript())()
   }
   const top = (id) => document.getElementById(id).style.top

@@ -43,6 +43,15 @@ def test_only_well_formed_keys_and_known_actions_get_through():
     assert page['parts'] == [{'key': 'p1', 'label': 'x' * 80}]
 
 
+def test_the_room_a_key_took_is_kept_on_a_block_shown_by_keys_and_nowhere_else():
+    page = validate_and_clean_schema(_page([
+        _block(shownBy=['s1'], rooms=[['s1', 8, 120.555], ['bad key', 1, 2], ['s1', True, 3], ['s2', 0, 0], 'x']),
+        {**_block(rooms=[['s1', 1, 2]]), 'id': 'b2'},
+    ]))['pages'][0]
+    assert page['components'][0]['props']['rooms'] == [['s1', 8.0, 120.56], ['s2', 0.0, 0.0]]
+    assert 'rooms' not in page['components'][1]['props']
+
+
 def test_a_page_that_shows_everything_stays_as_it_was():
     page = validate_and_clean_schema(_page([_block()]))['pages'][0]
     assert 'hiddenKeys' not in page

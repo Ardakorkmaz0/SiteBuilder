@@ -301,6 +301,19 @@ function backdropOver(n, origin, ctx) {
 // in reading order, into plain containers the eye cannot see.
 function fitChildren(children, ctx) {
   if (children.length <= MAX_CHILDREN) return children
+  // What runs down most of the box (its edges, its background) stays as it
+  // is: in a group it would stretch that group over all the others, and the
+  // groups would lie over each other instead of one under the next.
+  const top = Math.min(...children.map((c) => c.layout.y))
+  const span = Math.max(...children.map((c) => c.layout.y + c.layout.h)) - top
+  const left = Math.min(...children.map((c) => c.layout.x))
+  const width = Math.max(...children.map((c) => c.layout.x + c.layout.w)) - left
+  // ...and so do the lines across its top and bottom.
+  const tall = children.filter((c) => c.layout.h >= span / 2 || (c.layout.h <= 6 && c.layout.w >= width * 0.9))
+  if (tall.length && tall.length < children.length) {
+    const rest = children.filter((c) => !tall.includes(c))
+    return fitChildren([...tall, ...fitChildren(rest, ctx)], ctx)
+  }
   const ordered = [...children].sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x)
   const groups = []
   for (let start = 0; start < ordered.length; start += GROUP_SIZE) {
@@ -322,7 +335,35 @@ function fitChildren(children, ctx) {
   return fitChildren(groups, ctx)
 }
 
+// What the page shows only on a click, and what a click on it does
+// (htmlPageMeasure.js explore), carried by every block made from it.
+// The room the element took on the page (how far what followed it moved up
+// when it was hidden, as the reading measured it) rides on the topmost of
+// its blocks, counted from the element's own top; the others give up none
+// of their own, as they lie inside it. See reflowLevel in utils/pageShow.js.
+function marked(made, n, origin) {
+  if (!made.length || (!n.keys?.length && !n.actions?.length)) return
+  const measured = n.keys?.length && typeof n.room === 'number' && origin
+  const top = measured ? n.rect.y - origin.y : 0
+  const first = made.reduce((high, b) => (b.layout.y < high.layout.y ? b : high), made[0])
+  for (const b of made) {
+    if (n.keys?.length) b.props = { ...b.props, shownBy: [...new Set([...(b.props.shownBy || []), ...n.keys])].slice(0, 16) }
+    if (measured) {
+      const had = new Set((b.props.rooms || []).map(([key]) => key))
+      const mine = n.keys.filter((key) => !had.has(key)).map((key) => (b === first ? [key, fine(Math.max(0, b.layout.y - top)), fine(n.room)] : [key, 0, 0]))
+      if (mine.length) b.props = { ...b.props, rooms: [...(b.props.rooms || []), ...mine].slice(0, 16) }
+    }
+    if (n.actions?.length && !b.props.onClick) b.props = { ...b.props, onClick: n.actions }
+  }
+}
+
 function walk(n, out, origin, depth, ctx, href) {
+  const first = out.length
+  walkNode(n, out, origin, depth, ctx, href)
+  marked(out.slice(first), n, origin)
+}
+
+function walkNode(n, out, origin, depth, ctx, href) {
   const made = leaf(n, origin, ctx, href)
   if (made) {
     out.push(...named(made, n, ctx))
@@ -465,26 +506,32 @@ function section(n, ctx) {
 // that only holds full-width pieces is looked through.
 function bands(n, out, ctx) {
   for (const kid of n.kids || []) {
-    if (kid.kind || !isWide(kid, ctx)) {
-      walk(kid, out, { x: ctx.left, y: 0 }, 0, ctx)
-      continue
-    }
-    const kids = kid.kids || []
-    const wrapper = !isPainted(kid.s) && !SEMANTIC.has(kid.tag) && kids.length > 0 && kids.every((inner) => !inner.kind && isWide(inner, ctx))
-    if (wrapper) {
-      const first = out.length
-      bands(kid, out, ctx)
-      lendId(out[first], kid, ctx)
-      continue
-    }
-    const navbar = navbarFrom(kid, ctx)
-    if (navbar) {
-      out.push(navbar)
-      continue
-    }
-    if (!kids.length && !isPainted(kid.s)) continue
-    out.push(...named([section(kid, ctx)], kid, ctx))
+    const first = out.length
+    band(kid, out, ctx)
+    marked(out.slice(first), kid, { x: ctx.left, y: 0 })
   }
+}
+
+function band(kid, out, ctx) {
+  if (kid.kind || !isWide(kid, ctx)) {
+    walk(kid, out, { x: ctx.left, y: 0 }, 0, ctx)
+    return
+  }
+  const kids = kid.kids || []
+  const wrapper = !isPainted(kid.s) && !SEMANTIC.has(kid.tag) && kids.length > 0 && kids.every((inner) => !inner.kind && isWide(inner, ctx))
+  if (wrapper) {
+    const first = out.length
+    bands(kid, out, ctx)
+    lendId(out[first], kid, ctx)
+    return
+  }
+  const navbar = navbarFrom(kid, ctx)
+  if (navbar) {
+    out.push(navbar)
+    return
+  }
+  if (!kids.length && !isPainted(kid.s)) return
+  out.push(...named([section(kid, ctx)], kid, ctx))
 }
 
 const randomId = (type) => `${type}_${Math.random().toString(36).slice(2, 8)}`
@@ -510,12 +557,6 @@ export function canvasFromMeasured(measured, { makeId = randomId } = {}) {
   }
 }
 
-// The lowest a block may stand on a page (MAX_LAYOUT_Y on the server).
-const MAX_PAGE_Y = 200000
-
-const isPinned = (c) => c.props?.scrollBehavior === 'fixed'
-const bottomOf = (list) => list.reduce((low, c) => (isPinned(c) ? low : Math.max(low, c.layout.y + c.layout.h)), 0)
-const topOf = (list) => list.reduce((high, c) => (isPinned(c) ? high : Math.min(high, c.layout.y)), Infinity)
 // A block as drawn, whatever it is called.
 const look = (c) => JSON.stringify(c, (key, value) => (key === 'id' ? undefined : value))
 
@@ -541,44 +582,57 @@ function keepFirstAnchors(list, seen = new Set()) {
   }
 }
 
-// A page that shows its parts one at a time (chapters, tabs) stays one
-// page: the part it opens on comes first, as the browser drew it, and every
-// other part follows below it on the same page. What a part has in common
-// with the page as it opened (the side menu, a header) is not repeated, and
-// a "#part" link leads down the page to the part. A part that would reach
-// past the lowest place a block may stand is left out and counted as hidden;
-// it stays in the HTML page that is kept.
+// The words of the first heading in a list of blocks.
+function headingOf(list) {
+  for (const c of list) {
+    if (c.type === 'heading' && c.props.text) return c.props.text.replace(/\s+/g, ' ').trim().slice(0, 80)
+    const inside = headingOf(c.children || [])
+    if (inside) return inside
+  }
+  return ''
+}
+
+const withKey = (c, key) => ({ ...c, props: { ...c.props, shownBy: [...new Set([key, ...(c.props.shownBy || [])])].slice(0, 16) } })
+
+// A page that shows its parts one at a time (chapters, tabs) stays one page,
+// and shows them one at a time too (utils/pageShow.js): each part's blocks
+// stand where the browser drew them with that part shown, and carry the
+// part's key. What every part has, as drawn (the side menu, a header), is
+// written once and always shown. The page opens on the part it opened on,
+// and a "#id" link to a block of another part shows that part. The keys of
+// what a click shows are off when the page opens, as they were.
 export function canvasPageFromMeasured(measured, { makeId = randomId } = {}) {
   const page = canvasFromMeasured(measured, { makeId })
+  const offOf = (data) => (Array.isArray(data?.offKeys) ? data.offKeys : [])
   const states = (measured?.states || []).filter((state) => state?.data?.root)
-  if (!states.length) return { ...page, parts: 1 }
-  const components = [...page.components]
-  const shared = new Set(components.map(look))
+  if (!states.length) return { ...page, parts: [], hiddenKeys: offOf(measured), partCount: 1 }
+  const made = states.map((state) => canvasFromMeasured(state.data, { makeId }))
+  const looks = made.map((part) => new Set(part.components.map(look)))
+  const shared = new Set(page.components.map(look).filter((drawn) => looks.every((set) => set.has(drawn))))
+  const own = (list) => list.filter((c) => !shared.has(look(c)))
+  const parts = [{ key: 'p0', label: headingOf(own(page.components)) || page.title || 'Start' }]
+  const components = [
+    ...page.components.filter((c) => shared.has(look(c))),
+    ...own(page.components).map((c) => withKey(c, 'p0')),
+  ]
   const report = { ...page.report, hidden: 0 }
-  // The room above the content, kept between one part and the next.
-  const gap = Math.max(24, Math.min(160, Number.isFinite(topOf(components)) ? topOf(components) : 40))
-  let parts = 1
-  for (const state of states) {
-    const part = canvasFromMeasured(state.data, { makeId })
-    const own = part.components.filter((c) => !isPinned(c) && !shared.has(look(c)))
-    if (!own.length) continue
-    const shift = bottomOf(components) + gap - topOf(own)
-    if (shift + bottomOf(own) > MAX_PAGE_Y) {
-      report.hidden += 1
-      continue
-    }
-    for (const c of own) components.push({ ...c, layout: { ...c.layout, y: c.layout.y + shift } })
-    tally(own, report)
-    // What was too large in this part and not in the page as it opened.
+  made.forEach((part, index) => {
+    const key = `p${index + 1}`
+    const mine = own(part.components)
+    parts.push({ key, label: states[index].label || headingOf(mine) || `Part ${index + 2}` })
+    components.push(...mine.map((c) => withKey(c, key)))
+    tally(mine, report)
     report.tooLarge += Math.max(0, part.report.tooLarge - page.report.tooLarge)
-    parts += 1
-  }
+  })
   keepFirstAnchors(components)
+  const hiddenKeys = [...new Set([...parts.slice(1).map((part) => part.key), offOf(measured), ...states.map((state) => offOf(state.data))].flat())]
   return {
     ...page,
     components,
     fontFaces: fontFacesUsedBy((measured?.fontFaces || []).map((face) => face?.css || '').join('\n'), components),
     report,
     parts,
+    hiddenKeys,
+    partCount: parts.length,
   }
 }

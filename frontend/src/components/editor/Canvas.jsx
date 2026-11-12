@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { useEditorStore, selectCurrentPage } from '../../store/editorStore.js'
+import { useEditorStore, selectCurrentPage, partOfBlock, shownPartOf } from '../../store/editorStore.js'
+import { pageParts } from '../../utils/pageShow.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { canvasHeight, flowCanvasHeight, flowGap, flowSidePad } from '../renderer/layout.js'
 import { CANVAS_WIDTH, MOBILE_CANVAS_WIDTH } from '../registry.jsx'
@@ -95,7 +96,21 @@ export default function Canvas({
     [colorModePreview, schema, storedPage],
   )
   const page = useMemo(() => withColorModePage(storedPage, previewMode), [storedPage, previewMode])
-  const components = page.components
+  // A page shown a part at a time (utils/pageShow.js) has its parts drawn in
+  // the same place: the canvas shows the part chosen above it, with what all
+  // parts share.
+  const shownPart = useEditorStore((s) => s.shownPart)
+  const components = useMemo(() => {
+    const keys = pageParts(storedPage).map((part) => part.key)
+    if (!keys.length) return page.components
+    const key = shownPartOf(storedPage)
+    return page.components.filter((c) => {
+      const part = partOfBlock(c, keys)
+      return !part || part === key
+    })
+    // shownPart: the part on show changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page.components, storedPage, shownPart])
   const viewport = useEditorStore((s) => s.viewport)
   const trackDrag = usePointerDrag(page.id, viewport)
   const bg = page.background || '#ffffff'

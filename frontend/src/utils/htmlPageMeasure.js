@@ -32,6 +32,11 @@ function readPage(token, frameWindow) {
   // The fields the canvas's own input and select blocks draw.
   const FIELD_TYPES = new Set(['text', 'search', 'email', 'number', 'tel', 'url', 'password', 'date', 'time', 'textarea', 'select'])
   const DRAWN_FIELDS = new Set(['checkbox', 'radio', 'range'])
+  // What a click on the page shows and hides, as the reading learnt it.
+  const KEY_ATTR = 'data-pwb-read-key'
+  const STICKY_ATTR = 'data-pwb-read-sticky'
+  const ROOM_ATTR = 'data-pwb-read-room'
+  const DO_ATTR = 'data-pwb-read-do'
   // A formula as a typesetter lays it out (KaTeX, MathJax, MathML): hundreds
   // of positioned glyph pieces that mean nothing apart. It is carried as a
   // picture of itself.
@@ -194,14 +199,41 @@ function readPage(token, frameWindow) {
         ? { left: Math.min(box.left, rect.left), top: Math.min(box.top, rect.top), right: Math.max(box.right, rect.right), bottom: Math.max(box.bottom, rect.bottom) }
         : { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
     }
+    // What a box that cuts off its overflow lets be seen of a node inside
+    // it: a square root is drawn as a path far wider than the sign, cut to
+    // size by the box around it.
+    const clipOf = (node) => {
+      let clip = null
+      for (let up = node.parentElement; up; up = up.parentElement) {
+        const ucs = win.getComputedStyle(up)
+        if (ucs.overflowX !== 'visible' || ucs.overflowY !== 'visible') {
+          const r = up.getBoundingClientRect()
+          clip = clip
+            ? { left: Math.max(clip.left, r.left), top: Math.max(clip.top, r.top), right: Math.min(clip.right, r.right), bottom: Math.min(clip.bottom, r.bottom) }
+            : { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+        }
+        if (up === el) break
+      }
+      return clip
+    }
     for (const node of [el, ...el.querySelectorAll('*')]) {
+      // A drawing counts as its <svg>, not as the shapes inside it.
+      if (node.namespaceURI === 'http://www.w3.org/2000/svg' && node.tagName.toLowerCase() !== 'svg') continue
       const cs = win.getComputedStyle(node)
       // What a formula keeps for screen readers is clipped out of sight.
       if (isHidden(cs) || (cs.position === 'absolute' && cs.clip !== 'auto')) continue
       // A block's box is room, not ink: a formula set on its own line sits
       // in the middle of a box as wide as the page.
       if (/^(block|flex|grid|list-item|table|flow-root)$/.test(cs.display)) continue
-      for (const rect of node.getClientRects()) add(rect)
+      const clip = node === el ? null : clipOf(node)
+      for (const rect of node.getClientRects()) {
+        if (!clip) add(rect)
+        else {
+          const width = Math.min(rect.right, clip.right) - Math.max(rect.left, clip.left)
+          const height = Math.min(rect.bottom, clip.bottom) - Math.max(rect.top, clip.top)
+          if (width > 0 && height > 0) add({ left: Math.max(rect.left, clip.left), top: Math.max(rect.top, clip.top), right: Math.min(rect.right, clip.right), bottom: Math.min(rect.bottom, clip.bottom), width, height })
+        }
+      }
     }
     return box
   }
@@ -387,8 +419,16 @@ function readPage(token, frameWindow) {
       return null
     }
     const node = { tag: tag.toLowerCase(), rect: boxOf(el.getBoundingClientRect()), s: readStyles(cs) }
+    if (el.hasAttribute(STICKY_ATTR)) node.s.position = 'sticky'
     if (tag === 'A') node.href = el.getAttribute('href') || ''
     if (el.id) node.id = el.id
+    // What the page shows and hides on a click (see explore).
+    const keys = el.getAttribute(KEY_ATTR)
+    if (keys) node.keys = keys.split(' ')
+    const room = el.getAttribute(ROOM_ATTR)
+    if (room !== null && Number.isFinite(Number(room))) node.room = Number(room)
+    const actions = el.getAttribute(DO_ATTR)
+    if (actions) { try { node.actions = JSON.parse(actions) } catch { /* none */ } }
 
     if (tag === 'IMG') {
       return { ...node, kind: 'image', src: el.currentSrc || el.getAttribute('src') || '', alt: el.getAttribute('alt') || '' }
@@ -571,6 +611,23 @@ function readPage(token, frameWindow) {
     }
   }
 
+  // Whether an element is, or holds, a part of the page a link leads to (a
+  // chapter): those are read one by one, never opened to be read nor learnt
+  // as what a button shows. The chapter the page opened on counts too, once
+  // another one is shown and it is hidden.
+  function chapterCheck() {
+    const parts = new Set(states.map(({ part }) => part))
+    for (const link of doc.querySelectorAll('a[href^="#"]')) {
+      let id = ''
+      try { id = decodeURIComponent(link.getAttribute('href').slice(1)) } catch { /* not an id */ }
+      const target = id ? doc.getElementById(id) : null
+      const root = target ? hiddenRoot(target) : null
+      if (root) parts.add(root)
+    }
+    const list = [...parts]
+    return (el) => list.some((part) => el === part || el.contains(part))
+  }
+
   // The outermost thing that keeps `el` from being shown, or null.
   function hiddenRoot(el) {
     let root = null
@@ -587,7 +644,7 @@ function readPage(token, frameWindow) {
   // nothing in it (search results yet to come), nor one that would lie over
   // the screen.
   function reveal() {
-    const holdsState = (el) => states.some(({ part }) => el === part || el.contains(part))
+    const holdsState = chapterCheck()
     for (const el of doc.body.querySelectorAll('details:not([open])')) {
       if (!holdsState(el)) el.open = true
     }
@@ -598,13 +655,296 @@ function readPage(token, frameWindow) {
       const cs = win.getComputedStyle(el)
       if (cs.position === 'fixed' || isHidden(cs)) el.hidden = true
     }
+    // What a click shows, hidden by the page's rules rather than [hidden].
+    for (const el of doc.body.querySelectorAll(`[${KEY_ATTR}]`)) {
+      if (holdsState(el) || ownShown(el) || win.getComputedStyle(el).position === 'fixed') continue
+      el.hidden = false
+      if (!ownShown(el)) el.style.setProperty('display', 'block', 'important')
+    }
+  }
+
+  // What each button of the page shows and hides, learnt by pressing it.
+  //
+  // The page's own script does it, and the canvas has no script: a press is
+  // watched (which elements stopped or started being shown, by their own
+  // [hidden], class, style or an <details> opening), pressed again to tell
+  // a switch (the second press undoes the first) from a step-by-step button
+  // (each press shows one more) or a one-time one, and turned into actions on
+  // keys (utils/pageShow.js). Each element a button shows or hides gets a key;
+  // the steps a step-by-step button shows together share one. When it is done
+  // the page is put back as it opened, and the keys of what was hidden then
+  // are returned: they are off when the canvas page opens.
+  const WATCHED = ['hidden', 'class', 'style', 'open']
+  // Puts back what the records say was changed, newest first: attributes
+  // and words (a button's label a script rewrote, a step counter). What a
+  // script drew into the page stays: a formula it typeset as a step came
+  // into view is how that step is shown, and the step is read with it.
+  const drawsElements = (record) => [...record.addedNodes, ...record.removedNodes].some((node) => node.nodeType === 1)
+  const undo = (records) => {
+    for (let i = records.length - 1; i >= 0; i--) {
+      const record = records[i]
+      if (record.type === 'childList' && drawsElements(record)) continue
+      if (record.type === 'attributes') {
+        if (record.oldValue === null) record.target.removeAttribute(record.attributeName)
+        else record.target.setAttribute(record.attributeName, record.oldValue)
+      } else if (record.type === 'characterData') {
+        record.target.data = record.oldValue ?? ''
+      } else if (record.type === 'childList') {
+        record.addedNodes.forEach((node) => { if (node.parentNode === record.target) record.target.removeChild(node) })
+        const before = record.nextSibling && record.nextSibling.parentNode === record.target ? record.nextSibling : null
+        record.removedNodes.forEach((node) => record.target.insertBefore(node, before))
+      }
+    }
+  }
+  const WATCH_ALL = { subtree: true, attributes: true, attributeOldValue: true, characterData: true, characterDataOldValue: true, childList: true }
+  const keyed = new Map()
+  let keyCount = 0
+  const parent = new Map()
+  const root = (key) => { let k = key; while (parent.has(k)) k = parent.get(k); return k }
+  const merge = (a, b) => { const ra = root(a); const rb = root(b); if (ra !== rb) parent.set(rb, ra) }
+  const keyOf = (el) => {
+    if (!keyed.has(el)) keyed.set(el, `k${(keyCount += 1).toString(36)}`)
+    return root(keyed.get(el))
+  }
+  const ownShown = (el) => {
+    if (el.hidden) return false
+    const cs = win.getComputedStyle(el)
+    if (cs.display === 'none' || cs.visibility === 'hidden') return false
+    const box = el.parentElement
+    return !(box && box.tagName === 'DETAILS' && !box.open && el.tagName !== 'SUMMARY')
+  }
+  const pressable = (el) => !el.disabled && !el.hasAttribute(DO_ATTR) && !el.closest('a[href]')
+    && (el.checkVisibility ? el.checkVisibility({ visibilityProperty: true }) : el.getClientRects().length > 0)
+  const buttons = () => [...doc.body.querySelectorAll('button, summary, [role="button"]')].filter(pressable)
+
+  async function explore() {
+    const holdsState = chapterCheck()
+    const log = []
+    const watch = new MutationObserver((list) => { log.push(...list) })
+    watch.observe(doc.body, WATCH_ALL)
+    const flush = () => { log.push(...watch.takeRecords()) }
+    // Back to how the page stood when it opened.
+    const backTo = (mark) => {
+      flush()
+      undo(log.slice(mark))
+      flush()
+      log.length = mark
+    }
+    const press = async (button) => {
+      flush()
+      const mark = log.length
+      button.click()
+      await settle(25)
+      flush()
+      const records = log.slice(mark)
+      const was = new Map()
+      for (const record of records) {
+        if (record.type !== 'attributes' || !WATCHED.includes(record.attributeName)) continue
+        if (!was.has(record.target)) was.set(record.target, new Map())
+        const old = was.get(record.target)
+        if (!old.has(record.attributeName)) old.set(record.attributeName, record.oldValue)
+      }
+      if (!was.size) return { shown: [], hidden: [] }
+      const looked = new Set()
+      for (const el of was.keys()) {
+        looked.add(el)
+        for (const kid of el.children) looked.add(kid)
+        const inside = el.querySelectorAll('*')
+        if (inside.length <= 400) inside.forEach((item) => looked.add(item))
+      }
+      const list = [...looked].filter((el) => !holdsState(el) && el !== doc.body)
+      const now = new Map([...was.keys()].map((el) => [el, new Map([...was.get(el).keys()].map((name) => [name, el.getAttribute(name)]))]))
+      const put = (values) => {
+        for (const [el, attrs] of values) {
+          for (const [name, value] of attrs) {
+            if (value === null) el.removeAttribute(name)
+            else el.setAttribute(name, value)
+          }
+        }
+      }
+      put(was)
+      const before = list.map(ownShown)
+      put(now)
+      const after = list.map(ownShown)
+      flush()
+      log.length = mark + records.length
+      const shown = []
+      const hidden = []
+      list.forEach((el, i) => { if (before[i] !== after[i]) (after[i] ? shown : hidden).push(el) })
+      return { shown, hidden }
+    }
+    const same = (a, b) => a.length === b.length && a.every((el) => b.includes(el))
+    const plan = new Map()
+    const idle = []
+    const started = Date.now()
+    let presses = 0
+    const out = () => presses > 1500 || Date.now() - started > 60000
+    const learn = async (button) => {
+      presses += 1
+      const first = await press(button)
+      if (!first.shown.length && !first.hidden.length) return false
+      presses += 1
+      const second = pressable(button) || button.tagName === 'SUMMARY' ? await press(button) : { shown: [], hidden: [] }
+      if (same(second.shown, first.hidden) && same(second.hidden, first.shown)) {
+        plan.set(button, [{ do: 'toggle', units: [...first.shown, ...first.hidden] }])
+      } else if (first.shown.length && !first.hidden.length && second.shown.length && !second.hidden.length && !second.shown.some((el) => first.shown.includes(el))) {
+        const steps = [first.shown, second.shown]
+        while (!out() && pressable(button)) {
+          presses += 1
+          const more = await press(button)
+          if (!more.shown.length || more.hidden.length) break
+          steps.push(more.shown)
+        }
+        steps.forEach((group) => group.slice(1).forEach((el) => merge(keyOf(group[0]), keyOf(el))))
+        plan.set(button, [{ do: 'next', units: steps.map((group) => group[0]) }])
+      } else if (first.hidden.length && !first.shown.length && second.hidden.length && !second.shown.length && !second.hidden.some((el) => first.hidden.includes(el))) {
+        const steps = [first.hidden, second.hidden]
+        while (!out() && pressable(button)) {
+          presses += 1
+          const more = await press(button)
+          if (!more.hidden.length || more.shown.length) break
+          steps.push(more.hidden)
+        }
+        plan.set(button, [{ do: 'prev', units: steps.reverse().map((group) => group[0]) }])
+      } else {
+        // Once: what it showed and hid the first time (a second press that
+        // did something else is a different button at heart; the first is
+        // what a visitor meets).
+        const actions = []
+        if (first.shown.length) actions.push({ do: 'show', units: first.shown })
+        if (first.hidden.length) actions.push({ do: 'hide', units: first.hidden })
+        plan.set(button, actions)
+      }
+      return true
+    }
+    const tried = new Set()
+    const opening = buttons()
+    const visit = async (button) => {
+      if (tried.has(button) || out()) return
+      tried.add(button)
+      const before = new Set(buttons())
+      if (!(await learn(button))) {
+        idle.push(button)
+        return
+      }
+      // Buttons that came into view or became pressable through it, and
+      // those that one of them brought (a "previous step" comes alive once
+      // a step is shown).
+      for (let round = 0; round < 20 && !out(); round++) {
+        const fresh = buttons().filter((next) => !before.has(next) && !tried.has(next))
+        if (!fresh.length) break
+        for (const next of fresh) await visit(next)
+      }
+    }
+    flush()
+    const start = log.length
+    for (const button of opening) {
+      if (out()) break
+      backTo(start)
+      await visit(button)
+    }
+    // A button that did nothing may need something shown first: the steps
+    // for "start over". The step-by-step buttons near it are pressed through.
+    for (const button of idle) {
+      if (out()) break
+      backTo(start)
+      const nearby = [...plan.entries()].filter(([other, actions]) => actions.some((a) => a.do === 'next' || a.do === 'show') && other !== button)
+      const scope = nearby.filter(([other]) => {
+        for (let box = button.parentElement; box && box !== doc.body; box = box.parentElement) if (box.contains(other)) return box.querySelectorAll('button').length < 40
+        return false
+      })
+      for (const [other, actions] of scope) {
+        let guard = 0
+        while (pressable(other) && guard < 30 && !out()) {
+          guard += 1
+          presses += 1
+          const shown = await press(other)
+          if (!shown.shown.length) break
+          if (!actions.some((a) => a.do === 'next')) break
+        }
+      }
+      if (pressable(button)) await learn(button)
+    }
+    backTo(start)
+    watch.disconnect()
+    // Every element an action names has its key before anything is read.
+    for (const actions of plan.values()) for (const action of actions) action.units.forEach(keyOf)
+    // The page as it opened: what of it is hidden.
+    const off = new Set()
+    for (const [el, key] of keyed) if (!ownShown(el)) off.add(root(key))
+    for (const [el] of keyed) {
+      const mine = root(keyed.get(el))
+      const had = (el.getAttribute(KEY_ATTR) || '').split(' ').filter(Boolean)
+      if (!had.includes(mine)) el.setAttribute(KEY_ATTR, [...had, mine].join(' '))
+    }
+    for (const [button, actions] of plan) {
+      const written = actions
+        .map((action) => ({ do: action.do, keys: [...new Set(action.units.map((el) => keyOf(el)))] }))
+        .filter((action) => action.keys.length)
+      if (written.length) button.setAttribute(DO_ATTR, JSON.stringify(written))
+    }
+    return [...off]
+  }
+
+  // How much room each part a click shows takes on the page: how far what
+  // follows it moves up when it is hidden. A block that follows is not moved
+  // by its height and the gap under it, but by what the browser gives back,
+  // margins and the padding of the box it is in counted as they fall.
+  function measureRooms() {
+    const after = (el) => {
+      for (let up = el; up && up !== doc.body; up = up.parentElement) {
+        for (let next = up.nextElementSibling; next; next = next.nextElementSibling) {
+          const cs = win.getComputedStyle(next)
+          if (cs.position !== 'absolute' && cs.position !== 'fixed' && next.checkVisibility()) return next
+        }
+      }
+      return null
+    }
+    // On the page, not on the screen: with the page scrolled, the browser
+    // keeps what is in view where it is when something above it goes, and
+    // the screen would say nothing moved.
+    const at = (el, edge) => el.getBoundingClientRect()[edge] + win.scrollY
+    const anchoring = doc.documentElement.style.getPropertyValue('overflow-anchor')
+    doc.documentElement.style.setProperty('overflow-anchor', 'none')
+    for (const el of doc.body.querySelectorAll(`[${KEY_ATTR}]`)) {
+      if (!el.checkVisibility()) continue
+      const next = after(el)
+      const before = next ? at(next, 'top') : at(el, 'bottom')
+      const display = el.style.getPropertyValue('display')
+      const priority = el.style.getPropertyPriority('display')
+      el.style.setProperty('display', 'none', 'important')
+      const now = next ? at(next, 'top') : at(el, 'top')
+      if (display) el.style.setProperty('display', display, priority)
+      else el.style.removeProperty('display')
+      el.setAttribute(ROOM_ATTR, String(Math.max(0, Math.round((before - now) * 100) / 100)))
+    }
+    if (anchoring) doc.documentElement.style.setProperty('overflow-anchor', anchoring)
+    else doc.documentElement.style.removeProperty('overflow-anchor')
   }
 
   // The page as it stands now, read whole.
   async function snapshot() {
     stats.hidden = 0
     jobs = []
+    let off
+    try { off = await explore() } catch { off = [] }
+    // What is opened to be read is closed again afterwards: the next part
+    // of the page is learnt from how it opens, not from this reading.
+    // Records are handed to the observer's callback while the pictures are
+    // drawn, so they are kept as they come.
+    const openedLog = []
+    const opened = new MutationObserver((list) => { openedLog.push(...list) })
+    opened.observe(doc.body, WATCH_ALL)
     reveal()
+    // A box that sticks to the screen while the page scrolls (a bar of
+    // buttons at the bottom of a long solution) is read where it stands in
+    // the page, not where it is stuck: it says it sticks.
+    for (const el of doc.body.querySelectorAll('*')) {
+      if (win.getComputedStyle(el).position !== 'sticky') continue
+      el.setAttribute(STICKY_ATTR, '')
+      el.style.setProperty('position', 'relative', 'important')
+    }
+    measureRooms()
     win.scrollTo(0, 0)
     // A box that scrolls by itself (a side menu) is read from its top: a
     // script that scrolled it to the open chapter's link would otherwise
@@ -630,9 +970,13 @@ function readPage(token, frameWindow) {
         delete job.node.src
       }
     }
+    undo([...openedLog, ...opened.takeRecords()])
+    opened.disconnect()
     return root && {
       width: win.innerWidth,
       viewHeight: win.innerHeight,
+      // The keys of what the page keeps hidden when it opens, until a click.
+      offKeys: off,
       height: Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight),
       background: [bodyStyle.backgroundColor, rootStyle.backgroundColor],
       fontFamily: bodyStyle.fontFamily,
