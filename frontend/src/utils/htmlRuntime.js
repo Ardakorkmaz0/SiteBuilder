@@ -347,7 +347,15 @@ const INTERACTIVE_SCRIPT = `
         var id;
         try { id = decodeURIComponent(href.slice(1)); } catch (e) { return; }
         var target = id && document.getElementById(id);
-        if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+        if (target) {
+          // The address follows, as a click would make it: a page that shows
+          // its chapters by the address (hashchange) shows the one asked for.
+          // Set on this document itself: the link resolved against the
+          // address of the editor around a preview would take the frame away.
+          try { location.hash = id; } catch (e) {}
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
         // No matching element in THIS document — it may be a cross-page link
         // (#pageId). The page renders in a sandboxed, opaque-origin iframe, so
         // ask the host to switch pages. Unknown hashes are simply ignored.
@@ -791,7 +799,11 @@ const RUNTIME_SCRIPT = `
           return;
         }
         var target = findHashTarget(localTarget.hash);
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (!target) return;
+        // The address follows, set on this document: a page that shows its
+        // chapters by the address (hashchange) shows the one asked for.
+        try { location.hash = localTarget.hash; } catch (e) {}
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, true);
       try {
         new MutationObserver(function (records) {
