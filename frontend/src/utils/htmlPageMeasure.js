@@ -26,11 +26,12 @@ function readPage(token, frameWindow) {
   // What the canvas has no block for: kept as it is, in an HTML block.
   const KEPT_TAGS = new Set([
     'VIDEO', 'AUDIO', 'IFRAME', 'CANVAS', 'FORM', 'INPUT', 'TEXTAREA', 'SELECT',
-    'DETAILS', 'OBJECT', 'EMBED', 'PROGRESS', 'METER',
+    'OBJECT', 'EMBED', 'PROGRESS', 'METER',
   ])
-  const FLOWING = new Set(['FORM', 'DETAILS'])
+  const FLOWING = new Set(['FORM'])
   // The fields the canvas's own input and select blocks draw.
   const FIELD_TYPES = new Set(['text', 'search', 'email', 'number', 'tel', 'url', 'password', 'date', 'time', 'textarea', 'select'])
+  const DRAWN_FIELDS = new Set(['checkbox', 'radio', 'range'])
   // A formula as a typesetter lays it out (KaTeX, MathJax, MathML): hundreds
   // of positioned glyph pieces that mean nothing apart. It is carried as a
   // picture of itself.
@@ -180,6 +181,12 @@ function readPage(token, frameWindow) {
   // The box of everything `el` draws: an inline element's own box is one
   // line of its font, whatever stands taller or deeper inside it.
   const inkBox = (el) => {
+    // A field draws its own box, whatever its parent made of it (a flex
+    // item counts as a block).
+    if (el.tagName === 'INPUT') {
+      const rect = el.getBoundingClientRect()
+      return rect.width >= 0.5 && rect.height >= 0.5 ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } : null
+    }
     let box = null
     const add = (rect) => {
       if (rect.width < 0.5 || rect.height < 0.5) return
@@ -207,7 +214,8 @@ function readPage(token, frameWindow) {
   const picture = async (el) => {
     const box = inkBox(el)
     if (!box) return null
-    const key = `${el.outerHTML}|${win.getComputedStyle(el).fontSize}|${win.getComputedStyle(el).color}`
+    const look = win.getComputedStyle(el)
+    const key = `${el.outerHTML}|${look.fontSize}|${look.color}|${look.accentColor}|${look.width}|${look.height}`
     if (drawn.has(key)) {
       const src = await drawn.get(key)
       return src ? { src, box: { left: box.left - 1, top: box.top - 1, width: Math.ceil(box.right - box.left) + 2, height: Math.ceil(box.bottom - box.top) + 2 } } : null
@@ -232,6 +240,16 @@ function readPage(token, frameWindow) {
     // A copy as it is, classes and all: the page's rules lay it out here,
     // and the same rules go into the picture with it.
     const copy = el.cloneNode(true)
+    // A field takes its size and colour from rules about where it stands
+    // (".done input"), which do not reach a copy standing alone.
+    if (el.tagName === 'INPUT') {
+      const own = win.getComputedStyle(el)
+      for (const name of ['width', 'height', 'accent-color', 'color', 'opacity', 'vertical-align']) copy.style.setProperty(name, own.getPropertyValue(name))
+      copy.style.setProperty('margin', '0')
+      if (el.checked) copy.setAttribute('checked', '')
+      else copy.removeAttribute('checked')
+      if (el.type === 'range') copy.setAttribute('value', el.value)
+    }
     stage.appendChild(copy)
     doc.body.appendChild(stage)
     const alone = inkBox(copy)
@@ -391,6 +409,13 @@ function readPage(token, frameWindow) {
     // A field the canvas has a block of its own for.
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
       const type = tag === 'TEXTAREA' ? 'textarea' : tag === 'SELECT' ? 'select' : (el.getAttribute('type') || 'text').toLowerCase()
+      // A tick box, a round choice or a slider is carried as a picture of
+      // itself as the browser draws it: the canvas has no block for them.
+      if (DRAWN_FIELDS.has(type)) {
+        const drawn = { ...node, kind: 'image', src: '', alt: el.getAttribute('aria-label') || '', s: { ...node.s, objectFit: 'fill' } }
+        jobs.push({ el, node: drawn, owner: el, done: (made) => { drawn.src = made.src; drawn.rect = { x: made.box.left + win.scrollX, y: made.box.top + win.scrollY, w: made.box.width, h: made.box.height } } })
+        return drawn
+      }
       if (FIELD_TYPES.has(type)) {
         const options = tag === 'SELECT' ? [...el.options] : []
         return {
@@ -512,11 +537,11 @@ function readPage(token, frameWindow) {
       // What the page's own scripts do when it opens (draw formulas, show the
       // first chapter) has had its turn by now.
       await settle(400)
-      const first = await snapshot()
       // A page that shows its parts one at a time (chapters, tabs) links to
       // the ones it is hiding. Each hidden part some link leads to is a state
-      // the page can be put in and read again.
-      if (first && token) {
+      // the page can be put in and read again. They are found before the
+      // page is read, so that reading it leaves them hidden (see reveal).
+      if (token) {
         const found = new Map()
         for (const link of doc.querySelectorAll('a[href^="#"]')) {
           let id = ''
@@ -528,6 +553,9 @@ function readPage(token, frameWindow) {
           if (!known || (target === part && !known.exact)) found.set(part, { part, link, exact: target === part })
         }
         states.push(...[...found.values()].slice(0, 30))
+      }
+      const first = await snapshot()
+      if (first && token) {
         first.states = states.map(({ part, link }) => ({
           label: (part.getAttribute('data-title') || part.querySelector('h1, h2, h3')?.textContent || link.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80),
         }))
@@ -552,10 +580,31 @@ function readPage(token, frameWindow) {
     return root
   }
 
+  // What the page keeps hidden until a button shows it (the steps of a
+  // solution, the back of a card, a closed <details>) is read shown: the
+  // canvas has no button to show it with, and it would be lost. Not a part a
+  // link leads to, which is read as a state of its own, nor a box with
+  // nothing in it (search results yet to come), nor one that would lie over
+  // the screen.
+  function reveal() {
+    const holdsState = (el) => states.some(({ part }) => el === part || el.contains(part))
+    for (const el of doc.body.querySelectorAll('details:not([open])')) {
+      if (!holdsState(el)) el.open = true
+    }
+    for (const el of doc.body.querySelectorAll('[hidden]')) {
+      if (holdsState(el)) continue
+      if (!(el.textContent || '').trim() && !el.querySelector('img, svg, canvas')) continue
+      el.hidden = false
+      const cs = win.getComputedStyle(el)
+      if (cs.position === 'fixed' || isHidden(cs)) el.hidden = true
+    }
+  }
+
   // The page as it stands now, read whole.
   async function snapshot() {
     stats.hidden = 0
     jobs = []
+    reveal()
     win.scrollTo(0, 0)
     // A box that scrolls by itself (a side menu) is read from its top: a
     // script that scrolled it to the open chapter's link would otherwise

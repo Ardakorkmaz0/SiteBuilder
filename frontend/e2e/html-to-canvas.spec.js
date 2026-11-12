@@ -74,3 +74,66 @@ test('an HTML page turned into a canvas keeps its pieces, publishes them, and ca
   expect(versions.data[0].summary).toMatchObject({ hard: true, pages: [{ id: home.id, kind: 'mode', hard: true }] })
   await api(request, 'DELETE', `/sites/${siteId}/`)
 })
+
+// A page of notes that shows one part at a time, keeps its menu on the screen
+// and hides what a button or a <details> would show: all of it becomes
+// canvas blocks on one canvas page, nothing left in an HTML block.
+const NOTES = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Notes</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#fbf8f1}
+.side{position:fixed;inset:0 auto 0 0;width:240px;background:#f2ede1;padding:20px;box-sizing:border-box}
+.side a{display:block;color:#1f4e8c;line-height:28px}
+main{margin-left:280px;padding:40px}
+.done{display:inline-flex;gap:6px;align-items:center}
+</style></head><body>
+<nav class="side"><a href="#one">Part one</a><a href="#two">Part two</a></nav>
+<main>
+<section id="one"><h1>Part one</h1><div class="step" hidden><p>Square the errors first.</p></div><button type="button">Next step</button>
+<details><summary>Show the paper text</summary><p>Write your answer in ink.</p></details>
+<label class="done"><input type="checkbox"> Solved</label></section>
+<section id="two" hidden><h1>Part two</h1><p>The learning rate sets the step size.</p></section>
+</main>
+<script>
+document.querySelectorAll('.side a').forEach((a) => a.addEventListener('click', (event) => {
+  event.preventDefault()
+  const id = a.getAttribute('href').slice(1)
+  document.querySelectorAll('main > section').forEach((part) => { part.hidden = part.id !== id })
+}))
+</script>
+</body></html>`
+
+test('a page of notes becomes one canvas page with every part of it shown and no HTML block left', async ({ page, request }) => {
+  const siteId = await createHtmlSite(request, 'E2E notes to canvas', [{ html: NOTES }])
+  await openEditor(page, siteId)
+
+  await page.locator('header').locator('[data-tour="more"]').click()
+  await page.getByRole('button', { name: 'Convert to canvas blocks', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Part two', exact: true })).toBeVisible({ timeout: 30_000 })
+  await save(page)
+
+  const { data } = await api(request, 'GET', `/sites/${siteId}/`)
+  expect(data.schema.pages).toHaveLength(1)
+  const home = data.schema.pages[0]
+  const blocks = flat(home.components)
+  expect(blocks.filter((c) => c.type === 'html')).toHaveLength(0)
+
+  // What a button or a closed <details> would have shown is on the canvas.
+  const texts = blocks.map((c) => c.props.text).filter(Boolean)
+  expect(texts).toEqual(expect.arrayContaining(['Square the errors first.', 'Write your answer in ink.', 'The learning rate sets the step size.']))
+  // The tick box is a picture of itself.
+  expect(blocks.filter((c) => c.type === 'image' && c.props.src.startsWith('data:image/png') && c.layout.h <= 24)).toHaveLength(1)
+
+  // The second part follows the first on the same page, and its link leads there.
+  const headings = blocks.filter((c) => c.type === 'heading')
+  const one = headings.find((c) => c.props.text === 'Part one')
+  const two = headings.find((c) => c.props.text === 'Part two')
+  expect(two.layout.y).toBeGreaterThan(one.layout.y)
+  expect(one.props.anchor).toBe('one')
+  expect(two.props.anchor).toBe('two')
+
+  // The menu stays on the screen, down its whole height.
+  const menu = home.components.find((c) => c.props.scrollBehavior === 'fixed')
+  expect(menu).toMatchObject({ type: 'container', props: { pinHeight: 'full', pinX: 'left' }, layout: { x: 0, y: 0, w: 240 } })
+  expect(flat(menu.children).filter((c) => c.props.href).map((c) => c.props.href)).toEqual(['#one', '#two'])
+  await api(request, 'DELETE', `/sites/${siteId}/`)
+})
