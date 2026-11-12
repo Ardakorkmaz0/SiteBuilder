@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { clickActions, pageHasShow, pageShowAttrs, pageShowScript, reflowLevel, runActions, showAttrs, shownBy } from './pageShow.js'
-import { builderInteractiveTags } from './htmlRuntime.js'
+import { builderInteractiveTags, withBuilderRuntimeHtml } from './htmlRuntime.js'
+import { schemaToSingleHtml } from './schemaToFiles.js'
 
 const box = (y, h, extra = {}) => ({ x: 0, y, w: 600, h, ...extra })
 
@@ -210,6 +211,95 @@ describe('the published page', () => {
     expect([shown('one'), shown('two')]).toEqual([false, true])
     expect(window.__pwbPageCut).toBe(0)
   })
+
+  const toggle = (keys) => at(0, 50, ` data-pwb-do='[{"do":"toggle","keys":${JSON.stringify(keys)}}]'`, '<button id="toggle">toggle</button>')
+
+  it('gives the page its whole height back once the last hidden block is shown', () => {
+    let laidOut = 0
+    window.__pwbApplyLayout = () => { laidOut += 1 }
+    open(`<div class="page" data-pwb-keys="s" style="position:relative;height:680px">
+      ${toggle(['s'])}
+      ${at(60, 500, ' data-pwb-show="s"').replace('<div', '<div id="step"')}
+      ${at(580, 100).replace('<div', '<div id="tail"')}
+    </div>`)
+    expect(window.__pwbPageCut).toBe(520)
+
+    const before = laidOut
+    document.getElementById('toggle').click()
+    expect(shown('step')).toBe(true)
+    expect(window.__pwbPageCut).toBe(0)
+    expect(laidOut).toBeGreaterThan(before)
+    delete window.__pwbApplyLayout
+  })
+
+  it('keeps a fitted box at its shorter height, so fitting it again does not stretch it back', () => {
+    open(`<div class="page" data-pwb-keys="s" style="position:relative;height:400px">
+      ${toggle(['s'])}
+      <div id="wrap" style="position:absolute;left:0px;top:60px;width:600px;height:300px">
+        <div id="box" data-pwb-container-height="300" style="position:relative;width:600px;height:300px">
+          <div data-pwb-container-root style="position:absolute;left:0px;top:0px;width:600px;height:300px">
+            ${at(0, 80)}
+            ${at(100, 150, ' data-pwb-show="s"')}
+          </div>
+        </div>
+      </div>
+    </div>`)
+    // The hidden block gives up 100..250; the room under it stays.
+    expect(document.getElementById('box').getAttribute('data-pwb-container-height')).toBe('150')
+
+    document.getElementById('toggle').click()
+    expect(document.getElementById('box').getAttribute('data-pwb-container-height')).toBe('300')
+  })
+
+  it('hides a block pinned to the screen, and a block in a box that lays its blocks out by itself', () => {
+    open(`<div class="page" data-pwb-keys="s" style="position:relative;height:200px">
+      ${toggle(['s'])}
+      <div style="display:flex;flex-direction:column"><div id="flowing" data-pwb-show="s">In a column</div></div>
+    </div>
+    <div class="export-fixed"><div id="pinned" data-pwb-show="s" style="position:fixed;top:60px">Menu</div></div>`)
+    expect([shown('pinned'), shown('flowing')]).toEqual([false, false])
+
+    document.getElementById('toggle').click()
+    expect([shown('pinned'), shown('flowing')]).toEqual([true, true])
+  })
+
+  it('moves nothing by hand on a page laid out in flow, which closes the gap by itself', () => {
+    open(`<div class="page" data-pwb-keys="s" data-pwb-flow style="position:relative;height:300px">
+      ${toggle(['s'])}
+      ${at(60, 100, ' data-pwb-show="s"').replace('<div', '<div id="step"')}
+      ${at(180, 100).replace('<div', '<div id="tail"')}
+    </div>`)
+    expect(shown('step')).toBe(false)
+    expect(top('tail')).toBe('180px')
+    expect(window.__pwbPageCut).toBe(0)
+  })
+
+  it('shows and hides a block by any well-formed key, "__proto__" too', () => {
+    open(`<div class="page" data-pwb-keys="__proto__" style="position:relative;height:200px">
+      ${toggle(['__proto__'])}
+      ${at(60, 100, ' data-pwb-show="__proto__"').replace('<div', '<div id="target"')}
+    </div>`)
+    expect(shown('target')).toBe(false)
+
+    document.getElementById('toggle').click()
+    expect(shown('target')).toBe(true)
+  })
+})
+
+describe('a box that lays its blocks out by itself, on the published page', () => {
+  it('writes the keys and actions of the blocks in it', () => {
+    const html = schemaToSingleHtml({ theme: {}, pages: [{
+      id: 'p', name: 'Home', hiddenKeys: ['s'], components: [{
+        id: 'col', type: 'container', props: { flow: 'column', gap: 16 }, styles: {}, layout: { x: 0, y: 60, w: 800, h: 250 }, children: [
+          { id: 'target', type: 'text', props: { text: 'target', shownBy: ['s'] }, styles: {}, layout: { x: 0, y: 0, w: 800, h: 80 } },
+          { id: 'flip', type: 'button', props: { text: 'flip', onClick: [{ do: 'toggle', keys: ['s'] }] }, styles: {}, layout: { x: 0, y: 100, w: 800, h: 40 } },
+        ],
+      }],
+    }] }, 'Flow')
+
+    expect(html).toContain('data-pwb-show="s"')
+    expect(html).toContain('data-pwb-do="[{&quot;do&quot;:&quot;toggle&quot;,&quot;keys&quot;:[&quot;s&quot;]}]"')
+  })
 })
 
 describe('the script a published page gets', () => {
@@ -219,5 +309,15 @@ describe('the script a published page gets', () => {
     expect(builderInteractiveTags('<div data-pwb-show="s1">Step</div>')).toContain(RUNTIME)
     expect(builderInteractiveTags('<p>Plain</p>')).not.toContain(RUNTIME)
     expect(builderInteractiveTags('<p>Plain</p><script>console.log(1)</script>')).not.toContain(RUNTIME)
+  })
+
+  it('is found however the attribute is written', () => {
+    expect(builderInteractiveTags('<div DATA-PWB-SHOW="s1">Step</div>')).toContain(RUNTIME)
+    expect(builderInteractiveTags('<div data-pwb-show = "s1">Step</div>')).toContain(RUNTIME)
+  })
+
+  it('is not added to an HTML page shown in the editor, which has no such blocks', () => {
+    expect(withBuilderRuntimeHtml('<!doctype html><html><head></head><body><p>Plain</p></body></html>')).not.toContain(RUNTIME)
+    expect(withBuilderRuntimeHtml('<!doctype html><html><head></head><body><div class="page" data-pwb-keys="s"><div data-pwb-show="s">x</div></div></body></html>')).toContain('__pwbShowReady')
   })
 })

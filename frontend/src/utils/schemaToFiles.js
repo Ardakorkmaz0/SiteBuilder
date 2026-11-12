@@ -457,7 +457,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
         .map((ch) => {
           const filled = { ...ch, styles: { ...(ch.styles || {}), width: '100%' } }
           const childCss = autoLayoutChildCss(ch, c.props)
-          return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="${childCss}">${linkWrap(filled, inlineNode(filled))}</div>`
+          return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="${childCss}"${showAttrs(ch.props)}>${linkWrap(filled, inlineNode(filled))}</div>`
         })
         .join('')
       return `<div${hook} style="${autoCss};${styleStr}">${inner}</div>`

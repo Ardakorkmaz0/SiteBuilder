@@ -52,6 +52,18 @@ def test_the_room_a_key_took_is_kept_on_a_block_shown_by_keys_and_nowhere_else()
     assert 'rooms' not in page['components'][1]['props']
 
 
+def test_a_key_with_a_line_break_at_its_end_is_not_a_key():
+    # Python's $ also matches before a final line break; the page's own check does not.
+    page = validate_and_clean_schema(_page(
+        [_block(shownBy=['x\n', 'ok'], rooms=[['x\n', 0, 1], ['ok', 0, 2]])],
+        hiddenKeys=['x\n', 'ok'], parts=[{'key': 'x\n', 'label': 'X'}],
+    ))['pages'][0]
+    assert page['components'][0]['props']['shownBy'] == ['ok']
+    assert page['components'][0]['props']['rooms'] == [['ok', 0.0, 2.0]]
+    assert page['hiddenKeys'] == ['ok']
+    assert 'parts' not in page
+
+
 def test_a_page_that_shows_everything_stays_as_it_was():
     page = validate_and_clean_schema(_page([_block()]))['pages'][0]
     assert 'hiddenKeys' not in page

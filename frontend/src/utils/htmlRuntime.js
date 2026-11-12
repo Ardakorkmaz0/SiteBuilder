@@ -880,10 +880,13 @@ const NEEDS = {
   fit: /data-pwb-(?:fit|container-width)/,
   fields: /<(?:input|select|textarea)\b|pwb-(?:ph|focus|password)/i,
   // Blocks shown and hidden by keys (utils/pageShow.js).
-  show: /data-pwb-(?:show|do)=/,
+  show: /data-pwb-(?:show|do)\s*=/i,
   motion: /data-anim-in|pwb-hover/,
 }
 const ALL_NEEDS = Object.fromEntries(Object.keys(NEEDS).map((need) => [need, true]))
+// Everything a document in the editor may come to need while it is edited:
+// all but the blocks shown by keys, which the canvas writes and no one types.
+const EDITING_NEEDS = { ...ALL_NEEDS, show: false }
 
 export function runtimeNeeds(source) {
   if (typeof source !== 'string') return ALL_NEEDS
@@ -944,7 +947,7 @@ const neededParts = (needs) => Object.keys(NEEDS).filter((need) => need !== 'mot
 
 const interactiveTags = (needs) => {
   const css = interactiveCss(needs)
-  const parts = needs === ALL_NEEDS ? '' : ` data-builder-needs="${neededParts(needs)}"`
+  const parts = needs === ALL_NEEDS || needs === EDITING_NEEDS ? '' : ` data-builder-needs="${neededParts(needs)}"`
   return `${css ? `<style data-builder-interactive-style>${css}</style>` : ''}<script data-builder-interactive${parts}>${interactiveJs(needs)}${SCRIPT_END}`
 }
 
@@ -1037,8 +1040,10 @@ export function withBuilderRuntimeHtml(html) {
   // Styles in <head> for the first paint; scripts that READ the document at the
   // end of <body>, where the elements they look for already exist.
   const head = RUNTIME_STYLE_TAG + (motion ? '' : MOTION_STYLE_TAG)
+  // All of it, but the blocks shown by keys: those are written by the
+  // canvas, never typed into a document.
   const body = RUNTIME_SCRIPT_TAG
-    + (shim ? '' : interactiveTags(ALL_NEEDS))
+    + (shim ? '' : interactiveTags(NEEDS.show.test(out) ? ALL_NEEDS : EDITING_NEEDS))
     + (motion ? '' : MOTION_OBSERVER_TAG)
   const headed = insertBeforeClosingTag(out, 'head', head)
   if (headed) out = headed

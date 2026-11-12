@@ -36,4 +36,16 @@ describe('the part of the page the canvas shows', () => {
     expect(added.props.shownBy).toEqual(['p1'])
     expect(page().components.find((c) => c.id === 'one').props.shownBy).toEqual(['p0'])
   })
+
+  it('takes in a copy of a block of another part, pasted while it is shown', () => {
+    s().selectComponent('one')
+    s().copySelection()
+    s().showPart('notes', 'p1')
+    s().pasteClipboard()
+
+    const pasted = page().components.filter((c) => !['one', 'two'].includes(c.id))
+    expect(pasted).toHaveLength(1)
+    expect(pasted[0].props.text).toBe('one')
+    expect(pasted[0].props.shownBy).toEqual(['p1'])
+  })
 })

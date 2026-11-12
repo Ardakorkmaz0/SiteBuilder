@@ -588,7 +588,7 @@ function readPage(token, frameWindow) {
           try { id = decodeURIComponent(link.getAttribute('href').slice(1)) } catch { /* not an id */ }
           const target = id ? doc.getElementById(id) : null
           const part = target ? hiddenRoot(target) : null
-          if (!part) continue
+          if (!part || !isChapter(part)) continue
           const known = found.get(part)
           if (!known || (target === part && !known.exact)) found.set(part, { part, link, exact: target === part })
         }
@@ -617,15 +617,38 @@ function readPage(token, frameWindow) {
   // another one is shown and it is hidden.
   function chapterCheck() {
     const parts = new Set(states.map(({ part }) => part))
+    for (const target of linkTargets()) {
+      const root = hiddenRoot(target)
+      if (root && isChapter(root)) parts.add(root)
+    }
+    const list = [...parts]
+    return (el) => list.some((part) => el === part || el.contains(part))
+  }
+
+  // What the page's "#id" links lead to.
+  function linkTargets() {
+    const out = []
     for (const link of doc.querySelectorAll('a[href^="#"]')) {
       let id = ''
       try { id = decodeURIComponent(link.getAttribute('href').slice(1)) } catch { /* not an id */ }
       const target = id ? doc.getElementById(id) : null
-      const root = target ? hiddenRoot(target) : null
-      if (root) parts.add(root)
+      if (target) out.push(target)
     }
-    const list = [...parts]
-    return (el) => list.some((part) => el === part || el.contains(part))
+    return out
+  }
+
+  // Chapters come in a row: a hidden part is one when a part beside it is
+  // led to by a link too. A lone hidden answer a link points at is not: it
+  // is what its button shows, learnt and carried as such.
+  function isChapter(root) {
+    const parent = root.parentElement
+    if (!parent) return false
+    return linkTargets().some((target) => {
+      for (let el = target; el && el !== parent; el = el.parentElement) {
+        if (el.parentElement === parent) return el !== root
+      }
+      return false
+    })
   }
 
   // The outermost thing that keeps `el` from being shown, or null.
@@ -683,7 +706,12 @@ function readPage(token, frameWindow) {
   const undo = (records) => {
     for (let i = records.length - 1; i >= 0; i--) {
       const record = records[i]
-      if (record.type === 'childList' && drawsElements(record)) continue
+      // A button's own words go back whatever they are made of.
+      const inButton = record.target.closest && record.target.closest('button, summary, [role="button"]')
+      if (record.type === 'childList' && drawsElements(record) && !inButton) continue
+      // A chart a script drew is sized by the style it gave its <canvas>:
+      // taken back, the drawing would stand at the size of its pixels.
+      if (record.type === 'attributes' && record.target.tagName === 'CANVAS') continue
       if (record.type === 'attributes') {
         if (record.oldValue === null) record.target.removeAttribute(record.attributeName)
         else record.target.setAttribute(record.attributeName, record.oldValue)
@@ -736,6 +764,14 @@ function readPage(token, frameWindow) {
       button.click()
       await settle(25)
       flush()
+      // A page may show what it shows a moment later (an animation that
+      // starts first, a timer): a press that seems to do nothing is
+      // watched a while longer.
+      const changed = () => log.slice(mark).some((record) => record.type === 'attributes' && WATCHED.includes(record.attributeName))
+      for (let wait = 0; wait < 6 && !changed(); wait++) {
+        await settle(50)
+        flush()
+      }
       const records = log.slice(mark)
       const was = new Map()
       for (const record of records) {
@@ -867,6 +903,19 @@ function readPage(token, frameWindow) {
     }
     backTo(start)
     watch.disconnect()
+    // A button that shows a box shows it as the page opened it, with what
+    // inside it was hidden then still hidden (the steps after the first,
+    // when "start over" left them open): those are hidden by it too.
+    const units = [...new Set([...keyed.keys(), ...[...plan.values()].flat().flatMap((action) => action.units)])]
+    for (const actions of plan.values()) {
+      const shown = actions.filter((action) => action.do === 'show').flatMap((action) => action.units)
+      if (!shown.length) continue
+      const inside = units.filter((el) => !shown.includes(el) && !ownShown(el) && shown.some((box) => box !== el && box.contains(el)))
+      if (!inside.length) continue
+      const hide = actions.find((action) => action.do === 'hide')
+      if (hide) hide.units = [...new Set([...hide.units, ...inside])]
+      else actions.push({ do: 'hide', units: inside })
+    }
     // Every element an action names has its key before anything is read.
     for (const actions of plan.values()) for (const action of actions) action.units.forEach(keyOf)
     // The page as it opened: what of it is hidden.
