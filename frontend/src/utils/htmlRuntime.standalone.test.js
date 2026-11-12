@@ -62,6 +62,22 @@ describe('standalone published navigation', () => {
     expect(win.scrollTo).not.toHaveBeenCalled()
   })
 
+  it('puts a link to a part of the page into the address, so a page that shows its chapters by the address shows it', async () => {
+    // A page of notes opens one chapter and shows another when the address
+    // asks for it (hashchange). In the editor's View the address belongs to
+    // the document itself, never to the editor around it.
+    for (const [preview, readonly] of [[true, false], [false, false], [true, true]]) {
+      const { win, doc } = page('<a href="#two">Two</a><section id="one">One</section><section id="two" hidden>Two</section>', { preview, readonly })
+      win.HTMLElement.prototype.scrollIntoView = vi.fn()
+      win.addEventListener('hashchange', () => { doc.getElementById('two').hidden = win.location.hash !== '#two' })
+
+      expect(clickWasPrevented(win, doc.querySelector('a'))).toBe(true)
+      await new Promise((resolve) => win.setTimeout(resolve, 0))
+      expect(win.location.hash).toBe('#two')
+      expect(doc.getElementById('two').hidden).toBe(false)
+    }
+  })
+
   it('ignores malformed hash encoding without crashing the runtime', () => {
     const { win, doc } = page('<a href="#%broken">Go</a>')
     expect(clickWasPrevented(win, doc.querySelector('a'))).toBe(true)
