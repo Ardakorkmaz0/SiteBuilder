@@ -186,7 +186,7 @@ const SAMPLE = {
   gap: '13px', objectFit: 'contain', opacity: '0.4', transform: 'rotate(3deg)', filter: 'blur(2px)',
   backdropFilter: 'blur(3px)', textShadow: '1px 1px #000', aspectRatio: '2 / 1', objectPosition: 'top',
   backgroundSize: 'contain', backgroundPosition: 'left top', backgroundRepeat: 'repeat-x', cursor: 'crosshair',
-  overflow: 'scroll',
+  overflow: 'scroll', fontVariantNumeric: 'tabular-nums',
 }
 
 // A `border` next to a border width, style or colour is a mix inside the owner's

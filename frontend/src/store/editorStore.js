@@ -20,6 +20,7 @@ import { anchorOf, anchorProblem, elementIdFor, retargetLinks, slugifyAnchor } f
 import { splitPageHtml } from '../utils/projectSnapshot.js'
 import { normalizeLanguageTag } from '../utils/languages.js'
 import { containerDesignWidth } from '../utils/containerFit.js'
+import { mergeFontFaces } from '../utils/fontFaces.js'
 
 const HISTORY_LIMIT = 60
 // Gap between two same-key edits that still counts as one gesture.
@@ -1717,7 +1718,9 @@ export const useEditorStore = create((set, get) => ({
   // keeps asking for them, so its text is drawn in the faces it was measured in.
   // `more` are further canvas pages made from the same document (the parts it
   // showed one at a time): they are added after the page, in the same step.
-  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, fonts, more = [] } = {}) => {
+  // `fontFaces` are the document's own font files (utils/fontFaces.js); the
+  // site keeps them beside the ones it already has.
+  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, fonts, fontFaces = '', more = [] } = {}) => {
     const page = get().schema.pages.find((p) => p.id === id)
     if (!page || !Array.isArray(components)) return
     get().record()
@@ -1751,9 +1754,11 @@ export const useEditorStore = create((set, get) => ({
           fonts: Array.isArray(extra.fonts) ? extra.fonts : [],
         }))
       const at = converted.pages.findIndex((p) => p.id === id) + 1
-      const schema = added.length
+      const withPages = added.length
         ? { ...converted, pages: [...converted.pages.slice(0, at), ...added, ...converted.pages.slice(at)] }
         : converted
+      const faces = mergeFontFaces(withPages.fontFaces, [fontFaces, ...(Array.isArray(more) ? more.map((extra) => extra?.fontFaces || '') : [])].join('\n'))
+      const schema = faces ? { ...withPages, fontFaces: faces } : withPages
       return {
         schema,
         selectedId: null,

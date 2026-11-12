@@ -44,7 +44,8 @@ test('an HTML page turned into a canvas keeps its pieces, publishes them, and ca
   const heading = blocks.find((c) => c.type === 'heading')
   expect(heading).toMatchObject({ props: { text: 'Fresh bread daily', level: 'h1' }, layout: { x: 100, y: 80, h: 56 }, styles: { fontSize: '48px', color: 'rgb(255, 255, 255)' } })
   expect(blocks.find((c) => c.type === 'text')).toMatchObject({ props: { text: 'Baked every morning in our own oven.' }, layout: { x: 100, y: 152, h: 28 } })
-  expect(blocks.find((c) => c.type === 'button')).toMatchObject({ props: { text: 'Order now', href: '#order' }, styles: { backgroundColor: 'rgb(79, 70, 229)', borderRadius: '8px' } })
+  // A painted link is text that carries its link, its words aligned as the page had them.
+  expect(blocks.find((c) => c.props.text === 'Order now')).toMatchObject({ type: 'text', props: { href: '#order' }, styles: { backgroundColor: 'rgb(79, 70, 229)', borderRadius: '8px' } })
   // The canvas has no table block: it is kept as it is, in an HTML block.
   const kept = blocks.filter((c) => c.type === 'html')
   expect(kept).toHaveLength(1)

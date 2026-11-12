@@ -5,6 +5,7 @@
 // shared with the published page does), so React escapes all text. URLs go
 // through sanitizeUrl.
 import { useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { richPiece, richRuns, richStyle } from '../../utils/richText.js'
 import { sanitizeUrl, sanitizeImageSrc } from '../../utils/sanitize.js'
 import { ICONS } from '../../utils/icons.js'
 import { ALERT_VARIANTS } from './constants.js'
@@ -236,7 +237,7 @@ export function Heading({ props, style }) {
     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, ...style }}>
       {/* A heading given a line height of its own takes it; the tag's 1.15
           is for the ones that were given none. */}
-      <Tag style={style?.lineHeight ? { ...headingTagStyle, lineHeight: 'inherit' } : headingTagStyle}>{props.text}</Tag>
+      <Tag style={style?.lineHeight ? { ...headingTagStyle, lineHeight: 'inherit' } : headingTagStyle}><RichRuns props={props} /></Tag>
     </div>
   )
 }
@@ -244,9 +245,24 @@ export function Heading({ props, style }) {
 export function Text({ props, style }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, ...style }}>
-      <p style={{ margin: 0, ...multilineTextStyle }}>{props.text}</p>
+      <p style={{ margin: 0, ...multilineTextStyle }}><RichRuns props={props} /></p>
     </div>
   )
+}
+
+// A text or heading block's words: with the formatting kept beside them
+// (utils/richText.js) while it still belongs to the text, else as they are.
+function RichRuns({ props }) {
+  const runs = richRuns(props)
+  if (!runs) return props.text
+  return runs.map((run, index) => {
+    const piece = richPiece(run)
+    if (!piece) return null
+    const inner = piece.kind === 'image'
+      ? <img key={index} src={piece.src} alt={piece.alt} style={{ display: 'inline-block', width: piece.width, height: piece.height, verticalAlign: piece.shift, maxWidth: 'none', margin: `0 ${piece.marginRight}px 0 ${piece.marginLeft}px` }} />
+      : <span key={index} style={richStyle(piece)}>{piece.text}</span>
+    return piece.href ? <a key={index} href={piece.href} style={{ color: 'inherit' }} {...linkAttrs(piece.href)}>{inner}</a> : inner
+  })
 }
 
 export function Button({ props, style }) {

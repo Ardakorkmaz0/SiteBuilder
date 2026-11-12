@@ -53,6 +53,9 @@ ALLOWED_STYLE_KEYS = {
     'transform', 'filter', 'backdropFilter', 'textShadow', 'aspectRatio',
     'objectPosition', 'backgroundSize', 'backgroundPosition', 'backgroundRepeat',
     'cursor', 'overflow',
+    # Digits of equal width (tabular-nums): they decide where a line of
+    # figures breaks.
+    'fontVariantNumeric',
 }
 
 ALLOWED_URL_SCHEMES = ('http://', 'https://', 'mailto:', 'tel:')
@@ -224,6 +227,79 @@ def _optional_link(props):
     return {'href': href} if href else {}
 
 
+# Formatting inside a text or heading block, as runs beside its plain text:
+# a piece of text with a few marks, or an inline picture. Never markup; each
+# value is checked for what it is. Mirrors frontend/src/utils/richText.js.
+MAX_RICH_RUNS = 400
+_RICH_UNSAFE = re.compile(r'javascript:|expression\(|url\(|[;{}<>]', re.IGNORECASE)
+_RICH_SIZE = re.compile(r'^\d{1,3}(\.\d{1,3})?px$')
+_RICH_WEIGHT = re.compile(r'^([1-9]00|bold|normal)$')
+_RICH_LINES = ('underline', 'line-through', 'none', 'underline line-through')
+
+
+def _rich_value(value, limit=200):
+    text = str(value).strip() if isinstance(value, (str, int, float)) and not isinstance(value, bool) else ''
+    return text if text and len(text) <= limit and not _RICH_UNSAFE.search(text) else ''
+
+
+def _fraction(value, default, lo, hi):
+    n = value if isinstance(value, (int, float)) and not isinstance(value, bool) else default
+    if n != n:  # NaN guard
+        n = default
+    return round(max(lo, min(hi, float(n))), 2)
+
+
+def sanitize_rich(value):
+    """{'rich': runs} for a block that has formatting, {} for one that has none."""
+    if not isinstance(value, list) or not value or len(value) > MAX_RICH_RUNS:
+        return {}
+    runs = []
+    for raw in value:
+        if not isinstance(raw, dict):
+            continue
+        run = {}
+        href = sanitize_url(raw.get('href'))
+        if href:
+            run['href'] = href
+        if isinstance(raw.get('img'), str):
+            src = sanitize_image_src(raw.get('img'))
+            if not src:
+                continue
+            # To the hundredth: a picture a fraction of a pixel too wide
+            # breaks a line that fitted.
+            run.update({
+                'img': src,
+                'w': _fraction(raw.get('w'), 16, 1, 4000),
+                'h': _fraction(raw.get('h'), 16, 1, 4000),
+                'va': _fraction(raw.get('va'), 0, -400, 400),
+                'ml': _fraction(raw.get('ml'), -1, -400, 400),
+                'mr': _fraction(raw.get('mr'), -1, -400, 400),
+                'alt': _str(raw.get('alt'))[:300],
+            })
+            runs.append(run)
+            continue
+        if not isinstance(raw.get('t'), str):
+            continue
+        run['t'] = raw['t'][:5000]
+        weight = _rich_value(raw.get('b'), 10)
+        if _RICH_WEIGHT.match(weight):
+            run['b'] = weight
+        if raw.get('i') in ('italic', 'normal'):
+            run['i'] = raw['i']
+        if raw.get('u') in _RICH_LINES:
+            run['u'] = raw['u']
+        for key, limit in (('c', 64), ('bg', 64), ('f', 200)):
+            kept = _rich_value(raw.get(key), limit)
+            if kept:
+                run[key] = kept
+        if isinstance(raw.get('z'), str) and _RICH_SIZE.match(raw['z']):
+            run['z'] = raw['z']
+        if raw.get('v') in ('super', 'sub'):
+            run['v'] = raw['v']
+        runs.append(run)
+    return {'rich': runs} if runs else {}
+
+
 def sanitize_props(ctype, props):
     if not isinstance(props, dict):
         props = {}
@@ -260,13 +336,14 @@ def sanitize_props(ctype, props):
             'contentWidth': _optional_width(props.get('contentWidth')),
         }
     if ctype == 'text':
-        return {'text': _str(props.get('text')), 'href': sanitize_url(props.get('href'))}
+        return {'text': _str(props.get('text')), 'href': sanitize_url(props.get('href')), **sanitize_rich(props.get('rich'))}
     if ctype == 'heading':
         level = props.get('level')
         return {
             'text': _str(props.get('text')),
             'level': level if level in ('h1', 'h2', 'h3') else 'h2',
             'href': sanitize_url(props.get('href')),
+            **sanitize_rich(props.get('rich')),
         }
     if ctype in ('divider', 'spacer'):
         return {}
@@ -706,6 +783,33 @@ def sanitize_page_fonts(value):
     return [spec for spec in value if isinstance(spec, str) and _PAGE_FONT_RE.match(spec)][:MAX_PAGE_FONTS]
 
 
+# Fonts a site carries inside itself: @font-face rules whose font files are
+# data: URIs inside the rule. Nothing else is kept from the text. Mirrors
+# frontend/src/utils/fontFaces.js.
+MAX_FONT_FACES = 1_500_000
+_FONT_FACE_RE = re.compile(r'@font-face\s*\{[^{}]*\}', re.IGNORECASE)
+_FONT_FACE_BAD = re.compile(r'[<>]|javascript:|expression\(|@import', re.IGNORECASE)
+_FONT_FACE_URL = re.compile(r'url\(\s*["\']?([^)"\']*)', re.IGNORECASE)
+_FONT_FACE_FAMILY = re.compile(r'font-family\s*:\s*["\']?[^;"\'}]+', re.IGNORECASE)
+
+
+def sanitize_font_faces(value):
+    if not isinstance(value, str) or not value:
+        return ''
+    kept = []
+    size = 0
+    for rule in _FONT_FACE_RE.findall(value):
+        if _FONT_FACE_BAD.search(rule) or not _FONT_FACE_FAMILY.search(rule):
+            continue
+        if not all(re.match(r'data:(font|application)/', url.strip(), re.IGNORECASE) for url in _FONT_FACE_URL.findall(rule)):
+            continue
+        if size + len(rule) > MAX_FONT_FACES:
+            continue
+        size += len(rule)
+        kept.append(rule)
+    return '\n'.join(kept)
+
+
 def sanitize_custom_css(value):
     css = _str(value)[:20000]
     css = re.sub(r'</style', '<\\/style', css, flags=re.IGNORECASE)
@@ -835,6 +939,7 @@ def validate_and_clean_schema(schema):
             'components': [sanitize_component(c) for c in comps],
         })
     color_mode = sanitize_color_mode(schema.get('colorMode'))
+    font_faces = sanitize_font_faces(schema.get('fontFaces'))
     return {
         'theme': sanitize_theme(schema.get('theme')),
         # Absent until the owner sets the other palette, so older schemas stay
@@ -842,6 +947,9 @@ def validate_and_clean_schema(schema):
         **({'colorMode': color_mode} if color_mode else {}),
         'customCss': sanitize_custom_css(schema.get('customCss')),
         'customJs': sanitize_custom_js(schema.get('customJs')),
+        # Absent until a document that carries its own fonts is turned into
+        # canvas pages, so older schemas stay byte-identical.
+        **({'fontFaces': font_faces} if font_faces else {}),
         'pages': clean_pages,
     }
 

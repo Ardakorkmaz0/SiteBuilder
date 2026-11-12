@@ -472,6 +472,7 @@ export const TURKISH_TRANSLATIONS = {
   'Reading the page…': 'Sayfa okunuyor…',
   'Reading the page: part {done} of {total}…': 'Sayfa okunuyor: {total} bölümden {done}.…',
   'The page shows its content in {count} parts, one at a time. Each becomes a canvas page of its own, and the links between them lead from page to page.': 'Sayfa içeriğini {count} bölüm hâlinde, birer birer gösteriyor. Her biri ayrı bir tuval sayfası olur; aralarındaki bağlantılar sayfadan sayfaya götürür.',
+  'The page could not be read with its scripts running, so what they show is missing. Keep this tab in view and try again.': 'Sayfa betikleri çalışırken okunamadı, bu yüzden betiklerin gösterdiği kısımlar eksik. Bu sekmeyi görünür tutup yeniden deneyin.',
   'The page has scripts. They do not run on the canvas.': 'Sayfada betikler var. Bunlar tuvalde çalışmaz.',
   'The HTML page is kept: "Back to the HTML page" in this menu brings it back as it is now.': 'HTML sayfası saklanır: bu menüdeki “HTML sayfasına geri dön” onu şimdiki hâliyle geri getirir.',
   'Go back to the HTML page as it was before it became a canvas? (Undo brings the canvas back.)': 'Tuvale dönüşmeden önceki HTML sayfasına geri dönülsün mü? (Geri Al tuvali geri getirir.)',
