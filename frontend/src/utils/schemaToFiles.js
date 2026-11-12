@@ -144,8 +144,11 @@ function multiline(s) {
   return esc(s).replace(/\r?\n/g, '<br>')
 }
 
+// A value is written into a stylesheet or into a style="…" attribute. A
+// double quote (a font name like "Fira Sans") ended the attribute there, so
+// it is written as a single quote, which CSS reads the same way.
 function cssValue(v) {
-  return String(v).replace(/[;{}<]/g, '').trim()
+  return String(v).replace(/[;{}<]/g, '').replace(/"/g, "'").trim()
 }
 
 function kebab(k) {
