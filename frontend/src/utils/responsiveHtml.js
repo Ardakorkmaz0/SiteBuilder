@@ -41,7 +41,9 @@ function esc(s) {
 function multiline(s) {
   return esc(s).replace(/\r?\n/g, '<br>')
 }
-const cssVal = (v) => String(v).replace(/[;{}<]/g, '').trim()
+// Double quotes are written as single ones: they would end the style="…"
+// attribute the value is written into (schemaToFiles.js cssValue).
+const cssVal = (v) => String(v).replace(/[;{}<]/g, '').replace(/"/g, "'").trim()
 const kebab = (k) => k.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase())
 
 function safeCssProp(value, fallback = '') {
