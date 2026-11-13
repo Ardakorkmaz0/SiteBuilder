@@ -96,7 +96,7 @@ main{margin-left:280px;padding:40px}
 <details><summary>Show the paper text</summary><p>Write your answer in ink.</p></details>
 <label class="done"><input type="checkbox"> Solved</label>
 <p>Below the solution.</p></section>
-<section id="two" hidden><h1>Part two</h1><p>The learning rate sets the step size.</p></section>
+<div class="later"><section id="two" hidden><h1>Part two</h1><p>The learning rate sets the step size.</p></section></div>
 </main>
 <script>
 document.getElementById('next').addEventListener('click', () => {
@@ -105,7 +105,7 @@ document.getElementById('next').addEventListener('click', () => {
 })
 const route = () => {
   const id = location.hash.slice(1) || 'one'
-  document.querySelectorAll('main > section').forEach((part) => { part.hidden = part.id !== id })
+  document.querySelectorAll('main section').forEach((part) => { part.hidden = part.id !== id })
 }
 addEventListener('hashchange', route)
 </script>
@@ -181,29 +181,52 @@ test('a page of notes becomes one canvas page that shows its parts and steps as 
 })
 
 // What a button shows is learnt even when a link points at it too, when it
-// comes a moment after the press, and when the button rewrites its own label.
+// comes a moment after the press (with or without a "loading" look first),
+// when the button rewrites its own label, and when it is a drawing; a panel
+// keeps what was opened in it, and a box of steps starts over when opened.
 const ANSWERS = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Answers</title>
 <style>body{margin:0;font-family:Arial,sans-serif;padding:40px}</style></head><body>
-<a href="#answer">Jump to answer</a>
+<a href="#answer">Jump to answer</a> <a href="#footer">Jump to footer</a>
 <button type="button" id="show">Show answer</button>
 <div hidden id="answer"><h2>Hidden solution</h2><p>Answer is forty two.</p></div>
 <button type="button" id="late">Open later</button>
 <p hidden id="later">Shown a moment later.</p>
+<button type="button" id="loading">Open after loading</button>
+<p hidden id="loaded">Shown after loading.</p>
 <button type="button" id="relabel">Open text</button>
 <p hidden id="drawn"></p>
-<p>Footer survives.</p>
+<button type="button" id="draw">Show drawing</button>
+<canvas id="drawing" width="20" height="20" hidden></canvas>
+<button type="button" id="open">Open panel</button>
+<div id="panel" hidden><button type="button" id="detail">Reveal detail</button><p hidden id="kept">Kept detail</p></div>
+<div id="steps"><button type="button" id="start">Start</button><button type="button" id="all">All</button>
+<div id="work" hidden><p class="s" hidden>Step one</p><p class="s" hidden>Step two</p><p class="s" hidden>Step three</p>
+<button type="button" id="next">Next</button><button type="button" id="over">Over</button></div></div>
+<p id="footer">Footer survives.</p>
 <script>
-document.getElementById('show').addEventListener('click', () => { document.getElementById('answer').hidden = false })
-document.getElementById('late').addEventListener('click', () => { setTimeout(() => { document.getElementById('later').hidden = false }, 80) })
-document.getElementById('relabel').addEventListener('click', (event) => {
-  document.getElementById('drawn').innerHTML = '<span>Newly drawn solution</span>'
-  document.getElementById('drawn').hidden = false
+const $ = (id) => document.getElementById(id)
+$('show').addEventListener('click', () => { $('answer').hidden = false })
+$('late').addEventListener('click', () => { setTimeout(() => { $('later').hidden = false }, 80) })
+$('loading').addEventListener('click', (event) => { event.currentTarget.classList.add('busy'); setTimeout(() => { $('loaded').hidden = false }, 80) })
+$('relabel').addEventListener('click', (event) => {
+  $('drawn').innerHTML = '<span>Newly drawn solution</span>'
+  $('drawn').hidden = false
   event.currentTarget.innerHTML = '<span>Opened</span>'
 })
+$('drawing').getContext('2d').fillRect(0, 0, 20, 20)
+$('draw').addEventListener('click', () => { $('drawing').hidden = false })
+$('open').addEventListener('click', () => { $('panel').hidden = false })
+$('detail').addEventListener('click', () => { $('kept').hidden = false })
+let shown = 0
+const steps = () => document.querySelectorAll('#work .s').forEach((step, index) => { step.hidden = index >= shown })
+$('start').addEventListener('click', () => { $('work').hidden = false; shown = 1; steps() })
+$('all').addEventListener('click', () => { $('work').hidden = false; shown = 3; steps() })
+$('next').addEventListener('click', () => { shown = Math.min(3, shown + 1); steps() })
+$('over').addEventListener('click', () => { $('work').hidden = true; shown = 0; steps() })
 </script>
 </body></html>`
 
-test('a lone answer a link points at, an answer shown a moment later and a relabelled button are learnt', async ({ page, request }) => {
+test('what buttons show is learnt and plays back as on the page, links, delays, drawings and panels included', async ({ page, request, browser }) => {
   const siteId = await createHtmlSite(request, 'E2E answers to canvas', [{ html: ANSWERS }])
   await openEditor(page, siteId)
 
@@ -216,14 +239,42 @@ test('a lone answer a link points at, an answer shown a moment later and a relab
   const home = data.schema.pages[0]
   const blocks = flat(home.components)
   const named = (text) => blocks.find((c) => c.props.text === text)
-  // A link to it does not make the answer a chapter of its own.
+  // A link to it does not make the answer a chapter of its own, even with another link beside it.
   expect(home.parts || []).toEqual([])
-  for (const [answer, button] of [['Answer is forty two.', 'Show answer'], ['Shown a moment later.', 'Open later'], ['Newly drawn solution', 'Open text']]) {
+  for (const [answer, button] of [['Answer is forty two.', 'Show answer'], ['Shown a moment later.', 'Open later'], ['Shown after loading.', 'Open after loading'], ['Newly drawn solution', 'Open text']]) {
     const key = named(answer).props.shownBy[0]
     expect(home.hiddenKeys).toContain(key)
     expect(named(button).props.onClick).toEqual([{ do: 'show', keys: [key] }])
   }
   // The label the page opened with, not the one a press wrote.
   expect(named('Opened')).toBeUndefined()
+  // The drawing is hidden when the page opens, as it was.
+  const drawing = named('Show drawing').props.onClick[0].keys[0]
+  expect(home.hiddenKeys).toContain(drawing)
+  const drawn = blocks.find((c) => (c.props.shownBy || []).includes(drawing))
+  expect(drawn).toBeTruthy()
+  // An HTML block keeps none of the reading's own marks.
+  expect(JSON.stringify(blocks.filter((c) => c.type === 'html').map((c) => c.props.code))).not.toContain('data-pwb-read-')
+  // Opening the panel leaves what was opened inside it alone.
+  expect(named('Open panel').props.onClick.map((action) => action.do)).toEqual(['show'])
+
+  // On the published page: all, then start over, then start shows the first step only.
+  const slug = await publish(page, request, siteId)
+  const viewer = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+  const visitor = await viewer.newPage()
+  await visitor.goto(`${BACKEND}/s/${slug}/`)
+  const step = (text) => visitor.getByText(text, { exact: true })
+  await expect(step('Step one')).toBeHidden()
+  await visitor.getByText('All', { exact: true }).click()
+  await expect(step('Step three')).toBeVisible()
+  await visitor.getByText('Over', { exact: true }).click()
+  await expect(step('Step one')).toBeHidden()
+  await visitor.getByText('Start', { exact: true }).click()
+  await expect(step('Step one')).toBeVisible()
+  await expect(step('Step two')).toBeHidden()
+  await expect(step('Step three')).toBeHidden()
+  await visitor.getByText('Next', { exact: true }).click()
+  await expect(step('Step two')).toBeVisible()
+  await viewer.close()
   await api(request, 'DELETE', `/sites/${siteId}/`)
 })

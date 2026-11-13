@@ -669,10 +669,25 @@ function inShownPart(page, components) {
   if (!keys.length) return components
   const key = shownPartOf(page)
   const there = new Set((page.components || []).map((c) => c.id))
+  // Inside a block, a part's key means nothing but hiding it: a copied box
+  // keeps none of them.
+  const withoutParts = (list) => list.map((child) => {
+    const own = Array.isArray(child.props?.shownBy) ? child.props.shownBy.filter((item) => !keys.includes(item)) : null
+    let props = child.props
+    if (own) {
+      props = { ...child.props, shownBy: own }
+      if (!own.length) delete props.shownBy
+    }
+    return { ...child, props, ...(Array.isArray(child.children) ? { children: withoutParts(child.children) } : {}) }
+  })
   return components.map((c) => {
     if (there.has(c.id)) return c
     const own = (Array.isArray(c.props?.shownBy) ? c.props.shownBy : []).filter((item) => !keys.includes(item))
-    return { ...c, props: { ...c.props, shownBy: [key, ...own].slice(0, 16) } }
+    return {
+      ...c,
+      props: { ...c.props, shownBy: [key, ...own].slice(0, 16) },
+      ...(Array.isArray(c.children) ? { children: withoutParts(c.children) } : {}),
+    }
   })
 }
 
@@ -1525,7 +1540,7 @@ function insertComponent(state, page, type, x, y, parentId, presetId, initialSiz
   // mobile auto-syncing (withComponents re-derives it).
   const schema =
     state.viewport === 'mobile'
-      ? mapPage(state.schema, page.id, (p) => ({ ...p, components: nextComps, mobileManual: true }))
+      ? mapPage(state.schema, page.id, (p) => ({ ...p, components: inShownPart(p, nextComps), mobileManual: true }))
       : withComponents(state.schema, page.id, nextComps)
   return { schema, selectedId: id, selectedIds: [id], dirty: true }
 }
@@ -2220,7 +2235,7 @@ export const useEditorStore = create((set, get) => ({
       const components = apply(page.components)
       const schema =
         editedMobile
-          ? mapPage(state.schema, page.id, (p) => ({ ...p, components, mobileManual: true }))
+          ? mapPage(state.schema, page.id, (p) => ({ ...p, components: inShownPart(p, components), mobileManual: true }))
           : withComponents(state.schema, page.id, components)
       return { schema, dirty: true }
     })
@@ -2277,7 +2292,7 @@ export const useEditorStore = create((set, get) => ({
       const components = apply(page.components)
       const schema =
         key === 'mobileLayout'
-          ? mapPage(state.schema, page.id, (p) => ({ ...p, components, mobileManual: true }))
+          ? mapPage(state.schema, page.id, (p) => ({ ...p, components: inShownPart(p, components), mobileManual: true }))
           : withComponents(state.schema, page.id, components)
       return { schema, dirty: true }
     })
@@ -2326,7 +2341,7 @@ export const useEditorStore = create((set, get) => ({
       const components = apply(page.components)
       const schema =
         key === 'mobileLayout'
-          ? mapPage(state.schema, page.id, (p) => ({ ...p, components, mobileManual: true }))
+          ? mapPage(state.schema, page.id, (p) => ({ ...p, components: inShownPart(p, components), mobileManual: true }))
           : withComponents(state.schema, page.id, components)
       return { schema, dirty: true }
     })
@@ -2396,7 +2411,7 @@ export const useEditorStore = create((set, get) => ({
       // left following the desktop, the phone was laid out again on the spot
       // and the block was back where it started.
       const schema = baseKey === 'mobileLayout'
-        ? mapPage(state.schema, page.id, (p) => ({ ...p, components, mobileManual: true }))
+        ? mapPage(state.schema, page.id, (p) => ({ ...p, components: inShownPart(p, components), mobileManual: true }))
         : withComponents(state.schema, page.id, components)
       return { schema, dirty: true }
     })
@@ -2524,7 +2539,7 @@ export const useEditorStore = create((set, get) => ({
       })
       components = retargetLinks(components, from, to)
       // Only props changed — no layout to re-derive.
-      return { schema: mapPage(state.schema, page.id, (p) => ({ ...p, components })), dirty: true }
+      return { schema: mapPage(state.schema, page.id, (p) => ({ ...p, components: inShownPart(p, components) })), dirty: true }
     })
     return { ok: true, anchor, problem: '' }
   },
@@ -2670,7 +2685,7 @@ export const useEditorStore = create((set, get) => ({
       // stops auto-following PC); PC edits keep mobile in auto sync.
       const schema =
         key === 'mobileLayout'
-          ? mapPage(state.schema, page.id, (p) => ({ ...p, components, mobileManual: true }))
+          ? mapPage(state.schema, page.id, (p) => ({ ...p, components: inShownPart(p, components), mobileManual: true }))
           : withComponents(state.schema, page.id, components)
       return { schema, dirty: true }
     })
@@ -2735,7 +2750,7 @@ export const useEditorStore = create((set, get) => ({
       if (!phone) return { schema: withComponents(state.schema, page.id, components) }
       // The phone is one column: what sits under the block follows its bottom.
       components = followBottomOnPhone(components, id, h - (old.h || 0), (old.y || 0) + (old.h || 0))
-      return { schema: mapPage(state.schema, page.id, (p) => ({ ...p, components })) }
+      return { schema: mapPage(state.schema, page.id, (p) => ({ ...p, components: inShownPart(p, components) })) }
     })
   },
 
@@ -3250,7 +3265,7 @@ export const useEditorStore = create((set, get) => ({
       const without = removeFromTree(all, id)
       const nextComps = target ? addChildToTree(without, targetId, moved, { placed: true }) : [...without, moved]
       const schema = onMobile
-        ? mapPage(current.schema, currentPage.id, (p) => ({ ...p, components: nextComps, mobileManual: true }))
+        ? mapPage(current.schema, currentPage.id, (p) => ({ ...p, components: inShownPart(p, nextComps), mobileManual: true }))
         : withComponents(current.schema, currentPage.id, nextComps)
       return { schema, selectedId: id, selectedIds: [id], dirty: true }
     })

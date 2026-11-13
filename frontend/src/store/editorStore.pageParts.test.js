@@ -16,6 +16,7 @@ beforeEach(() => {
       components: [heading('one', 'p0'), heading('two', 'p1')],
     }],
   })
+  s().showPart('notes', 'p0')
 })
 
 describe('the part of the page the canvas shows', () => {
@@ -47,5 +48,43 @@ describe('the part of the page the canvas shows', () => {
     expect(pasted).toHaveLength(1)
     expect(pasted[0].props.text).toBe('one')
     expect(pasted[0].props.shownBy).toEqual(['p1'])
+  })
+
+  it('takes in a copied box whole: the blocks inside keep no key of the part they came from', () => {
+    s().addComponent('container', 400, 200)
+    const box = page().components.find((c) => c.type === 'container')
+    s().moveComponentInto('one', box.id)
+    s().selectComponent(box.id)
+    s().copySelection()
+    s().showPart('notes', 'p1')
+    s().pasteClipboard()
+
+    const pasted = page().components.find((c) => c.type === 'container' && c.id !== box.id)
+    expect(pasted.props.shownBy).toEqual(['p1'])
+    expect(pasted.children.map((c) => c.props.shownBy)).toEqual([undefined])
+  })
+
+  it('takes in a block added or moved out of a box on the phone canvas too', () => {
+    s().addComponent('container', 400, 200)
+    const box = page().components.find((c) => c.type === 'container')
+    s().moveComponentInto('one', box.id)
+    s().updateProps?.('one', { shownBy: ['p0', 's'] })
+    s().showPart('notes', 'p1')
+    s().setViewport('mobile')
+    s().addComponent('heading', 0, 300)
+    s().moveComponentInto('one', null)
+
+    const added = page().components.find((c) => c.type === 'heading' && !['one', 'two'].includes(c.id))
+    expect(added.props.shownBy).toEqual(['p1'])
+    expect(page().components.find((c) => c.id === 'one').props.shownBy).toEqual(['p1', 's'])
+    s().setViewport('pc')
+  })
+
+  it('keeps the keys of a duplicate that are not a part\'s', () => {
+    s().updateProps('one', { shownBy: ['p0', 's'] })
+    s().duplicateComponent('one')
+
+    const copy = page().components.find((c) => !['one', 'two'].includes(c.id))
+    expect(copy.props.shownBy).toEqual(['p0', 's'])
   })
 })

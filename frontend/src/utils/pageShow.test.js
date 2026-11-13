@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { clickActions, pageHasShow, pageShowAttrs, pageShowScript, reflowLevel, runActions, showAttrs, shownBy } from './pageShow.js'
-import { builderInteractiveTags, withBuilderRuntimeHtml } from './htmlRuntime.js'
+import { builderInteractiveTags, withBuilderInteractiveHtml, withBuilderRuntimeHtml } from './htmlRuntime.js'
 import { schemaToSingleHtml } from './schemaToFiles.js'
 
 const box = (y, h, extra = {}) => ({ x: 0, y, w: 600, h, ...extra })
@@ -283,6 +283,8 @@ describe('the published page', () => {
 
     document.getElementById('toggle').click()
     expect(shown('target')).toBe(true)
+    document.getElementById('toggle').click()
+    expect(shown('target')).toBe(false)
   })
 })
 
@@ -314,6 +316,14 @@ describe('the script a published page gets', () => {
   it('is found however the attribute is written', () => {
     expect(builderInteractiveTags('<div DATA-PWB-SHOW="s1">Step</div>')).toContain(RUNTIME)
     expect(builderInteractiveTags('<div data-pwb-show = "s1">Step</div>')).toContain(RUNTIME)
+  })
+
+  it('is added once an editor document comes to have such blocks', () => {
+    const plain = withBuilderRuntimeHtml('<!doctype html><html><head></head><body><p>Plain</p></body></html>')
+    const keyed = plain.replace('<p>Plain</p>', '<div class="page" data-pwb-keys="s"><div data-pwb-show="s">Hidden</div></div>')
+
+    expect(withBuilderRuntimeHtml(keyed)).toContain('__pwbShowReady')
+    expect(withBuilderInteractiveHtml(keyed)).toContain('__pwbShowReady')
   })
 
   it('is not added to an HTML page shown in the editor, which has no such blocks', () => {
