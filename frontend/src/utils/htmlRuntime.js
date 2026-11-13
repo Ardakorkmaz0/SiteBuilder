@@ -960,6 +960,10 @@ export function withoutBuilderShim(html) {
   return String(html || '').replace(SHIM_TAGS, '').replace(MOTION_TAGS, '')
 }
 
+// A shim written for an editor document leaves the blocks shown by keys out
+// though it says nothing: once the document has such blocks, it is replaced.
+const lacksShow = (html) => hasInteractiveRuntime(html) && NEEDS.show.test(withoutBuilderShim(html)) && !html.includes('__pwbShowReady')
+
 // What the script a document carries was written for: null for one that does not
 // say, written whole by an earlier version, and nothing it could lack.
 function shimParts(html) {
@@ -1011,7 +1015,7 @@ export function withBuilderInteractiveHtml(html) {
   // only the first copy in a document runs.
   const parts = shimParts(out)
   const page = () => withoutBuilderShim(out)
-  if (parts !== null && neededParts(runtimeNeeds(page())) !== parts) out = out.replace(SHIM_TAGS, '')
+  if ((parts !== null && neededParts(runtimeNeeds(page())) !== parts) || lacksShow(out)) out = out.replace(SHIM_TAGS, '')
   const shim = hasInteractiveRuntime(out)
   const motion = hasMotionRuntime(out)
   // Only what is missing: an older export has the shim but no motion, and a
@@ -1034,7 +1038,7 @@ export function withBuilderRuntimeHtml(html) {
   // — injecting the whole thing would duplicate the shared handlers.
   let out = String(html || '')
   // Anything can be added while editing: a script written for some needs gives way.
-  if (shimParts(out) !== null) out = out.replace(SHIM_TAGS, '')
+  if (shimParts(out) !== null || lacksShow(out)) out = out.replace(SHIM_TAGS, '')
   const shim = hasInteractiveRuntime(out)
   const motion = hasMotionRuntime(out)
   // Styles in <head> for the first paint; scripts that READ the document at the

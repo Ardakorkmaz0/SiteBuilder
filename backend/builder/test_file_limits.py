@@ -133,3 +133,21 @@ def test_html_is_measured_in_bytes(monkeypatch, html, kept):
         else:
             with pytest.raises(drf.ValidationError):
                 check()
+
+
+def test_a_site_published_whole_is_measured_in_bytes(monkeypatch):
+    from rest_framework import serializers as drf
+
+    from . import validators
+
+    # Two pages of four two-byte letters: 16 bytes, past a 10-byte site.
+    monkeypatch.setattr(validators, 'MAX_PUBLISHED_TOTAL_BYTES', 10)
+    with pytest.raises(drf.ValidationError):
+        clean_published_pages([{'path': '', 'html': 'é' * 4}, {'path': 'next', 'html': 'é' * 4}])
+
+
+def test_a_ten_mb_page_is_kept_by_the_check_itself():
+    from . import validators
+
+    html = 'a' * (10 * 1024 * 1024)
+    assert validators._page_html(html) is html

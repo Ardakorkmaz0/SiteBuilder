@@ -16,14 +16,12 @@ same operation.
 import hashlib
 import json
 
-from django.db.models.functions import Length
-from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import serializers
 
 from .models import LiveSnapshot, PublishedPage, SiteVersion
 from .validators import (
-    MAX_PUBLISHED_PAGES, MAX_PUBLISHED_TOTAL_BYTES, _published_path, clean_published_pages,
+    MAX_PUBLISHED_PAGES, MAX_PUBLISHED_TOTAL_BYTES, _published_path, clean_published_pages, text_bytes,
 )
 
 
@@ -234,8 +232,9 @@ def send_page_live(site, data, was_published):
     row = clean_published_pages([data])[0]
     if others.count() >= MAX_PUBLISHED_PAGES:
         raise serializers.ValidationError(f'Too many pages to publish (max {MAX_PUBLISHED_PAGES}).')
-    used = others.aggregate(total=Sum(Length('html')))['total'] or 0
-    if used + len(row['html']) > MAX_PUBLISHED_TOTAL_BYTES:
+    # In UTF-8 bytes, as every other size limit: the database counts characters.
+    used = sum(text_bytes(html) for html in others.values_list('html', flat=True).iterator())
+    if used + text_bytes(row['html']) > MAX_PUBLISHED_TOTAL_BYTES:
         raise serializers.ValidationError('The published site is too large (max 250 MB).')
     snapshot = take_snapshot(site, was_published, page_id)
     site.published_pages.filter(page_id=page_id).delete()

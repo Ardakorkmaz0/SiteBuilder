@@ -33,6 +33,8 @@ function readPage(token, frameWindow) {
   const FIELD_TYPES = new Set(['text', 'search', 'email', 'number', 'tel', 'url', 'password', 'date', 'time', 'textarea', 'select'])
   const DRAWN_FIELDS = new Set(['checkbox', 'radio', 'range'])
   // What a click on the page shows and hides, as the reading learnt it.
+  // What links led to that was in view when the page opened.
+  let openTargets = []
   const KEY_ATTR = 'data-pwb-read-key'
   const STICKY_ATTR = 'data-pwb-read-sticky'
   const ROOM_ATTR = 'data-pwb-read-room'
@@ -119,6 +121,8 @@ function readPage(token, frameWindow) {
     const to = [copy, ...copy.querySelectorAll('*')]
     from.forEach((node, index) => {
       const target = to[index]
+      // What the reading marked on the page is the reading's own.
+      if (target) [...target.attributes].forEach((attribute) => { if (attribute.name.startsWith('data-pwb-read-')) target.removeAttribute(attribute.name) })
       if (!target || node.namespaceURI !== 'http://www.w3.org/1999/xhtml') return
       const cs = win.getComputedStyle(node)
       const root = node === el
@@ -578,9 +582,11 @@ function readPage(token, frameWindow) {
       // first chapter) has had its turn by now.
       await settle(400)
       // A page that shows its parts one at a time (chapters, tabs) links to
-      // the ones it is hiding. Each hidden part some link leads to is a state
-      // the page can be put in and read again. They are found before the
+      // the ones it is hiding. Each hidden part a link really shows is a
+      // state the page can be put in and read again; one a link only points
+      // at (an answer behind a button) is not. They are found before the
       // page is read, so that reading it leaves them hidden (see reveal).
+      openTargets = linkTargets().filter((target) => !hiddenRoot(target))
       if (token) {
         const found = new Map()
         for (const link of doc.querySelectorAll('a[href^="#"]')) {
@@ -588,11 +594,13 @@ function readPage(token, frameWindow) {
           try { id = decodeURIComponent(link.getAttribute('href').slice(1)) } catch { /* not an id */ }
           const target = id ? doc.getElementById(id) : null
           const part = target ? hiddenRoot(target) : null
-          if (!part || !isChapter(part)) continue
+          if (!part) continue
           const known = found.get(part)
           if (!known || (target === part && !known.exact)) found.set(part, { part, link, exact: target === part })
         }
-        states.push(...[...found.values()].slice(0, 30))
+        for (const candidate of [...found.values()].slice(0, 30)) {
+          if (await linkShows(candidate)) states.push(candidate)
+        }
       }
       const first = await snapshot()
       if (first && token) {
@@ -617,9 +625,10 @@ function readPage(token, frameWindow) {
   // another one is shown and it is hidden.
   function chapterCheck() {
     const parts = new Set(states.map(({ part }) => part))
-    for (const target of linkTargets()) {
+    // The chapter the page opened on, now that another one is shown.
+    for (const target of openTargets) {
       const root = hiddenRoot(target)
-      if (root && isChapter(root)) parts.add(root)
+      if (root) parts.add(root)
     }
     const list = [...parts]
     return (el) => list.some((part) => el === part || el.contains(part))
@@ -637,18 +646,36 @@ function readPage(token, frameWindow) {
     return out
   }
 
-  // Chapters come in a row: a hidden part is one when a part beside it is
-  // led to by a link too. A lone hidden answer a link points at is not: it
-  // is what its button shows, learnt and carried as such.
-  function isChapter(root) {
-    const parent = root.parentElement
-    if (!parent) return false
-    return linkTargets().some((target) => {
-      for (let el = target; el && el !== parent; el = el.parentElement) {
-        if (el.parentElement === parent) return el !== root
+  // Whether following a link shows the part it leads to, as a chapter's
+  // link does. The page is put back as it was afterwards: its address, and
+  // what the link changed on it.
+  async function linkShows({ part, link }) {
+    const log = []
+    const watch = new MutationObserver((list) => { log.push(...list) })
+    watch.observe(doc.body, WATCH_ALL)
+    const home = win.location.href
+    const go = (href) => {
+      const before = win.location.href
+      win.history.replaceState(null, '', href)
+      win.dispatchEvent(new win.HashChangeEvent('hashchange', { oldURL: before, newURL: win.location.href }))
+      win.dispatchEvent(new win.PopStateEvent('popstate', { state: null }))
+    }
+    let shows = false
+    try {
+      link.click()
+      await settle(120)
+      if (hiddenRoot(part)) {
+        go(link.getAttribute('href'))
+        await settle(150)
       }
-      return false
-    })
+      shows = !hiddenRoot(part)
+      go(home)
+      await settle(150)
+    } catch { /* not shown */ }
+    log.push(...watch.takeRecords())
+    watch.disconnect()
+    undo(log)
+    return shows
   }
 
   // The outermost thing that keeps `el` from being shown, or null.
@@ -710,8 +737,9 @@ function readPage(token, frameWindow) {
       const inButton = record.target.closest && record.target.closest('button, summary, [role="button"]')
       if (record.type === 'childList' && drawsElements(record) && !inButton) continue
       // A chart a script drew is sized by the style it gave its <canvas>:
-      // taken back, the drawing would stand at the size of its pixels.
-      if (record.type === 'attributes' && record.target.tagName === 'CANVAS') continue
+      // taken back, the drawing would stand at the size of its pixels. Its
+      // other attributes ([hidden]) go back as any other's.
+      if (record.type === 'attributes' && record.target.tagName === 'CANVAS' && record.attributeName === 'style') continue
       if (record.type === 'attributes') {
         if (record.oldValue === null) record.target.removeAttribute(record.attributeName)
         else record.target.setAttribute(record.attributeName, record.oldValue)
@@ -763,15 +791,23 @@ function readPage(token, frameWindow) {
       const mark = log.length
       button.click()
       await settle(25)
-      flush()
-      // A page may show what it shows a moment later (an animation that
-      // starts first, a timer): a press that seems to do nothing is
+      // A page may show what it shows a moment later (a timer, a "loading"
+      // look first): a press that has shown or hidden nothing yet is
       // watched a while longer.
-      const changed = () => log.slice(mark).some((record) => record.type === 'attributes' && WATCHED.includes(record.attributeName))
-      for (let wait = 0; wait < 6 && !changed(); wait++) {
+      // 300 ms for a press that changed nothing yet, 150 ms for one that
+      // changed only a look.
+      let seen = flips(mark)
+      for (let wait = 0; !seen.shown.length && !seen.hidden.length && wait < (log.length > mark ? 3 : 6); wait++) {
         await settle(50)
-        flush()
+        seen = flips(mark)
       }
+      return seen
+    }
+    // What the changes since `mark` have shown and hidden: each changed
+    // element and what is inside it, looked at with the old attributes put
+    // back for a moment and then the new ones.
+    const flips = (mark) => {
+      flush()
       const records = log.slice(mark)
       const was = new Map()
       for (const record of records) {
@@ -903,14 +939,16 @@ function readPage(token, frameWindow) {
     }
     backTo(start)
     watch.disconnect()
-    // A button that shows a box shows it as the page opened it, with what
-    // inside it was hidden then still hidden (the steps after the first,
-    // when "start over" left them open): those are hidden by it too.
-    const units = [...new Set([...keyed.keys(), ...[...plan.values()].flat().flatMap((action) => action.units)])]
+    // A button that shows a box of steps starts them over: the steps after
+    // the first, hidden when the page opened, are hidden by it too (or a
+    // "start over" that left them open would show them all again). Only
+    // steps a next/previous button walks through: a box of other things
+    // keeps what was opened in it.
+    const steps = new Set([...plan.values()].flat().filter((action) => action.do === 'next' || action.do === 'prev').flatMap((action) => action.units))
     for (const actions of plan.values()) {
       const shown = actions.filter((action) => action.do === 'show').flatMap((action) => action.units)
       if (!shown.length) continue
-      const inside = units.filter((el) => !shown.includes(el) && !ownShown(el) && shown.some((box) => box !== el && box.contains(el)))
+      const inside = [...steps].filter((el) => !shown.includes(el) && !ownShown(el) && shown.some((box) => box !== el && box.contains(el)))
       if (!inside.length) continue
       const hide = actions.find((action) => action.do === 'hide')
       if (hide) hide.units = [...new Set([...hide.units, ...inside])]

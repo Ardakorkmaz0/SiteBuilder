@@ -191,6 +191,15 @@ class TestOnePageGoesLive:
         assert send(client, site, 'about', 'About v1').status_code == 400
         assert set(served(site)) == {''}
 
+    def test_the_size_limit_counts_bytes_not_characters(self, client, site, monkeypatch):
+        # Five two-byte letters: room for both pages counted in characters, not in bytes.
+        home, about = document('Ééééé'), document('About v1')
+        monkeypatch.setattr('builder.live_pages.MAX_PUBLISHED_TOTAL_BYTES', len(home) + len(about))
+        assert send(client, site, 'home', 'Ééééé').status_code == 200
+
+        assert send(client, site, 'about', 'About v1').status_code == 400
+        assert set(served(site)) == {''}
+
 
 class TestStatusOfEachPage:
     def test_saving_a_change_makes_only_that_page_older(self, client, site):
