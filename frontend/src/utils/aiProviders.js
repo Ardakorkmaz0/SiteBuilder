@@ -264,12 +264,18 @@ export function pickBestLocalModel(models, preferred) {
 }
 
 const LOCAL_MODELS_CACHE_KEY = 'pwb_local_models_cache'
+let localStatusRequest = 0
+
+function localEndpointKey(base) {
+  return String(base || '').trim().replace(/\/+$/, '')
+}
 
 // Fetch the list of locally-installed models from the Django proxy. Returns
 // { ok, runtime, models, base } or { ok: false, reason }. Successful results
 // are cached in localStorage so the chat call path can self-heal even when
 // the Settings panel has never been opened in this session.
 export async function fetchLocalStatus(baseOverride) {
+  const request = ++localStatusRequest
   try {
     const prefix = `${resolveBackendBase()}${LOCAL_PROXY_PATH}/status/`
     const isAbsolute = /^https?:\/\//i.test(prefix)
@@ -281,11 +287,14 @@ export async function fetchLocalStatus(baseOverride) {
     const res = await fetch(target, { method: 'GET' })
     if (!res.ok) return { ok: false, reason: `HTTP ${res.status}` }
     const data = await res.json()
-    if (data?.ok && Array.isArray(data.models)) {
+    // Older requests and other endpoints must not change the model catalogue
+    // used to validate the next chat request for the current local runtime.
+    if (data?.ok && Array.isArray(data.models) && request === localStatusRequest &&
+        localEndpointKey(base) === localEndpointKey(getEndpoint('local'))) {
       try {
         localStorage.setItem(
           LOCAL_MODELS_CACHE_KEY,
-          JSON.stringify({ at: Date.now(), models: data.models }),
+          JSON.stringify({ at: Date.now(), base: localEndpointKey(base), models: data.models }),
         )
       } catch { /* storage unavailable */ }
     }
@@ -295,11 +304,12 @@ export async function fetchLocalStatus(baseOverride) {
   }
 }
 
-export function readCachedLocalModels() {
+export function readCachedLocalModels(base = getEndpoint('local')) {
   try {
     const raw = localStorage.getItem(LOCAL_MODELS_CACHE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
+    if (typeof parsed?.base !== 'string' || localEndpointKey(parsed.base) !== localEndpointKey(base)) return []
     return Array.isArray(parsed?.models) ? parsed.models : []
   } catch { return [] }
 }

@@ -77,6 +77,10 @@ function readPage(token, frameWindow) {
     'border-bottom', 'border-left', 'border-radius', 'box-shadow', 'opacity', 'vertical-align',
     'object-fit', 'overflow', 'min-width',
   ]
+  const SVG_OWN = [
+    'clip-path', 'clip-rule', 'mask', 'filter', 'marker-start', 'marker-mid', 'marker-end',
+    'stop-color', 'stop-opacity', 'flood-color', 'flood-opacity', 'lighting-color', 'vector-effect',
+  ]
   const win = frameWindow || window
   const doc = win.document
   const stats = { hidden: 0 }
@@ -112,7 +116,7 @@ function readPage(token, frameWindow) {
       doc.body.appendChild(probe)
       const cs = win.getComputedStyle(probe)
       const values = {}
-      for (const key of OWN) values[key] = cs.getPropertyValue(key)
+      for (const key of ns === SVG_NS ? [...OWN, ...SVG_OWN] : OWN) values[key] = cs.getPropertyValue(key)
       plain.set(cacheKey, values)
       probe.remove()
     }
@@ -138,7 +142,7 @@ function readPage(token, frameWindow) {
         if (value && (root || !parent || value !== parent.getPropertyValue(key))) css.push(`${key}:${value}`)
       }
       const base = defaultsOf(node.localName || node.tagName, ns)
-      for (const key of OWN) {
+      for (const key of ns === SVG_NS ? [...OWN, ...SVG_OWN] : OWN) {
         const value = cs.getPropertyValue(key)
         if (value && value !== base[key]) css.push(`${key}:${value}`)
       }
@@ -151,7 +155,9 @@ function readPage(token, frameWindow) {
       }
       target.setAttribute('style', css.join(';'))
       target.removeAttribute('class')
-      target.removeAttribute('id')
+      // SVG definitions are addressed by url(#id), href and xlink:href. Each
+      // exported image/HTML block is its own document, so keep these targets.
+      if (ns === HTML_NS) target.removeAttribute('id')
     })
     return copy
   }
@@ -408,7 +414,7 @@ function readPage(token, frameWindow) {
 
   const svgImage = (el, cs) => {
     const copy = standaloneCopy(el, false)
-    copy.setAttribute('xmlns', SVG_NS)
+    copy.setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns', SVG_NS)
     // `currentColor` has nothing to refer to once the drawing is a picture.
     copy.style.color = cs.color
     const bytes = new TextEncoder().encode(new XMLSerializer().serializeToString(copy))

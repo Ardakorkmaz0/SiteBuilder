@@ -10,7 +10,7 @@
 // The one exception is a `relayed` provider (NVIDIA, which refuses browser
 // calls): its key passes through this app's server on the way, unstored, and
 // the panel says so instead of repeating the sentence above.
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useAuthStore } from '../../store/authStore.js'
 import {
@@ -263,6 +263,26 @@ export default function AiSettings({ showHeading = true }) {
   const [endpoint, setEndpointState] = useState(() => getEndpoint(provider))
   const [localStatus, setLocalStatus] = useState(null) // { ok, runtime, models, reason }
   const [localRefreshing, setLocalRefreshing] = useState(false)
+  const localStatusRunRef = useRef(null)
+  // A response belongs to the provider/endpoint that started it. Invalidate
+  // during commit, including unmount, before an old promise can update state.
+  useLayoutEffect(() => () => { localStatusRunRef.current = null }, [provider, endpoint])
+  const loadLocalStatus = useCallback((base) => {
+    const run = {}
+    localStatusRunRef.current = run
+    fetchLocalStatus(base).then((status) => {
+      if (localStatusRunRef.current !== run) return
+      setLocalStatus(status)
+      setLocalRefreshing(false)
+      if (status?.ok && Array.isArray(status.models) && status.models.length) {
+        setModelState((current) => pickBestLocalModel(status.models, current) || current)
+      }
+    }).catch((error) => {
+      if (localStatusRunRef.current !== run) return
+      setLocalStatus({ ok: false, reason: error?.message || 'fetch failed' })
+      setLocalRefreshing(false)
+    })
+  }, [])
   const knownModels = getModelsFor(provider)
   const providerInfo = AI_PROVIDERS.find((p) => p.id === provider)
   const needsKey = providerInfo?.needsKey !== false
@@ -300,40 +320,13 @@ export default function AiSettings({ showHeading = true }) {
   // treated as refreshing by the row below.
   useEffect(() => {
     if (provider !== 'local') return undefined
-    let cancelled = false
-    fetchLocalStatus(endpoint || undefined).then((s) => {
-      if (cancelled) return
-      setLocalStatus(s)
-      setLocalRefreshing(false)
-      // Auto-pick: if the saved model isn't installed, or even if it is but
-      // is a weak-tool-calling model (e.g. gemma) when a stronger one is
-      // available (llama3.1 / qwen2.5 / mistral-nemo), switch automatically.
-      if (s?.ok && Array.isArray(s.models) && s.models.length) {
-        const best = pickBestLocalModel(s.models, model)
-        if (best && best !== model) setModelState(best)
-      }
-    }).catch((e) => {
-      if (cancelled) return
-      setLocalStatus({ ok: false, reason: e?.message || 'fetch failed' })
-      setLocalRefreshing(false)
-    })
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider, endpoint])
+    // Auto-pick an installed, tool-capable model from the current endpoint.
+    loadLocalStatus(endpoint || undefined)
+  }, [provider, endpoint, loadLocalStatus])
 
   function refreshLocalStatus() {
     setLocalRefreshing(true)
-    fetchLocalStatus(endpoint || undefined).then((s) => {
-      setLocalStatus(s)
-      setLocalRefreshing(false)
-      if (s?.ok && Array.isArray(s.models) && s.models.length) {
-        const best = pickBestLocalModel(s.models, model)
-        if (best && best !== model) setModelState(best)
-      }
-    }).catch((e) => {
-      setLocalStatus({ ok: false, reason: e?.message || 'fetch failed' })
-      setLocalRefreshing(false)
-    })
+    loadLocalStatus(endpoint || undefined)
   }
   // When the user picks a different provider, persist it and load the saved
   // key + model + endpoint for that provider so they don't bleed across each

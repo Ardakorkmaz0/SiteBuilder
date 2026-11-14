@@ -381,8 +381,6 @@ function SiteEditor() {
   const pcFold = useEditorStore((s) => selectCurrentPage(s).canvasFold || 0)
   const mobileW = useEditorStore((s) => selectCurrentPage(s).mobileWidth || 390)
   const mobileFold = useEditorStore((s) => selectCurrentPage(s).mobileFold || 0)
-  const undo = useEditorStore((s) => s.undo)
-  const redo = useEditorStore((s) => s.redo)
   const canUndo = useEditorStore((s) => s.past.length > 0)
   const canRedo = useEditorStore((s) => s.future.length > 0)
   const markSaved = useEditorStore((s) => s.markSaved)
@@ -1149,7 +1147,7 @@ function SiteEditor() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo, canvasMode, fullscreen])
+  }, [canvasMode, fullscreen])
 
   // The component link tool only applies to the Empty-mode Edit canvas. Drop it
   // whenever we leave that surface (View/Source, or an HTML page) so it can't
@@ -1500,14 +1498,14 @@ function SiteEditor() {
     restoreHtmlEntry(entry)
   }
 
-  // On an HTML page, Undo takes the newest step of either stack: the page's
-  // documents, or the site itself (a page deleted, added or renamed, a theme
-  // edit), which used to be out of reach of Undo there. Redo brings back the
+  // Undo takes the newest step of either stack: page documents, or the site
+  // itself. A document can be edited from a different page's source panel,
+  // so both stacks remain available on canvas pages too. Redo brings back the
   // step undone last, which is the one with the lowest stamp.
   const stampOf = (entry) => (entry && Number.isFinite(entry.at) ? entry.at : 0)
-  function undoOnHtmlPage() {
+  function undoDraftStep() {
     const live = workspaceRef.current?.getHtml?.()
-    if ((workspaceDirty || htmlTyping) && live != null && live !== siteHtml) {
+    if (currentPageIsHtml && (workspaceDirty || htmlTyping) && live != null && live !== siteHtml) {
       // Source can run ahead of the committed map. Undo that edit first and
       // keep its exact text for Redo instead of skipping it (and losing it).
       setHtmlFuture([{ pageId: currentPageId, html: live, at: nextHistoryStamp() }])
@@ -1523,9 +1521,9 @@ function SiteEditor() {
     if (siteAt > htmlAt) store.undo()
     else undoHtml()
   }
-  function redoOnHtmlPage() {
+  function redoDraftStep() {
     const live = workspaceRef.current?.getHtml?.()
-    if ((workspaceDirty || htmlTyping) && live != null && live !== siteHtml) {
+    if (currentPageIsHtml && (workspaceDirty || htmlTyping) && live != null && live !== siteHtml) {
       commitHtml(live)
       return
     }
@@ -2083,13 +2081,12 @@ function SiteEditor() {
     const typed = workspaceRef.current?.getHtml?.()
     const typing = currentPageIsHtml && (workspaceDirty || htmlTyping) && typed != null && typed !== siteHtml
     const siteAt = store.past.length ? (store.pastAt[store.pastAt.length - 1] ?? 0) : -1
-    const htmlAt = currentPageIsHtml && htmlPast.length ? stampOf(htmlPast[htmlPast.length - 1]) : -1
+    const htmlAt = htmlPast.length ? stampOf(htmlPast[htmlPast.length - 1]) : -1
     if (entry && !typing && entry.at > Math.max(siteAt, htmlAt)) {
       swapLiveStep(entry, { undoing: true })
       return
     }
-    if (currentPageIsHtml) undoOnHtmlPage()
-    else undo()
+    undoDraftStep()
   }
   function redoStep() {
     const store = useEditorStore.getState()
@@ -2101,14 +2098,13 @@ function SiteEditor() {
       setLiveFuture([])
     } else if (entry) {
       const siteNext = store.future.length ? (store.futureAt[0] ?? 0) : Infinity
-      const htmlNext = currentPageIsHtml && htmlFuture.length ? stampOf(htmlFuture[htmlFuture.length - 1]) : Infinity
+      const htmlNext = htmlFuture.length ? stampOf(htmlFuture[htmlFuture.length - 1]) : Infinity
       if (entry.at < Math.min(siteNext, htmlNext)) {
         swapLiveStep(entry, { undoing: false })
         return
       }
     }
-    if (currentPageIsHtml) redoOnHtmlPage()
-    else redo()
+    redoDraftStep()
   }
 
   async function loadIntoDraft(request) {
@@ -2750,10 +2746,10 @@ function SiteEditor() {
         <div className="ml-auto flex min-w-0 items-center gap-1">
           {aiOn && <AiBar open={aiOpen} onOpenChange={setAiOpen} />}
           <span className="mx-1 hidden h-5 w-px bg-[var(--studio-border)] lg:block" aria-hidden />
-          <button type="button" onClick={undoStep} disabled={!livePast.length && (currentPageIsHtml ? !htmlPast.length && !canUndo && !htmlTyping && !workspaceDirty : !canUndo)} title={t('Undo (Ctrl+Z)')} className="studio-icon-btn hidden md:inline-flex">
+          <button type="button" onClick={undoStep} disabled={!livePast.length && !htmlPast.length && !canUndo && !(currentPageIsHtml && (htmlTyping || workspaceDirty))} title={t('Undo (Ctrl+Z)')} className="studio-icon-btn hidden md:inline-flex">
             <UndoIcon size={16} />
           </button>
-          <button type="button" onClick={redoStep} disabled={!liveFuture.length && (currentPageIsHtml ? workspaceDirty || (!htmlFuture.length && !canRedo) : !canRedo)} title={t('Redo (Ctrl+Shift+Z)')} className="studio-icon-btn hidden md:inline-flex">
+          <button type="button" onClick={redoStep} disabled={!liveFuture.length && ((currentPageIsHtml && workspaceDirty) || (!htmlFuture.length && !canRedo))} title={t('Redo (Ctrl+Shift+Z)')} className="studio-icon-btn hidden md:inline-flex">
             <RedoIcon size={16} />
           </button>
           <button type="button" onClick={previewCurrentSite} disabled={saving} className="studio-btn hidden lg:inline-flex">

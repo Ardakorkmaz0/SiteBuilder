@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { measureHtmlPage } from './htmlPageMeasure.js'
 
 function decodeSvgDataUrl(src) {
@@ -29,7 +29,7 @@ describe('measureHtmlPage SVG inlining', () => {
     vi.restoreAllMocks()
   })
 
-  it('inlines computed CSS styles onto SVG descendants inside kept HTML blocks and standalone SVG images', async () => {
+  beforeEach(() => {
     // Force fallback to readWithoutScripts where jsdom exposes contentDocument.
     vi.spyOn(URL, 'createObjectURL').mockImplementation(() => {
       throw new Error('no blob url in jsdom')
@@ -44,7 +44,6 @@ describe('measureHtmlPage SVG inlining', () => {
             installFrameStubs(el.contentDocument, el.contentWindow)
           }
         }, true)
-        const origAppend = document.body.appendChild.bind(document.body)
         // jsdom does not always load srcdoc iframes asynchronously; populate contentDocument if empty.
         queueMicrotask(() => {
           if (el.isConnected && el.srcdoc && el.contentDocument) {
@@ -55,11 +54,12 @@ describe('measureHtmlPage SVG inlining', () => {
             el.dispatchEvent(new Event('load'))
           }
         })
-        void origAppend
       }
       return el
     })
+  })
 
+  it('inlines computed CSS styles onto SVG descendants inside kept HTML blocks and standalone SVG images', async () => {
     const html = `<!doctype html>
 <html>
 <head>
@@ -90,7 +90,7 @@ describe('measureHtmlPage SVG inlining', () => {
     const path = parsedForm.querySelector('path')
 
     expect(svg.getAttribute('class')).toBeNull()
-    expect(svg.getAttribute('id')).toBeNull()
+    expect(svg.getAttribute('id')).toBe('inside-svg')
     expect(path.getAttribute('class')).toBeNull()
     expect(svg.getAttribute('style') || '').toContain('width:24px')
     expect(svg.getAttribute('style') || '').toContain('color:rgb(12, 34, 56)')
@@ -104,5 +104,41 @@ describe('measureHtmlPage SVG inlining', () => {
     const decodedSvg = decodeSvgDataUrl(imgNode.src)
     expect(decodedSvg).toContain('fill:rgb(200, 10, 20)')
     expect(decodedSvg).toContain('stroke:rgb(1, 2, 3)')
+  })
+
+  it.each([false, true])('preserves SVG definition references and their computed styles (inside HTML: %s)', async (insideHtml) => {
+    const svg = `<svg id="art" viewBox="0 0 24 24" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <defs>
+        <linearGradient id="paint"><stop class="first-stop" offset="0"/><stop offset="1" stop-color="blue"/></linearGradient>
+        <clipPath id="clip"><rect width="24" height="24"/></clipPath>
+        <mask id="stencil"><rect width="24" height="24" fill="white"/></mask>
+        <filter id="shadow"><feGaussianBlur stdDeviation="1"/></filter>
+        <path id="shape" d="M0 0h24v24z"/>
+      </defs>
+      <g class="painted"><use href="#shape"/><use xlink:href="#shape"/></g>
+    </svg>`
+    const html = `<!doctype html><html><head><style>
+      .painted { fill: url(#paint); clip-path: url(#clip); mask: url(#stencil); filter: url(#shadow); }
+      .first-stop { stop-color: rgb(200, 10, 20); stop-opacity: 0.5; }
+    </style></head><body>${insideHtml ? `<form id="contact">${svg}</form>` : svg}</body></html>`
+
+    const reading = await measureHtmlPage(html, { width: 1200, height: 900, timeout: 2000 })
+    const output = insideHtml
+      ? reading.root.kids.find((node) => node.kind === 'html').code
+      : decodeSvgDataUrl(reading.root.kids.find((node) => node.kind === 'image').src)
+    const parsed = new DOMParser().parseFromString(output, insideHtml ? 'text/html' : 'image/svg+xml')
+    expect(parsed.querySelector('parsererror')).toBeNull()
+    for (const id of ['paint', 'clip', 'stencil', 'shadow', 'shape']) {
+      expect(parsed.getElementById(id)).not.toBeNull()
+    }
+    expect(parsed.querySelector('g').style.fill).toMatch(/^url\(["']?#paint["']?\)$/)
+    expect(parsed.querySelector('g').style.clipPath).toMatch(/^url\(["']?#clip["']?\)$/)
+    expect(parsed.querySelector('g').style.mask).toMatch(/^url\(["']?#stencil["']?\)$/)
+    expect(parsed.querySelector('g').style.filter).toMatch(/^url\(["']?#shadow["']?\)$/)
+    expect(parsed.querySelector('stop').style.stopColor).toBe('rgb(200, 10, 20)')
+    expect(parsed.querySelector('stop').style.stopOpacity).toBe('0.5')
+    expect(parsed.querySelectorAll('use')[0].getAttribute('href')).toBe('#shape')
+    expect(parsed.querySelectorAll('use')[1].getAttributeNS('http://www.w3.org/1999/xlink', 'href')).toBe('#shape')
+    if (insideHtml) expect(parsed.querySelector('form').hasAttribute('id')).toBe(false)
   })
 })

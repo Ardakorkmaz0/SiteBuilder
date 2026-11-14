@@ -49,7 +49,16 @@ for (const initiallyEmpty of [false, true]) test(`importing HTML into an inactiv
     await expect(file(page, 'About')).toBeVisible()
     await header(page).getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click()
     await file(page, 'About').click()
-    await expect(source(page)).toHaveValue(previous)
+    if (initiallyEmpty) {
+      await expect(source(page)).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'about.html', exact: true })).toBeVisible()
+      await save(page)
+      const undone = (await api(request, 'GET', `/sites/${siteId}/`)).data.schema.pages[1]
+      expect(undone.mode).toBe('empty')
+      expect(undone.html).toBe('')
+    } else {
+      await expect(source(page)).toHaveValue(previous)
+    }
     await header(page).getByRole('button', { name: 'Redo (Ctrl+Shift+Z)', exact: true }).click()
     await expect(source(page)).toHaveValue(/About imported revision/)
     await save(page)

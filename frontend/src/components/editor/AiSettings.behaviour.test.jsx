@@ -7,6 +7,7 @@ import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../../ui/UiThemeProvider.jsx'
 import { OPEN_POLICY, setAiPolicy, useAiPolicy, useAiPolicyStore } from '../../utils/aiPolicy.js'
 import { getAiPreferences } from '../../utils/aiPreferences.js'
+import { runAiPrompt } from '../../utils/aiAssistant.js'
 
 function renderSettings() {
   return render(
@@ -28,6 +29,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
   useAiPolicyStore.setState({ policy: OPEN_POLICY })
 })
 
@@ -83,7 +86,7 @@ describe('the connection test', () => {
   it('reports a working key with how long it took', async () => {
     localStorage.setItem('pwb_ai_provider', 'groq')
     localStorage.setItem('pwb_groq_key', 'test-key')
-    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'OK' } }] }) }))
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'OK' } }] }) })))
     renderSettings()
 
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Test connection' })) })
@@ -96,7 +99,7 @@ describe('the connection test', () => {
     localStorage.setItem('pwb_language', 'tr')
     localStorage.setItem('pwb_ai_provider', 'groq')
     localStorage.setItem('pwb_groq_key', 'test-key')
-    globalThis.fetch = vi.fn(async () => ({ ok: false, status: 401, text: async () => '{"error":{"message":"Invalid API Key"}}' }))
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401, text: async () => '{"error":{"message":"Invalid API Key"}}' })))
     renderSettings()
 
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Bağlantıyı test et' })) })
@@ -143,22 +146,81 @@ describe('render purity and local status errors', () => {
     expect(localStorage.getItem('pwb_ai_provider')).toBe('openrouter')
   })
 
-  it('recovers refreshing state cleanly if fetchLocalStatus rejects', async () => {
+  it('reports a failed local refresh and enables another attempt', async () => {
     vi.stubEnv('VITE_API_URL', '/api')
     setAiPolicy({ enabled: true, providers: ['local', 'openrouter'] })
     localStorage.setItem('pwb_ai_provider', 'local')
-    const rejections = []
-    const onUnhandled = (reason) => rejections.push(reason)
-    globalThis.process.on('unhandledRejection', onUnhandled)
-    try {
-      renderSettings()
-      const refreshBtn = await screen.findByRole('button', { name: 'Refresh' })
-      expect(refreshBtn).toBeEnabled()
-      expect(screen.queryByText('Checking…')).toBeNull()
-      expect(rejections).toHaveLength(0)
-    } finally {
-      globalThis.process.off('unhandledRejection', onUnhandled)
-      vi.unstubAllEnvs()
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(localResponse(['llama3.1']))
+      .mockRejectedValueOnce(new Error('Runtime offline')))
+    renderSettings()
+    await screen.findByText('1 model ready')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh', exact: true }))
+
+    await screen.findByText('Cannot reach the local runtime')
+    expect(screen.getByText('Make sure Ollama is running. (Runtime offline)')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled()
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2)
+  })
+})
+
+function localResponse(models) {
+  return { ok: true, json: async () => ({ ok: true, runtime: 'ollama', models }) }
+}
+
+describe('local status request ownership', () => {
+  it.each(['selection', 'server policy'])('ignores a refresh after %s changes the provider', async (change) => {
+    setAiPolicy({ enabled: true, providers: ['local', 'groq'] })
+    localStorage.setItem('pwb_ai_provider', 'local')
+    localStorage.setItem('pwb_groq_model', 'llama-3.3-70b-versatile')
+    let resolveRefresh
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(localResponse(['gemma3:4b']))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve })))
+    renderSettings()
+    await screen.findByText('1 model ready')
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh', exact: true }))
+
+    if (change === 'selection') {
+      fireEvent.change(screen.getByRole('combobox', { name: /^Provider/ }), { target: { value: 'groq' } })
+    } else {
+      act(() => setAiPolicy({ enabled: true, providers: ['groq'] }))
     }
+    await act(async () => { resolveRefresh(localResponse(['qwen2.5:7b'])) })
+
+    expect(screen.getByRole('combobox', { name: /^Provider/ })).toHaveValue('groq')
+    expect(localStorage.getItem('pwb_groq_model')).toBe('llama-3.3-70b-versatile')
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the new endpoint status and model when an older refresh arrives later', async () => {
+    setAiPolicy({ enabled: true, providers: ['local'] })
+    localStorage.setItem('pwb_ai_provider', 'local')
+    let resolveRefresh
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(localResponse(['gemma3:4b']))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve }))
+      .mockResolvedValueOnce(localResponse(['llama3.1:8b']))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ choices: [{ message: { content: 'Hello' } }] }) }))
+    renderSettings()
+    await screen.findByText('1 model ready')
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh', exact: true }))
+    fireEvent.change(screen.getByRole('textbox', { name: /^Base URL \(advanced\)/ }), {
+      target: { value: 'http://localhost:1234/v1' },
+    })
+    await waitFor(() => expect(localStorage.getItem('pwb_local_model')).toBe('llama3.1:8b'))
+    await act(async () => { resolveRefresh(localResponse(['qwen2.5:7b'])) })
+
+    expect(localStorage.getItem('pwb_local_model')).toBe('llama3.1:8b')
+    expect(screen.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled()
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3)
+    expect(new URL(globalThis.fetch.mock.calls[2][0], window.location.origin).searchParams.get('base')).toBe('http://localhost:1234/v1')
+
+    await act(async () => { await runAiPrompt('Hello', { maxRounds: 1 }) })
+    expect(globalThis.fetch).toHaveBeenCalledTimes(4)
+    expect(JSON.parse(globalThis.fetch.mock.calls[3][1].body)).toMatchObject({
+      _localBase: 'http://localhost:1234/v1', model: 'llama3.1:8b',
+    })
   })
 })

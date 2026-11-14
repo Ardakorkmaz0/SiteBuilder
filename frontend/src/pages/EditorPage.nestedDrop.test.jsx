@@ -158,21 +158,24 @@ describe('palette placement through nested fitted containers', () => {
     expect(nested().children[1].layout.y).toBe(60)
   })
 
-  it('keeps dragged sections and horizontal navbars on the page instead of inside a hovered container', async () => {
+  it.each([false, true])('keeps sections and horizontal navbars on the page with HTML payload %s', async (html) => {
     await openEditor()
     const canvas = document.getElementById('free-canvas')
     canvas.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800 })
 
     await act(async () => onDragEnd({
-      active: { data: { current: { from: 'palette', type: 'region', w: 1000, h: 360 } }, rect: { current: { translated: { left: 0, top: 450 } } } },
+      active: { data: { current: { from: 'palette', type: 'region', w: 1000, h: 360, ...(html ? { html: '<section>Palette section</section>' } : {}) } }, rect: { current: { translated: { left: 0, top: 450 } } } },
       over: { id: 'nested' },
     }))
     await act(async () => onDragEnd({
-      active: { data: { current: { from: 'palette', type: 'navbar', preset: 'minimal', w: 1000, h: 64 } }, rect: { current: { translated: { left: 0, top: 10 } } } },
+      active: { data: { current: { from: 'palette', type: 'navbar', preset: 'minimal', w: 1000, h: 64, ...(html ? { html: '<nav>Palette navigation</nav>' } : {}) } }, rect: { current: { translated: { left: 0, top: 10 } } } },
       over: { id: 'nested' },
     }))
 
     expect(nested().children).toHaveLength(1)
-    expect(state().schema.pages[0].components.map((c) => c.type)).toEqual(['container', 'region', 'navbar'])
+    expect(state().schema.pages[0].components.map((c) => c.type)).toEqual(html ? ['container', 'html', 'html'] : ['container', 'region', 'navbar'])
+    if (html) {
+      expect(state().schema.pages[0].components.slice(1).map((c) => c.props._paletteType)).toEqual(['region', 'navbar'])
+    }
   })
 })

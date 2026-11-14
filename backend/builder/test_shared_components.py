@@ -8,9 +8,12 @@ check turns them red.
 """
 
 import json
+import threading
 
 import pytest
 from django.contrib.auth.models import User
+from django.db import close_old_connections, connection, connections
+from django.db.models.query import QuerySet
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -318,6 +321,101 @@ class TestUsing:
         site.refresh_from_db()
         blocks = site.schema['pages'][0]['components']
         assert len({b['id'] for b in blocks}) == 2
+
+
+@pytest.mark.django_db(transaction=True)
+class TestConcurrentUsing:
+    def test_reads_the_site_with_a_row_lock_inside_its_transaction(self, author, taker, monkeypatch):
+        component = SharedComponent.objects.create(author=author, **GOOD)
+        site = Site.objects.get(owner=taker)
+        initial_revision = site.revision
+        observed_reads = []
+        original_get = QuerySet.get
+
+        def observe_get(queryset, *args, **kwargs):
+            if queryset.model is Site:
+                observed_reads.append((queryset.query.select_for_update, connection.in_atomic_block))
+            return original_get(queryset, *args, **kwargs)
+
+        assert not connection.in_atomic_block
+        with monkeypatch.context() as patch:
+            patch.setattr(QuerySet, 'get', observe_get)
+            response = client_for(taker).post(
+                reverse('shared-component-use', args=[component.pk]),
+                {'site_id': site.pk, 'page_id': 'page_home'}, format='json',
+            )
+
+        assert response.status_code == 200
+        assert observed_reads == [(True, True)]
+        site.refresh_from_db()
+        assert [block['id'] for block in site.schema['pages'][0]['components']] == [response.data['block_id']]
+        assert site.revision == initial_revision + 1
+        component.refresh_from_db()
+        assert component.use_count == 1
+
+    def test_parallel_insertions_preserve_both_blocks_and_revisions(self, author, taker, monkeypatch):
+        if not connection.features.has_select_for_update:
+            pytest.skip('Requires real row locks; also runs against PostgreSQL in CI.')
+        component = SharedComponent.objects.create(author=author, **GOOD)
+        site = Site.objects.get(owner=taker)
+        initial_revision = site.revision
+        original_get = QuerySet.get
+        first_read = threading.Event()
+        second_attempt = threading.Event()
+        second_read = threading.Event()
+        release_first = threading.Event()
+        responses = {}
+        errors = []
+
+        def controlled_get(queryset, *args, **kwargs):
+            thread_name = threading.current_thread().name
+            if queryset.model is Site and thread_name == 'shared-use-second':
+                second_attempt.set()
+            result = original_get(queryset, *args, **kwargs)
+            if queryset.model is Site and thread_name == 'shared-use-first':
+                first_read.set()
+                assert release_first.wait(10), 'First insertion was not released'
+            elif queryset.model is Site and thread_name == 'shared-use-second':
+                second_read.set()
+            return result
+
+        def insert(name):
+            close_old_connections()
+            try:
+                responses[name] = client_for(taker).post(
+                    reverse('shared-component-use', args=[component.pk]),
+                    {'site_id': site.pk, 'page_id': 'page_home'}, format='json',
+                )
+            except Exception as error:
+                errors.append(error)
+            finally:
+                connections.close_all()
+
+        first = threading.Thread(target=insert, args=('first',), name='shared-use-first')
+        second = threading.Thread(target=insert, args=('second',), name='shared-use-second')
+        monkeypatch.setattr(QuerySet, 'get', controlled_get)
+        try:
+            first.start()
+            assert first_read.wait(10), 'First insertion did not read the site'
+            second.start()
+            assert second_attempt.wait(10), 'Second insertion did not try to read the site'
+            assert not second_read.wait(0.4), 'Second insertion bypassed the site row lock'
+        finally:
+            release_first.set()
+            first.join(10)
+            if second.ident is not None:
+                second.join(10)
+
+        assert not first.is_alive() and not second.is_alive()
+        assert not errors, errors
+        assert responses['first'].status_code == responses['second'].status_code == 200
+        site.refresh_from_db()
+        block_ids = [block['id'] for block in site.schema['pages'][0]['components']]
+        assert len(block_ids) == 2
+        assert set(block_ids) == {responses['first'].data['block_id'], responses['second'].data['block_id']}
+        assert site.revision == initial_revision + 2
+        component.refresh_from_db()
+        assert component.use_count == 2
 
 
 class TestFeed:

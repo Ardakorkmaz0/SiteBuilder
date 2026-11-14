@@ -130,6 +130,27 @@ describe('a new navbar on a wide artboard', () => {
 })
 
 describe('Renderer fixed side rail inset', () => {
+  it('does not leave a gap for a hidden desktop rail that is visible on mobile', () => {
+    const rail = {
+      id: 'rail', type: 'navbar', hidden: true, hiddenMobile: false,
+      props: { brand: 'Studio', links: [], navLayout: 'vertical', scrollBehavior: 'fixed', pinX: 'left' },
+      styles: {}, layout: { x: 0, y: 0, w: 220, h: 720 },
+    }
+    const topNav = {
+      id: 'topnav', type: 'navbar',
+      props: { brand: 'Top', links: [], navLayout: 'horizontal', scrollBehavior: 'fixed' },
+      styles: {}, layout: { x: 0, y: 0, w: 1000, h: 64 },
+    }
+    const html = renderToStaticMarkup(
+      <Renderer width={1400} designWidth={1000} viewport="pc" components={[rail, topNav]} />,
+    )
+    expect(html).not.toContain('id="rail"')
+    const topStyle = html.match(/id="topnav" style="([^"]*)"/)?.[1] || ''
+    expect(topStyle).toMatch(/(?:^|;)left:0(?:;|$)/)
+    expect(topStyle).toMatch(/(?:^|;)right:0(?:;|$)/)
+    expect(topStyle).toMatch(/(?:^|;)width:100%(?:;|$)/)
+  })
+
   it('insets a fixed horizontal top navbar past a fixed vertical rail on desktop only', () => {
     const rail = {
       id: 'rail',

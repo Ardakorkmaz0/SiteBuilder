@@ -591,7 +591,8 @@ export function parseCssRules(cssText) {
         j++
       }
     }
-    const selector = selBuf.trim().replace(/\s+/g, ' ')
+    // Whitespace inside a quoted attribute value belongs to the selector.
+    const selector = selBuf.trim()
     if (/^@(media|supports)/i.test(selector)) {
       for (const r of parseCssRules(text.slice(open + 1, close))) {
         out.push({ selector: r.selector, index: open + 1 + r.index })

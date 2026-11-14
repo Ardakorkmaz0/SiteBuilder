@@ -10,6 +10,7 @@ export function fixedRailInset(components) {
   let right = 0
   for (const c of components || []) {
     if (
+      c?.hidden ||
       c?.type !== 'navbar' ||
       c.props?.navLayout !== 'vertical' ||
       c.props?.scrollBehavior !== 'fixed'

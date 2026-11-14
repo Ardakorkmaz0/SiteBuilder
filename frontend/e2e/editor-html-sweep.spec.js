@@ -205,10 +205,10 @@ test.describe('HTML editor user-path sweep', () => {
     expect(saved).not.toContain('pwb-arrowhead')
     await tool(page, 'Text')
     await clickInFrame(page, '#paragraph')
-    await field(properties(page), 'Link (href)').selectOption('section')
+    await properties(page).getByRole('combobox', { name: 'Link (href)', exact: true }).selectOption('section')
     await properties(page).getByRole('combobox', { name: 'Section on this page' }).selectOption('contact')
     expect(await inFrame(page, (doc) => doc.querySelector('#paragraph').closest('a').getAttribute('href'))).toBe('#contact')
-    await field(properties(page), 'Link (href)').selectOption('none')
+    await properties(page).getByRole('combobox', { name: 'Link (href)', exact: true }).selectOption('none')
     expect(await inFrame(page, (doc) => doc.querySelector('#paragraph').closest('a'))).toBeNull()
   })
 

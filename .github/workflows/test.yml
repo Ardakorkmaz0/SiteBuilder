@@ -1,5 +1,5 @@
 # Three legs: frontend (Vitest under jsdom), backend (pytest + pytest-django
-# against the in-memory SQLite test DB) and end-to-end (Playwright driving the
+# against SQLite, plus PostgreSQL row-lock checks) and end-to-end (Playwright driving the
 # real app against a real Django server). Runs on every push + PR so
 # regressions land before review.
 name: tests
@@ -36,6 +36,20 @@ jobs:
   backend:
     name: Backend (pytest-django)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: builder_test
+          POSTGRES_PASSWORD: local-ci-test-password
+          POSTGRES_DB: builder_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U builder_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: backend
@@ -56,6 +70,10 @@ jobs:
         run: python manage.py migrate --noinput
       - name: Test
         run: pytest -q
+      - name: Shared component row locks (PostgreSQL)
+        env:
+          DATABASE_URL: postgres://builder_test:local-ci-test-password@127.0.0.1:5432/builder_test
+        run: pytest -q builder/test_shared_components.py
 
   e2e:
     name: End-to-end (${{ matrix.browser }})

@@ -57,8 +57,8 @@ test.describe('editing an HTML page', () => {
   // "Section on this page" asked for an id the person had to know.
   test('a link can point at a section picked from the page', async ({ page }) => {
     await clickInFrame(page, '#lnk')
-    await field(page, 'Link (href)').selectOption('section')
-    await properties(page).locator('select[aria-label="Section on this page"]').selectOption('contact')
+    await properties(page).getByRole('combobox', { name: 'Link (href)', exact: true }).selectOption('section')
+    await properties(page).getByRole('combobox', { name: 'Section on this page', exact: true }).selectOption('contact')
     expect(await inFrame(page, (doc) => doc.querySelector('#lnk').getAttribute('href'))).toBe('#contact')
   })
 

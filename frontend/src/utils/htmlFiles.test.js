@@ -498,6 +498,22 @@ describe('assemblePreviewHtml — template tag edge cases', () => {
 })
 
 describe('parseCssRules — comments, strings and @imports', () => {
+  it.each(['[data-label="a  b"]', "[data-label='a  b']"])(
+    'preserves significant whitespace in the quoted selector %s',
+    (selector) => {
+      const element = document.createElement('div')
+      element.setAttribute('data-label', 'a  b')
+      document.body.appendChild(element)
+      try {
+        expect(matchingCssRules(element, [{ path: 'styles.css', content: `${selector} { color: red; }` }])).toEqual([
+          { path: 'styles.css', selector, index: 0 },
+        ])
+      } finally {
+        element.remove()
+      }
+    },
+  )
+
   it('ignores braces inside CSS comments and quoted strings without corrupting following rules', () => {
     const css = [
       '@import "a{b}.css";',

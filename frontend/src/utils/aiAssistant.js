@@ -1902,7 +1902,7 @@ async function callLocal(apiKey, history, currentTurnText, signal) {
   // Ollama 404s from a stale localStorage default (e.g. "llama3.1" when the
   // user actually pulled "llama3.1:8b").
   let savedModel = getModel('local')
-  const cached = readCachedLocalModels()
+  const cached = readCachedLocalModels(base)
   if (cached.length && !cached.includes(savedModel)) {
     const corrected = pickBestLocalModel(cached, savedModel)
     if (corrected && corrected !== savedModel) {
