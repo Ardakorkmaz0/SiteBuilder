@@ -72,4 +72,29 @@ describe('free canvas placement', () => {
     const { container } = renderCanvas()
     expect(container.querySelector('#free-canvas').classList.contains('site-surface')).toBe(true)
   })
+
+  it('uses the page-specific theme font when a page overrides the site theme', () => {
+    useEditorStore.getState().loadSchema({
+      theme: { fontFamily: 'Inter, sans-serif' },
+      pages: [{
+        id: 'home',
+        name: 'Home',
+        canvasWidth: 1000,
+        theme: { fontFamily: '"Playfair Display", Georgia, serif' },
+        components: [{
+          id: 'embed',
+          type: 'html',
+          props: { code: '<p style="font-family:inherit">Hi</p>', _siteFont: true },
+          styles: {},
+          layout: { x: 100, y: 100, w: 400, h: 200 },
+        }],
+      }],
+    })
+    useEditorStore.getState().setViewport('pc')
+    const { container } = renderCanvas()
+    const canvas = container.querySelector('#free-canvas')
+    expect(canvas.style.fontFamily).toContain('Playfair Display')
+    const frame = container.querySelector('iframe[title="Embedded HTML"]')
+    expect(frame.getAttribute('srcdoc')).toContain(':root{--pwb-embed-font:"Playfair Display", Georgia, serif;}')
+  })
 })

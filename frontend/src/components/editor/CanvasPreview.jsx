@@ -3,7 +3,8 @@ import { Renderer } from '../renderer/Renderer.jsx'
 import { ColorModeRoot } from '../renderer/ColorMode.jsx'
 import { withColorModeComponents, withColorModePage } from '../../utils/colorMode.js'
 import { useEditorStore } from '../../store/editorStore.js'
-import { pageTheme } from '../../utils/theme.js'
+import { canvasFontFamily, pageTheme } from '../../utils/theme.js'
+import { EmbedFontContext } from '../renderer/embedFont.js'
 import { canvasHeight, flowCanvasHeight } from '../renderer/layout.js'
 import { HTML_ALLOW, PUBLIC_HTML_SANDBOX } from '../../utils/htmlRuntime.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
@@ -119,8 +120,9 @@ export default function CanvasPreview({
   colorMode = null,
 }) {
   const { t } = useLanguage()
-  // As on the published page: text with no colour of its own is the theme's.
+  // As on the published page: text with no colour or font of its own takes the page's theme.
   const textColor = useEditorStore((s) => pageTheme(s.schema, page).textColor)
+  const fontFamily = useEditorStore((s) => canvasFontFamily(s.schema, page))
   const workspaceRef = useRef(null)
   const deviceScrollRef = useRef(null)
   const iframeRef = useRef(null)
@@ -343,19 +345,22 @@ export default function CanvasPreview({
         width,
         minHeight: mobile ? Math.max(artboardHeight, devicePageH) : artboardHeight,
         overflowX: 'clip',
+        fontFamily,
         color: `var(--site-text, ${textColor})`,
         ...(mobile ? {} : { boxShadow: PAGE_SHEET_SHADOW }),
       }}
     >
       <ColorModeRoot mode={colorMode}>
-        <Renderer
-          components={withColorModeComponents(components, colorMode, { background })}
-          background={colorMode ? withColorModePage({ background }, colorMode).background : background}
-          viewport={viewport}
-          width={width}
-          designWidth={width}
-          flowMode={flowMode}
-        />
+        <EmbedFontContext.Provider value={fontFamily}>
+          <Renderer
+            components={withColorModeComponents(components, colorMode, { background })}
+            background={colorMode ? withColorModePage({ background }, colorMode).background : background}
+            viewport={viewport}
+            width={width}
+            designWidth={width}
+            flowMode={flowMode}
+          />
+        </EmbedFontContext.Provider>
       </ColorModeRoot>
       {/* Same as the edit canvas: on the phone the screen's bottom edge already
           IS the fold, so a dashed rule across the design says nothing. */}

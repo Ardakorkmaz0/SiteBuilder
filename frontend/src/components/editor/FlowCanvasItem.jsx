@@ -23,6 +23,7 @@ import { autoLayoutChildStyle, autoLayoutContainerStyle } from '../../utils/auto
 import { containerDesignWidth } from '../../utils/containerFit.js'
 import { usePointerDrag } from '../../ui/usePointerDrag.js'
 import { createReparentTracker } from '../../utils/reparentDrag.js'
+import { embedAspectLock } from '../../utils/htmlSnippetSizing.js'
 import {
   CHROME_ACCENT,
   HOVER_RING_CLASS,
@@ -32,6 +33,7 @@ import {
   hoverRingStyle,
   resizeEdgeHitZones,
   resizeHandles,
+  resizedBox,
 } from './selectionChrome.js'
 import { ResizeAffordances, SelectionFrame } from './ChromeAffordances.jsx'
 
@@ -119,25 +121,30 @@ export default function FlowCanvasItem({
     const scroller = document.getElementById('canvas-scroll')
     const canvas = document.getElementById('free-canvas')
     if (!scroller || !canvas) return undefined
+    const scale = canvasScale > 0 ? canvasScale : 1
     let prev = { x: 0, y: 0 }
     const apply = () => {
       const sRect = scroller.getBoundingClientRect()
       const cRect = canvas.getBoundingClientRect()
       const r = el.getBoundingClientRect()
+      const canvasW = cRect.width / scale
+      const canvasH = cRect.height / scale
+      const itemW = r.width / scale
+      const itemH = r.height / scale
       // The item's untransformed flow position, in canvas coordinates (1:1).
-      const baseX = r.left - cRect.left - prev.x
-      const baseY = r.top - cRect.top - prev.y
-      const viewTop = sRect.top - cRect.top
-      const viewBottom = viewTop + sRect.height
-      let targetY = pinY === 'bottom' ? viewBottom - r.height - pinOffsetY : viewTop + pinOffsetY
-      targetY = Math.min(Math.max(targetY, 0), Math.max(0, cRect.height - r.height))
+      const baseX = (r.left - cRect.left) / scale - prev.x
+      const baseY = (r.top - cRect.top) / scale - prev.y
+      const viewTop = (sRect.top - cRect.top) / scale
+      const viewBottom = viewTop + sRect.height / scale
+      let targetY = pinY === 'bottom' ? viewBottom - itemH - pinOffsetY : viewTop + pinOffsetY
+      targetY = Math.min(Math.max(targetY, pinY === 'bottom' ? 0 : Math.min(0, pinOffsetY)), Math.max(0, canvasH - itemH))
       let targetX =
         pinX === 'right'
-          ? cRect.width - r.width - pinOffsetX
+          ? canvasW - itemW - pinOffsetX
           : pinX === 'left'
             ? pinOffsetX
-            : (cRect.width - r.width) / 2 + pinOffsetX
-      targetX = Math.min(Math.max(targetX, 0), Math.max(0, cRect.width - r.width))
+            : (canvasW - itemW) / 2 + pinOffsetX
+      targetX = Math.min(Math.max(targetX, 0), Math.max(0, canvasW - itemW))
       prev = { x: Math.round(targetX - baseX), y: Math.round(targetY - baseY) }
       el.style.transform = prev.x || prev.y ? `translate(${prev.x}px, ${prev.y}px)` : ''
     }
@@ -149,7 +156,7 @@ export default function FlowCanvasItem({
       window.removeEventListener('resize', apply)
       el.style.transform = ''
     }
-  }, [pinMode, pinY, pinX, pinOffsetY, pinOffsetX, viewport])
+  }, [pinMode, pinY, pinX, pinOffsetY, pinOffsetX, viewport, canvasScale])
 
   function startResize(e, dir) {
     e.stopPropagation()
@@ -725,24 +732,11 @@ function TabsCanvasItem({
     const sx = e.clientX
     const sy = e.clientY
     const orig = { x, y, w, h }
+    const aspect = embedAspectLock(component)
     function onMove(ev) {
       const dx = (ev.clientX - sx) / interactionScale
       const dy = (ev.clientY - sy) / interactionScale
-      let nx = orig.x
-      let ny = orig.y
-      let nw = orig.w
-      let nh = orig.h
-      if (dir.includes('e')) nw = Math.max(MIN, orig.w + dx)
-      if (dir.includes('s')) nh = Math.max(MIN, orig.h + dy)
-      if (dir.includes('w')) {
-        nw = Math.max(MIN, orig.w - dx)
-        nx = orig.x + (orig.w - nw)
-      }
-      if (dir.includes('n')) {
-        nh = Math.max(MIN, orig.h - dy)
-        ny = orig.y + (orig.h - nh)
-      }
-      applyLayout({ x: nx, y: ny, w: nw, h: nh })
+      applyLayout(resizedBox(orig, dir, dx, dy, MIN, aspect))
     }
     // One undo step per gesture; ends on pointerup, cancel or loss of focus.
     useEditorStore.getState().beginHistoryGesture()

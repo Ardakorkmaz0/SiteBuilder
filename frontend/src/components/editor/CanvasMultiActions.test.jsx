@@ -67,4 +67,22 @@ describe('CanvasMultiActions', () => {
     await user.click(screen.getByRole('button', { name: 'Delete selected' }))
     expect(useEditorStore.getState().schema.pages[0].components).toHaveLength(0)
   })
+
+  it('preserves counter-scale when positioned above the group with a translateY transform', () => {
+    localStorage.setItem('pwb_language', 'en')
+    loadThree()
+    render(
+      <LanguageProvider>
+        <CanvasMultiActions
+          count={3}
+          canvasScale={0.5}
+          style={{ left: 100, top: 200, transform: 'translateY(calc(-100% - 8px))' }}
+        />
+      </LanguageProvider>,
+    )
+    const toolbar = screen.getByRole('toolbar', { name: 'Align & distribute' })
+    expect(toolbar.style.transformOrigin).toBe('top left')
+    expect(toolbar.style.transform).toContain('scale(2)')
+    expect(toolbar.style.transform).toContain('translateY(calc(-100% - 8px))')
+  })
 })

@@ -23,6 +23,7 @@ import {
 } from './layout.js'
 import { scaleCssValue, scaledPx } from './scale.js'
 import { regionContentWidth, responsiveRegionChildLayout } from '../../utils/regionLayout.js'
+import { fixedRailInset } from '../../utils/railInset.js'
 import { autoLayoutChildStyle, autoLayoutContainerStyle } from '../../utils/autoLayout.js'
 import { elementIdFor } from '../../utils/anchors.js'
 import { fitsBox, nativeFit } from '../../utils/boxFit.js'
@@ -418,6 +419,8 @@ export function Renderer({
     )
   }
 
+  const railInset = viewport !== 'mobile' ? fixedRailInset(list) : null
+
   return (
     <div
       style={{
@@ -446,7 +449,7 @@ export function Renderer({
             key={c.id}
             // id lets in-page links (#anchor, else #componentId) scroll here.
             id={elementIdFor(c)}
-            style={pinnedLayoutStyle(c, baseStyle)}
+            style={pinnedLayoutStyle(c, baseStyle, railInset)}
           >
             <RenderComponent component={c} viewport={viewport} canvasDesignWidth={baseDesignW} fit />
           </div>

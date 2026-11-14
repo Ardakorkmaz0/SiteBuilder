@@ -351,8 +351,8 @@ export function hasOwnTheme(page) {
 
 // The font the free canvas sets its page in (and that opted-in HTML embeds are
 // measured and drawn with, see baseFontTag in htmlEmbedDocument.js).
-export function canvasFontFamily(schema) {
-  return schema?.theme?.fontFamily || DEFAULT_THEME.fontFamily
+export function canvasFontFamily(schema, page = null) {
+  return pageTheme(schema, page).fontFamily
 }
 
 export function pageTheme(schema, page) {

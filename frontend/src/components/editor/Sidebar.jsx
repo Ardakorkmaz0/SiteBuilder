@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { DRAG_MIME } from '../../utils/htmlPlacement.js'
-import { useEditorStore } from '../../store/editorStore.js'
+import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
 import { CodeIcon, FolderIcon, LayersIcon, PlusIcon, SaveIcon, SparklesIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import BlockLibrary from './BlockLibrary.jsx'
@@ -353,7 +353,15 @@ function CustomBlockPanel({ onPick, onArm, onInspect, theme }) {
       onPick('section', cleanHtml)
       return
     }
-    addBlock([{ type: 'html', x: 24, y: 0, w: 1000, h: 360, props: { code: cleanHtml } }], 24)
+    const state = useEditorStore.getState()
+    const page = selectCurrentPage(state)
+    const mobile = state.viewport === 'mobile'
+    const bottom = (page?.components || []).reduce((lowest, c) => {
+      const box = (mobile ? c.mobileLayout || c.layout : c.layout) || {}
+      return Math.max(lowest, (box.y || 0) + (box.h || 0))
+    }, 0)
+    const y = bottom > 0 ? bottom + 24 : 24
+    addBlock([{ type: 'html', x: mobile ? 16 : 24, y: 0, w: 1000, h: 360, props: { code: cleanHtml } }], y)
   }
 
   const saveCustom = () => {

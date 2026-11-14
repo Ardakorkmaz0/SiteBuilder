@@ -128,3 +128,38 @@ describe('a new navbar on a wide artboard', () => {
     expect(html).toMatch(/max-width:1200px/)
   })
 })
+
+describe('Renderer fixed side rail inset', () => {
+  it('insets a fixed horizontal top navbar past a fixed vertical rail on desktop only', () => {
+    const rail = {
+      id: 'rail',
+      type: 'navbar',
+      props: { brand: 'Studio', links: [], navLayout: 'vertical', scrollBehavior: 'fixed', pinX: 'left' },
+      styles: {},
+      layout: { x: 0, y: 0, w: 220, h: 720 },
+    }
+    const topNav = {
+      id: 'topnav',
+      type: 'navbar',
+      props: { brand: 'Top', links: [], navLayout: 'horizontal', scrollBehavior: 'fixed' },
+      styles: {},
+      layout: { x: 0, y: 0, w: 1000, h: 64 },
+    }
+
+    const pcHtml = renderToStaticMarkup(
+      <Renderer width={1400} designWidth={1000} viewport="pc" components={[rail, topNav]} />,
+    )
+    const topPcStyle = pcHtml.match(/id="topnav" style="([^"]*)"/)?.[1] || ''
+    expect(topPcStyle).toMatch(/(?:^|;)left:220px(?:;|$)/)
+    expect(topPcStyle).toMatch(/(?:^|;)right:0(?:;|$)/)
+    expect(topPcStyle).toMatch(/(?:^|;)width:auto(?:;|$)/)
+
+    const mobileHtml = renderToStaticMarkup(
+      <Renderer width={390} designWidth={390} viewport="mobile" components={[rail, topNav]} />,
+    )
+    const topMobileStyle = mobileHtml.match(/id="topnav" style="([^"]*)"/)?.[1] || ''
+    expect(topMobileStyle).toMatch(/(?:^|;)left:0(?:;|$)/)
+    expect(topMobileStyle).toMatch(/(?:^|;)right:0(?:;|$)/)
+    expect(topMobileStyle).toMatch(/(?:^|;)width:100%(?:;|$)/)
+  })
+})

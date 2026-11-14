@@ -22,4 +22,24 @@ describe('a palette snippet dropped into a section', () => {
     expect(child.layout).toMatchObject({ x: 40, y: 30, w: 120, h: 48 })
     expect(s().schema.pages[0].components).toHaveLength(1)
   })
+
+  it('keeps the mobile drop coordinates in a section instead of re-deriving auto mobile', () => {
+    const region = s().schema.pages[0].components[0]
+    s().setViewport('mobile')
+    s().addComponent('html', 40, 140, region.id, null, { w: 120, h: 48 }, { code: '<a href="#">Mobil</a>' })
+    const page = s().schema.pages[0]
+    const child = page.components[0].children[0]
+    expect(page.mobileManual).toBe(true)
+    expect(child.mobileLayout).toMatchObject({ x: 40, y: 140, w: 120, h: 48 })
+    expect(child.layout.y).toBe(16)
+  })
+
+  it('keeps sections and horizontal navbars on the page even if dropped over a parent id', () => {
+    const region = s().schema.pages[0].components[0]
+    s().addComponent('region', 0, 50, region.id)
+    s().addComponent('navbar', 0, 10, region.id, 'minimal')
+    const top = s().schema.pages[0].components
+    expect(top[0].children).toEqual([])
+    expect(top.map((c) => c.type)).toEqual(['region', 'region', 'navbar'])
+  })
 })

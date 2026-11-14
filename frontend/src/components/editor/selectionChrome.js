@@ -125,3 +125,25 @@ export function chromeBadgeStyle(metrics, corner = 'top-left') {
     whiteSpace: 'nowrap',
   }
 }
+
+/** Resize an item box cleanly while honoring minimum bounds and optional aspect ratio lock. */
+export function resizedBox(orig, dir, dx, dy, min = 20, aspect = null) {
+  let { x: nx, y: ny, w: nw, h: nh } = orig
+  if (dir.includes('e')) nw = Math.max(min, orig.w + dx)
+  if (dir.includes('s')) nh = Math.max(min, orig.h + dy)
+  if (dir.includes('w')) {
+    nw = Math.max(min, orig.w - dx)
+    nx = orig.x + (orig.w - nw)
+  }
+  if (dir.includes('n')) {
+    nh = Math.max(min, orig.h - dy)
+    ny = orig.y + (orig.h - nh)
+  }
+  if (aspect) {
+    if (dir.includes('e') || dir.includes('w')) nh = Math.max(min, Math.round(nw / aspect))
+    else nw = Math.max(min, Math.round(nh * aspect))
+    if (dir.includes('n')) ny = orig.y + orig.h - nh
+    if (dir.includes('w')) nx = orig.x + orig.w - nw
+  }
+  return { x: nx, y: ny, w: nw, h: nh }
+}

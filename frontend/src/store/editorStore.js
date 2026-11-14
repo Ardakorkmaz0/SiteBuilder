@@ -1364,7 +1364,8 @@ function insertComponent(state, page, type, x, y, parentId, presetId, initialSiz
   const kids = PARENT_TYPES.has(type) ? { children: [] } : {}
 
   // Dropping a palette item INTO a container: it becomes a flowing child.
-  if (parentId) {
+  const canDropInParent = type !== 'region' && !(type === 'navbar' && fullWidth)
+  if (parentId && canDropInParent) {
     const parentNode = findInTree(comps, parentId)
     const parentW = parentDesignWidth(parentNode)
     const parentH = Math.round(parentNode?.layout?.h || 0) || undefined
@@ -1425,12 +1426,13 @@ function insertComponent(state, page, type, x, y, parentId, presetId, initialSiz
       hiddenMobile: false,
       ...kids,
     }
+    const nextComps = addChildToTree(page.components, parentId, child)
+    const schema =
+      regionParent && state.viewport === 'mobile'
+        ? mapPage(state.schema, page.id, (p) => ({ ...p, components: inShownPart(p, nextComps), mobileManual: true }))
+        : withComponents(state.schema, page.id, nextComps)
     return {
-      schema: withComponents(
-        state.schema,
-        page.id,
-        addChildToTree(page.components, parentId, child),
-      ),
+      schema,
       selectedId: id,
       selectedIds: [id],
       dirty: true,
@@ -2019,7 +2021,9 @@ export const useEditorStore = create((set, get) => ({
         .filter(Boolean)
       if (!built.length) return {}
       const nextComps = [...page.components, ...built]
-      const schema = withComponents(state.schema, page.id, nextComps)
+      const schema = onMobile
+        ? mapPage(state.schema, page.id, (p) => ({ ...p, components: inShownPart(p, nextComps), mobileManual: true }))
+        : withComponents(state.schema, page.id, nextComps)
       return { schema, selectedId: built[0].id, selectedIds: [built[0].id], dirty: true }
     })
   },
@@ -2549,11 +2553,12 @@ export const useEditorStore = create((set, get) => ({
   // merged over the base `styles` only on phones — so "make the heading
   // smaller on mobile" never touches the desktop design. Clearing a field on
   // mobile removes the override and the desktop value shows through again.
-  updateStyles: (id, patch) => {
+  updateStyles: (id, patch, opts) => {
     get().record('style-' + id)
     set((state) => {
       const page = selectCurrentPage(state)
-      const mobileScope = state.viewport === 'mobile' && !page.flowMode
+      const vp = opts?.viewport || state.viewport
+      const mobileScope = vp === 'mobile' && !page.flowMode
       const components = mapTree(page.components, id, (c) => {
         if (!mobileScope) return { ...c, styles: { ...c.styles, ...patch } }
         const over = { ...(c.stylesMobile || {}) }
@@ -2615,9 +2620,9 @@ export const useEditorStore = create((set, get) => ({
 
   // Move and resize both flow through here, editing the ACTIVE breakpoint only.
   // Containers/tabs share one child design; regions keep a phone layout too.
-  setLayout: (id, patch) => {
+  setLayout: (id, patch, opts) => {
     const page0 = selectCurrentPage(get())
-    const key = componentLayoutKey(page0, id, get().viewport)
+    const key = componentLayoutKey(page0, id, opts?.viewport || get().viewport)
     get().record('layout-' + key + '-' + id)
     set((state) => {
       const page = selectCurrentPage(state)

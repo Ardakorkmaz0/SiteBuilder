@@ -46,4 +46,33 @@ describe('the canvas preview in the other palette', () => {
     expect(drawnOn('#fafafa')).toContain('var(--pwb-alt-muted, #54595f)')
     expect(drawnOn('#ffffff')).not.toContain('var(--pwb-alt-muted, #54595f)')
   })
+
+  it('applies the resolved theme fontFamily to the preview artboard and opted-in embeds', async () => {
+    const { useEditorStore } = await import('../../store/editorStore.js')
+    const page = {
+      id: 'home',
+      name: 'Home',
+      theme: { ...DEFAULT_THEME, fontFamily: '"Playfair Display", Georgia, serif' },
+      components: [{
+        id: 'embed',
+        type: 'html',
+        props: { code: '<p>Hi</p>', _siteFont: true },
+        styles: {},
+        layout: { x: 0, y: 0, w: 300, h: 120 },
+      }],
+    }
+    useEditorStore.getState().loadSchema({
+      theme: { ...DEFAULT_THEME, fontFamily: 'Inter, sans-serif' },
+      pages: [page],
+    })
+    const { container } = render(
+      <LanguageProvider>
+        <CanvasPreview page={page} viewport="pc" width={1000} />
+      </LanguageProvider>,
+    )
+    const artboard = container.querySelector('[data-builder-preview-artboard]')
+    expect(artboard.style.fontFamily).toContain('Playfair Display')
+    const frame = container.querySelector('iframe[title="Embedded HTML"]')
+    expect(frame.getAttribute('srcdoc')).toContain(':root{--pwb-embed-font:"Playfair Display", Georgia, serif;}')
+  })
 })

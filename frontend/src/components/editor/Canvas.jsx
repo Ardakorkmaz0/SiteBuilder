@@ -3,7 +3,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { useEditorStore, selectCurrentPage, partOfBlock, shownPartOf } from '../../store/editorStore.js'
 import { pageParts } from '../../utils/pageShow.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
-import { canvasHeight, flowCanvasHeight, flowGap, flowSidePad } from '../renderer/layout.js'
+import { canvasHeight, flowCanvasHeight, flowGap, flowSidePad, isHidden } from '../renderer/layout.js'
 import { CANVAS_WIDTH, MOBILE_CANVAS_WIDTH } from '../registry.jsx'
 import FreeCanvasItem from './FreeCanvasItem.jsx'
 import FlowCanvasItem from './FlowCanvasItem.jsx'
@@ -144,7 +144,7 @@ export default function Canvas({
   // affects descendants that don't override fontFamily themselves — the
   // existing per-component baked-in fonts still win, which is the contract
   // the "Apply to design" button operates on.
-  const themeFontFamily = useEditorStore((s) => canvasFontFamily(s.schema))
+  const themeFontFamily = useEditorStore((s) => canvasFontFamily(s.schema, selectCurrentPage(s)))
   // Text with no colour of its own takes the page's text colour, as on the
   // published page (body { color: var(--site-text) }), not the app's.
   const themeTextColor = useEditorStore((s) => pageTheme(s.schema, selectCurrentPage(s)).textColor)
@@ -191,11 +191,11 @@ export default function Canvas({
     selectedIds.length === 1 &&
     !!selectedId &&
     !!selectedComponent
-  // HTML embeds expose one extra "fit to content" action in the desktop
-  // toolbar, so include it when calculating the exact physical toolbar width.
-  const selectionActionCount = 7 + (
-    !isMobile && selectedComponent?.type === 'html' ? 1 : 0
-  )
+  // Desktop HTML embeds expose "fit to content", and Canvas adds "Open large"
+  // whenever `onSpotlight` is wired; include both in toolbar width calculation.
+  const selectionActionCount = 7
+    + (!isMobile && selectedComponent?.type === 'html' ? 1 : 0)
+    + (onSpotlight ? 1 : 0)
 
   useEffect(() => {
     const el = scrollElRef.current
@@ -432,7 +432,7 @@ export default function Canvas({
       const y2 = Math.max(m.startY, m.curY)
       const ids = components
         .filter((c) => {
-          if (c.hidden || (isMobile && c.hiddenMobile)) return false
+          if (isHidden(c, viewport)) return false
           const L = (isMobile ? c.mobileLayout || c.layout : c.layout) || {}
           const bx = L.x || 0
           const by = L.y || 0

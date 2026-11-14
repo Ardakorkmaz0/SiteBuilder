@@ -8,6 +8,7 @@ import { usePointerDrag } from '../../ui/usePointerDrag.js'
 import { createReparentTracker } from '../../utils/reparentDrag.js'
 import { embedAspectLock } from '../../utils/htmlSnippetSizing.js'
 import { fixedRailInset } from '../../utils/railInset.js'
+import { isHidden } from '../renderer/layout.js'
 import { BRUSH_CURSOR } from './brushCursor.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import {
@@ -18,6 +19,7 @@ import {
   hoverRingStyle,
   resizeEdgeHitZones,
   resizeHandles,
+  resizedBox,
 } from './selectionChrome.js'
 import { ResizeAffordances, SelectionFrame } from './ChromeAffordances.jsx'
 
@@ -295,7 +297,7 @@ export default function FreeCanvasItem({
       }
     }
     const siblings = (page.components || [])
-      .filter((c) => !groupIds.includes(c.id))
+      .filter((c) => !groupIds.includes(c.id) && !isHidden(c, state.viewport))
       .map((c) => {
         const l = c[layoutKey] || c.layout || {}
         return { id: c.id, x: l.x || 0, y: l.y || 0, w: l.w || 0, h: l.h || 0 }
@@ -393,27 +395,7 @@ export default function FreeCanvasItem({
     function resizeTo(clientX, clientY) {
       const dx = (clientX - sx) / canvasScale
       const dy = (clientY - sy) / canvasScale + drag.scrolled()
-      let { x: nx, y: ny, w: nw, h: nh } = orig
-      if (dir.includes('e')) nw = Math.max(MIN, orig.w + dx)
-      if (dir.includes('s')) nh = Math.max(MIN, orig.h + dy)
-      if (dir.includes('w')) {
-        nw = Math.max(MIN, orig.w - dx)
-        nx = orig.x + (orig.w - nw)
-      }
-      if (dir.includes('n')) {
-        nh = Math.max(MIN, orig.h - dy)
-        ny = orig.y + (orig.h - nh)
-      }
-      if (aspect) {
-        // Drive from the horizontal axis for any handle that moves an
-        // east/west edge, else from the vertical axis; then re-anchor the
-        // fixed corner so the opposite edge stays put.
-        if (dir.includes('e') || dir.includes('w')) nh = Math.max(MIN, Math.round(nw / aspect))
-        else nw = Math.max(MIN, Math.round(nh * aspect))
-        if (dir.includes('n')) ny = orig.y + orig.h - nh
-        if (dir.includes('w')) nx = orig.x + orig.w - nw
-      }
-      setLayout(component.id, { x: nx, y: ny, w: nw, h: nh })
+      setLayout(component.id, resizedBox(orig, dir, dx, dy, MIN, aspect))
     }
     useEditorStore.getState().beginHistoryGesture()
     trackDrag(e, {

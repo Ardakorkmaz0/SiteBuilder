@@ -82,4 +82,25 @@ describe('canvas selection action overlay', () => {
     expect(toolbar.style.left).toBe(`${expected.left}px`)
     expect(toolbar.style.top).toBe(`${expected.top}px`)
   })
+
+  it('includes the Open large spotlight button in the toolbar width calculation', () => {
+    loadSelectedPage()
+    const { container } = render(
+      <LanguageProvider>
+        <DndContext>
+          <Canvas zoom={100} onSpotlight={() => {}} />
+        </DndContext>
+      </LanguageProvider>,
+    )
+    const canvas = container.querySelector('#free-canvas')
+    const target = container.querySelector('[data-cid="button"]')
+    canvas.getBoundingClientRect = () => ({ left: 100, top: 50, width: 1000, height: 800, right: 1100, bottom: 850 })
+    // Near the right edge at 1:1 scale: 8 buttons = 248px + 8px margin -> max left 744px (7 buttons would clamp to 774px).
+    target.getBoundingClientRect = () => ({ left: 990, top: 250, width: 100, height: 50, right: 1090, bottom: 300 })
+
+    act(() => window.dispatchEvent(new Event('resize')))
+
+    const toolbar = container.querySelector('[data-canvas-selection-actions]')
+    expect(toolbar.style.left).toBe('744px')
+  })
 })

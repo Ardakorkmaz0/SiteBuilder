@@ -193,3 +193,46 @@ describe('Sidebar from the keyboard', () => {
     expect(picks).toEqual([['button', { atEnd: true }]])
   })
 })
+
+describe('CustomBlockPanel placement', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    localStorage.setItem('pwb_language', 'en')
+  })
+
+  it('places custom HTML below existing blocks on whichever viewport is active', async () => {
+    const { selectCurrentPage, useEditorStore } = await import('../../store/editorStore.js')
+    useEditorStore.getState().loadSchema({
+      theme: {},
+      pages: [{
+        id: 'home',
+        name: 'Home',
+        mobileManual: true,
+        components: [{
+          id: 'b1',
+          type: 'text',
+          props: { text: 'Top' },
+          styles: {},
+          layout: { x: 24, y: 24, w: 300, h: 176 },
+          mobileLayout: { x: 16, y: 40, w: 358, h: 360 },
+        }],
+      }],
+    })
+
+    const user = userEvent.setup()
+    renderSidebar()
+    await user.click(screen.getByRole('button', { name: /Custom HTML/ }))
+    await user.click(screen.getByRole('button', { name: 'Place', exact: true }))
+
+    const comps = selectCurrentPage(useEditorStore.getState()).components
+    expect(comps).toHaveLength(2)
+    expect(comps[1].layout.y).toBe(224)
+
+    useEditorStore.getState().setViewport('mobile')
+    await user.click(screen.getByRole('button', { name: 'Place', exact: true }))
+    const afterMobile = selectCurrentPage(useEditorStore.getState()).components
+    expect(afterMobile).toHaveLength(3)
+    // PC place auto-stacked comps[1].mobileLayout at 416..776, so mobile Place stacks below it at 800.
+    expect(afterMobile[2].mobileLayout.y).toBe(800)
+  })
+})

@@ -137,9 +137,10 @@ export default function CanvasSelectionActions({ componentId, canvasScale = 1, s
     if (comp?.type !== 'html') return
     // Pressing Fit is an explicit "go back to hugging the content" — it clears
     // the hand-sized flag so the box tracks the content again from here on.
+    const store = useEditorStore.getState()
     fitHtmlEmbedLayout(comp, Math.round(comp.layout?.w || 360), (patch) =>
       fitEmbedBox(componentId, patch, { releaseManual: true }),
-    { font: canvasFontFamily(useEditorStore.getState().schema) })
+    { font: canvasFontFamily(store.schema, selectCurrentPage(store)) })
   }
   const actions = [
     ['parent', <ParentIcon key="parent-icon" />, t('Select parent'), () => selectParent(componentId), !parent],

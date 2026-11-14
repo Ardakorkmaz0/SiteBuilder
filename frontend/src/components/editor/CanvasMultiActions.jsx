@@ -74,6 +74,7 @@ export default function CanvasMultiActions({ count, canvasScale = 1, style }) {
         pointerEvents: 'auto',
         ...selectionActionsScaleStyle(canvasScale),
         ...style,
+        transform: [selectionActionsScaleStyle(canvasScale).transform, style?.transform].filter(Boolean).join(' ') || undefined,
       }}
     >
       <span className="px-1 text-[11px] font-semibold text-white/60">{count}</span>

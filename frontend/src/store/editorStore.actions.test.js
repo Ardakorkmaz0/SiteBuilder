@@ -861,6 +861,19 @@ describe('addBlock drop position', () => {
     expect(comps[0].mobileLayout.y).toBeGreaterThan(0)
     expect(comps[1].mobileLayout.y).toBeGreaterThan(comps[0].mobileLayout.y)
   })
+
+  it('switches an automatic page to mobileManual so a mobile palette block keeps its drop spot', () => {
+    s().loadSchema({
+      theme: {},
+      pages: [{ id: 'p1', name: 'Home', components: [], mobileManual: false }],
+    })
+    s().selectPage('p1')
+    s().setViewport('mobile')
+    block(420)
+    const page = selectCurrentPage(useEditorStore.getState())
+    expect(page.mobileManual).toBe(true)
+    expect(page.components[0].mobileLayout.y).toBe(420)
+  })
 })
 
 describe('embed box manual flag', () => {
