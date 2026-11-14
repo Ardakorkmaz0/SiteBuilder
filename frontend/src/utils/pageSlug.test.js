@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { pageSlug } from './pageSlug.js'
 import { pagePath as publishedPath } from './publishedPages.js'
-import { pageFileName } from './pageFiles.js'
+import { pageFileName, pageFileNames } from './pageFiles.js'
 import { schemaToFiles } from './schemaToFiles.js'
 import { visiblePageAddress } from '../components/editor/browserPageAddress.js'
 
@@ -24,5 +24,18 @@ describe('the address word of a page', () => {
     expect(pageSlug('Über uns')).toBe('uber-uns')
     expect(pageSlug('Наши работы')).toBe('')
     expect(pageFileName({ name: 'Наши работы' }, false)).toBe('page.html')
+  })
+
+  it('deduplicates file names across pages with identical slugs, matching schemaToFiles', () => {
+    const pages = [
+      { id: 'p1', name: 'Home', components: [] },
+      { id: 'p2', name: 'Hakkımızda', components: [] },
+      { id: 'p3', name: 'Hakkımızda', components: [] },
+    ]
+    const names = pageFileNames(pages)
+    expect([...names.values()]).toEqual(['index.html', 'hakkimizda.html', 'hakkimizda-2.html'])
+    expect(pageFileName(pages[2], false, pages)).toBe('hakkimizda-2.html')
+    const exportedHtml = schemaToFiles({ theme: {}, pages }).filter((f) => f.lang === 'html').map((f) => f.name)
+    expect([...names.values()]).toEqual(exportedHtml)
   })
 })

@@ -1,4 +1,5 @@
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 
 // Another tab or device saved this site after it was opened here. Saving now
@@ -6,6 +7,7 @@ import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 // Either can be right, so the person decides — nothing is written until then.
 export default function SiteConflictDialog({ open, onReload, onOverwrite }) {
   const { t } = useLanguage()
+  useEscapeToClose(open, () => {})
   const ref = useInitialDialogFocus(open)
   if (!open) return null
   return (

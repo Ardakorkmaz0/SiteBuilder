@@ -26,6 +26,7 @@ import {
   PC_CANVAS_PRESETS,
   MOBILE_CANVAS_PRESETS,
 } from '../components/registry.jsx'
+import { componentPresetProps } from '../utils/componentPresets.js'
 import AiBar from '../components/editor/AiBar.jsx'
 import AiChatPanel from '../components/editor/AiChatPanel.jsx'
 import { loadAiPolicy } from '../utils/aiPolicy.js'
@@ -1201,6 +1202,14 @@ function SiteEditor() {
     else if (y < rect.top + EDGE) scroller.scrollTop -= 16
   }
 
+  function canNestPaletteDrop(d) {
+    if (!d?.type || d.type === 'region') return false
+    if (d.type === 'navbar') {
+      return componentPresetProps('navbar', d.preset)?.navLayout === 'vertical'
+    }
+    return true
+  }
+
   function onDragEnd(event) {
     setActiveType(null)
     const { active, over } = event
@@ -1211,7 +1220,7 @@ function SiteEditor() {
 
     // Dropped onto a native container/tab panel: keep it as a child of that
     // structure. For tabs, the store tags it with the currently active tab.
-    if (over.id && over.id !== 'canvas' && data.type) {
+    if (over.id && over.id !== 'canvas' && canNestPaletteDrop(data)) {
       let x = 12
       let y = 12
       const targetEl = findDroppableElement(over.id)
@@ -1300,7 +1309,7 @@ function SiteEditor() {
   function placeData(d, x, y, inside = null) {
     const w = d.w || 360
     const h = d.h || 120
-    if (inside?.parentId && d.type !== 'region') {
+    if (inside?.parentId && canNestPaletteDrop(d)) {
       const ix = Math.max(0, Math.round(inside.x - w / 2))
       const iy = Math.max(0, Math.round(inside.y - h / 2))
       if (d.html) {
@@ -1366,7 +1375,7 @@ function SiteEditor() {
       if (findComponentDeep(fresh, componentId)) {
         useEditorStore.getState().fitEmbedBox(componentId, patch, { record: false })
       }
-    }, { font: canvasFontFamily(useEditorStore.getState().schema) })
+    }, { font: canvasFontFamily(useEditorStore.getState().schema, selectCurrentPage(useEditorStore.getState())) })
   }
 
   function autoFitDroppedEmbed() {
@@ -1412,6 +1421,40 @@ function SiteEditor() {
     setSiteHtml(next)
     markHtmlDirty()
     if (reseedWorkspace) workspaceRef.current?.setDocument?.(next)
+  }
+
+  // Switching a canvas page to HTML updates both page.mode and pageHtmlMap;
+  // keeping both snapshots bound to the single store history entry means one
+  // Undo cleanly restores the canvas page (and clears pageHtmlMap for it).
+  function applyHtmlPage(pageId, htmlText, { reseedWorkspace = false } = {}) {
+    const state = useEditorStore.getState()
+    const targetPage = state.schema.pages.find((p) => p.id === pageId)
+    if (targetPage && targetPage.mode !== 'html') {
+      const mapBefore = pageId === currentPageId ? liveHtmlMap() : liveHtmlMap({ commit: true })
+      const nextMap = { ...mapBefore, [pageId]: htmlText }
+      rememberHtmlForSchema(state.schema, mapBefore)
+      setPageMode(pageId, 'html')
+      rememberHtmlForSchema(useEditorStore.getState().schema, nextMap)
+      setHtmlFuture([])
+      setPageHtmlMap(nextMap)
+      markHtmlDirty()
+      if (reseedWorkspace && pageId === currentPageId) workspaceRef.current?.setDocument?.(htmlText)
+      return
+    }
+    if (pageId === currentPageId) {
+      commitHtml(htmlText, { reseedWorkspace })
+      return
+    }
+    const at = nextHistoryStamp()
+    const previous = latestHtmlMapRef.current[pageId] || ''
+    setHtmlPast((p) => [
+      ...p.slice(-(HTML_HISTORY_CAP - 1)),
+      { pageId, html: previous, at },
+    ])
+    setHtmlFuture([])
+    if (useEditorStore.getState().future.length) useEditorStore.setState({ future: [], futureAt: [] })
+    setPageHtmlMap((m) => ({ ...m, [pageId]: htmlText }))
+    markHtmlDirty()
   }
 
   // …and the other way round: a new step recorded in the store (a page
@@ -1566,21 +1609,7 @@ function SiteEditor() {
   // Load an HTML document into a specific page (Files panel ⬆ / empty-page
   // import). Undoable like every other HTML change.
   function importHtmlIntoPage(pageId, htmlText) {
-    setPageMode(pageId, 'html')
-    if (pageId === currentPageId) {
-      commitHtml(htmlText, { reseedWorkspace: true })
-      return
-    }
-    const at = nextHistoryStamp()
-    const previous = latestHtmlMapRef.current[pageId] || ''
-    setHtmlPast((p) => [
-      ...p.slice(-(HTML_HISTORY_CAP - 1)),
-      { pageId, html: previous, at },
-    ])
-    setHtmlFuture([])
-    if (useEditorStore.getState().future.length) useEditorStore.setState({ future: [], futureAt: [] })
-    setPageHtmlMap((m) => ({ ...m, [pageId]: htmlText }))
-    markHtmlDirty()
+    applyHtmlPage(pageId, htmlText, { reseedWorkspace: true })
   }
 
   function applyComponentSourceHtml({ pageId, html, nextMode = 'source' }) {
@@ -2179,8 +2208,7 @@ function SiteEditor() {
         )
       )
         return
-      commitHtml(picked.html, { reseedWorkspace: true })
-      setPageMode(currentPageId, 'html')
+      applyHtmlPage(currentPageId, picked.html, { reseedWorkspace: true })
       linkLocalFile(picked.handle, picked.name)
     } catch (e) {
       if (!isPickerCancel(e)) setError(t('Could not open the file: {error}', { error: e?.message || e }))
@@ -2249,10 +2277,9 @@ function SiteEditor() {
     // converted, the way the Code panel already does.
     const state = useEditorStore.getState()
     const page = state.schema.pages.find((p) => p.id === currentPageId) || state.schema.pages[0]
-    commitHtml(withoutBuilderShim(schemaToResponsiveHtml({ ...state.schema, pages: [page] }, title)), {
+    applyHtmlPage(currentPageId, withoutBuilderShim(schemaToResponsiveHtml({ ...state.schema, pages: [page] }, title)), {
       reseedWorkspace: true,
     })
-    setPageMode(currentPageId, 'html')
   }
 
   // The other direction: the HTML page is drawn in a hidden frame, and every
@@ -2354,8 +2381,7 @@ function SiteEditor() {
       return
     const state = useEditorStore.getState()
     const page = state.schema.pages.find((p) => p.id === currentPageId)
-    commitHtml(emptyHtmlDocument(title || 'My Site', state.schema.theme, page?.language), { reseedWorkspace: true })
-    setPageMode(currentPageId, 'html')
+    applyHtmlPage(currentPageId, emptyHtmlDocument(title || 'My Site', state.schema.theme, page?.language), { reseedWorkspace: true })
   }
 
   // Apply the AI wizard's generated site: the active page becomes an HTML
@@ -2383,8 +2409,7 @@ function SiteEditor() {
     )
       return
     setWizardOpen(false)
-    commitHtml(html, { reseedWorkspace: true })
-    setPageMode(currentPageId, 'html')
+    applyHtmlPage(currentPageId, html, { reseedWorkspace: true })
     if (nextTitle?.trim()) changeTitle(nextTitle.trim())
     if (nextCategory && category === 'other') changeCategory(nextCategory)
     if (nextTags?.length && parseDiscoveryTags(tagsText).length === 0) {
@@ -2403,8 +2428,7 @@ function SiteEditor() {
     )
       return
     const built = tpl.build(title || 'My Site', useEditorStore.getState().schema.theme)
-    commitHtml(localizeTemplateHtml(built, contentLanguage), { reseedWorkspace: true })
-    setPageMode(currentPageId, 'html')
+    applyHtmlPage(currentPageId, localizeTemplateHtml(built, contentLanguage), { reseedWorkspace: true })
   }
 
   // Unified importer for an HTML file, a project folder (HTML + CSS), or a
@@ -2433,8 +2457,8 @@ function SiteEditor() {
         // Keep the HTML exactly as-is (with its JavaScript). This page becomes
         // an HTML page: viewed/edited in the embedded workspace and published
         // inside a sandboxed iframe so its JS runs.
-        commitHtml(await htmlFilesToDocument(files), { reseedWorkspace: true })
-        setPageMode(currentPageId, 'html')
+        const nextHtml = await htmlFilesToDocument(files)
+        applyHtmlPage(currentPageId, nextHtml, { reseedWorkspace: true })
         return 'html'
       }
       const raw = JSON.parse(await jsons[0].text())
@@ -2506,7 +2530,7 @@ function SiteEditor() {
         onOverwrite={() => conflict.overwrite((publish, goLive) => save(publish, { force: true, goLive }))}
       />
       <UnsavedLeaveDialog
-      open={leaveGuard.promptOpen}
+      open={leaveGuard.promptOpen && !conflict.open}
       saving={saving}
       onSave={saveAndLeave}
       onDiscard={discardAndLeave}
@@ -2533,6 +2557,7 @@ function SiteEditor() {
           colorModeSetting={colorModeSetting}
           customCss={customCss}
           customJs={customJs}
+          fontFaces={siteFontFaces}
           error={error}
           onSelectPage={switchToPage}
           onBack={guardedBack}
@@ -3133,7 +3158,7 @@ function SiteEditor() {
                   onBrowserAddressChange={changeBrowserAddress}
                   fileName={
                     (localFile?.pageId === currentPageId && localFile?.name) ||
-                    pageFileName(currentPage, currentPageIndex === 0)
+                    pageFileName(currentPage, currentPageIndex === 0, storePages)
                   }
                   onCommit={(h) => commitHtml(h)}
                   onRequestSave={() => save()}
@@ -3217,8 +3242,9 @@ function SiteEditor() {
                 open={!!spotlightElement && !!htmlSelection}
                 element={spotlightElement}
                 info={htmlSelection}
+                viewport={isMobileDevice(htmlDevice) ? 'mobile' : 'pc'}
                 pages={storePages}
-                onChange={(patch) => workspaceRef.current?.updateSelectedElement?.(patch)}
+                onChange={(patch, opts) => workspaceRef.current?.updateSelectedElement?.(patch, opts)}
                 onSelectParent={() => workspaceRef.current?.selectParent?.()}
                 onDuplicate={() => workspaceRef.current?.duplicateSelected?.()}
                 onMoveUp={() => workspaceRef.current?.moveSelected?.('up')}

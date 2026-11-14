@@ -76,4 +76,16 @@ describe('LabeledColor on a setting that stores what it gets', () => {
     rerender(<LanguageProvider><LabeledColor label="Page background" value="#222222" onChange={() => {}} /></LanguageProvider>)
     expect(field()).toHaveValue('#222222')
   })
+
+  it('expands 3-digit hex and trims 8-digit alpha hex for the native color picker', () => {
+    const picker = () => document.querySelector('input[type="color"]')
+    const { rerender } = render(<LanguageProvider><LabeledColor label="Accent" value="#fff" onChange={() => {}} /></LanguageProvider>)
+    expect(picker()).toHaveValue('#ffffff')
+
+    rerender(<LanguageProvider><LabeledColor label="Accent" value="#3a9" onChange={() => {}} /></LanguageProvider>)
+    expect(picker()).toHaveValue('#33aa99')
+
+    rerender(<LanguageProvider><LabeledColor label="Accent" value="#33669980" onChange={() => {}} /></LanguageProvider>)
+    expect(picker()).toHaveValue('#336699')
+  })
 })

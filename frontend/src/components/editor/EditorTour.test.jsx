@@ -105,4 +105,33 @@ describe('EditorTour', () => {
     await new Promise((resolve) => window.setTimeout(resolve, 20))
     expect(document.querySelector('.editor-tour')).toBeNull()
   })
+
+  it('closes only itself on Escape above another layer and returns focus to the opener button', async () => {
+    const { useState } = await import('react')
+    const { useEscapeToClose } = await import('../../ui/useEscapeToClose.js')
+    const underClosed = vi.fn()
+    function Host() {
+      const [tourOpen, setTourOpen] = useState(false)
+      useEscapeToClose(true, underClosed)
+      return (
+        <UiThemeProvider>
+          <LanguageProvider>
+            <button type="button" onClick={() => setTourOpen(true)}>Start tour</button>
+            <EditorTour open={tourOpen} steps={STEPS} onClose={() => setTourOpen(false)} />
+          </LanguageProvider>
+        </UiThemeProvider>
+      )
+    }
+    render(<Host />)
+    const trigger = screen.getByRole('button', { name: 'Start tour' })
+    trigger.focus()
+    fireEvent.click(trigger)
+    await screen.findByText('1/2')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog', { name: 'Editor tour' })).not.toBeInTheDocument()
+    expect(underClosed).not.toHaveBeenCalled()
+    expect(trigger).toHaveFocus()
+  })
 })

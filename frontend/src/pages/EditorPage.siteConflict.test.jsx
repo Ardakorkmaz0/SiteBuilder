@@ -229,4 +229,36 @@ describe('a save made from an older revision', () => {
     expect(updateSite).toHaveBeenCalledTimes(2)
     expect(updateSite.mock.calls[1][1]).not.toHaveProperty('base_revision')
   }, 30000)
+
+  it('hides the leave dialog while the conflict dialog is open so Esc cannot cancel leaving', async () => {
+    updateSite
+      .mockRejectedValueOnce({ response: { status: 409, data: { code: 'site_changed', detail: 'This site was saved somewhere else after it was opened here.' } } })
+      .mockImplementation(async (id, payload) => ({ ...payload, slug: 'two-tabs', revision: 6 }))
+    render(
+      <UiThemeProvider>
+        <LanguageProvider>
+          <MemoryRouter initialEntries={['/editor/1']}>
+            <Routes>
+              <Route path="/editor/:id" element={<EditorPage />} />
+              <Route path="/sites" element={<p>sites page</p>} />
+            </Routes>
+          </MemoryRouter>
+        </LanguageProvider>
+      </UiThemeProvider>,
+    )
+    await waitFor(() => expect(document.querySelector('[data-cid="h1"]')).toBeTruthy(), SLOW)
+    await act(async () => useEditorStore.getState().updateProps('h1', { text: 'Mine' }))
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Back to previous page' })[0])
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and leave' }, SLOW))
+    await screen.findByRole('alertdialog', { name: 'This site changed somewhere else' }, SLOW)
+
+    // Two modals must never stack together while resolving a save conflict.
+    expect(screen.queryByRole('dialog', { name: 'Save before leaving?' })).not.toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.getByRole('alertdialog', { name: 'This site changed somewhere else' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save mine anyway' }))
+    expect(await screen.findByText('sites page', {}, SLOW)).toBeInTheDocument()
+  }, 30000)
 })

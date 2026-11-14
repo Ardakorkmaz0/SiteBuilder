@@ -156,4 +156,42 @@ describe('BrowserFrame', () => {
     expect(screen.queryByRole('menuitem', { name: 'Enter full screen' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Browser menu' })).toHaveFocus()
   })
+
+  it('cancels address editing on Escape without propagating down or losing focus', async () => {
+    const user = userEvent.setup()
+    const onAddressChange = vi.fn()
+    const outerEsc = vi.fn()
+    const { useEscapeToClose } = await import('../../ui/useEscapeToClose.js')
+    function Host() {
+      useEscapeToClose(true, outerEsc)
+      return (
+        <LanguageProvider>
+          <BrowserFrame
+            screenWidth={1000}
+            screenHeight={700}
+            siteTitle="Acme"
+            address="acme.test"
+            pages={pages}
+            currentPageId="about"
+            onAddressChange={onAddressChange}
+          >
+            <div>Page</div>
+          </BrowserFrame>
+        </LanguageProvider>
+      )
+    }
+    localStorage.setItem('pwb_language', 'en')
+    render(<Host />)
+
+    const opener = screen.getByTitle('Edit page link')
+    await user.click(opener)
+    const input = screen.getByRole('textbox', { name: 'Page link' })
+    await user.clear(input)
+    await user.type(input, 'typo.test{Escape}')
+
+    expect(onAddressChange).not.toHaveBeenCalled()
+    expect(outerEsc).not.toHaveBeenCalled()
+    expect(screen.queryByRole('textbox', { name: 'Page link' })).toBeNull()
+    expect(screen.getByTitle('Edit page link')).toHaveFocus()
+  })
 })

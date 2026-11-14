@@ -157,4 +157,22 @@ describe('palette placement through nested fitted containers', () => {
     expect(nested().children[1].layout.x).toBe(300)
     expect(nested().children[1].layout.y).toBe(60)
   })
+
+  it('keeps dragged sections and horizontal navbars on the page instead of inside a hovered container', async () => {
+    await openEditor()
+    const canvas = document.getElementById('free-canvas')
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800 })
+
+    await act(async () => onDragEnd({
+      active: { data: { current: { from: 'palette', type: 'region', w: 1000, h: 360 } }, rect: { current: { translated: { left: 0, top: 450 } } } },
+      over: { id: 'nested' },
+    }))
+    await act(async () => onDragEnd({
+      active: { data: { current: { from: 'palette', type: 'navbar', preset: 'minimal', w: 1000, h: 64 } }, rect: { current: { translated: { left: 0, top: 10 } } } },
+      over: { id: 'nested' },
+    }))
+
+    expect(nested().children).toHaveLength(1)
+    expect(state().schema.pages[0].components.map((c) => c.type)).toEqual(['container', 'region', 'navbar'])
+  })
 })

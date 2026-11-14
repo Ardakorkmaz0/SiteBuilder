@@ -96,4 +96,27 @@ describe('HTML workspace handoff to phone preview', () => {
     expect(screen.getByRole('main', { name: 'Mobile site preview', exact: true })).toBeInTheDocument()
     expect(screen.getByTitle('Previewing Home').getAttribute('srcdoc')).toContain('Live iframe typing before resize')
   }, 30000)
+
+  it('opens ElementSpotlight on Phone when HTML device is mobile even while canvas viewport is PC', async () => {
+    await openEditor('edit')
+    fireEvent.click(screen.getByRole('button', { name: 'Mobile', exact: true }))
+    const iframe = screen.getByTitle('site')
+    iframe.contentDocument.open()
+    iframe.contentDocument.write(savedHtml)
+    iframe.contentDocument.close()
+    fireEvent.load(iframe)
+
+    const doc = iframe.contentDocument
+    await act(async () => {
+      fireEvent.click(doc.getElementById('t'))
+    })
+    const spotlightBtn = doc.querySelector('[data-pwb-selection-action="spotlight"]')
+    expect(spotlightBtn).not.toBeNull()
+    await act(async () => {
+      fireEvent.click(spotlightBtn)
+    })
+
+    const dialog = await screen.findByRole('dialog', { name: 'Open large' })
+    expect(dialog.querySelector('button[aria-pressed="true"]')?.textContent).toMatch(/Phone/i)
+  }, 30000)
 })

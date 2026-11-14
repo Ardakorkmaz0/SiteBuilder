@@ -198,4 +198,43 @@ describe('MobileBrowserChrome controls', () => {
     const labels = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label') || b.title)
     expect(labels.some((label) => /back|forward/i.test(label || ''))).toBe(false)
   })
+
+  it('cancels address editing on Escape without propagating down or losing focus', async () => {
+    const user = userEvent.setup()
+    const onAddressChange = vi.fn()
+    const outerEsc = vi.fn()
+    const { useEscapeToClose } = await import('../../ui/useEscapeToClose.js')
+    function Host() {
+      useEscapeToClose(true, outerEsc)
+      return (
+        <LanguageProvider>
+          <MobileBrowserChrome
+            screenWidth={PAGE_W}
+            screenHeight={PAGE_H}
+            model={PHONE_MODELS['iphone-island']}
+            siteTitle="Acme"
+            address="acme.test"
+            pages={pages}
+            currentPageId="about"
+            onAddressChange={onAddressChange}
+          >
+            <div>Page</div>
+          </MobileBrowserChrome>
+        </LanguageProvider>
+      )
+    }
+    localStorage.setItem('pwb_language', 'en')
+    render(<Host />)
+
+    const opener = screen.getByTitle('Edit page link')
+    await user.click(opener)
+    const input = screen.getByRole('textbox', { name: 'Page link' })
+    await user.clear(input)
+    await user.type(input, 'typo.test{Escape}')
+
+    expect(onAddressChange).not.toHaveBeenCalled()
+    expect(outerEsc).not.toHaveBeenCalled()
+    expect(screen.queryByRole('textbox', { name: 'Page link' })).toBeNull()
+    expect(screen.getByTitle('Edit page link')).toHaveFocus()
+  })
 })

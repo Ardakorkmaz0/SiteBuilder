@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { placeCard, usableSteps } from '../../utils/tourPlacement.js'
 import { EDITOR_TOUR_STEPS, markTourSeen } from '../../utils/editorTour.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 
 // A walk through the editor: one card at a time, pointing at the thing it is
 // talking about.
@@ -49,6 +50,8 @@ export default function EditorTour({ open, steps = EDITOR_TOUR_STEPS, onClose })
     onClose?.()
   }, [onClose])
 
+  useEscapeToClose(open && Boolean(step), close)
+
   // Keep the spotlight on the target while the page scrolls or resizes.
   useEffect(() => {
     if (!open || !step) return undefined
@@ -73,15 +76,14 @@ export default function EditorTour({ open, steps = EDITOR_TOUR_STEPS, onClose })
   }, [open, step])
 
   useEffect(() => {
-    if (!open) return undefined
+    if (!open || !step) return undefined
     const onKey = (event) => {
-      if (event.key === 'Escape') { event.preventDefault(); close() }
-      else if (event.key === 'ArrowRight') move(1)
+      if (event.key === 'ArrowRight') move(1)
       else if (event.key === 'ArrowLeft') move(-1)
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [open, close])
+  }, [open, step])
 
   if (!open || !step) return null
 

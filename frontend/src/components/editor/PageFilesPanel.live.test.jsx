@@ -132,4 +132,13 @@ describe('right-clicking a file', () => {
 
     expect(within(menu).getByRole('menuitem', { name: 'Import an HTML file into this page' })).toHaveFocus()
   })
+
+  it('gives every divider a unique key when live actions and convert action are both present', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    renderPanel({ onConvertToCanvas: vi.fn() })
+    openMenu('about.html')
+    const keyWarnings = errSpy.mock.calls.filter(([msg]) => /same key/i.test(String(msg)))
+    errSpy.mockRestore()
+    expect(keyWarnings).toEqual([])
+  })
 })

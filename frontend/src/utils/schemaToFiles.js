@@ -6,7 +6,7 @@
 // user input: text is HTML-escaped, URLs go through sanitizeUrl, style keys are
 // whitelisted by sanitizeStyles, and CSS values are stripped of `;{}<` so a
 // value can't break out of its rule.
-import { pageSlug } from './pageSlug.js'
+import { pageFileNameList } from './pageFiles.js'
 import { sanitizeStyles, sanitizeUrl, sanitizeImageSrc } from './sanitize.js'
 import { ICONS, iconSvg } from './icons.js'
 import { fieldHtml } from './formField.js'
@@ -979,11 +979,6 @@ function projectSource(files, schema) {
   return `${pages}${customJsBlock(schema?.customJs)}`
 }
 
-// Make unique, friendly file names from page names (first page -> index.html).
-function slug(name) {
-  return pageSlug(name) || 'page'
-}
-
 // A single, self-contained .html file. It preserves the same renderer semantics
 // as public preview: absolute pages keep their exact PC/mobile designs and scale
 // to the visitor's viewport width; flow pages fill the viewport naturally.
@@ -1132,13 +1127,9 @@ export function schemaToFiles(input, { documents = {} } = {}) {
   const schema = { ...input, pages: (input?.pages || []).map((page, index) => withColorModePage(page, modes[index])) }
   const pages = schema.pages
   const files = []
-  const used = new Set()
+  const fileNames = pageFileNameList(pages)
   pages.forEach((page, i) => {
-    let base = i === 0 ? 'index' : slug(page.name)
-    let name = `${base}.html`
-    let n = 2
-    while (used.has(name)) name = `${base}-${n++}.html`
-    used.add(name)
+    const name = fileNames[i]
     files.push({
       name,
       lang: 'html',

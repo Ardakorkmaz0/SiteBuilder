@@ -18,9 +18,10 @@
 // editing. Back and forward are the exception — there is no history to walk, so
 // they are drawn dimmed, exactly as a real browser draws them.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { useEditableAddress } from './useEditableAddress.js'
 import { ArrowLeftIcon, ArrowRightIcon, MoreHorizontalIcon } from '../icons.jsx'
 import Favicon from './BrowserFavicon.jsx'
 import { pageTitle, visiblePageAddress } from './browserPageAddress.js'
@@ -126,9 +127,6 @@ export default function MobileBrowserChrome({
   children,
 }) {
   const { t } = useLanguage()
-  const addressInputRef = useRef(null)
-  const [editingAddress, setEditingAddress] = useState(false)
-  const [addressDraft, setAddressDraft] = useState('')
   const [pageMenuOpen, setPageMenuOpen] = useState(false)
   const [browserMenuOpen, setBrowserMenuOpen] = useState(false)
   useEscapeToClose(pageMenuOpen, () => setPageMenuOpen(false))
@@ -141,31 +139,23 @@ export default function MobileBrowserChrome({
   const activeIndex = Math.max(0, tabs.findIndex((page) => page.id === currentPageId))
   const activePage = tabs[activeIndex] || tabs[0]
   const visibleAddress = visiblePageAddress(address, activePage, activeIndex)
+  const {
+    inputRef: addressInputRef,
+    buttonRef: addressButtonRef,
+    editing: editingAddress,
+    draft: addressDraft,
+    setDraft: setAddressDraft,
+    begin: beginAddressEdit,
+    commit: commitAddress,
+  } = useEditableAddress({
+    visibleAddress,
+    onAddressChange,
+    onBegin: () => setBrowserMenuOpen(false),
+  })
   const pageMenuRoom = android
     ? screenHeight + MOBILE_BROWSER_GESTURE - 8
     : screenHeight + MOBILE_BROWSER_STATUS + MOBILE_BROWSER_BAR - 8
   const pageMenuMaxHeight = Math.max(0, Math.min(PAGE_MENU_MAX_HEIGHT, pageMenuRoom))
-
-  useEffect(() => {
-    if (!editingAddress) return undefined
-    const frame = requestAnimationFrame(() => {
-      addressInputRef.current?.focus()
-      addressInputRef.current?.select()
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [editingAddress, visibleAddress])
-
-  function beginAddressEdit() {
-    setBrowserMenuOpen(false)
-    setAddressDraft(visibleAddress)
-    setEditingAddress(true)
-  }
-
-  function commitAddress() {
-    const next = addressDraft.trim()
-    setEditingAddress(false)
-    if (next !== visibleAddress) onAddressChange?.(next)
-  }
 
   function openPage(pageId) {
     setPageMenuOpen(false)
@@ -316,13 +306,13 @@ export default function MobileBrowserChrome({
               onBlur={commitAddress}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') commitAddress()
-                if (event.key === 'Escape') setEditingAddress(false)
               }}
               aria-label={t('Page link')}
               className="min-w-0 flex-1 bg-transparent py-1 text-[12px] text-[var(--studio-text)] outline-none"
             />
           ) : (
             <button
+              ref={addressButtonRef}
               type="button"
               onClick={beginAddressEdit}
               title={t('Edit page link')}

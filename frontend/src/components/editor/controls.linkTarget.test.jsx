@@ -1,6 +1,7 @@
 // "Section on this page" used to be a bare text box. Element ids on the canvas
 // are generated component ids, so what people typed (#about, #contact — what a
 // new navbar ships with) matched nothing and the link went nowhere, silently.
+import { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
@@ -105,5 +106,28 @@ describe('every field of a link has a name', () => {
 
     renderControl('#contact', { sections: null })
     expect(screen.getByRole('textbox', { name: 'section id (e.g. contact)' })).toHaveValue('contact')
+  })
+
+  it('keeps the section id input open while clearing and retyping it, and does not wrap multiple inputs in a single <label>', () => {
+    function Controlled() {
+      const [val, setVal] = useState('#contact')
+      return (
+        <LanguageProvider>
+          <LinkTargetControl label="Link" value={val} onChange={setVal} pages={[{ id: 'p1', name: 'Home' }]} sections={null} />
+        </LanguageProvider>
+      )
+    }
+    localStorage.setItem('pwb_language', 'en')
+    const { container } = render(<Controlled />)
+    expect(container.querySelector('label')).toBeNull()
+    expect(screen.getByRole('combobox', { name: 'Link' })).toHaveValue('section')
+
+    const box = screen.getByRole('textbox', { name: 'section id (e.g. contact)' })
+    fireEvent.change(box, { target: { value: '' } })
+    expect(screen.getByRole('textbox', { name: 'section id (e.g. contact)' })).toHaveValue('')
+    expect(screen.getByRole('combobox', { name: 'Link' })).toHaveValue('section')
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'section id (e.g. contact)' }), { target: { value: 'pricing' } })
+    expect(screen.getByRole('textbox', { name: 'section id (e.g. contact)' })).toHaveValue('pricing')
   })
 })

@@ -4,6 +4,7 @@ import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import Favicon from './BrowserFavicon.jsx'
 import { previewScaleStyle } from './previewScale.js'
 import { pageTitle, visiblePageAddress } from './browserPageAddress.js'
+import { useEditableAddress } from './useEditableAddress.js'
 import {
   BROWSER_FRAME_BOTTOM,
   BROWSER_FRAME_SIDE,
@@ -44,14 +45,11 @@ export default function BrowserFrame({
 }) {
   const { t } = useLanguage()
   const frameRef = useRef(null)
-  const addressInputRef = useRef(null)
   const fullscreenViewportRef = useRef(null)
   const [pageMenuOpen, setPageMenuOpen] = useState(false)
   const [browserMenuOpen, setBrowserMenuOpen] = useState(false)
   useEscapeToClose(pageMenuOpen, () => setPageMenuOpen(false))
   useEscapeToClose(browserMenuOpen, () => setBrowserMenuOpen(false))
-  const [editingAddress, setEditingAddress] = useState(false)
-  const [addressDraft, setAddressDraft] = useState('')
   const [reloadNonce, setReloadNonce] = useState(0)
   const [fullscreen, setFullscreen] = useState(false)
   const [fullscreenWidth, setFullscreenWidth] = useState(
@@ -65,6 +63,15 @@ export default function BrowserFrame({
   const activeIndex = Math.max(0, tabs.findIndex((page) => page.id === currentPageId))
   const activePage = tabs[activeIndex] || tabs[0]
   const visibleAddress = visiblePageAddress(address, activePage, activeIndex)
+  const {
+    inputRef: addressInputRef,
+    buttonRef: addressButtonRef,
+    editing: editingAddress,
+    draft: addressDraft,
+    setDraft: setAddressDraft,
+    begin: beginAddressEdit,
+    commit: commitAddress,
+  } = useEditableAddress({ visibleAddress, onAddressChange })
 
   const { shownTabs, hiddenTabs } = useMemo(() => {
     if (tabs.length <= 6) return { shownTabs: tabs, hiddenTabs: [] }
@@ -98,20 +105,6 @@ export default function BrowserFrame({
     }
   }, [fullscreen])
 
-  useEffect(() => {
-    if (!editingAddress) return undefined
-    const frame = requestAnimationFrame(() => {
-      addressInputRef.current?.focus()
-      addressInputRef.current?.select()
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [editingAddress, visibleAddress])
-
-  function beginAddressEdit() {
-    setAddressDraft(visibleAddress)
-    setEditingAddress(true)
-  }
-
   function setZoom(next) {
     const normalized = next === 'fit'
       ? 'fit'
@@ -137,12 +130,6 @@ export default function BrowserFrame({
     setPageMenuOpen(false)
     if (onEditPage) onEditPage(pageId)
     else onSelectPage?.(pageId)
-  }
-
-  function commitAddress() {
-    const next = addressDraft.trim()
-    setEditingAddress(false)
-    if (next !== visibleAddress) onAddressChange?.(next)
   }
 
   async function toggleFullscreen() {
@@ -294,13 +281,12 @@ export default function BrowserFrame({
               onBlur={commitAddress}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') commitAddress()
-                if (event.key === 'Escape') setEditingAddress(false)
               }}
               aria-label={t('Page link')}
               className="min-w-0 flex-1 bg-transparent py-1 text-[11px] text-[var(--studio-text)] outline-none"
             />
           ) : (
-            <button type="button" onClick={beginAddressEdit} title={t('Edit page link')} className="min-w-0 flex-1 truncate py-1 text-left">
+            <button ref={addressButtonRef} type="button" onClick={beginAddressEdit} title={t('Edit page link')} className="min-w-0 flex-1 truncate py-1 text-left">
               {visibleAddress}
             </button>
           )}

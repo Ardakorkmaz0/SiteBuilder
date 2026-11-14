@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEditorStore } from '../../store/editorStore.js'
 import { readFileText } from '../../utils/fileText.js'
-import { pageFileName } from '../../utils/pageFiles.js'
+import { pageFileName, pageFileNames } from '../../utils/pageFiles.js'
 import { countLinksToPage } from '../../utils/pageLinks.js'
 import { CanvasPageIcon, FolderIcon, HtmlPageIcon, LinkIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
@@ -48,6 +48,7 @@ export default function PageFilesPanel({
 }) {
   const { t } = useLanguage()
   const pages = useEditorStore((s) => s.schema.pages)
+  const fileNames = pageFileNames(pages)
   const currentPageId = useEditorStore((s) => s.currentPageId)
   const selectPage = useEditorStore((s) => s.selectPage)
   const addPage = useEditorStore((s) => s.addPage)
@@ -188,12 +189,12 @@ export default function PageFilesPanel({
     if (action === 'toHtml') onBackToHtml(page.id)
     if (action === 'rename') startRename(page)
     if (action === 'import') startImport(page)
-    if (action === 'delete') confirmDelete(page, pageFileName(page, page.id === pages[0]?.id))
+    if (action === 'delete') confirmDelete(page, fileNames.get(page.id) || pageFileName(page, page.id === pages[0]?.id))
   }
 
   const renderFile = (page, indented) => {
     const isHome = page.id === pages[0]?.id
-    const fname = pageFileName(page, isHome)
+    const fname = fileNames.get(page.id) || pageFileName(page, isHome)
     const isHtmlPage = page.mode === 'html'
     const kind = isHtmlPage ? 'HTML page' : 'Canvas page: blocks you drag and drop'
     const active = page.id === currentPageId
@@ -410,7 +411,7 @@ export default function PageFilesPanel({
         <FileMenu
           x={menu.x}
           y={menu.y}
-          label={t('Options for {name}', { name: pageFileName(menuPage, menuPage.id === pages[0]?.id) })}
+          label={t('Options for {name}', { name: fileNames.get(menuPage.id) || pageFileName(menuPage, menuPage.id === pages[0]?.id) })}
           onClose={closeMenu}
           items={menuItems(menuPage)}
           onPick={(action) => pickMenuItem(action, menuPage)}
@@ -471,8 +472,8 @@ function FileMenu({ x, y, label, items, onPick, onClose }) {
       style={position}
       className="studio-theme-surface fixed z-[130] w-56 rounded-[var(--studio-radius-lg)] border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-1.5 text-xs text-[var(--studio-text)] shadow-[var(--studio-shadow-lg)]"
     >
-      {items.map((item) => (item.divider ? (
-        <div key="divider" className="my-1 border-t border-[var(--studio-border)]" />
+      {items.map((item, index) => (item.divider ? (
+        <div key={`divider-${index}`} className="my-1 border-t border-[var(--studio-border)]" />
       ) : (
         <button
           key={item.label}

@@ -301,6 +301,16 @@ function ImageLibrary({ value, onPick }) {
 // a gradient stop, emptying drops the gradient the new colour is being typed for.
 // `subject` names what the value belongs to, for a field that can change hands
 // while it is being typed in.
+function pickerHex(color) {
+  const hex = String(color || '').trim()
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) return hex
+  if (/^#[0-9a-fA-F]{8}$/.test(hex)) return `#${hex.slice(1, 7)}`
+  if (/^#[0-9a-fA-F]{3,4}$/.test(hex)) {
+    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+  }
+  return '#000000'
+}
+
 export function LabeledColor({ label, value, onChange, fallback, accepts, subject }) {
   const { t } = useLanguage()
   const labelId = useId()
@@ -313,7 +323,7 @@ export function LabeledColor({ label, value, onChange, fallback, accepts, subjec
     setDraft(null)
   }
   const shown = value || fallback || ''
-  const hex = /^#[0-9a-fA-F]{6}$/.test(shown) ? shown : '#000000'
+  const hex = pickerHex(shown)
   return (
     <div className="block min-w-0">
       <span id={labelId} className={labelCls}>{label}</span>
@@ -664,15 +674,18 @@ const CUSTOM_SECTION = '__custom'
 
 export function LinkTargetControl({ label, value, onChange, pages = [], sections = null }) {
   const { t } = useLanguage()
+  const labelId = useId()
   const href = typeof value === 'string' ? value : ''
   const pageIds = new Set(pages.map((p) => p.id))
+  const [keepSectionOnHash, setKeepSectionOnHash] = useState(false)
+  if (keepSectionOnHash && href !== '#') setKeepSectionOnHash(false)
   // A link to a page that has since been deleted. It used to show as a
   // "section on this page" named after the old page id.
   const deletedPage = pages.length > 0 && looksLikePageLink(href) && !pageIds.has(href.slice(1))
   let kind
   if (!href) kind = 'none'
   else if (/^(https?:|mailto:|tel:)/i.test(href)) kind = 'url'
-  else if (href === '#' || href === '#top') kind = 'top'
+  else if ((href === '#' && !keepSectionOnHash) || href === '#top') kind = 'top'
   else if (href.startsWith('#') && (pageIds.has(href.slice(1)) || deletedPage)) kind = 'page'
   else if (href.startsWith('#')) kind = 'section'
   else kind = 'url'
@@ -693,6 +706,7 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
   const setKind = (k) => {
     const wasUrl = kind === 'url' && !typingUrl
     setUrlPickedOver(null)
+    setKeepSectionOnHash(false)
     if (k === 'none') onChange('')
     else if (k === 'top') onChange('#top')
     else if (k === 'page') onChange('#' + (pages[0]?.id || ''))
@@ -701,10 +715,11 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
   }
 
   return (
-    <label className="block">
-      {label && <span className={labelCls}>{label}</span>}
+    <div className="block">
+      {label && <span id={labelId} className={labelCls}>{label}</span>}
       <select
         className={inputCls + ' mb-1'}
+        aria-labelledby={label ? labelId : undefined}
         value={kind}
         onChange={(e) => setKind(e.target.value)}
       >
@@ -760,7 +775,12 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
           aria-label={t('section id (e.g. contact)')}
           value={sectionId}
           placeholder={t('section id (e.g. contact)')}
-          onChange={(e) => onChange('#' + e.target.value.replace(/^#/, ''))}
+          onChange={(e) => {
+            const next = '#' + e.target.value.replace(/^#/, '')
+            setKeepSectionOnHash(next === '#')
+            onChange(next)
+          }}
+          onBlur={() => setKeepSectionOnHash(false)}
         />
       )}
       {kind === 'section' && pickable && !knownSection && (
@@ -790,7 +810,7 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
       {kind === 'top' && (
         <p className="text-xs text-[var(--studio-text-faint)]">{t('Clicking scrolls to the top of the page.')}</p>
       )}
-    </label>
+    </div>
   )
 }
 

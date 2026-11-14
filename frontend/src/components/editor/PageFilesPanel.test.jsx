@@ -126,4 +126,17 @@ describe('importing an HTML file into a page', () => {
     await vi.waitFor(() => expect(onImportInto).toHaveBeenCalledTimes(1))
     expect(onImportInto).toHaveBeenCalledWith('home', '<meta charset="utf-8"><p>şığİ</p>')
   })
+
+  it('shows deduplicated file names when two pages have the same name', () => {
+    useEditorStore.getState().loadSchema({
+      pages: [
+        { id: 'home', name: 'Home', components: [] },
+        { id: 'about1', name: 'About', components: [] },
+        { id: 'about2', name: 'About', components: [] },
+      ],
+    })
+    open({ mode: 'html' })
+    expect(screen.getByRole('button', { name: 'about.html' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'about-2.html' })).toBeInTheDocument()
+  })
 })
