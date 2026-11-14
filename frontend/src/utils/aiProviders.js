@@ -270,11 +270,15 @@ const LOCAL_MODELS_CACHE_KEY = 'pwb_local_models_cache'
 // are cached in localStorage so the chat call path can self-heal even when
 // the Settings panel has never been opened in this session.
 export async function fetchLocalStatus(baseOverride) {
-  const url = new URL(`${resolveBackendBase()}${LOCAL_PROXY_PATH}/status/`)
-  const base = baseOverride || getEndpoint('local')
-  if (base) url.searchParams.set('base', base)
   try {
-    const res = await fetch(url.toString(), { method: 'GET' })
+    const prefix = `${resolveBackendBase()}${LOCAL_PROXY_PATH}/status/`
+    const isAbsolute = /^https?:\/\//i.test(prefix)
+    const fallbackOrigin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'http://127.0.0.1'
+    const url = isAbsolute ? new URL(prefix) : new URL(prefix, fallbackOrigin)
+    const base = baseOverride || getEndpoint('local')
+    if (base) url.searchParams.set('base', base)
+    const target = isAbsolute ? url.toString() : `${url.pathname}${url.search}`
+    const res = await fetch(target, { method: 'GET' })
     if (!res.ok) return { ok: false, reason: `HTTP ${res.status}` }
     const data = await res.json()
     if (data?.ok && Array.isArray(data.models)) {

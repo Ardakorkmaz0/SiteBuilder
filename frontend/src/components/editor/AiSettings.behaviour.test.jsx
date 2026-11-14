@@ -5,7 +5,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import AiSettings from './AiSettings.jsx'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../../ui/UiThemeProvider.jsx'
-import { OPEN_POLICY, setAiPolicy, useAiPolicyStore } from '../../utils/aiPolicy.js'
+import { OPEN_POLICY, setAiPolicy, useAiPolicy, useAiPolicyStore } from '../../utils/aiPolicy.js'
 import { getAiPreferences } from '../../utils/aiPreferences.js'
 
 function renderSettings() {
@@ -102,5 +102,63 @@ describe('the connection test', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Bağlantıyı test et' })) })
 
     await waitFor(() => expect(screen.getByText(/API anahtarınız reddedildi \(401\)/)).toBeTruthy())
+  })
+})
+
+describe('render purity and local status errors', () => {
+  it('switches away from a disabled provider in an effect rather than mutating storage inside render', async () => {
+    setAiPolicy({ enabled: true, providers: ['openrouter', 'groq', 'gemini'] })
+    localStorage.setItem('pwb_ai_provider', 'groq')
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+    let writesDuringRender = 0
+
+    function Probe() {
+      useAiPolicy()
+      // During commit phase of render, effects have not executed yet. Any
+      // pwb_ai_provider write observed here came from inside render().
+      writesDuringRender = setItemSpy.mock.calls.filter(([k]) => k === 'pwb_ai_provider').length
+      return null
+    }
+
+    const { container } = render(
+      <UiThemeProvider>
+        <LanguageProvider>
+          <AiSettings />
+          <Probe />
+        </LanguageProvider>
+      </UiThemeProvider>,
+    )
+    expect(writesDuringRender).toBe(0)
+    setItemSpy.mockClear()
+    writesDuringRender = 0
+
+    act(() => {
+      setAiPolicy({ enabled: true, providers: ['openrouter', 'gemini'] })
+    })
+
+    await waitFor(() => {
+      expect(container.querySelector('select').value).toBe('openrouter')
+    })
+    expect(writesDuringRender).toBe(0)
+    expect(localStorage.getItem('pwb_ai_provider')).toBe('openrouter')
+  })
+
+  it('recovers refreshing state cleanly if fetchLocalStatus rejects', async () => {
+    vi.stubEnv('VITE_API_URL', '/api')
+    setAiPolicy({ enabled: true, providers: ['local', 'openrouter'] })
+    localStorage.setItem('pwb_ai_provider', 'local')
+    const rejections = []
+    const onUnhandled = (reason) => rejections.push(reason)
+    globalThis.process.on('unhandledRejection', onUnhandled)
+    try {
+      renderSettings()
+      const refreshBtn = await screen.findByRole('button', { name: 'Refresh' })
+      expect(refreshBtn).toBeEnabled()
+      expect(screen.queryByText('Checking…')).toBeNull()
+      expect(rejections).toHaveLength(0)
+    } finally {
+      globalThis.process.off('unhandledRejection', onUnhandled)
+      vi.unstubAllEnvs()
+    }
   })
 })

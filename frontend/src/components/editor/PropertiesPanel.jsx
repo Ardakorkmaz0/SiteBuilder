@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useEditorStore, selectCurrentPage } from '../../store/editorStore.js'
 import { registry } from '../registry.jsx'
 import PanelTabs from './PanelTabs.jsx'
@@ -625,14 +625,20 @@ export default function PropertiesPanel({
   // Each HTML page's document, by page id: its palette and any theme switch
   // in it are in there, not in the schema.
   pageHtmlMap = null,
+  viewportOverride = null,
 }) {
   const { t } = useLanguage()
   const selectedId = useEditorStore((s) => s.selectedId)
   const schema = useEditorStore((s) => s.schema)
   const page = useEditorStore(selectCurrentPage)
-  const viewport = useEditorStore((s) => s.viewport)
+  const storeViewport = useEditorStore((s) => s.viewport)
+  const viewport = viewportOverride || storeViewport
   const updateProps = useEditorStore((s) => s.updateProps)
-  const updateStyles = useEditorStore((s) => s.updateStyles)
+  const rawUpdateStyles = useEditorStore((s) => s.updateStyles)
+  const updateStyles = useCallback(
+    (id, patch) => rawUpdateStyles(id, patch, viewportOverride ? { viewport: viewportOverride } : undefined),
+    [rawUpdateStyles, viewportOverride],
+  )
   const clearMobileStyles = useEditorStore((s) => s.clearMobileStyles)
   const updateTheme = useEditorStore((s) => s.updateTheme)
   const applyTheme = useEditorStore((s) => s.applyTheme)
@@ -642,7 +648,11 @@ export default function PropertiesPanel({
   const themeUnapplied = useEditorStore((s) => s.themeUnapplied)
   const markThemeApplied = useEditorStore((s) => s.markThemeApplied)
   const applyComponentPreset = useEditorStore((s) => s.applyComponentPreset)
-  const setLayout = useEditorStore((s) => s.setLayout)
+  const rawSetLayout = useEditorStore((s) => s.setLayout)
+  const setLayout = useCallback(
+    (id, patch) => rawSetLayout(id, patch, viewportOverride ? { viewport: viewportOverride } : undefined),
+    [rawSetLayout, viewportOverride],
+  )
   const setLayoutMany = useEditorStore((s) => s.setLayoutMany)
   const fitEmbedBox = useEditorStore((s) => s.fitEmbedBox)
   const alignSelection = useEditorStore((s) => s.alignSelection)
@@ -1681,6 +1691,7 @@ export default function PropertiesPanel({
         {aiOn && aiEditOpen && (
           <div className="mt-3">
             <AiComponentEdit
+              key={component.id}
               component={component}
               onApply={(styles, props) => asOneStep(() => {
                 if (styles && Object.keys(styles).length) updateStyles(component.id, styles)

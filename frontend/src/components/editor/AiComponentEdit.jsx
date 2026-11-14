@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { aiEditComponent } from '../../utils/aiAssistant.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { aiErrorText } from '../../utils/aiErrorText.js'
@@ -22,29 +22,46 @@ export default function AiComponentEdit({ component, onApply }) {
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
   const [pending, setPending] = useState(null)
+  const [lastComponentId, setLastComponentId] = useState(component?.id)
+  if (component?.id !== lastComponentId) {
+    setLastComponentId(component?.id)
+    setPrompt('')
+    setBusy(false)
+    setError('')
+    setDone(false)
+    setPending(null)
+  }
+  const componentIdRef = useRef(component?.id)
+
+  useEffect(() => {
+    componentIdRef.current = component?.id
+  }, [component?.id])
 
   const ask = async (text) => {
     const instruction = (text ?? prompt).trim()
+    const targetId = component?.id
     if (!instruction || busy) return
     setBusy(true)
     setError('')
     setDone(false)
     try {
       const { styles, props } = await aiEditComponent(component, instruction)
+      if (targetId !== componentIdRef.current) return
       if (!Object.keys(styles).length && !Object.keys(props).length) {
         setError(t('The AI returned no change. Try rephrasing.'))
       } else {
-        setPending({ styles, props })
+        setPending({ targetId, styles, props })
       }
     } catch (e) {
+      if (targetId !== componentIdRef.current) return
       setError(aiErrorText(e, t) || t('AI request failed.'))
     } finally {
-      setBusy(false)
+      if (targetId === componentIdRef.current) setBusy(false)
     }
   }
 
   const accept = () => {
-    if (!pending) return
+    if (!pending || pending.targetId !== component?.id) return
     onApply(pending.styles, pending.props)
     setPending(null)
     setDone(true)

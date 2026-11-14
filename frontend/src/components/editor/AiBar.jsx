@@ -59,7 +59,7 @@ export default function AiBar({ open = false, onOpenChange }) {
         // refresh the header badge) that the model changed.
         try { window.dispatchEvent(new Event('storage')) } catch { /* ignore */ }
       }
-    })
+    }).catch(() => { /* ignore local check errors */ })
     return () => { cancelled = true }
   }, [])
 

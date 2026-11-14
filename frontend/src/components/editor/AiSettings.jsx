@@ -312,6 +312,10 @@ export default function AiSettings({ showHeading = true }) {
         const best = pickBestLocalModel(s.models, model)
         if (best && best !== model) setModelState(best)
       }
+    }).catch((e) => {
+      if (cancelled) return
+      setLocalStatus({ ok: false, reason: e?.message || 'fetch failed' })
+      setLocalRefreshing(false)
     })
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -326,6 +330,9 @@ export default function AiSettings({ showHeading = true }) {
         const best = pickBestLocalModel(s.models, model)
         if (best && best !== model) setModelState(best)
       }
+    }).catch((e) => {
+      setLocalStatus({ ok: false, reason: e?.message || 'fetch failed' })
+      setLocalRefreshing(false)
     })
   }
   // When the user picks a different provider, persist it and load the saved
@@ -360,12 +367,19 @@ export default function AiSettings({ showHeading = true }) {
     if (providerInfo?.configurableEndpoint) setEndpoint(endpoint, provider)
   }, [endpoint, provider, providerInfo?.configurableEndpoint])
   const modelLabel = models.find((m) => m.id === model)?.label.replace(' (recommended)', '') || model
-  // Switched off on the server since this panel opened: show the provider the
-  // editor actually uses now.
-  if (offered.length && !offered.some((p) => p.id === provider)) {
-    const next = getProvider()
-    if (next !== provider) pickProvider(next)
+  // Switched off on the server since this panel opened: reset UI state for the
+  // fallback provider during render and persist it in an effect so render stays pure.
+  const fallbackProvider = offered.length && !offered.some((p) => p.id === provider) ? getProvider() : provider
+  if (fallbackProvider !== provider) {
+    setProviderState(fallbackProvider)
+    setValue(getApiKey(fallbackProvider))
+    setModelState(getModel(fallbackProvider))
+    setEndpointState(getEndpoint(fallbackProvider))
+    setLocalStatus(null)
   }
+  useEffect(() => {
+    setProvider(provider)
+  }, [provider])
   if (!offered.length) {
     return (
       <section className="space-y-3">
