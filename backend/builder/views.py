@@ -2239,11 +2239,6 @@ class UseSharedComponentView(APIView):
         if not component:
             return error_response('component_not_found', 'Component not found.', status.HTTP_404_NOT_FOUND)
 
-        try:
-            site = Site.objects.get(pk=request.data.get('site_id'), owner=request.user)
-        except (Site.DoesNotExist, TypeError, ValueError):
-            return error_response('site_not_found', 'Site not found.', status.HTTP_404_NOT_FOUND)
-
         # Refuse again on the way in. A block published before a rule tightened
         # must not slip into a site just because it is already in the library.
         problems = shared_component_problems(component.html, component.css, component.policy)
@@ -2253,56 +2248,62 @@ class UseSharedComponentView(APIView):
             )
 
         page_id = str(request.data.get('page_id') or '').strip()
-        schema = site.schema if isinstance(site.schema, dict) else {}
-        pages = schema.get('pages') if isinstance(schema.get('pages'), list) else []
-        if not pages:
-            return error_response('page_not_found', 'That site has no page to add to.', status.HTTP_400_BAD_REQUEST)
-        target = next((p for p in pages if p.get('id') == page_id), pages[0])
-
         style = '<style>\n' + component.css + '\n</style>\n' if component.css.strip() else ''
-        # An HTML page shows its document, not a component list: a block added
-        # to its components was invisible there and on the published page. It
-        # goes into the document instead, wrapped and marked so a takedown can
-        # still find it (shared_marks.py).
-        if target.get('mode') == 'html' or str(target.get('html') or '').strip():
-            target['html'] = insert_before_body_end(
-                target.get('html') or '', wrap_marked(style + component.html, component.pk),
-            )
+
+        with transaction.atomic():
+            # Lock and re-read the site row under the transaction so concurrent
+            # saves or rapid shared-block insertions cannot clobber each other.
+            try:
+                site = Site.objects.select_for_update().get(pk=request.data.get('site_id'), owner=request.user)
+            except (Site.DoesNotExist, TypeError, ValueError):
+                return error_response('site_not_found', 'Site not found.', status.HTTP_404_NOT_FOUND)
+
+            schema = site.schema if isinstance(site.schema, dict) else {}
+            pages = schema.get('pages') if isinstance(schema.get('pages'), list) else []
+            if not pages:
+                return error_response('page_not_found', 'That site has no page to add to.', status.HTTP_400_BAD_REQUEST)
+            target = next((p for p in pages if p.get('id') == page_id), pages[0])
+
+            update = ['schema', 'revision', 'updated_at']
+            # An HTML page shows its document, not a component list: a block added
+            # to its components was invisible there and on the published page. It
+            # goes into the document instead, wrapped and marked so a takedown can
+            # still find it (shared_marks.py).
+            if target.get('mode') == 'html' or str(target.get('html') or '').strip():
+                target['html'] = insert_before_body_end(
+                    target.get('html') or '', wrap_marked(style + component.html, component.pk),
+                )
+                block_id = ''
+                # The home page's document is mirrored to site.html.
+                if target is pages[0]:
+                    site.html = target['html']
+                    update.append('html')
+            else:
+                block_id = 'html_shared_%s_%s' % (component.pk, uuid.uuid4().hex[:8])
+                block = {
+                    'id': block_id,
+                    'type': 'html',
+                    'props': {'code': style + component.html, '_sharedFrom': component.pk},
+                    'styles': {},
+                    'layout': {
+                        'x': 0,
+                        'y': _next_free_y(target.get('components')),
+                        'w': component.natural_width or 600,
+                        'h': component.natural_height or 200,
+                    },
+                }
+                target.setdefault('components', []).append(block)
+
+            # Straight through the normal save gate — a shared block is subject to
+            # exactly the same allowlist as anything the user drew themselves.
             site.schema = validate_and_clean_schema(schema)
             site.revision += 1
-            update = ['schema', 'revision', 'updated_at']
-            # The home page's document is mirrored to site.html.
-            if target is pages[0]:
-                site.html = target['html']
-                update.append('html')
             site.save(update_fields=update)
+
             SharedComponent.objects.filter(pk=component.pk).update(use_count=F('use_count') + 1)
             component.refresh_from_db(fields=['use_count'])
             component.recompute_hot_score(save=True)
-            return Response({'site_id': site.pk, 'page_id': target.get('id'), 'block_id': ''})
-        block_id = 'html_shared_%s_%s' % (component.pk, int(timezone.now().timestamp()))
-        block = {
-            'id': block_id,
-            'type': 'html',
-            'props': {'code': style + component.html, '_sharedFrom': component.pk},
-            'styles': {},
-            'layout': {
-                'x': 0,
-                'y': _next_free_y(target.get('components')),
-                'w': component.natural_width or 600,
-                'h': component.natural_height or 200,
-            },
-        }
-        target.setdefault('components', []).append(block)
-        # Straight through the normal save gate — a shared block is subject to
-        # exactly the same allowlist as anything the user drew themselves.
-        site.schema = validate_and_clean_schema(schema)
-        site.revision += 1
-        site.save(update_fields=['schema', 'revision', 'updated_at'])
 
-        SharedComponent.objects.filter(pk=component.pk).update(use_count=F('use_count') + 1)
-        component.refresh_from_db(fields=['use_count'])
-        component.recompute_hot_score(save=True)
         return Response({'site_id': site.pk, 'page_id': target.get('id'), 'block_id': block_id})
 
 

@@ -241,6 +241,84 @@ class TestUsing:
         )
         assert res.status_code == 404
 
+    def test_anonymous_cannot_use_a_component(self, author, taker):
+        component = SharedComponent.objects.create(author=author, **GOOD)
+        site = Site.objects.get(owner=taker)
+        before_schema = site.schema
+        before_rev = site.revision
+        res = APIClient().post(
+            reverse('shared-component-use', args=[component.pk]),
+            {'site_id': site.pk}, format='json',
+        )
+        assert res.status_code in (401, 403)
+        site.refresh_from_db()
+        assert site.schema == before_schema
+        assert site.revision == before_rev
+        component.refresh_from_db()
+        assert component.use_count == 0
+
+    def test_concurrent_save_between_validation_and_write_is_not_overwritten(self, author, taker, monkeypatch):
+        from . import views
+
+        component = SharedComponent.objects.create(author=author, **GOOD)
+        site = Site.objects.get(owner=taker)
+        initial_rev = site.revision
+        original_problems = views.shared_component_problems
+        interleaved_block = {
+            'id': 'concurrent_btn', 'type': 'button',
+            'props': {'text': 'Concurrent'}, 'styles': {},
+            'layout': {'x': 0, 'y': 40, 'w': 140, 'h': 44},
+        }
+
+        def save_concurrently_after_problems(*args, **kwargs):
+            problems = original_problems(*args, **kwargs)
+            Site.objects.filter(pk=site.pk).update(
+                revision=initial_rev + 1,
+                schema={
+                    'theme': {},
+                    'pages': [{'id': 'page_home', 'name': 'Home', 'components': [interleaved_block]}],
+                },
+            )
+            return problems
+
+        monkeypatch.setattr(views, 'shared_component_problems', save_concurrently_after_problems)
+        res = client_for(taker).post(
+            reverse('shared-component-use', args=[component.pk]),
+            {'site_id': site.pk, 'page_id': 'page_home'},
+            format='json',
+        )
+        assert res.status_code == 200
+        site.refresh_from_db()
+        blocks = site.schema['pages'][0]['components']
+        assert [b['id'] for b in blocks] == ['concurrent_btn', res.data['block_id']]
+        assert blocks[1]['layout']['y'] >= 84
+        assert site.revision == initial_rev + 2
+
+    def test_using_same_component_twice_assigns_distinct_block_ids(self, author, taker, monkeypatch):
+        from django.utils import timezone
+        from datetime import datetime, timezone as dt_tz
+
+        component = SharedComponent.objects.create(author=author, **GOOD)
+        site = Site.objects.get(owner=taker)
+        frozen = datetime(2026, 1, 1, 12, 0, 0, tzinfo=dt_tz.utc)
+        monkeypatch.setattr(timezone, 'now', lambda: frozen)
+
+        first = client_for(taker).post(
+            reverse('shared-component-use', args=[component.pk]),
+            {'site_id': site.pk, 'page_id': 'page_home'},
+            format='json',
+        )
+        second = client_for(taker).post(
+            reverse('shared-component-use', args=[component.pk]),
+            {'site_id': site.pk, 'page_id': 'page_home'},
+            format='json',
+        )
+        assert first.status_code == 200 and second.status_code == 200
+        assert first.data['block_id'] != second.data['block_id']
+        site.refresh_from_db()
+        blocks = site.schema['pages'][0]['components']
+        assert len({b['id'] for b in blocks}) == 2
+
 
 class TestFeed:
     def test_lists_only_published_ones(self, author):
