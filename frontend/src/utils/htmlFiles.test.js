@@ -466,3 +466,58 @@ describe('editable HTML reference preservation', () => {
     expect(linkedFilesFor(`${folder}/index.html`, html, files)).toEqual([`${folder}/theme.css`])
   })
 })
+
+describe('assemblePreviewHtml — template tag edge cases', () => {
+  it('handles % inside {% ... %} and braces inside {{ ... }} in both VIEW and EDIT modes', async () => {
+    const html =
+      '<body>' +
+      '{% if discount == "50%" %}<p>{{ {"label": "Half"}|safe }}</p>{% endif %}' +
+      '{% if count % 2 == 0 %}<span>{{ note|default:"{ok}" }}</span>{% endif %}' +
+      '</body>'
+
+    const viewed = await assemblePreviewHtml(html, 'index.html', new Map())
+    expect(viewed).not.toContain('50%')
+    expect(viewed).not.toContain('%}')
+    expect(viewed).not.toContain('{%')
+    expect(viewed).not.toContain('{{')
+    expect(viewed).not.toContain('}}')
+    expect(parseHtml(viewed).querySelector('p').textContent).toBe('')
+    expect(parseHtml(viewed).querySelector('span').textContent).toBe('')
+
+    const edited = await assemblePreviewHtml(html, 'index.html', new Map(), { forEdit: true })
+    const chips = [...parseHtml(edited).querySelectorAll('[data-pwb-tt]')].map((el) => el.textContent)
+    expect(chips).toEqual([
+      '{% if discount == "50%" %}',
+      '{{ {"label": "Half"}|safe }}',
+      '{% endif %}',
+      '{% if count % 2 == 0 %}',
+      '{{ note|default:"{ok}" }}',
+      '{% endif %}',
+    ])
+  })
+})
+
+describe('parseCssRules — comments, strings and @imports', () => {
+  it('ignores braces inside CSS comments and quoted strings without corrupting following rules', () => {
+    const css = [
+      '@import "a{b}.css";',
+      '/* header { broken } */',
+      '.hero { color: red; }',
+      '.badge::before { content: "} {"; }',
+      '/* another /* { comment */',
+      '.after { color: green; }',
+      '@media (min-width: 768px) { /* inside media */ .grid { display: grid; } }',
+    ].join('\n')
+
+    const rules = parseCssRules(css)
+    expect(rules.map((r) => r.selector)).toEqual([
+      '.hero',
+      '.badge::before',
+      '.after',
+      '.grid',
+    ])
+    for (const rule of rules) {
+      expect(css.slice(rule.index, rule.index + rule.selector.length)).toBe(rule.selector)
+    }
+  })
+})

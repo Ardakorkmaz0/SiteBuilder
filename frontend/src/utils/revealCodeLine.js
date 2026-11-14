@@ -81,5 +81,6 @@ export function revealLine(element, content, target) {
   // After the selection: setSelectionRange scrolls the caret into view itself,
   // which would leave the region wherever the browser felt like putting it.
   element.scrollTop = top
+  element.dispatchEvent(new Event('scroll'))
   return { start: index, end: last }
 }

@@ -1,7 +1,7 @@
 // The ticker reads the page through one writer and the Source panel may show
 // another, so "go to this line" cannot trust the line number alone.
-import { describe, expect, it } from 'vitest'
-import { lineIndexFor } from './revealCodeLine.js'
+import { describe, expect, it, vi } from 'vitest'
+import { lineIndexFor, revealLine } from './revealCodeLine.js'
 
 const doc = [
   '<!doctype html>',
@@ -36,5 +36,22 @@ describe('lineIndexFor', () => {
     expect(lineIndexFor(doc, { line: 9999 })).toBe(5)
     expect(lineIndexFor(doc, {})).toBe(-1)
     expect(lineIndexFor('', { line: 4 })).toBe(0)
+  })
+})
+
+describe('revealLine', () => {
+  it('dispatches a scroll event after setting scrollTop so synced overlays update immediately', () => {
+    const lines = Array.from({ length: 60 }, (_, i) => `/* line ${i + 1} */`).join('\n')
+    const ta = document.createElement('textarea')
+    ta.value = lines
+    document.body.appendChild(ta)
+    const onScroll = vi.fn()
+    ta.addEventListener('scroll', onScroll)
+    try {
+      revealLine(ta, lines, { line: 50 })
+      expect(onScroll).toHaveBeenCalledTimes(1)
+    } finally {
+      ta.remove()
+    }
   })
 })

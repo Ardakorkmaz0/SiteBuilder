@@ -1306,9 +1306,10 @@ function HtmlWorkspace({
     setDocument,
     // Files-panel affordance: clicking the open file toggles its source view.
     toggleSource: () => switchMode(mode === 'source' ? 'view' : 'source'),
-    updateSelectedElement: (patch) =>
+    updateSelectedElement: (patch, opts) =>
       mutateSelected((doc, el) => {
-        if (isMobileDevice(deviceId)) applyMobileElementPatch(el, patch)
+        const mobile = opts?.viewport ? opts.viewport === 'mobile' : isMobileDevice(deviceId)
+        if (mobile) applyMobileElementPatch(el, patch)
         else applyElementPatch(el, patch)
       }),
     resetSelectedMobileStyles: () =>
@@ -2345,17 +2346,19 @@ function HtmlWorkspace({
               {fileName}
               <CodeColorsToggle />
             </div>
-            <CodeField
-              ref={sourceRef}
-              lang="html"
-              aria-label={t('HTML source editor')}
-              value={sourceDraft}
-              onChange={(e) => { setGlow(null); setSourceDraft(e.target.value) }}
-              spellCheck={false}
-              placeholder={t('This page has no HTML yet — paste or write a full document here, then Apply & Save.')}
-              className="min-h-0 flex-1 resize-none bg-[#1e1e1e] p-4 font-mono text-sm leading-relaxed text-gray-100 outline-none placeholder:text-gray-500"
-            />
-            <CodeLineGlow targetRef={sourceRef} text={sourceDraft} line={glow?.line} endLine={glow?.endLine} onClear={clearGlow} />
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              <CodeField
+                ref={sourceRef}
+                lang="html"
+                aria-label={t('HTML source editor')}
+                value={sourceDraft}
+                onChange={(e) => { setGlow(null); setSourceDraft(e.target.value) }}
+                spellCheck={false}
+                placeholder={t('This page has no HTML yet — paste or write a full document here, then Apply & Save.')}
+                className="min-h-0 flex-1 resize-none bg-[#1e1e1e] p-4 font-mono text-sm leading-relaxed text-gray-100 outline-none placeholder:text-gray-500"
+              />
+              <CodeLineGlow targetRef={sourceRef} text={sourceDraft} line={glow?.line} endLine={glow?.endLine} onClear={clearGlow} />
+            </div>
           </main>
         ) : !String(html || '').trim() ? (
           /* Empty page: keep the full workspace chrome (toolbar, device bar)

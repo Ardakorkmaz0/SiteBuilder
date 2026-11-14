@@ -27,4 +27,38 @@ describe('SpotlightShell', () => {
     await userEvent.setup().keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()
   })
+
+  it('keeps Tab and Shift+Tab inside the modal dialog and exposes panel without hidden classes', async () => {
+    localStorage.setItem('pwb_language', 'en')
+    render(
+      <LanguageProvider>
+        <button type="button">Outside trigger</button>
+        <SpotlightShell
+          open
+          title="<h1>"
+          onClose={vi.fn()}
+          renderPreview={() => <p>preview</p>}
+          panel={<button type="button">Inside inspector</button>}
+          caption={() => ''}
+        />
+      </LanguageProvider>,
+    )
+
+    const outside = screen.getByRole('button', { name: 'Outside trigger' })
+    const dialog = screen.getByRole('dialog', { name: 'Open large' })
+    const insidePanelBtn = screen.getByRole('button', { name: 'Inside inspector' })
+    const aside = insidePanelBtn.closest('aside')
+
+    expect(aside).not.toBeNull()
+    expect(aside.className).not.toMatch(/\bhidden\b/)
+
+    const user = userEvent.setup()
+    insidePanelBtn.focus()
+    await user.tab()
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    expect(document.activeElement).not.toBe(outside)
+
+    await user.tab({ shift: true })
+    expect(document.activeElement).toBe(insidePanelBtn)
+  })
 })

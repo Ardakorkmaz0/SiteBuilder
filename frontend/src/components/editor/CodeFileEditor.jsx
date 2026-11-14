@@ -40,10 +40,11 @@ function TextFileEditor({ file, onChange, reveal }) {
     if (!reveal || !ta) return
     const start = Math.max(0, Math.min(reveal.index || 0, ta.value.length))
     const end = Math.min(ta.value.length, start + (reveal.length || 0))
-    ta.focus()
+    ta.focus({ preventScroll: true })
     try { ta.setSelectionRange(start, end) } catch { /* ignore */ }
     const linesBefore = (ta.value.slice(0, start).match(/\n/g) || []).length
     ta.scrollTop = Math.max(0, linesBefore * 21 - 80) // ~line height, leave headroom
+    ta.dispatchEvent(new Event('scroll'))
   }, [reveal])
 
   return (

@@ -140,7 +140,7 @@ export default function ComponentSpotlight({ open, componentId, onClose }) {
           </div>
         )
       }}
-      panel={<PropertiesPanel />}
+      panel={(previewWidth) => <PropertiesPanel viewportOverride={spotlightViewport(previewWidth)} />}
     />
   )
 }

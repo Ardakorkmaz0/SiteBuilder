@@ -225,6 +225,21 @@ describe('publishedPagesFor', () => {
     const [home] = publishedPagesFor({ theme: {}, pages: [{ id: 'home', name: 'Home', components: [{ id: 'b', type: 'button', props: { text: 'Go', href: '#other' }, layout: { x: 0, y: 0, w: 120, h: 40 } }] }, { id: 'other', name: 'Other', components: [] }] }, {}, 'Ada')
     expect(home.html).toContain('#other')
   })
+  it('renders canvas components when page.mode is explicitly empty even if htmlMap has a stale entry', () => {
+    const emptyCanvas = {
+      theme: {},
+      pages: [
+        page('home', 'Home', { mode: 'empty' }),
+      ],
+    }
+    const staleHtml = '<!DOCTYPE html><html><head><title>Stale HTML</title></head><body><p>Orphan HTML</p></body></html>'
+
+    const [home] = publishedPagesFor(emptyCanvas, { home: staleHtml }, 'Ada')
+
+    expect(home.html).toContain('Home')
+    expect(home.html).not.toContain('Orphan HTML')
+  })
+
   it('survives a schema with no pages at all', () => {
     expect(publishedPagesFor({}, {}, 'Ada')).toEqual([])
   })

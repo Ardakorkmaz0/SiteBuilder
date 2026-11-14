@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useRef } from 'react'
 
 const FOCUSABLE = 'button, a[href], input:not([type="hidden"]), select, textarea, iframe, [tabindex]'
 
-function focusableElements(dialog) {
+export function focusableElements(dialog) {
   return [...dialog.querySelectorAll(FOCUSABLE)].filter((element) => {
     const style = window.getComputedStyle(element)
     return element.tabIndex >= 0 && !element.disabled &&

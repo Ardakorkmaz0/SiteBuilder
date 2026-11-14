@@ -10,11 +10,13 @@ import HtmlElementPanel from './HtmlElementPanel.jsx'
 import { elementSpotlightDocument } from '../../utils/elementSpotlight.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEditorStore } from '../../store/editorStore.js'
+import { spotlightViewport } from './spotlight.js'
 
 export default function ElementSpotlight({
   open,
   element,
   info,
+  viewport: propViewport,
   pages = [],
   onChange,
   onClose,
@@ -26,15 +28,16 @@ export default function ElementSpotlight({
   onResetMobile,
 }) {
   const { t } = useLanguage()
-  const viewport = useEditorStore((state) => state.viewport)
+  const storeViewport = useEditorStore((state) => state.viewport)
+  const activeViewport = propViewport ?? storeViewport
   // Bumped on every edit so the preview is rebuilt from the element as it now
   // is. The element is mutated in place, so nothing else would tell React.
   const [revision, setRevision] = useState(0)
 
   if (!open || !element || !info) return null
 
-  const handleChange = (patch) => {
-    onChange?.(patch)
+  const handleChange = (patch, opts) => {
+    onChange?.(patch, opts)
     setRevision((value) => value + 1)
   }
 
@@ -42,7 +45,7 @@ export default function ElementSpotlight({
     <SpotlightShell
       open={open}
       onClose={onClose}
-      initialWidth={viewport === 'mobile' ? 'phone' : 'desktop'}
+      initialWidth={activeViewport === 'mobile' ? 'phone' : 'desktop'}
       title={`<${info.tag}>`}
       subtitle={info.classes ? `.${info.classes.split(' ').join(' .')}` : ''}
       caption={(width) => t('Rendered with the page’s own styles at {width}px.', { width })}
@@ -56,21 +59,24 @@ export default function ElementSpotlight({
           style={{ height: 'min(70vh, 720px)' }}
         />
       )}
-      panel={(
-        <HtmlElementPanel
-          info={info}
-          viewport={viewport}
-          pages={pages}
-          onChange={handleChange}
-          onSelectParent={onSelectParent}
-          onDuplicate={onDuplicate}
-          onMoveUp={onMoveUp}
-          onMoveDown={onMoveDown}
-          onDelete={() => { onDelete?.(); onClose?.() }}
-          onResetMobile={onResetMobile}
-          onClose={onClose}
-        />
-      )}
+      panel={(previewWidth) => {
+        const panelViewport = spotlightViewport(previewWidth)
+        return (
+          <HtmlElementPanel
+            info={info}
+            viewport={panelViewport}
+            pages={pages}
+            onChange={(patch) => handleChange(patch, { viewport: panelViewport })}
+            onSelectParent={onSelectParent}
+            onDuplicate={onDuplicate}
+            onMoveUp={onMoveUp}
+            onMoveDown={onMoveDown}
+            onDelete={() => { onDelete?.(); onClose?.() }}
+            onResetMobile={onResetMobile}
+            onClose={onClose}
+          />
+        )
+      }}
     />
   )
 }

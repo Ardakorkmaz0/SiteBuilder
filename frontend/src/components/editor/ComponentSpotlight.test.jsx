@@ -4,7 +4,7 @@
 // nothing at all because it happens to be hidden on this breakpoint, or
 // growing a second properties panel that drifts from the rail's.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import ComponentSpotlight from './ComponentSpotlight.jsx'
@@ -277,5 +277,29 @@ describe('spotlightViewport', () => {
     expect(spotlightViewport(MOBILE_BREAKPOINT + 1)).toBe('pc')
     expect(spotlightViewport(390)).toBe('mobile')
     expect(spotlightViewport(1100)).toBe('pc')
+  })
+
+  it('updates PropertiesPanel viewport and style writes to match the spotlight width while preserving store viewport', async () => {
+    useEditorStore.getState().selectComponent('card_1')
+    useEditorStore.getState().setViewport('mobile')
+    renderSpotlight()
+
+    const dialog = screen.getByRole('dialog', { name: 'Open large' })
+    const aside = dialog.querySelector('aside')
+    expect(within(aside).getByText('Mobile')).toBeInTheDocument()
+    expect(within(aside).queryByText('PC')).toBeNull()
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Desktop/ }))
+
+    expect(within(aside).getByText('PC')).toBeInTheDocument()
+    expect(useEditorStore.getState().viewport).toBe('mobile')
+
+    await user.click(within(aside).getByRole('tab', { name: 'Design' }))
+    const bgInput = within(aside).getByRole('textbox', { name: 'Background' })
+    fireEvent.change(bgInput, { target: { value: '#123456' } })
+    const card = useEditorStore.getState().schema.pages[0].components[0]
+    expect(card.styles.backgroundColor).toBe('#123456')
+    expect(card.stylesMobile?.backgroundColor).toBeUndefined()
   })
 })

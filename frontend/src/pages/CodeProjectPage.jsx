@@ -211,6 +211,7 @@ export default function CodeProjectPage() {
   const htmlSelection = sel && sel.session === projectSessionId && sel.path === activePath ? sel.info : null
   const pendingType = pending && pending.session === projectSessionId && pending.path === activePath ? pending.type : null
   const pendingHtml = pending && pending.session === projectSessionId && pending.path === activePath ? pending.html : null
+  const pendingAtEnd = !!(pending && pending.session === projectSessionId && pending.path === activePath && pending.atEnd)
 
   // Build the View/Edit document for the open html from the LIVE files map, so
   // editing a linked CSS/JS re-renders the preview. Reads files at call time
@@ -655,7 +656,7 @@ export default function CodeProjectPage() {
             component palette, whose picks splice a block into the document. */}
         {leftOpen ? (
           <Sidebar
-            onPickComponent={isHtml ? (type, html) => setPending({ session: projectSessionId, path: activePath, type, html }) : undefined}
+            onPickComponent={isHtml ? (type, html, options) => setPending({ session: projectSessionId, path: activePath, type, html, atEnd: !!options?.atEnd }) : undefined}
             onCollapse={() => setLeftOpen(false)}
             filesPanel={<ProjectFilesPanel key={projectSessionId} onOpen={openFile} />}
           />
@@ -688,6 +689,7 @@ export default function CodeProjectPage() {
               onElementSelect={onElementSelect}
               pendingType={pendingType}
               pendingHtml={pendingHtml}
+              pendingAtEnd={pendingAtEnd}
               onPlaced={() => setPending(null)}
               onCancelPlacement={() => setPending(null)}
             />
@@ -750,6 +752,7 @@ export default function CodeProjectPage() {
                     <div className="min-h-0 flex-1">
                       <HtmlElementPanel
                         info={htmlSelection}
+                        viewport={isMobileDevice(htmlDevice) ? 'mobile' : 'pc'}
                         pages={[]}
                         onChange={(patch) => workspaceRef.current?.updateSelectedElement?.(patch)}
                         onSelectParent={() => workspaceRef.current?.selectParent?.()}
@@ -757,6 +760,7 @@ export default function CodeProjectPage() {
                         onMoveUp={() => workspaceRef.current?.moveSelected?.('up')}
                         onMoveDown={() => workspaceRef.current?.moveSelected?.('down')}
                         onDelete={() => workspaceRef.current?.deleteSelected?.()}
+                        onResetMobile={() => workspaceRef.current?.resetSelectedMobileStyles?.()}
                         onClose={() => workspaceRef.current?.clearSelection?.()}
                       />
                     </div>

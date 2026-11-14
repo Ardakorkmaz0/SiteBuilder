@@ -425,7 +425,7 @@ export async function assemblePreviewHtml(htmlText, htmlPath, filesMap, opts = {
 
 // Strip `{% … %}` and `{{ … }}` from text + attributes (leaving <script>/<style>
 // contents intact). View-only — never applied to the saved document.
-const TEMPLATE_TAG_RE = /\{%[^%]*%\}|\{\{[^}]*\}\}/g
+const TEMPLATE_TAG_RE = /\{%(?:[^%"']|"[^"\\]*(?:\\.[^"\\]*)*"|'[^'\\]*(?:\\.[^'\\]*)*'|%(?!\}))*%\}|\{\{(?:[^{}"']|"[^"\\]*(?:\\.[^"\\]*)*"|'[^'\\]*(?:\\.[^'\\]*)*'|\{(?:[^{}"']|"[^"\\]*(?:\\.[^"\\]*)*"|'[^'\\]*(?:\\.[^'\\]*)*')*\})*\}\}/g
 function neutralizeTemplateTags(node) {
   for (const child of [...node.childNodes]) {
     if (child.nodeType === 3) {
@@ -455,9 +455,8 @@ function chipifyTemplateTags(node) {
     if (child.nodeType === 3) {
       const text = child.nodeValue
       if (!text || !text.includes('{')) continue
-      // Fresh regex literal (not the shared module global) so matchAll starts at
-      // index 0 — reusing a stateful global here skips the first tag.
-      const matches = [...text.matchAll(/\{%[^%]*%\}|\{\{[^}]*\}\}/g)]
+      // Fresh RegExp from TEMPLATE_TAG_RE so matchAll starts at index 0 cleanly.
+      const matches = [...text.matchAll(new RegExp(TEMPLATE_TAG_RE.source, 'g'))]
       if (!matches.length) continue
       const frag = doc.createDocumentFragment()
       let last = 0
@@ -511,6 +510,22 @@ export function linkedFilesFor(htmlPath, htmlContent, filesMap) {
   return out
 }
 
+function skipCssQuoted(text, i) {
+  const quote = text[i]
+  let j = i + 1
+  while (j < text.length) {
+    if (text[j] === '\\') { j += 2; continue }
+    if (text[j] === quote) return j + 1
+    j++
+  }
+  return text.length
+}
+
+function skipCssComment(text, i) {
+  const end = text.indexOf('*/', i + 2)
+  return end === -1 ? text.length : end + 2
+}
+
 // Parse the style rules out of a CSS string into { selector, index } — `index`
 // is the char offset of the selector's first character, so the editor can
 // scroll to it. Tolerant (not a full CSS parser): handles top-level rules and
@@ -522,24 +537,67 @@ export function parseCssRules(cssText) {
   const n = text.length
   let i = 0
   while (i < n) {
-    const open = text.indexOf('{', i)
+    while (i < n) {
+      if (/\s/.test(text[i])) { i++; continue }
+      if (text[i] === '/' && text[i + 1] === '*') { i = skipCssComment(text, i); continue }
+      if (text[i] === ';') { i++; continue }
+      break
+    }
+    if (i >= n) break
+    const selStart = i
+    let selBuf = ''
+    let open = -1
+    let statementEnded = false
+    while (i < n) {
+      const c = text[i]
+      if (c === '"' || c === "'") {
+        const next = skipCssQuoted(text, i)
+        selBuf += text.slice(i, next)
+        i = next
+      } else if (c === '/' && text[i + 1] === '*') {
+        selBuf += ' '
+        i = skipCssComment(text, i)
+      } else if (c === ';') {
+        i++
+        statementEnded = true
+        break
+      } else if (c === '{') {
+        open = i
+        break
+      } else {
+        selBuf += c
+        i++
+      }
+    }
+    if (statementEnded) continue
     if (open === -1) break
-    const rawSel = text.slice(i, open)
     let depth = 1
     let j = open + 1
+    let close = n
     while (j < n && depth > 0) {
       const c = text[j]
-      if (c === '{') depth++
-      else if (c === '}') depth--
-      j++
+      if (c === '"' || c === "'") {
+        j = skipCssQuoted(text, j)
+      } else if (c === '/' && text[j + 1] === '*') {
+        j = skipCssComment(text, j)
+      } else if (c === '{') {
+        depth++
+        j++
+      } else if (c === '}') {
+        depth--
+        if (depth === 0) { close = j; j++; break }
+        j++
+      } else {
+        j++
+      }
     }
-    const selector = rawSel.trim()
+    const selector = selBuf.trim().replace(/\s+/g, ' ')
     if (/^@(media|supports)/i.test(selector)) {
-      for (const r of parseCssRules(text.slice(open + 1, j - 1))) {
+      for (const r of parseCssRules(text.slice(open + 1, close))) {
         out.push({ selector: r.selector, index: open + 1 + r.index })
       }
     } else if (selector && !selector.startsWith('@')) {
-      out.push({ selector, index: i + (rawSel.length - rawSel.trimStart().length) })
+      out.push({ selector, index: selStart })
     }
     i = j
   }

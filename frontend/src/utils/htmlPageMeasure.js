@@ -66,7 +66,8 @@ function readPage(token, frameWindow) {
   const INHERITED = [
     'color', 'font-family', 'font-size', 'font-weight', 'font-style', 'line-height',
     'letter-spacing', 'text-align', 'text-transform', 'white-space', 'list-style-type',
-    'border-collapse', 'border-spacing', 'cursor', 'fill', 'stroke',
+    'border-collapse', 'border-spacing', 'cursor', 'fill', 'fill-opacity', 'fill-rule',
+    'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity',
   ]
   const OWN = [
     'display', 'position', 'top', 'left', 'flex-direction', 'flex-wrap', 'align-items', 'justify-content',
@@ -101,18 +102,21 @@ function readPage(token, frameWindow) {
   const inlineLevel = (el) => /^(inline|contents|ruby|math)/.test(win.getComputedStyle(el).display)
 
   // A copy of `el` that carries its look in style attributes.
+  const HTML_NS = 'http://www.w3.org/1999/xhtml'
+  const SVG_NS = 'http://www.w3.org/2000/svg'
   const plain = new Map()
-  const defaultsOf = (tag) => {
-    if (!plain.has(tag)) {
-      const probe = doc.createElement(tag)
+  const defaultsOf = (tag, ns = HTML_NS) => {
+    const cacheKey = `${ns}|${tag}`
+    if (!plain.has(cacheKey)) {
+      const probe = ns === SVG_NS ? doc.createElementNS(SVG_NS, tag) : doc.createElement(tag)
       doc.body.appendChild(probe)
       const cs = win.getComputedStyle(probe)
       const values = {}
       for (const key of OWN) values[key] = cs.getPropertyValue(key)
-      plain.set(tag, values)
+      plain.set(cacheKey, values)
       probe.remove()
     }
-    return plain.get(tag)
+    return plain.get(cacheKey)
   }
   const standaloneHtml = (el, fill) => standaloneCopy(el, fill).outerHTML
   const standaloneCopy = (el, fill) => {
@@ -123,16 +127,17 @@ function readPage(token, frameWindow) {
       const target = to[index]
       // What the reading marked on the page is the reading's own.
       if (target) [...target.attributes].forEach((attribute) => { if (attribute.name.startsWith('data-pwb-read-')) target.removeAttribute(attribute.name) })
-      if (!target || node.namespaceURI !== 'http://www.w3.org/1999/xhtml') return
+      const ns = node.namespaceURI
+      if (!target || (ns !== HTML_NS && ns !== SVG_NS)) return
       const cs = win.getComputedStyle(node)
       const root = node === el
-      const parent = root ? null : win.getComputedStyle(node.parentElement)
+      const parent = root || !node.parentElement ? null : win.getComputedStyle(node.parentElement)
       const css = []
       for (const key of INHERITED) {
         const value = cs.getPropertyValue(key)
-        if (value && (root || value !== parent.getPropertyValue(key))) css.push(`${key}:${value}`)
+        if (value && (root || !parent || value !== parent.getPropertyValue(key))) css.push(`${key}:${value}`)
       }
-      const base = defaultsOf(node.tagName)
+      const base = defaultsOf(node.localName || node.tagName, ns)
       for (const key of OWN) {
         const value = cs.getPropertyValue(key)
         if (value && value !== base[key]) css.push(`${key}:${value}`)
@@ -402,8 +407,8 @@ function readPage(token, frameWindow) {
   }
 
   const svgImage = (el, cs) => {
-    const copy = el.cloneNode(true)
-    copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+    const copy = standaloneCopy(el, false)
+    copy.setAttribute('xmlns', SVG_NS)
     // `currentColor` has nothing to refer to once the drawing is a picture.
     copy.style.color = cs.color
     const bytes = new TextEncoder().encode(new XMLSerializer().serializeToString(copy))

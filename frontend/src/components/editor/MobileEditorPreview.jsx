@@ -26,6 +26,7 @@ export default function MobileEditorPreview({
   colorModeSetting,
   customCss,
   customJs,
+  fontFaces = '',
   error,
   onSelectPage,
   onBack,
@@ -51,9 +52,10 @@ export default function MobileEditorPreview({
       theme,
       customCss,
       customJs,
+      fontFaces,
       pages: [currentPage],
     }, title || currentPage.name || 'My Site', { colorMode }))
-  }, [colorModeSetting, currentHtml, currentIsHtml, currentPage, customCss, customJs, pageHtmlMap, pages, theme, title])
+  }, [colorModeSetting, currentHtml, currentIsHtml, currentPage, customCss, customJs, fontFaces, pageHtmlMap, pages, theme, title])
 
   async function copyEditorLink() {
     try {

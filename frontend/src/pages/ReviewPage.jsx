@@ -8,6 +8,7 @@ import { apiError } from '../utils/errors.js'
 import { HTML_ALLOW, PUBLIC_HTML_SANDBOX, withBuilderInteractiveHtml, withViewportMeta } from '../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../utils/schemaToFiles.js'
 import { isPreviewMessageSource, previewPageId } from '../utils/previewMessages.js'
+import { colorModeFor, withColorModeHtml } from '../utils/colorMode.js'
 
 export default function ReviewPage() {
   const { token } = useParams()
@@ -51,14 +52,17 @@ export default function ReviewPage() {
   const isHtml = page.mode === 'html' || !!html.trim()
   const previewHtml = useMemo(() => {
     if (!site) return ''
-    if (isHtml) return withViewportMeta(withBuilderInteractiveHtml(html))
+    const htmlMap = !page.html && page.id === pages[0]?.id && site.html ? { [page.id]: site.html } : {}
+    const colorMode = colorModeFor(site.schema, page, htmlMap)
+    if (isHtml) return withViewportMeta(withBuilderInteractiveHtml(withColorModeHtml(html, colorMode)))
     return withViewportMeta(schemaToSingleHtml({
       theme: site.schema?.theme,
       customCss: site.schema?.customCss,
       customJs: site.schema?.customJs,
+      fontFaces: site.schema?.fontFaces,
       pages: [page],
-    }, site.title || page.name || 'Site'))
-  }, [html, isHtml, page, site])
+    }, site.title || page.name || 'Site', { colorMode }))
+  }, [html, isHtml, page, pages, site])
 
   useEffect(() => {
     const onMessage = (event) => {

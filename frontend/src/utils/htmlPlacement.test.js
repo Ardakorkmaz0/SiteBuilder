@@ -524,3 +524,19 @@ describe('endOfPage', () => {
   })
 })
 
+describe('serializeDocument — template tag chips', () => {
+  it('preserves raw <, >, and & characters inside [data-pwb-tt] chips when saving', () => {
+    const doc = parseHtmlDocument(
+      '<!DOCTYPE html>\n<html><head></head><body>' +
+      '<span data-pwb-tt="" contenteditable="false">{% if a &lt; 10 &amp;&amp; b &gt; 1 %}</span>' +
+      '<p><span data-pwb-tt="" contenteditable="false">{{ "A &amp; B" }}</span></p>' +
+      '<span data-pwb-tt="" contenteditable="false">{% endif %}</span>' +
+      '</body></html>',
+    )
+    const saved = serializeDocument(doc)
+    expect(saved).toContain('{% if a < 10 && b > 1 %}')
+    expect(saved).toContain('{{ "A & B" }}')
+    expect(saved).not.toContain('&lt; 10')
+    expect(saved).not.toContain('data-pwb-tt')
+  })
+})

@@ -6,9 +6,11 @@
 // share is everything around the preview, so that lives here once. A second
 // copy of this chrome would drift from the first within a week.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
+import { focusableElements } from '../../ui/useDialogMotion.js'
 import { SPOTLIGHT_WIDTHS, SPOTLIGHT_Z } from './spotlight.js'
 
 export default function SpotlightShell({
@@ -34,22 +36,39 @@ export default function SpotlightShell({
 
   useEscapeToClose(open, close)
   // Opened from the element's toolbar, which lives inside the page's iframe:
-  // focus stayed in there, so Esc and Tab never reached this dialog.
-  const dialogRef = useRef(null)
-  useEffect(() => {
-    if (open) dialogRef.current?.focus({ preventScroll: true })
-  }, [open])
+  // focus stayed in there, so Esc and Tab never reached this dialog. Returning
+  // focus on close and trapping Tab keeps keyboard navigation inside the modal.
+  const dialogRef = useInitialDialogFocus(open)
+
+  const onKeyDown = useCallback((event) => {
+    if (event.key !== 'Tab' || !dialogRef.current) return
+    const elements = focusableElements(dialogRef.current)
+    const first = elements[0]
+    const last = elements[elements.length - 1]
+    if (!first) {
+      event.preventDefault()
+      dialogRef.current.focus({ preventScroll: true })
+    } else if (event.shiftKey && (document.activeElement === first || !elements.includes(document.activeElement))) {
+      event.preventDefault()
+      last.focus({ preventScroll: true })
+    } else if (!event.shiftKey && (document.activeElement === last || !elements.includes(document.activeElement))) {
+      event.preventDefault()
+      first.focus({ preventScroll: true })
+    }
+  }, [dialogRef])
 
   if (!open) return null
 
   const width = widthChoice || initialWidth
   const previewWidth = SPOTLIGHT_WIDTHS.find(([id]) => id === width)?.[1] || 1100
+  const renderedPanel = typeof panel === 'function' ? panel(previewWidth) : panel
 
   return (
     <div
       ref={dialogRef}
       tabIndex={-1}
-      className="studio-theme-surface fixed inset-0 flex outline-none"
+      onKeyDown={onKeyDown}
+      className="studio-theme-surface fixed inset-0 flex flex-col lg:flex-row outline-none"
       style={{ zIndex: SPOTLIGHT_Z }}
       role="dialog"
       aria-modal="true"
@@ -64,7 +83,7 @@ export default function SpotlightShell({
         className="absolute inset-0 cursor-default border-0 bg-[color-mix(in_srgb,var(--studio-shell)_72%,transparent)] backdrop-blur-md"
       />
 
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col p-4 lg:p-6">
+      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col p-4 lg:p-6">
         <div className="mb-3 flex shrink-0 items-center gap-2">
           <span className="shrink-0 truncate text-sm font-semibold text-[var(--studio-text)]">{title}</span>
           {/* Said out loud, where the mode is entered: this one is still being
@@ -119,9 +138,11 @@ export default function SpotlightShell({
 
       {/* The rail's own panel, unchanged: one definition of an element's
           properties, shown in a roomier place — not a second inspector. */}
-      <aside className="relative z-10 hidden w-[360px] shrink-0 border-s border-[var(--studio-border)] bg-[var(--studio-panel)] lg:block">
-        {panel}
-      </aside>
+      {renderedPanel ? (
+        <aside className="relative z-10 max-h-[42vh] w-full shrink-0 overflow-y-auto border-t border-[var(--studio-border)] bg-[var(--studio-panel)] lg:h-full lg:max-h-none lg:w-[360px] lg:border-s lg:border-t-0">
+          {renderedPanel}
+        </aside>
+      ) : null}
     </div>
   )
 }

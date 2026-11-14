@@ -475,13 +475,29 @@ export function serializeDocument(doc) {
   // bakes the resolved CSS/JS into the source.
   root.querySelectorAll('[data-pwb-injected]').forEach((el) => el.remove())
   // Unwrap the Code-project EDIT template-tag chips back to their exact text, so
-  // the saved file keeps `{% … %}` / `{{ … }}` byte-for-byte.
-  root.querySelectorAll('[data-pwb-tt]').forEach((el) => el.replaceWith(el.textContent))
+  // the saved file keeps `{% … %}` / `{{ … }}` byte-for-byte (without escaping `<`, `>`, `&`).
+  const restoredTags = []
+  const tagChips = root.querySelectorAll('[data-pwb-tt]')
+  if (tagChips.length) {
+    const existing = root.innerHTML
+    const seed = `__PWB_TT_${Math.random().toString(36).slice(2)}_`
+    let nonce = 0
+    tagChips.forEach((el) => {
+      let token = `${seed}${nonce++}__`
+      while (existing.includes(token)) token = `${seed}${nonce++}__`
+      restoredTags.push([token, el.textContent])
+      el.replaceWith(token)
+    })
+  }
   // Edit mode may be showing the state View's scripts put the page in (a dark
   // class, an opened accordion). That is borrowed, not authored: put the
   // author's own attributes back.
   restoreAuthoredState(root)
-  return '<!DOCTYPE html>\n' + root.outerHTML
+  let html = '<!DOCTYPE html>\n' + root.outerHTML
+  for (const [token, raw] of restoredTags) {
+    html = html.replace(token, () => raw)
+  }
+  return html
 }
 
 // The same text, as the browser would write it back.

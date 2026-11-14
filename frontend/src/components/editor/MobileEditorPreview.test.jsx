@@ -63,4 +63,33 @@ describe('the editor on a phone', () => {
   it('is drawn as before when the site has one palette', () => {
     expect(preview([{ id: 'home', name: 'Home', components: [text] }])).not.toContain('data-pwb-color-mode')
   })
+
+  it('includes uploaded fontFaces inside the preview frame', () => {
+    const face = '@font-face{font-family:"Okul";src:url(data:font/woff2;base64,AAAA)}'
+    render(
+      <MemoryRouter>
+        <LanguageProvider>
+          <UiThemeProvider>
+            <MobileEditorPreview
+              title="Site"
+              slug="site"
+              published={false}
+              pages={[{ id: 'home', name: 'Home', components: [{ ...text, styles: { ...text.styles, fontFamily: 'Okul, serif' } }] }]}
+              currentPageId="home"
+              pageHtmlMap={{}}
+              theme={{}}
+              fontFaces={face}
+              colorModeSetting={{}}
+              customCss=""
+              customJs=""
+              onSelectPage={vi.fn()}
+              onBack={vi.fn()}
+            />
+          </UiThemeProvider>
+        </LanguageProvider>
+      </MemoryRouter>,
+    )
+    const html = screen.getByTestId('mobile-editor-preview').querySelector('iframe').getAttribute('srcdoc')
+    expect(html).toContain(face)
+  })
 })

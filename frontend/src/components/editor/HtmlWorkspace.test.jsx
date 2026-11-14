@@ -463,3 +463,31 @@ describe('HTML selection quick actions', () => {
     expect(serializeDocument(document)).not.toContain('data-pwb-selection-action')
   })
 })
+
+describe('HTML workspace source glow positioning', () => {
+  it('positions CodeLineGlow inside a relative wrapper around the code field, excluding the top file header', async () => {
+    const workspaceRef = createRef()
+    const html = '<!doctype html>\n<html>\n<body>\n<p>First</p>\n<p>Target</p>\n</body>\n</html>'
+    render(
+      <LanguageProvider>
+        <HtmlWorkspace
+          ref={workspaceRef}
+          persistKey="source-glow-pos"
+          fileName="index.html"
+          html={html}
+        />
+      </LanguageProvider>,
+    )
+
+    act(() => workspaceRef.current.revealSource({ line: 5, text: '<p>Target</p>' }))
+
+    const status = await screen.findByRole('status', {}, { timeout: 1500 })
+    const container = status.parentElement
+    const textbox = screen.getByRole('textbox')
+    const headerLabel = screen.getByText('index.html')
+
+    expect(container.className).toContain('relative')
+    expect(container.contains(textbox)).toBe(true)
+    expect(container.contains(headerLabel)).toBe(false)
+  })
+})

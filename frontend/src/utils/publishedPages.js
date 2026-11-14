@@ -97,7 +97,7 @@ export function pageDocument(page, schema, siteTitle, htmlMap = {}, links = new 
   // A switch on any page lets the visitor change the palette on every page.
   const colorMode = colorModeFor(schema, page, htmlMap)
   const authored = htmlMap[page?.id]
-  if (typeof authored === 'string' && authored.trim()) {
+  if (page?.mode !== 'empty' && typeof authored === 'string' && authored.trim()) {
     return withBuilderInteractiveHtml(withColorModeHtml(withPageSeoTags(withPublishedHtmlLinks(authored, links), page), colorMode))
   }
   const title = pageSeoTitle(page, page?.name || siteTitle || 'My Site')
