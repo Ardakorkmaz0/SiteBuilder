@@ -6,10 +6,10 @@
 // one palette with the colours swapped. Reveals use <details>, so they work on
 // a published page without a script.
 //
-// The side panel edits an element's words as one field when everything inside
-// it is inline (a <span>, a <b>), and writing that field back flattens it to
-// plain text. So a badge, a cell, a bar or a key that sits beside other words
-// is a <div> of its own: each stays a separate field and keeps its look.
+// A badge, a cell, a bar or a key that sits beside other words is a <div> of
+// its own, so the side panel lists it as its own field. A widget with an
+// answer to open keeps room for its tallest open state (min-height): an embed
+// is a fixed frame, and an answer opened past it would be cut off.
 import { FONT, copy, variant } from './kit.js'
 
 const wrap = (style, inner) => `<div style="${FONT}${style}">${inner}</div>`
@@ -24,33 +24,33 @@ const frac = (top, bottom) => (
 )
 
 const EXAM = [
-  variant('study-question-paper', copy('Exam question with solution', 'Çözümlü sınav sorusu'), (T) => wrap(`max-width:460px;padding:18px 20px 16px;background:#fbf8f1;border:1px solid #e4dccb;color:#2b2620;${SERIF}`, `
+  variant('study-question-paper', copy('Exam question with solution', 'Çözümlü sınav sorusu'), (T) => wrap(`max-width:460px;min-height:294px;padding:18px 20px 16px;background:#fbf8f1;border:1px solid #e4dccb;color:#2b2620;${SERIF}`, `
     <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px;${SANS}"><div style="font-weight:700;font-size:15px;">${T('Question 3', 'Soru 3')}</div><div style="font-size:11.5px;color:#b42318;border:1px solid currentColor;padding:0 5px;border-radius:2px;">${T('Midterm 2023', '2023 vize')}</div><div aria-label="${T('Difficulty 2 of 3', 'Zorluk 3 üzerinden 2')}" style="margin-left:auto;font-size:12px;color:#8a7f6d;letter-spacing:2px;">●●○</div></div>
     <p style="margin:0 0 12px;font-size:16px;line-height:1.55;">${T('A model scores 99% on its training data and 61% on new data. What is happening, and what would you try first?', 'Bir model eğitim verisinde %99, yeni veride %61 başarı veriyor. Ne oluyor ve ilk olarak neyi denersiniz?')}</p>
     <details style="border-top:1px solid #e4dccb;padding-top:10px;"><summary style="cursor:pointer;${SANS}font-size:13.5px;font-weight:600;color:#b42318;">${T('Show the solution', 'Çözümü göster')}</summary>
     <ol style="list-style:decimal;margin:10px 0 0;padding-left:20px;font-size:15px;line-height:1.55;"><li>${T('The gap between the two scores is the clue: the model has memorised its training set.', 'İki skor arasındaki fark ipucudur: model eğitim kümesini ezberlemiş.')}</li><li>${T('That is overfitting.', 'Bu aşırı öğrenmedir (overfitting).')}</li><li>${T('Try regularisation or more data before a bigger model.', 'Daha büyük bir modelden önce düzenlileştirme ya da daha fazla veri deneyin.')}</li></ol></details>`)),
 
-  variant('study-options-explained', copy('Options with explanations', 'Açıklamalı şıklar'), (T) => wrap(`max-width:440px;color:#1c1917;${SANS}`, `
+  variant('study-options-explained', copy('Options with explanations', 'Açıklamalı şıklar'), (T) => wrap(`max-width:440px;min-height:302px;color:#1c1917;${SANS}`, `
     <p style="margin:0 0 10px;font-weight:600;font-size:15.5px;line-height:1.45;">${T('Which search is complete and optimal when every step costs the same?', 'Her adımın maliyeti eşitken hangi arama hem tam hem optimaldir?')}</p>
     ${[
       ['A', T('Depth-first', 'Derinlik öncelikli'), false, T('It can get lost down an endless branch.', 'Sonsuz bir dalda kaybolabilir.')],
       ['B', T('Breadth-first', 'Genişlik öncelikli'), true, T('It reaches the shallowest goal first.', 'En sığdaki hedefe ilk o ulaşır.')],
       ['C', T('Greedy best-first', 'Açgözlü en iyi öncelikli'), false, T('It trusts the heuristic and can miss a cheaper path.', 'Sezgisele güvenir, daha ucuz bir yolu kaçırabilir.')],
       ['D', T('Depth-limited', 'Derinlik sınırlı'), false, T('A goal below the limit is never found.', 'Sınırın altındaki bir hedef hiç bulunmaz.')],
-    ].map(([letter, text, right, why]) => `<details style="margin-bottom:6px;border:1px solid ${right ? '#86efac' : '#e7e5e4'};border-radius:6px;background:#ffffff;"><summary style="cursor:pointer;display:flex;gap:10px;padding:9px 12px;font-size:14.5px;list-style:none;"><div style="font-weight:700;color:#78716c;">${letter}</div><span>${text}</span></summary><div style="display:flex;gap:6px;padding:0 12px 10px 34px;font-size:13.5px;line-height:1.5;color:${right ? '#15803d' : '#b91c1c'};"><div style="font-weight:700;">${right ? T('Right.', 'Doğru.') : T('Wrong.', 'Yanlış.')}</div><div>${why}</div></div></details>`).join('')}
-    <p style="margin:8px 0 0;font-size:12.5px;color:#a8a29e;">${T('Click an option to see why.', 'Nedenini görmek için bir şıkka tıklayın.')}</p>`)),
+    ].map(([letter, text, right, why]) => `<details name="study-options" style="margin-bottom:6px;border:1px solid ${right ? '#86efac' : '#e7e5e4'};border-radius:6px;background:#ffffff;"><summary style="cursor:pointer;display:flex;gap:10px;padding:9px 12px;font-size:14.5px;list-style:none;"><span style="font-weight:700;color:#78716c;">${letter}</span><span>${text}</span></summary><div style="display:flex;gap:6px;padding:0 12px 10px 34px;font-size:13.5px;line-height:1.5;color:${right ? '#15803d' : '#b91c1c'};"><div style="font-weight:700;">${right ? T('Right.', 'Doğru.') : T('Wrong.', 'Yanlış.')}</div><div>${why}</div></div></details>`).join('')}
+    <p style="margin:8px 0 0;font-size:12.5px;color:#57534e;">${T('Click an option to see why.', 'Nedenini görmek için bir şıkka tıklayın.')}</p>`)),
 
-  variant('study-true-false-board', copy('True or false board', 'Doğru-yanlış tahtası'), (T) => wrap(`max-width:440px;padding:16px 20px;border-radius:6px;background:#23402f;border:8px solid #6b4f34;color:#eef3ea;${HAND}`, `
+  variant('study-true-false-board', copy('True or false board', 'Doğru-yanlış tahtası'), (T) => wrap(`max-width:440px;min-height:232px;padding:16px 20px;border-radius:6px;background:#23402f;border:8px solid #6b4f34;color:#eef3ea;${HAND}`, `
     <div style="margin-bottom:8px;font-weight:700;font-size:17px;">${T('True or false?', 'Doğru mu, yanlış mı?')}</div>
     ${[
       [T('0.1 + 0.2 is exactly 0.3 in floating point.', 'Kayan noktada 0,1 + 0,2 tam olarak 0,3 eder.'), false, T('neither has an exact binary form.', 'ikisinin de tam bir ikili karşılığı yok.')],
       [T('Bisection converges whenever f(a) · f(b) < 0.', 'f(a) · f(b) < 0 olduğunda ikiye bölme hep yakınsar.'), true, T('the root stays inside the shrinking interval.', 'kök daralan aralığın içinde kalır.')],
       [T('Newton’s method needs the derivative.', 'Newton yöntemi türeve ihtiyaç duyar.'), true, T('every step divides by f′(x).', 'her adım f′(x)’e böler.')],
-    ].map(([claim, truth, note]) => `<details style="padding:8px 0;border-top:1.5px dashed rgba(238,243,234,0.35);"><summary style="cursor:pointer;font-size:15px;line-height:1.45;">${claim}</summary><p style="margin:6px 0 0;font-size:14px;color:${truth ? '#bbf7d0' : '#fecaca'};">${truth ? T('True', 'Doğru') : T('False', 'Yanlış')}: ${note}</p></details>`).join('')}`)),
+    ].map(([claim, truth, note]) => `<details name="study-claims" style="padding:8px 0;border-top:1.5px dashed rgba(238,243,234,0.35);"><summary style="cursor:pointer;font-size:15px;line-height:1.45;">${claim}</summary><p style="margin:6px 0 0;font-size:14px;color:${truth ? '#bbf7d0' : '#fecaca'};">${truth ? T('True', 'Doğru') : T('False', 'Yanlış')}: ${note}</p></details>`).join('')}`)),
 
   variant('study-fill-blanks', copy('Fill in the blanks', 'Boşluk doldurma'), (T) => {
     const blank = '<span style="display:inline-block;min-width:64px;height:20px;border-bottom:2px solid #1e293b;vertical-align:-4px;"></span>'
-    return wrap(`position:relative;max-width:460px;padding:0 18px 0 50px;background-color:#ffffff;background-image:repeating-linear-gradient(transparent 0 27px,#c7d7f0 27px 28px);border:1px solid #e2e8f0;line-height:28px;font-size:15.5px;color:#1e293b;${SANS}`, `
+    return wrap(`position:relative;max-width:460px;min-height:120px;padding:0 18px 0 50px;background-color:#ffffff;background-image:repeating-linear-gradient(transparent 0 27px,#c7d7f0 27px 28px);border:1px solid #e2e8f0;line-height:28px;font-size:15.5px;color:#1e293b;${SANS}`, `
     <div aria-hidden="true" style="position:absolute;top:0;bottom:0;left:36px;width:1.5px;background:#f2a7a7;"></div>
     <p style="margin:0;">${T('The error of bisection halves with every', 'İkiye bölmede hata her')} ${blank}${T(', so after n steps it is at most (b − a) /', ' yarıya iner; n adımdan sonra en fazla (b − a) /')} ${blank}.</p>
     <details><summary style="cursor:pointer;font-size:13.5px;font-weight:700;color:#2563eb;">${T('Answers', 'Cevaplar')}</summary><div style="font-size:14.5px;">1. ${T('step', 'adımda')} · 2. 2<sup>n</sup></div></details>`)
@@ -69,17 +69,17 @@ const EXAM = [
   }),
 
   variant('study-solved-counter', copy('Solved counter', 'Çözülen soru sayacı'), (T) => wrap(`max-width:420px;padding:18px 20px;background:#ffffff;border-top:6px solid #e10600;color:#111111;font-family:'Helvetica Neue',Arial,sans-serif;`, `
-    <div style="display:flex;align-items:baseline;gap:8px;"><div style="font-weight:800;font-size:52px;line-height:0.9;letter-spacing:-0.04em;">7</div><div style="font-size:22px;font-weight:700;color:#9ca3af;">/ 13</div></div>
+    <div style="display:flex;align-items:baseline;gap:8px;"><div style="font-weight:800;font-size:52px;line-height:0.9;letter-spacing:-0.04em;">7</div><div style="font-size:22px;font-weight:700;color:#6b7280;">/ 13</div></div>
     <p style="margin:6px 0 12px;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${T('Questions solved', 'Çözülen soru')}</p>
     <div style="display:grid;grid-template-columns:repeat(13,1fr);gap:3px;">${Array.from({ length: 13 }, (_, i) => `<div style="height:14px;background:${i < 7 ? '#111111' : i === 7 ? '#e10600' : '#e5e7eb'};"></div>`).join('')}</div>`)),
 
-  variant('study-hint-ladder', copy('Hint ladder', 'İpucu merdiveni'), (T) => wrap(`max-width:420px;color:#422006;${SANS}`, `
+  variant('study-hint-ladder', copy('Hint ladder', 'İpucu merdiveni'), (T) => wrap(`max-width:420px;min-height:212px;color:#422006;${SANS}`, `
     <p style="margin:0 0 10px;font-size:15px;font-weight:600;">${T('Which node does breadth-first search expand third? Open one hint at a time.', 'Genişlik öncelikli arama üçüncü olarak hangi düğümü açar? İpuçlarını tek tek açın.')}</p>
     ${[
       [T('Hint 1', '1. ipucu'), T('It expands the tree level by level.', 'Ağacı düzey düzey açar.')],
       [T('Hint 2', '2. ipucu'), T('Write down the queue after every step.', 'Her adımdan sonra kuyruğu yazın.')],
       [T('Answer', 'Cevap'), T('B: the queue goes S, then A and B.', 'B: kuyruk önce S, sonra A ve B olur.')],
-    ].map(([label, text], i) => `<details style="margin:0 0 6px ${i * 18}px;padding:8px 12px;border-radius:0 10px 10px 0;border-left:4px solid ${['#fcd34d', '#f59e0b', '#b45309'][i]};background:${['#fffbeb', '#fef3c7', '#fde68a'][i]};"><summary style="cursor:pointer;font-weight:700;font-size:14px;">${label}</summary><p style="margin:6px 0 0;font-size:14px;line-height:1.5;">${text}</p></details>`).join('')}`)),
+    ].map(([label, text], i) => `<details name="study-hints" style="margin:0 0 6px ${i * 18}px;padding:8px 12px;border-radius:0 10px 10px 0;border-left:4px solid ${['#fcd34d', '#f59e0b', '#b45309'][i]};background:${['#fffbeb', '#fef3c7', '#fde68a'][i]};"><summary style="cursor:pointer;font-weight:700;font-size:14px;">${label}</summary><p style="margin:6px 0 0;font-size:14px;line-height:1.5;">${text}</p></details>`).join('')}`)),
 ]
 
 const FORMULAS = [
@@ -88,7 +88,7 @@ const FORMULAS = [
     <div style="display:flex;align-items:center;gap:8px;font-size:21px;font-style:italic;${SERIF}">x<sub>n+1</sub> = x<sub>n</sub> − ${frac('f(x<sub>n</sub>)', 'f′(x<sub>n</sub>)')}</div>
     <p style="margin:6px 0 0;font-size:12.5px;color:#5b6b85;">${T('It stops working when f′(xₙ) gets close to zero.', 'f′(xₙ) sıfıra yaklaştığında işe yaramaz.')}</p>`)),
 
-  variant('study-formula-flashcard', copy('Formula flashcard', 'Formül hafıza kartı'), (T) => wrap(`max-width:380px;background-color:#ffffff;background-image:repeating-linear-gradient(transparent 0 25px,#dbeafe 25px 26px);border:1px solid #e5e7eb;box-shadow:0 6px 14px rgba(0,0,0,0.07);color:#1f2937;${SANS}`, `
+  variant('study-formula-flashcard', copy('Formula flashcard', 'Formül hafıza kartı'), (T) => wrap(`max-width:380px;min-height:154px;background-color:#ffffff;background-image:repeating-linear-gradient(transparent 0 25px,#dbeafe 25px 26px);border:1px solid #e5e7eb;box-shadow:0 6px 14px rgba(0,0,0,0.07);color:#1f2937;${SANS}`, `
     <div style="padding:10px 16px;border-bottom:2px solid #ef4444;background:#ffffff;font-weight:700;font-size:14.5px;">${T('Mean squared error', 'Ortalama kare hata')}</div>
     <details style="padding:12px 16px 14px;"><summary style="cursor:pointer;font-size:13.5px;color:#6b7280;">${T('Can you write it from memory? Click to check.', 'Ezbere yazabilir misiniz? Kontrol için tıklayın.')}</summary>
     <div style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:20px;font-style:italic;${SERIF}">MSE = ${frac('1', 'n')} Σ (y<sub>i</sub> − ŷ<sub>i</sub>)<sup>2</sup></div></details>`)),
@@ -113,7 +113,7 @@ const FORMULAS = [
   variant('study-constant-tiles', copy('Constant tiles', 'Sabit kutucukları'), (T) => wrap(`display:flex;flex-wrap:wrap;gap:8px;max-width:440px;${SANS}`, [
     ['1', 'π', T('pi', 'pi'), T('3.14159', '3,14159'), '#fde68a'],
     ['2', 'e', T('Euler’s number', 'Euler sayısı'), T('2.71828', '2,71828'), '#bbf7d0'],
-    ['3', 'ε', T('machine epsilon', 'makine epsilonu'), '2.2e−16', '#bfdbfe'],
+    ['3', 'ε', T('machine epsilon', 'makine epsilonu'), T('2.2e−16', '2,2e−16'), '#bfdbfe'],
     ['4', 'φ', T('golden ratio', 'altın oran'), T('1.61803', '1,61803'), '#fbcfe8'],
   ].map(([n, symbol, name, value, colour]) => `<div style="display:flex;flex-direction:column;width:100px;height:106px;padding:7px 8px;border:2px solid #1f2937;background:${colour};color:#111827;box-sizing:border-box;"><div style="font-size:11px;font-weight:700;">${n}</div><div style="font-weight:700;font-size:30px;line-height:1.1;${SERIF}">${symbol}</div><div style="font-size:11px;font-weight:600;line-height:1.2;">${name}</div><div style="margin-top:auto;font-size:11px;${MONO}">${value}</div></div>`).join(''))),
 
@@ -135,10 +135,11 @@ const NOTES = [
     <div style="display:flex;gap:8px;padding:6px 12px;background:#dafbe1;"><div style="color:#1a7f37;font-weight:700;">+</div><div>${T('relative error = |x − x̃| / |x|', 'bağıl hata = |x − x̃| / |x|')}</div></div>
     <p style="margin:0;padding:8px 12px;font-size:13px;color:#57606a;${SANS}">${T('Without the division it is the absolute error.', 'Bölme olmadan bu mutlak hatadır.')}</p>`)),
 
-  variant('study-sticky-note', copy('Sticky note', 'Yapışkan not'), (T) => wrap(`position:relative;max-width:260px;padding:30px 18px 18px;background:#fff59d;box-shadow:0 10px 18px rgba(0,0,0,0.12);color:#3b3200;font-size:16px;line-height:1.45;transform:rotate(-2deg);${HAND}`, `
+  variant('study-sticky-note', copy('Sticky note', 'Yapışkan not'), (T) => wrap(`max-width:284px;padding:12px;${HAND}`, `
+    <div style="position:relative;padding:30px 18px 18px;background:#fff59d;box-shadow:0 8px 14px rgba(0,0,0,0.12);color:#3b3200;font-size:16px;line-height:1.45;transform:rotate(-2deg);">
     <div aria-hidden="true" style="position:absolute;top:4px;left:50%;width:84px;height:18px;margin-left:-42px;background:rgba(255,255,255,0.7);box-shadow:0 1px 2px rgba(0,0,0,0.08);transform:rotate(3deg);"></div>
     <div style="margin-bottom:6px;font-weight:700;">${T('Do not forget!', 'Unutmayın!')}</div>
-    <p style="margin:0;">${T('Bring a calculator, a pencil and your student card. Room B-204, 09:30.', 'Hesap makinesi, kurşun kalem ve öğrenci kartınızı getirin. B-204, 09.30.')}</p>`)),
+    <p style="margin:0;">${T('Bring a calculator, a pencil and your student card. Room B-204, 09:30.', 'Hesap makinesi, kurşun kalem ve öğrenci kartınızı getirin. B-204, 09.30.')}</p></div>`)),
 
   variant('study-side-note', copy('Side note', 'Kenar notu'), (T) => wrap(`display:flex;gap:18px;max-width:520px;padding:14px 16px;background:#fffff8;color:#111111;${SERIF}`, `
     <p style="flex:1 1 0;margin:0;font-size:16px;line-height:1.6;">${T('A heuristic is admissible when it never overestimates the true cost', 'Bir sezgisel, gerçek maliyeti hiçbir zaman olduğundan fazla tahmin etmiyorsa kabul edilebilirdir')}<sup style="color:#aa0000;">1</sup>${T(', which is what lets A* stop at the first goal it takes off the queue.', '. A*’ın kuyruktan çıkan ilk hedefte durabilmesini sağlayan da budur.')}</p>
@@ -161,7 +162,7 @@ const NOTES = [
   }),
 
   variant('study-source-list', copy('Source list', 'Kaynak listesi'), (T) => wrap(`max-width:460px;padding:12px 16px;border:1px solid #e5e7eb;border-radius:4px;background:#ffffff;color:#1f2937;font-size:14.5px;line-height:1.55;${SERIF}`, `
-    <div style="margin-bottom:6px;font-size:11.5px;font-weight:700;letter-spacing:0.1em;color:#9ca3af;${SANS}">${T('SOURCES', 'KAYNAKLAR')}</div>
+    <div style="margin-bottom:6px;font-size:11.5px;font-weight:700;letter-spacing:0.1em;color:#6b7280;${SANS}">${T('SOURCES', 'KAYNAKLAR')}</div>
     ${[
       `Russell, S. &amp; Norvig, P. <i>Artificial Intelligence: A Modern Approach</i>, ${T('4th ed., ch. 3.', '4. baskı, 3. bölüm.')}`,
       `Burden, R. L. &amp; Faires, J. D. <i>Numerical Analysis</i>, ${T('10th ed., §2.3.', '10. baskı, §2.3.')}`,
@@ -249,11 +250,11 @@ const STEPS = [
     T('Repeat until the interval is shorter than your tolerance.', 'Aralık toleransınızdan kısa olana kadar tekrarlayın.'),
   ].map((text, i) => `<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;"><div style="position:relative;display:grid;place-items:center;flex-shrink:0;width:32px;height:32px;font-weight:700;font-size:14px;${SANS}">${i + 1}<svg aria-hidden="true" viewBox="0 0 32 32" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;"><path d="M16 3 C25 2 30 9 29 17 C28 26 20 30 13 29 C5 27 2 20 4 12 C6 6 11 3 18 4" fill="none" stroke="#c0262d" stroke-width="1.8" stroke-linecap="round" /></svg></div><p style="margin:5px 0 0;font-size:15.5px;line-height:1.5;">${text}</p></div>`).join(''))),
 
-  variant('study-step-timeline', copy('Step timeline', 'Adım zaman çizgisi'), (T) => wrap(`max-width:420px;padding-left:22px;border-left:2px dotted #94a3b8;color:#0f172a;${SANS}`, [
+  variant('study-step-timeline', copy('Step timeline', 'Adım zaman çizgisi'), (T) => wrap(`position:relative;max-width:420px;padding-left:30px;color:#0f172a;${SANS}`, '<div aria-hidden="true" style="position:absolute;top:0;bottom:0;left:7px;border-left:2px dotted #94a3b8;"></div>' + [
     [T('Step 1 · First normal form', '1. adım · Birinci normal form'), T('Every cell holds one value; split repeating groups into rows.', 'Her hücrede tek değer olsun; tekrar eden grupları satırlara bölün.')],
     [T('Step 2 · Second normal form', '2. adım · İkinci normal form'), T('Every column depends on the whole key, not on part of it.', 'Her sütun anahtarın bir parçasına değil tamamına bağlı olsun.')],
     [T('Step 3 · Third normal form', '3. adım · Üçüncü normal form'), T('No column depends on another column that is not a key.', 'Hiçbir sütun, anahtar olmayan başka bir sütuna bağlı olmasın.')],
-  ].map(([title, text], i) => `<details${i ? '' : ' open'} style="position:relative;margin-bottom:10px;"><summary style="cursor:pointer;font-weight:700;font-size:14.5px;list-style:none;"><div aria-hidden="true" style="position:absolute;left:-31px;top:2px;width:16px;height:16px;border-radius:50%;background:${i ? '#ffffff' : '#0ea5e9'};border:2px solid #0ea5e9;box-sizing:border-box;"></div><span>${title}</span></summary><p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:#475569;">${text}</p></details>`).join(''))),
+  ].map(([title, text], i) => `<details name="study-steps"${i ? '' : ' open'} style="position:relative;margin-bottom:10px;"><summary style="cursor:pointer;font-weight:700;font-size:14.5px;list-style:none;"><span aria-hidden="true" style="position:absolute;left:-30px;top:2px;width:16px;height:16px;border-radius:50%;background:${i ? '#ffffff' : '#0ea5e9'};border:2px solid #0ea5e9;box-sizing:border-box;"></span><span>${title}</span></summary><p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:#475569;">${text}</p></details>`).join(''))),
 
   variant('study-algorithm-box', copy('Algorithm box', 'Algoritma kutusu'), (T) => {
     const k = (en, tr) => `<b>${T(en, tr)}</b>`
@@ -273,11 +274,11 @@ const STEPS = [
     <table style="width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums;">
       <tr style="border-top:2px solid #111111;border-bottom:1px solid #111111;"><th style="padding:4px 8px;text-align:left;">n</th><th style="padding:4px 8px;text-align:right;">x<sub>n</sub></th><th style="padding:4px 8px;text-align:right;">|x<sub>n</sub> − √2|</th></tr>
       ${[
-        ['0', '1', '4.1e−1'],
-        ['1', T('1.5', '1,5'), '8.6e−2'],
-        ['2', T('1.416667', '1,416667'), '2.5e−3'],
-        ['3', T('1.414216', '1,414216'), '2.1e−6'],
-        ['4', T('1.414214', '1,414214'), '1.6e−12'],
+        ['0', '1', T('4.1e−1', '4,1e−1')],
+        ['1', T('1.5', '1,5'), T('8.6e−2', '8,6e−2')],
+        ['2', T('1.416667', '1,416667'), T('2.5e−3', '2,5e−3')],
+        ['3', T('1.414216', '1,414216'), T('2.1e−6', '2,1e−6')],
+        ['4', T('1.414214', '1,414214'), T('1.6e−12', '1,6e−12')],
       ].map(([n, x, error], i) => `<tr${i === 4 ? ' style="border-bottom:2px solid #111111;"' : ''}><td style="padding:3px 8px;">${n}</td><td style="padding:3px 8px;text-align:right;">${x}</td><td style="padding:3px 8px;text-align:right;">${error}</td></tr>`).join('')}
     </table>`)),
 
@@ -304,7 +305,7 @@ const STEPS = [
 
 const PLANNING = [
   variant('study-chapter-opener', copy('Chapter opener', 'Bölüm açılışı'), (T) => wrap(`display:flex;gap:18px;align-items:flex-start;max-width:460px;color:#0f172a;font-family:'Helvetica Neue',Arial,sans-serif;`, `
-    <div aria-hidden="true" style="font-size:96px;font-weight:900;line-height:0.8;letter-spacing:-0.05em;color:transparent;-webkit-text-stroke:2px #0f766e;">03</div>
+    <div aria-hidden="true" style="flex-shrink:0;white-space:nowrap;font-size:96px;font-weight:900;line-height:0.8;letter-spacing:-0.05em;color:transparent;-webkit-text-stroke:2px #0f766e;">03</div>
     <div><p style="margin:0 0 4px;font-size:12px;font-weight:800;letter-spacing:0.14em;color:#0f766e;">${T('CHAPTER THREE', 'ÜÇÜNCÜ BÖLÜM')}</p><h3 style="margin:0 0 8px;font-size:24px;line-height:1.15;">${T('Finding roots', 'Kök bulma')}</h3><p style="margin:0;font-size:14px;line-height:1.55;color:#475569;">${T('After this chapter you can choose between bisection, Newton and the secant method, and say why.', 'Bu bölümden sonra ikiye bölme, Newton ve kiriş yöntemleri arasında seçim yapabilir ve nedenini söyleyebilirsiniz.')}</p></div>`)),
 
   variant('study-exam-line', copy('Exam line map', 'Sınav hattı haritası'), (T) => wrap(`max-width:480px;padding:14px 16px;background:#ffffff;color:#111827;${SANS}`, `
@@ -322,7 +323,7 @@ const PLANNING = [
 
   variant('study-focus-timer', copy('Focus timer', 'Odak sayacı'), (T) => wrap(`display:inline-flex;align-items:center;gap:16px;padding-top:8px;color:#7f1d1d;${SANS}`, `
     <div style="position:relative;display:grid;place-items:center;flex-shrink:0;width:108px;height:108px;border-radius:50%;background:conic-gradient(#dc2626 0 60%,#fecaca 60% 100%);"><div aria-hidden="true" style="position:absolute;top:-8px;left:50%;width:24px;height:12px;margin-left:-12px;border-radius:12px 12px 0 0;background:#16a34a;"></div><div style="display:grid;place-items:center;width:84px;height:84px;border-radius:50%;background:#fff7f7;font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;">15:00</div></div>
-    <div><div style="font-weight:700;font-size:16px;">${T('Focus · round 3 of 4', 'Odak · 4 turun 3.’sü')}</div><div style="font-size:13.5px;color:#9f1239;">${T('Then a 5-minute break', 'Ardından 5 dakika mola')}</div></div>`)),
+    <div><div style="font-weight:700;font-size:16px;">${T('Focus · round 3 of 4', 'Odak · 3. tur / 4')}</div><div style="font-size:13.5px;color:#9f1239;">${T('Then a 5-minute break', 'Ardından 5 dakika mola')}</div></div>`)),
 
   variant('study-exam-countdown', copy('Exam countdown', 'Sınav geri sayımı'), (T) => {
     const flap = (digit) => `<div style="position:relative;display:grid;place-items:center;width:34px;height:48px;border-radius:5px;background:linear-gradient(#2a2a2e 50%,#232327 50%);font-size:30px;font-weight:800;${MONO}">${digit}<div aria-hidden="true" style="position:absolute;left:0;right:0;top:50%;height:1px;background:#09090b;"></div></div>`
@@ -331,10 +332,10 @@ const PLANNING = [
     <div style="display:flex;gap:10px;">${[['0', '6', T('days', 'gün')], ['1', '4', T('hours', 'saat')], ['3', '2', T('minutes', 'dakika')]].map(([a, b, label]) => `<div style="display:grid;justify-items:center;gap:4px;"><div style="display:flex;gap:3px;">${flap(a)}${flap(b)}</div><div style="font-size:11px;color:#a1a1aa;">${label}</div></div>`).join('')}</div>`)
   }),
 
-  variant('study-flashcard-stack', copy('Flashcard stack', 'Hafıza kartı destesi'), (T) => wrap(`position:relative;max-width:360px;padding:12px 12px 0 0;color:#1e293b;${SANS}`, `
-    <div aria-hidden="true" style="position:absolute;top:0;right:0;left:12px;bottom:12px;border-radius:12px;background:#c7d2fe;transform:rotate(3deg);"></div>
-    <div aria-hidden="true" style="position:absolute;top:6px;right:6px;left:6px;bottom:6px;border-radius:12px;background:#e0e7ff;transform:rotate(-2deg);"></div>
-    <details style="position:relative;padding:18px 20px;border-radius:12px;background:#ffffff;border:1px solid #c7d2fe;box-shadow:0 8px 20px rgba(30,41,59,0.12);"><summary style="cursor:pointer;list-style:none;"><div style="margin-bottom:6px;font-size:11.5px;font-weight:800;letter-spacing:0.1em;color:#6366f1;">${T('CARD 4 OF 20', 'KART 4 / 20')}</div><div style="font-weight:700;font-size:17px;line-height:1.35;">${T('What does a high-variance model do?', 'Yüksek varyanslı bir model ne yapar?')}</div><div style="margin-top:10px;font-size:12.5px;color:#94a3b8;">${T('Tap to turn it over', 'Çevirmek için dokunun')}</div></summary>
+  variant('study-flashcard-stack', copy('Flashcard stack', 'Hafıza kartı destesi'), (T) => wrap(`position:relative;max-width:372px;padding:18px;color:#1e293b;${SANS}`, `
+    <div aria-hidden="true" style="position:absolute;top:12px;right:12px;left:22px;bottom:22px;border-radius:12px;background:#c7d2fe;transform:rotate(3deg);"></div>
+    <div aria-hidden="true" style="position:absolute;top:16px;right:16px;left:18px;bottom:18px;border-radius:12px;background:#e0e7ff;transform:rotate(-2deg);"></div>
+    <details style="position:relative;box-sizing:border-box;min-height:234px;padding:18px 20px;border-radius:12px;background:#ffffff;border:1px solid #c7d2fe;box-shadow:0 8px 20px rgba(30,41,59,0.12);"><summary style="cursor:pointer;list-style:none;"><span style="display:block;margin-bottom:6px;font-size:11.5px;font-weight:800;letter-spacing:0.1em;color:#4f46e5;">${T('CARD 4 OF 20', 'KART 4 / 20')}</span><span style="display:block;font-weight:700;font-size:17px;line-height:1.35;">${T('What does a high-variance model do?', 'Yüksek varyanslı bir model ne yapar?')}</span><span style="display:block;margin-top:10px;font-size:12.5px;color:#475569;">${T('Tap to turn it over', 'Çevirmek için dokunun')}</span></summary>
     <p style="margin:12px 0 0;padding-top:12px;border-top:1px dashed #c7d2fe;font-size:15px;line-height:1.5;">${T('It follows its training data too closely, so its predictions change a lot from one sample to the next.', 'Eğitim verisini fazla yakından izler; bu yüzden tahminleri bir örneklemden ötekine çok değişir.')}</p></details>`)),
 
   variant('study-glossary-leaders', copy('Glossary with leaders', 'Noktalı sözlük'), (T) => wrap(`max-width:420px;color:#1c1917;${SERIF}`, `

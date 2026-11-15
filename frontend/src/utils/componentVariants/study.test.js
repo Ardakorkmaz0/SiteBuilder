@@ -23,7 +23,8 @@ describe('study widgets', () => {
   it('gives no two of them the same outer look', () => {
     // The library's older pieces were one palette with colours swapped; each
     // study widget is drawn in a look of its own, so no outer box repeats.
-    const looks = study.map((widget) => parse(widget.html).firstElementChild.getAttribute('style'))
+    // Compared as the browser reads them, so a stray ';' or space is no disguise.
+    const looks = study.map((widget) => parse(widget.html).firstElementChild.style.cssText)
     expect(new Set(looks).size).toBe(study.length)
   })
 
@@ -37,6 +38,8 @@ describe('study widgets', () => {
       for (const details of parse(widget.htmlTr).querySelectorAll('details')) {
         expect(details.firstElementChild.tagName, widget.id).toBe('SUMMARY')
         expect(details.firstElementChild.textContent.trim(), widget.id).not.toBe('')
+        // A summary holds phrasing content only.
+        expect(details.firstElementChild.querySelector('div, p, ol, ul, table'), widget.id).toBeNull()
       }
     }
   })
@@ -45,25 +48,37 @@ describe('study widgets', () => {
     const constants = study.find((widget) => widget.id === 'study-constant-tiles')
     expect(constants.htmlTr).toContain('3,14159')
     expect(constants.html).toContain('3.14159')
-    const table = study.find((widget) => widget.id === 'study-results-table')
-    expect(table.htmlTr).toContain('1,414214')
+    // A point between digits, not a thousands group of three: a decimal. Only
+    // program output (<pre>), a clock time and a book section keep the point.
+    const decimal = /\d\.(?:\d{1,2}|\d{4,})(?!\d)/g
+    const kept = new Set(['9.30', '2.3'])
+    for (const widget of study) {
+      const body = parse(widget.htmlTr)
+      body.querySelectorAll('pre').forEach((pre) => pre.remove())
+      const found = (body.textContent.match(decimal) || []).filter((match) => !kept.has(match))
+      expect(found, widget.id).toEqual([])
+    }
   })
 
-  it('keeps every badge, cell and bar when the side panel rewrites a text', () => {
-    // A field whose words sit beside a styled inline piece is written back as
-    // plain text and the piece is lost. Only these mark words inside a running
-    // sentence (a blank, a fraction, a highlight, a keyword, a footnote mark).
-    const sentences = new Set([
-      'study-fill-blanks', 'study-formula-card', 'study-formula-flashcard',
-      'study-highlighted-notes', 'study-query-result', 'study-side-note',
-    ])
-    const styled = (html) => parse(html).querySelectorAll('[style]').length
-    for (const widget of study.filter((item) => !sentences.has(item.id))) {
-      let html = widget.htmlTr
-      for (const field of listHtmlContentFields(html, { maxText: 200 }).texts) {
-        html = updateHtmlTextAtPath(html, field.path, field.text)
+  it('keeps every element and its look when the side panel edits a text', () => {
+    // Every element with its attributes, in order: a fraction, a <sub>, a
+    // styled blank or an italic title must survive a corrected word.
+    const structure = (html) => [...parse(html).querySelectorAll('*')]
+      .map((el) => `${el.tagName}${[...el.attributes].map((a) => ` ${a.name}=${a.value}`).join('')}`)
+    for (const widget of study) {
+      for (const source of [widget.html, widget.htmlTr]) {
+        const fields = listHtmlContentFields(source, { maxText: 200 }).texts
+        expect(fields.length, widget.id).toBeGreaterThan(0)
+        let html = source
+        const written = fields.map((field) => {
+          const middle = Math.floor(field.text.length / 2)
+          const text = `${field.text.slice(0, middle)}Ω${field.text.slice(middle)}`
+          html = updateHtmlTextAtPath(html, field.path, text)
+          return text
+        })
+        expect(structure(html), widget.id).toEqual(structure(source))
+        expect(listHtmlContentFields(html, { maxText: 200 }).texts.map((field) => field.text), widget.id).toEqual(written)
       }
-      expect(styled(html), widget.id).toBe(styled(widget.htmlTr))
     }
   })
 
