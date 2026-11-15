@@ -163,3 +163,26 @@ describe('a full-width navbar on a wide artboard', () => {
     expect(row.style.maxWidth).toBe('1880px')
   })
 })
+
+describe('a side menu as tall as the screen', () => {
+  // Its scroll box showed a scrollbar that took room in Brave: the menu then
+  // measured narrower and shrank its blocks, the shorter blocks no longer
+  // needed the scrollbar, and the menu flipped between two sizes every frame.
+  it('scrolls without a scrollbar that takes room from its blocks', () => {
+    s().loadSchema({
+      theme: {},
+      pages: [{
+        id: 'p1',
+        name: 'Home',
+        components: [box('menu', 'container', { x: 0, y: 0, w: 300, h: 900 }, {
+          props: { scrollBehavior: 'fixed', pinHeight: 'full' },
+          children: [box('title', 'text', { x: 16, y: 20, w: 268, h: 56 }, { props: { text: 'Notes' } })],
+        })],
+      }],
+    })
+    const { handle } = renderItem('menu')
+    const scroller = handle.querySelector('.overflow-y-auto')
+
+    expect(scroller.getAttribute('style')).toContain('scrollbar-width: none')
+  })
+})

@@ -464,7 +464,14 @@ export default function FreeCanvasItem({
           />
         </div>
       ) : component.type === 'container' ? (
-        <div className={`h-full w-full ${isFullHeightRail ? 'overflow-y-auto overflow-x-hidden' : 'overflow-visible'}`}>
+        // A rail scrolls without a scrollbar that takes room. Where scrollbars
+        // take room (Brave, Firefox on Linux) the bar narrowed the box, the box
+        // shrank its blocks to fit, the shorter blocks no longer needed the bar,
+        // and the rail flipped between two sizes on every frame.
+        <div
+          className={`h-full w-full ${isFullHeightRail ? 'overflow-y-auto overflow-x-hidden' : 'overflow-visible'}`}
+          style={isFullHeightRail ? { scrollbarWidth: 'none' } : undefined}
+        >
           <ContainerEditor
             component={component}
             canvasScale={canvasScale}
