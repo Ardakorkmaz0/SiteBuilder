@@ -71,9 +71,11 @@ describe('BlockLibrary', () => {
     const user = userEvent.setup()
     renderLibrary()
     await user.type(screen.getByPlaceholderText('Search blocks'), 'copyable code')
-    expect(cards()).toHaveLength(1)
+    // The one block described so comes first; blocks that match part of the
+    // query follow under their own heading.
     expect(cards()[0]).toHaveTextContent('Offer with code')
-  })
+    expect(screen.getByRole('heading', { name: 'Might be related' })).toBeInTheDocument()
+  }, 20000) // Thirteen keystrokes, each drawing a page of live previews.
 
   it('lists widgets by group and places them as widget embeds', async () => {
     localStorage.setItem('pwb_language', 'en')
@@ -108,7 +110,7 @@ describe('BlockLibrary', () => {
     const user = userEvent.setup()
     renderLibrary()
     const input = screen.getByPlaceholderText('Search blocks')
-    await user.type(input, 'zzz-no-such-block')
+    await user.type(input, 'qqxzzq')
     expect(screen.getByText('No blocks match your search')).toBeInTheDocument()
   })
 

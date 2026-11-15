@@ -1,21 +1,13 @@
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { HTML_BLOCKS } from '../../utils/htmlVariants.js'
-import { WIDGETS, WIDGET_CATEGORIES, WIDGET_TYPE } from '../../utils/componentVariants/index.js'
+import { WIDGET_CATEGORIES } from '../../utils/componentVariants/index.js'
 import { SECTION_CATEGORIES } from '../../utils/sectionBlocks/index.js'
+import { buildSearchIndex, searchComponents } from '../../utils/componentSearch.js'
+import { buildEntries, matchesCategory } from './libraryEntries.js'
 import { LayersIcon, SearchIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
-import {
-  ADDABLE_PALETTE_ITEMS,
-  NATIVE_CANVAS_TYPES,
-  WIDE_HTML,
-  blockSize,
-  htmlSize,
-  localizedHtml,
-  previewSrcDoc,
-  variantsForType,
-} from './paletteData.js'
+import { ADDABLE_PALETTE_ITEMS, localizedHtml, previewSrcDoc } from './paletteData.js'
 
 // Webflow-style block library: a full overlay with a category rail, search and
 // large live previews. It is a DISCOVERY surface — picking a block closes the
@@ -85,76 +77,9 @@ function LibraryCard({ entry, onUse }) {
   )
 }
 
-const SECTION_CATEGORY_NAMES = new Map(SECTION_CATEGORIES.map((category) => [category.id, category.name.en]))
-const WIDGET_CATEGORY_NAMES = new Map(WIDGET_CATEGORIES.map((category) => [category.id, category.name.en]))
-
-// Flatten the whole palette into searchable entries once per open. Sections
-// are filed by their library category (`section:hero`, `section:footer`…),
-// widgets by their group (`widget:rating`…), components by palette type.
-function buildEntries() {
-  const entries = []
-  for (const block of HTML_BLOCKS) {
-    const [w, h] = blockSize(block.id)
-    entries.push({
-      kind: 'section',
-      key: `section-${block.id}`,
-      categoryId: `section:${block.category}`,
-      categoryLabel: SECTION_CATEGORY_NAMES.get(block.category) || 'Sections',
-      label: block.label,
-      desc: block.desc || '',
-      html: block.html,
-      htmlTr: block.htmlTr,
-      wide: true,
-      use: { type: 'section', preset: block.id, w, h, label: block.label },
-    })
-  }
-  for (const widget of WIDGETS) {
-    const [w, h] = htmlSize(WIDGET_TYPE, widget)
-    entries.push({
-      kind: 'variant',
-      key: `widget-${widget.id}`,
-      categoryId: `widget:${widget.group}`,
-      categoryLabel: WIDGET_CATEGORY_NAMES.get(widget.group),
-      label: widget.label,
-      desc: widget.label,
-      html: widget.html,
-      htmlTr: widget.htmlTr,
-      fit: [w, h],
-      use: { type: WIDGET_TYPE, preset: widget.id, w, h, label: widget.label },
-    })
-  }
-  for (const item of ADDABLE_PALETTE_ITEMS) {
-    for (const variant of variantsForType(item.type)) {
-      const [w, h] = htmlSize(item.type, variant)
-      const native = NATIVE_CANVAS_TYPES.has(item.type) || !!variant.native
-      entries.push({
-        kind: 'variant',
-        key: `${item.type}-${variant.id}`,
-        categoryId: item.type,
-        categoryLabel: item.label,
-        label: variant.label === 'Default' ? item.label : variant.label,
-        desc: item.label,
-        html: variant.html,
-        htmlTr: variant.htmlTr,
-        wide: WIDE_HTML.has(item.type),
-        native,
-        use: { type: item.type, preset: variant.id === 'default' ? null : variant.id, w, h, label: variant.label },
-      })
-    }
-  }
-  return entries
-}
-
 // Hundreds of live previews would be slow to mount at once; the grid shows a
 // page at a time and grows on request.
 const PAGE_SIZE = 36
-
-function matchesCategory(entry, category) {
-  if (category === 'all') return true
-  if (category === 'sections') return entry.kind === 'section'
-  if (category === 'widgets') return entry.categoryId.startsWith('widget:')
-  return entry.categoryId === category
-}
 
 export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlacement }) {
   const { language, t } = useLanguage()
@@ -192,20 +117,17 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
       },
     ]
   }, [entries])
+  // Search spans everything (it ignores the active category), in both
+  // languages, on every keystroke: the index is built once per open.
+  const searchIndex = useMemo(() => buildSearchIndex(entries), [entries])
+  const q = query.trim()
+  const results = useMemo(() => (q ? searchComponents(searchIndex, q) : null), [searchIndex, q])
   useEscapeToClose(open, onClose)
 
   if (!open) return null
 
-  const q = query.trim().toLocaleLowerCase('tr')
-  const visible = entries.filter((entry) => {
-    if (!q) return matchesCategory(entry, category)
-    // Search spans EVERYTHING (ignores the active category) and matches the
-    // English label, description and category and their Turkish translations.
-    const haystack = [entry.label, t(entry.label), entry.desc, t(entry.desc), entry.categoryLabel, t(entry.categoryLabel)]
-      .join(' ')
-      .toLocaleLowerCase('tr')
-    return haystack.includes(q)
-  })
+  const visible = results ? results.best : entries.filter((entry) => matchesCategory(entry, category))
+  const related = results ? results.related : []
   const shown = visible.slice(0, limit)
 
   const chooseCategory = (id) => {
@@ -326,12 +248,26 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
 
             {/* Cards */}
             <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-              {visible.length === 0 ? (
+              {results?.suggestion && (
+                <p className="mb-3 text-sm text-[var(--studio-text-muted,#6b7280)]">
+                  <button
+                    type="button"
+                    onClick={() => setQuery(results.suggestion)}
+                    className="font-semibold text-[var(--studio-accent-hover,#4338ca)] underline-offset-2 hover:underline"
+                  >
+                    {t('Did you mean “{query}”?', { query: results.suggestion })}
+                  </button>
+                </p>
+              )}
+              {visible.length === 0 && related.length === 0 ? (
                 <p className="mt-10 text-center text-sm text-[var(--studio-text-muted,#6b7280)]">
                   {t('No blocks match your search')}
                 </p>
               ) : (
                 <>
+                  {visible.length === 0 && (
+                    <p className="mb-3 text-sm text-[var(--studio-text-muted,#6b7280)]">{t('No exact match. These come close:')}</p>
+                  )}
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
                     {shown.map((entry) => (
                       <LibraryCard key={entry.key} entry={entry} onUse={use} />
@@ -350,6 +286,20 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
                         {t('Showing {shown} of {total}', { shown: shown.length, total: visible.length })}
                       </span>
                     </div>
+                  )}
+                  {related.length > 0 && (
+                    <section aria-labelledby={visible.length ? 'block-library-related' : undefined} className={visible.length ? 'mt-6' : ''}>
+                      {visible.length > 0 && (
+                        <h3 id="block-library-related" className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--studio-text-faint,#9ca3af)]">
+                          {t('Might be related')}
+                        </h3>
+                      )}
+                      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                        {related.map((entry) => (
+                          <LibraryCard key={entry.key} entry={entry} onUse={use} />
+                        ))}
+                      </div>
+                    </section>
                   )}
                 </>
               )}
