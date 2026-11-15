@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useDraggable } from '@dnd-kit/core'
 import { DRAG_MIME } from '../../utils/htmlPlacement.js'
 import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
 import { CodeIcon, FolderIcon, LayersIcon, PlusIcon, SaveIcon, SparklesIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { notePaletteUse, quickPicks, readPaletteUsage } from '../../utils/paletteQuick.js'
 import BlockLibrary from './BlockLibrary.jsx'
 import AnimationPanel from './AnimationPanel.jsx'
 import {
@@ -220,7 +223,7 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
 }
 
 // A component category: click the row to reveal its variants. Same in both modes.
-function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle }) {
+function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle, onHover, onLeave }) {
   const { language, t } = useLanguage()
   const variants = variantsForType(item.type)
   const wide = WIDE_HTML.has(item.type)
@@ -229,6 +232,14 @@ function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle }) {
     <div className="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white">
       <button
         type="button"
+        // A mouse resting on the row opens its quick-add flyout; a touch
+        // (no hover) keeps the tap-to-expand list below.
+        onPointerEnter={(event) => {
+          if (event.pointerType !== 'touch' && event.pointerType !== 'pen') onHover?.(event.currentTarget)
+        }}
+        onPointerLeave={() => onLeave?.()}
+        onFocus={(event) => onHover?.(event.currentTarget)}
+        onBlur={() => onLeave?.()}
         onClick={() => {
           onToggle()
           if (firstVariant) {
@@ -261,6 +272,132 @@ function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle }) {
         </div>
       )}
     </div>
+  )
+}
+
+// Quick add: a wide flyout beside the palette with a row's first few variants,
+// numbered. It opens when the pointer rests on the row and closes a moment
+// after it leaves both; the number keys add a variant straight to the canvas.
+const FLYOUT_WIDTH = 540
+const QUICK_COUNT = 4
+
+function flyoutPreviewStyle([w, h]) {
+  const scale = Math.max(0.2, Math.min(0.9, 228 / w, 104 / h))
+  return { width: w, transform: `scale(${scale.toFixed(3)})`, transformOrigin: 'center', flexShrink: 0, pointerEvents: 'none' }
+}
+
+function PaletteFlyout({ item, anchor, onPick, onArm, onEnter, onLeave, onClose, onSeeAll }) {
+  const { language, t } = useLanguage()
+  const variants = variantsForType(item.type)
+  const [picks] = useState(() => quickPicks(variants, readPaletteUsage()[item.type], QUICK_COUNT))
+  const [added, setAdded] = useState(null)
+  const addedTimer = useRef(null)
+  useEscapeToClose(true, onClose)
+
+  const dataFor = (variant) => {
+    const html = localizedHtml(variant, language)
+    const [w, h] = htmlSize(item.type, variant)
+    const preset = variant.id === 'default' ? null : variant.id
+    const label = t(variant.label)
+    const native = !onPick && (NATIVE_CANVAS_TYPES.has(item.type) || !!variant.native)
+    return { html, data: native ? { type: item.type, preset, w, h, label } : { type: item.type, preset, html, w, h, label } }
+  }
+  // The number keys add straight away: below the selected block, else in the
+  // middle of the canvas on screen. A click arms the usual tap-to-place.
+  const add = (index) => {
+    const variant = picks[index]
+    if (!variant) return
+    const { html, data } = dataFor(variant)
+    notePaletteUse(item.type, variant.id)
+    if (onPick) onPick(item.type, html, { atEnd: true })
+    else onArm?.(data, { inView: true })
+    setAdded(index)
+    window.clearTimeout(addedTimer.current)
+    addedTimer.current = window.setTimeout(() => setAdded(null), 900)
+  }
+  const addRef = useRef(add)
+  useEffect(() => { addRef.current = add })
+  useEffect(() => () => window.clearTimeout(addedTimer.current), [])
+
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return
+      const target = event.target
+      if (target?.closest?.('input, textarea, select, [contenteditable="true"], [contenteditable=""]')) return
+      const index = Number(event.key) - 1
+      if (!Number.isInteger(index) || index < 0 || index >= QUICK_COUNT) return
+      event.preventDefault()
+      event.stopPropagation()
+      addRef.current(index)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  const room = typeof window === 'undefined' ? FLYOUT_WIDTH : window.innerWidth - anchor.left - 12
+  const top = typeof window === 'undefined'
+    ? anchor.top
+    : Math.max(8, Math.min(anchor.top - 12, window.innerHeight - 330))
+  return createPortal(
+    <div
+      role="group"
+      aria-label={t('Quick add: {name}', { name: t(item.label) })}
+      data-palette-flyout={item.type}
+      onPointerEnter={onEnter}
+      onPointerLeave={onLeave}
+      style={{ position: 'fixed', left: anchor.left, top, width: Math.min(FLYOUT_WIDTH, room) }}
+      className="studio-panel z-50 rounded-xl border p-3 shadow-2xl"
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--studio-text)]">{t(item.label)}</span>
+        <span className="text-[11px] text-[var(--studio-text-muted)]">{t('Press 1 to {count} to add', { count: picks.length })}</span>
+        <button
+          type="button"
+          onClick={onSeeAll}
+          className="rounded-md px-2 py-1 text-xs font-semibold text-[var(--studio-accent-hover)] hover:bg-[var(--studio-control-hover)]"
+        >
+          {t('See all ({count})', { count: variants.length })}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {picks.map((variant, index) => {
+          const { html } = dataFor(variant)
+          const size = htmlSize(item.type, variant)
+          const label = t(variant.label)
+          return (
+            <button
+              key={variant.id}
+              type="button"
+              aria-keyshortcuts={String(index + 1)}
+              aria-label={t('{name}: press {n} to add it', { name: label, n: index + 1 })}
+              onClick={() => {
+                const { data } = dataFor(variant)
+                notePaletteUse(item.type, variant.id)
+                if (onPick) onPick(item.type, html)
+                else onArm?.(data)
+                onClose()
+              }}
+              className={`relative rounded-lg border p-2 text-left transition hover:border-[var(--studio-accent)] hover:bg-[var(--studio-control-hover)] ${added === index ? 'border-[var(--studio-accent)] bg-[var(--studio-control)]' : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)]'}`}
+            >
+              <span
+                aria-hidden="true"
+                className="absolute left-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-md bg-[var(--studio-accent)] text-xs font-bold text-white shadow"
+              >
+                {index + 1}
+              </span>
+              <span className="flex h-[112px] w-full items-center justify-center overflow-hidden rounded-md bg-[#f8fafc] text-black">
+                <span style={flyoutPreviewStyle(size)} dangerouslySetInnerHTML={{ __html: html }} />
+              </span>
+              <span className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--studio-text-muted)]">
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+                {added === index && <span className="font-semibold text-[var(--studio-accent-hover)]">{t('Added')}</span>}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -613,6 +750,40 @@ export default function Sidebar({ onPickComponent, onArmPlacement, onCollapse, f
   const [openType, setOpenType] = useState(null)
   const [preview, setPreview] = useState(null)
   const [libraryOpen, setLibraryOpen] = useState(false)
+  const [libraryCategory, setLibraryCategory] = useState('all')
+  const [libraryKey, setLibraryKey] = useState(0)
+  // Quick-add flyout: { type, anchor }. Opening waits for the pointer to rest
+  // (crossing rows on the way to the flyout does not switch it); closing waits
+  // for it to leave both the row and the flyout.
+  const [flyout, setFlyout] = useState(null)
+  const flyoutTimer = useRef(null)
+  const flyoutOpen = !!flyout
+  useEffect(() => () => window.clearTimeout(flyoutTimer.current), [])
+  const hoverRow = (type, element) => {
+    window.clearTimeout(flyoutTimer.current)
+    const aside = element.closest('aside')
+    const left = (aside || element).getBoundingClientRect().right + 6
+    const top = element.getBoundingClientRect().top
+    if (typeof window !== 'undefined' && window.innerWidth - left < 360) return
+    flyoutTimer.current = window.setTimeout(() => setFlyout({ type, anchor: { left, top } }), flyoutOpen ? 140 : 180)
+  }
+  const leaveFlyout = () => {
+    window.clearTimeout(flyoutTimer.current)
+    flyoutTimer.current = window.setTimeout(() => setFlyout(null), 250)
+  }
+  const stayOnFlyout = () => window.clearTimeout(flyoutTimer.current)
+  const closeFlyout = () => {
+    window.clearTimeout(flyoutTimer.current)
+    setFlyout(null)
+  }
+  const openLibrary = (category = 'all') => {
+    closeFlyout()
+    setPreview(null)
+    setLibraryCategory(category)
+    setLibraryKey((key) => key + 1)
+    setLibraryOpen(true)
+  }
+  const flyoutItem = flyout ? ADDABLE_PALETTE_ITEMS.find((item) => item.type === flyout.type) : null
   const theme = useEditorStore((s) => s.schema.theme) || {}
   return (
     <aside data-tour="rail-left" className="studio-panel flex w-60 shrink-0 flex-col overflow-hidden border-r">
@@ -654,13 +825,10 @@ export default function Sidebar({ onPickComponent, onArmPlacement, onCollapse, f
                 palette for users who already know what they want. */}
             <button
               type="button"
-              onClick={() => {
-                // A palette detail may contain a fixed/pinned navbar preview.
-                // Clear it before opening the full-screen library so no stale
-                // preview remains mounted under the modal.
-                setPreview(null)
-                setLibraryOpen(true)
-              }}
+              // A palette detail may contain a fixed/pinned navbar preview.
+              // It is cleared before the full-screen library opens, so no stale
+              // preview remains mounted under the modal.
+              onClick={() => openLibrary()}
               className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--studio-accent)] px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--studio-accent-fill-hover)]"
             >
               <LayersIcon size={15} /> {t('Browse all blocks')}
@@ -679,6 +847,8 @@ export default function Sidebar({ onPickComponent, onArmPlacement, onCollapse, f
                   onInspect={setPreview}
                   open={openType === item.type}
                   onToggle={() => setOpenType((open) => (open === item.type ? null : item.type))}
+                  onHover={variantsForType(item.type).length ? (element) => hoverRow(item.type, element) : undefined}
+                  onLeave={leaveFlyout}
                 />
               ))}
             </div>
@@ -692,10 +862,25 @@ export default function Sidebar({ onPickComponent, onArmPlacement, onCollapse, f
         )}
       </div>
       {/* The hover-preview panel belongs to the Components palette only. */}
-      {!(filesPanel && (tab === 'files' || tab === 'animation')) && (
+      {!flyoutOpen && !(filesPanel && (tab === 'files' || tab === 'animation')) && (
         <PalettePreviewPanel preview={preview} onClose={() => setPreview(null)} />
       )}
+      {flyoutItem && !libraryOpen && !(filesPanel && (tab === 'files' || tab === 'animation')) && (
+        <PaletteFlyout
+          key={flyoutItem.type}
+          item={flyoutItem}
+          anchor={flyout.anchor}
+          onPick={onPickComponent}
+          onArm={onArmPlacement}
+          onEnter={stayOnFlyout}
+          onLeave={leaveFlyout}
+          onClose={closeFlyout}
+          onSeeAll={() => openLibrary(flyoutItem.type)}
+        />
+      )}
       <BlockLibrary
+        key={libraryKey}
+        initialCategory={libraryCategory}
         open={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         onPickComponent={onPickComponent}

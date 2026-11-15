@@ -16,6 +16,7 @@ import { getSite, liveToDraft, sendPageLive, sendVersionLive, setPageHidden, swa
 import { getVersionContent, restoreVersion } from '../api/versions.js'
 import LiveVersionView from '../components/editor/LiveVersionView.jsx'
 import { useEditorStore, selectCurrentPage, nextHistoryStamp, shownPartOf } from '../store/editorStore.js'
+import { inViewSpot } from '../utils/paletteQuick.js'
 import { useAuthStore } from '../store/authStore.js'
 import { useGuestGate } from '../utils/useGuestGate.jsx'
 import { lastPageOutside } from '../utils/lastVisited.js'
@@ -1302,6 +1303,30 @@ function SiteEditor() {
       return Math.max(lowest, (box.y || 0) + (box.h || 0))
     }, 0)
     placeData(d, width / 2, bottom + 24 + (d.h || 120) / 2)
+  }
+
+  // A palette variant added by its number key: below the selected block, or
+  // in the middle of the part of the canvas on screen, selected.
+  function placeInView(d) {
+    const state = useEditorStore.getState()
+    const page = selectCurrentPage(state)
+    const mobile = state.viewport === 'mobile'
+    const width = mobile ? (page.mobileWidth || MOBILE_CANVAS_WIDTH) : (page.canvasWidth || CANVAS_WIDTH)
+    const top = (page.components || []).find((c) => c.id === state.selectedId && state.selectedIds.length <= 1)
+    const selected = top ? (mobile ? top.mobileLayout || top.layout : top.layout) : null
+    let view = { top: 0, height: 600 }
+    const canvasEl = document.getElementById('free-canvas')
+    const scroller = document.getElementById('canvas-scroll')
+    if (canvasEl && scroller) {
+      const scale = Number(canvasEl.dataset?.builderCanvasScale) || 1
+      const canvasRect = canvasEl.getBoundingClientRect()
+      const scrollRect = scroller.getBoundingClientRect()
+      const from = Math.max(0, (scrollRect.top - canvasRect.top) / scale)
+      const to = Math.max(from, (Math.min(scrollRect.bottom, canvasRect.bottom) - canvasRect.top) / scale)
+      view = { top: from, height: to - from }
+    }
+    const spot = inViewSpot({ selected, view, canvasWidth: width, height: d.h || 120 })
+    placeData(d, spot.x, spot.y)
   }
 
   function placeData(d, x, y, inside = null) {
@@ -3275,6 +3300,11 @@ function SiteEditor() {
                     if (options?.atEnd) {
                       switchCanvasMode('edit')
                       placeAtEnd(data)
+                      return
+                    }
+                    if (options?.inView) {
+                      switchCanvasMode('edit')
+                      placeInView(data)
                       return
                     }
                     setPendingPlace(data)

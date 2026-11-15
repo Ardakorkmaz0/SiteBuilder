@@ -81,9 +81,9 @@ function LibraryCard({ entry, onUse }) {
 // page at a time and grows on request.
 const PAGE_SIZE = 36
 
-export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlacement }) {
+export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlacement, initialCategory = 'all' }) {
   const { language, t } = useLanguage()
-  const [category, setCategory] = useState('all')
+  const [category, setCategory] = useState(initialCategory)
   const [query, setQuery] = useState('')
   const [limit, setLimit] = useState(PAGE_SIZE)
   const entries = useMemo(() => buildEntries(), [])
