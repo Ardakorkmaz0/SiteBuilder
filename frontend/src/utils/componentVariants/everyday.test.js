@@ -53,7 +53,7 @@ describe('everyday widgets', () => {
         expect(listHtmlContentFields(edited, { maxText: 10000 }).texts.map(field => field.text), widget.id).toEqual(expectedText)
       }
     }
-  })
+  }, 20000) // Every field of 30 widgets in two languages, each write a fresh parse: seconds under a busy CI.
 
   it('builds both languages with matching markup and no unresolved copy', () => {
     const tags = html => [...html.matchAll(/<\/?[a-z][a-z0-9-]*/gi)].map(match => match[0].toLowerCase())

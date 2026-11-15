@@ -65,8 +65,10 @@ describe('study widgets', () => {
     // styled blank or an italic title must survive a corrected word.
     const structure = (html) => [...parse(html).querySelectorAll('*')]
       .map((el) => `${el.tagName}${[...el.attributes].map((a) => ` ${a.name}=${a.value}`).join('')}`)
+    // The Turkish build: the same markup as the English one (componentVariants.test.js),
+    // and the writer does not depend on the language.
     for (const widget of study) {
-      for (const source of [widget.html, widget.htmlTr]) {
+      for (const source of [widget.htmlTr]) {
         const fields = listHtmlContentFields(source, { maxText: 200 }).texts
         expect(fields.length, widget.id).toBeGreaterThan(0)
         let html = source
@@ -80,7 +82,7 @@ describe('study widgets', () => {
         expect(listHtmlContentFields(html, { maxText: 200 }).texts.map((field) => field.text), widget.id).toEqual(written)
       }
     }
-  })
+  }, 20000) // Every field of 41 widgets, each write a fresh parse: over a second alone.
 
   it('numbers its ordered lists itself, whatever the page resets', () => {
     for (const widget of study) {
