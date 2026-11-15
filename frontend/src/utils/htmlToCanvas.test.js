@@ -685,4 +685,95 @@ describe('converted canvas fidelity regressions', () => {
     expect(navs).toHaveLength(1)
     expect(navs[0].props.shownBy).toBeUndefined()
   })
+
+  it('formats elliptical border-radius with CSS slash syntax and emits edgeLines on unpainted and flattened boxes', () => {
+    const result = convert(page([
+      node('div', [40, 40, 500, 180], {
+        kids: [
+          node('tr', [56, 60, 468, 36], {
+            kids: [text('td', [56, 66, 200, 24], 'Row 1')],
+          }, {
+            borderBottomWidth: '1px',
+            borderBottomStyle: 'solid',
+            borderBottomColor: 'rgb(216, 208, 191)',
+          }),
+          node('div', [56, 110, 468, 50], {
+            kids: [
+              node('div', [56, 110, 468, 50], {
+                kids: [text('p', [70, 122, 300, 24], 'Step detail')],
+              }, {
+                backgroundColor: 'rgb(255, 253, 248)',
+                borderLeftWidth: '3px',
+                borderLeftStyle: 'solid',
+                borderLeftColor: 'rgb(31, 78, 140)',
+              }),
+            ],
+          }, { backgroundColor: 'rgb(248, 244, 234)' }),
+        ],
+      }, {
+        backgroundColor: 'rgb(255, 255, 255)',
+        borderTopLeftRadius: '14px 18px',
+        borderTopRightRadius: '22px 12px',
+        borderBottomRightRadius: '12px 20px',
+        borderBottomLeftRadius: '18px 14px',
+      }),
+    ]))
+
+    const card = result.components[0]
+    expect(card.styles.borderRadius).toBe('14px 22px 12px 18px / 18px 12px 20px 14px')
+    const spacers = JSON.stringify(card.children)
+    expect(spacers).toContain('linear-gradient(rgb(216, 208, 191), rgb(216, 208, 191))')
+    expect(spacers).toContain('linear-gradient(rgb(31, 78, 140), rgb(31, 78, 140))')
+  })
+
+  it('keeps flashcards and multi-part quiz option buttons as containers instead of flattening them into centered buttons', () => {
+    const result = convert(page([
+      node('button', [40, 40, 280, 160], {
+        actions: [{ do: 'flip', keys: ['k1', 'k2'] }],
+        kids: [
+          text('span', [56, 56, 240, 40], 'Soru yüzü', {}, { keys: ['k1'] }),
+          text('span', [56, 56, 240, 60], 'Cevap yüzü', {}, { keys: ['k2'] }),
+        ],
+      }, { backgroundColor: 'rgb(255, 253, 248)' }),
+      node('button', [360, 40, 480, 56], {
+        actions: [{ do: 'show', keys: ['k3'] }],
+        kids: [
+          text('span', [376, 54, 28, 28], 'A)', { fontWeight: '700' }),
+          text('span', [412, 54, 300, 28], 'Validation hatası en düşük olan model'),
+        ],
+      }, { backgroundColor: 'rgb(255, 253, 248)' }),
+    ]))
+
+    expect(result.components.map((c) => [c.type, c.props.onClick?.[0]?.do, c.children.length])).toEqual([
+      ['container', 'flip', 2],
+      ['container', 'show', 2],
+    ])
+    expect(result.components[0].children.map((c) => [c.props.text, c.props.shownBy])).toEqual([
+      ['Soru yüzü', ['k1']],
+      ['Cevap yüzü', ['k2']],
+    ])
+  })
+
+  it('deduplicates fixed sidebar chrome when progress counters change across states and takes chapter title from content h1', () => {
+    const makeSidebar = (step) => node('aside', [0, 0, 280, 900], {
+      kids: [
+        text('h2', [20, 20, 220, 28], 'Sidebar Title'),
+        text('span', [20, 56, 120, 18], `${step} / 2 tamamlandı`),
+        node('div', [20, 80, 100 * step, 6], {}, { backgroundColor: 'rgb(31, 78, 140)' }),
+        text('a', [20, 110, 220, 28], '1. Giriş', {}, { href: '#giris' }),
+        text('a', [20, 144, 220, 28], '2. Metrikler', {}, { href: '#metrikler' }),
+      ],
+    }, { position: 'fixed', backgroundColor: 'rgb(242, 237, 225)' })
+    const state0 = page([makeSidebar(0), text('h1', [320, 40, 600, 48], 'Hata Metrikleri', {}, { id: 'giris' })], { viewHeight: 900 })
+    const state1 = page([makeSidebar(1), text('h1', [320, 40, 600, 48], 'Sınıflandırma', {}, { id: 'metrikler' })], { viewHeight: 900 })
+    const result = canvasPageFromMeasured({
+      ...state0,
+      states: [{ label: '2. Metrikler', data: state1 }],
+    })
+
+    const sidebars = result.components.filter((c) => c.type === 'container' && c.props.scrollBehavior === 'fixed')
+    expect(sidebars).toHaveLength(1)
+    expect(sidebars[0].props.shownBy).toBeUndefined()
+    expect(result.parts[0]).toEqual({ key: 'p0', label: 'Hata Metrikleri' })
+  })
 })

@@ -73,9 +73,28 @@ function isPainted(s) {
     || (!!s.boxShadow && s.boxShadow !== 'none')
 }
 
+function hasNonUniformBorder(s) {
+  return !uniformBorder(s) && SIDES.some((side) => {
+    const edge = sideOf(s, side)
+    return edge.width > 0 && alphaOf(edge.color) > 0
+  })
+}
+
 function radiusOf(s) {
-  const corners = ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].map((corner) => s[`border${corner}Radius`] || '0px')
+  const corners = ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].map((corner) => String(s[`border${corner}Radius`] || '0px').trim())
   if (corners.every((corner) => px(corner) === 0)) return ''
+  if (corners.some((corner) => /\s/.test(corner))) {
+    const rx = []
+    const ry = []
+    for (const corner of corners) {
+      const parts = corner.split(/\s+/)
+      rx.push(parts[0])
+      ry.push(parts[1] || parts[0])
+    }
+    const xPart = rx.every((v) => v === rx[0]) ? rx[0] : rx.join(' ')
+    const yPart = ry.every((v) => v === ry[0]) ? ry[0] : ry.join(' ')
+    return `${xPart} / ${yPart}`
+  }
   return corners.every((corner) => corner === corners[0]) ? corners[0] : corners.join(' ')
 }
 
@@ -176,18 +195,22 @@ function named(made, n, ctx) {
   return made
 }
 
-// Extract label text + sample text style from a <button> holding an SVG/image icon
-// beside nested label spans, without absorbing real inputs or multi-link widgets.
+// Extract label text + sample text style from a simple <button> holding an
+// SVG/image icon beside a label span, without collapsing structured cards or
+// multi-part buttons (flashcards, MCQ options) that hold inner layout/states.
 function readButtonContent(n, state = { parts: [], sample: null }) {
   for (const kid of n.kids || []) {
     if (kid.kind === 'field' || kid.kind === 'list' || kid.tag === 'a' || kid.tag === 'button' || kid.tag === 'table') return null
     if (kid.kind === 'html' && kid.tag !== 'svg') return null
+    if (kid.keys?.length || kid.actions?.length || kid.runs?.length) return null
+    if (kid.tag !== 'svg' && (isPainted(kid.s) || hasNonUniformBorder(kid.s))) return null
     if (kid.kind === 'text') {
       const words = (kid.text || '').trim()
       if (words) {
         state.parts.push(words)
         if (!state.sample) state.sample = kid.s
       }
+      if (state.parts.length > 1) return null
       continue
     }
     if (kid.kind === 'image' || kid.kind === 'line' || kid.tag === 'svg') continue
@@ -454,6 +477,7 @@ function walkNode(n, out, origin, depth, ctx, href) {
     if (depth === 0 && isPinnedPos(n.s.position) && n.rect.w >= 1 && n.rect.h >= 1) {
       const children = []
       kids.forEach((kid) => walk(kid, children, { x: n.rect.x, y: n.rect.y }, depth + 1, ctx, inside))
+      children.push(...edgeLines(n, ctx))
       if (children.length) {
         const innerMax = children.reduce((max, c) => Math.max(max, subtreeDepth(c)), 0)
         const budget = Math.max(1, MAX_NESTING_DEPTH - 1 - innerMax)
@@ -466,6 +490,7 @@ function walkNode(n, out, origin, depth, ctx, href) {
     // Nothing of its own to show: what it holds stands where it stood, and
     // the first of it takes the box's id, so a link to the box still lands.
     const first = out.length
+    if (n.rect.w >= 1 && n.rect.h >= 1) out.push(...edgeLines(n, ctx, origin))
     kids.forEach((kid) => walk(kid, out, origin, depth, ctx, inside))
     lendId(out[first], n, ctx)
     return
@@ -487,7 +512,7 @@ function walkNode(n, out, origin, depth, ctx, href) {
   }
   // Nothing inside it, or too deep (or too flat) for a box with children:
   // the box is drawn as a shape, and what it held is laid over it.
-  const drawn = [shape(ctx, boxStyles(n.s), n.rect, origin), ...backdropOver(n, origin, ctx)]
+  const drawn = [shape(ctx, boxStyles(n.s), n.rect, origin), ...backdropOver(n, origin, ctx), ...edgeLines(n, ctx, origin)]
   if (depth === 0) pinBlocks(drawn, origin, n, ctx)
   out.push(...named(drawn, n, ctx))
   kids.forEach((kid) => walk(kid, out, origin, depth, ctx, inside))
@@ -678,20 +703,42 @@ const CHROME_PAINT_KEYS = new Set([
   'color', 'backgroundColor', 'backgroundImage', 'borderColor',
   'border', 'boxShadow', 'fontWeight', 'textDecoration', 'opacity',
 ])
-// Persistent pinned/navbar chrome often flips link colour or weight for the
-// active section across states; compare its structure and layout without those
-// paint tokens so it stays emitted once rather than per part.
-const chromeLook = (c) => JSON.stringify(c, (key, value) => {
-  if (key === 'id') return undefined
-  if (key === 'styles' && value && typeof value === 'object') {
-    const stripped = {}
-    for (const [k, v] of Object.entries(value)) {
-      if (!CHROME_PAINT_KEYS.has(k)) stripped[k] = v
-    }
-    return stripped
+const collectChromeHrefs = (c, out = []) => {
+  if (c?.props?.href) out.push(c.props.href)
+  if (Array.isArray(c?.props?.links)) {
+    for (const l of c.props.links) if (l?.href) out.push(l.href)
   }
-  return value
-})
+  if (Array.isArray(c?.children)) {
+    for (const child of c.children) collectChromeHrefs(child, out)
+  }
+  return out
+}
+
+// Persistent pinned/navbar chrome often flips link colour, weight, or a chapter
+// progress indicator across states; compare its navigation signature or stripped
+// structure so it stays emitted once rather than duplicated per part.
+const chromeLook = (c) => {
+  const hrefs = collectChromeHrefs(c)
+  if (hrefs.length >= 2) {
+    return JSON.stringify({
+      type: c.type,
+      scrollBehavior: c.props?.scrollBehavior,
+      layout: c.layout,
+      hrefs,
+    })
+  }
+  return JSON.stringify(c, (key, value) => {
+    if (key === 'id') return undefined
+    if (key === 'styles' && value && typeof value === 'object') {
+      const stripped = {}
+      for (const [k, v] of Object.entries(value)) {
+        if (!CHROME_PAINT_KEYS.has(k)) stripped[k] = v
+      }
+      return stripped
+    }
+    return value
+  })
+}
 
 // How many blocks of each kind a list holds, as the report counts them.
 function tally(list, into) {
@@ -717,12 +764,18 @@ function keepFirstAnchors(list, seen = new Set()) {
 
 // The words of the first heading in a list of blocks.
 function headingOf(list) {
-  for (const c of list) {
-    if (c.type === 'heading' && c.props.text) return c.props.text.replace(/\s+/g, ' ').trim().slice(0, 80)
-    const inside = headingOf(c.children || [])
-    if (inside) return inside
+  const nonChrome = list.filter((c) => !isChrome(c))
+  const scan = (items, tag) => {
+    for (const c of items) {
+      if (c.type === 'heading' && c.props.text && (!tag || c.props.level === tag)) {
+        return c.props.text.replace(/\s+/g, ' ').trim().slice(0, 80)
+      }
+      const inside = scan(c.children || [], tag)
+      if (inside) return inside
+    }
+    return ''
   }
-  return ''
+  return scan(nonChrome, 'h1') || scan(nonChrome, '') || scan(list, '')
 }
 
 const withKey = (c, key) => ({ ...c, props: { ...c.props, shownBy: [...new Set([key, ...(c.props.shownBy || [])])].slice(0, 16) } })

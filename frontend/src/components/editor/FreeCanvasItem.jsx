@@ -79,9 +79,9 @@ export default function FreeCanvasItem({
   // looked nothing like View. Measure the visible canvas band and render the
   // rail at that height, so Edit frames it exactly like the published page.
   const isFullHeightRail =
-    component.type === 'navbar' &&
-    component.props?.navLayout === 'vertical' &&
-    component.props?.scrollBehavior === 'fixed'
+    component.props?.scrollBehavior === 'fixed' &&
+    ((component.type === 'navbar' && component.props?.navLayout === 'vertical') ||
+      component.props?.pinHeight === 'full')
   const [railHeight, setRailHeight] = useState(0)
   useEffect(() => {
     if (!isFullHeightRail) return undefined
@@ -464,7 +464,7 @@ export default function FreeCanvasItem({
           />
         </div>
       ) : component.type === 'container' ? (
-        <div className="h-full w-full overflow-visible">
+        <div className={`h-full w-full ${isFullHeightRail ? 'overflow-y-auto overflow-x-hidden' : 'overflow-visible'}`}>
           <ContainerEditor
             component={component}
             canvasScale={canvasScale}

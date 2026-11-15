@@ -616,7 +616,7 @@ MAX_SHOWN_BY = 16
 MAX_ACTIONS = 8
 MAX_ACTION_KEYS = 400
 MAX_PAGE_KEYS = 20000
-MAX_PARTS = 60
+MAX_PARTS = 100
 
 
 def _show_keys(value, limit):

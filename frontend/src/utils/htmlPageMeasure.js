@@ -179,7 +179,14 @@ function readPage(token, frameWindow) {
       for (const rule of rules) {
         if (rule.constructor?.name !== 'CSSFontFaceRule' && rule.type !== 5) continue
         const family = (rule.style?.getPropertyValue('font-family') || '').replace(/["']/g, '').trim()
-        if (family && /url\(\s*["']?data:/i.test(rule.cssText)) faces.push({ family, css: rule.cssText })
+        if (family && /url\(\s*["']?data:/i.test(rule.cssText)) {
+          const css = rule.cssText
+          faces.push({
+            family,
+            css,
+            encoded: encodeURIComponent(css.replace(/&/g, '&amp;').replace(/</g, '&lt;')),
+          })
+        }
       }
     }
     return faces
@@ -189,6 +196,7 @@ function readPage(token, frameWindow) {
   // a formula is laid out by class rules, and a copy drawn without them
   // falls apart (an accent leaves its letter, a sum loses its limits).
   let sheetText = null
+  let encodedSheetText = null
   const pageCss = () => {
     if (sheetText !== null) return sheetText
     const parts = []
@@ -202,6 +210,11 @@ function readPage(token, frameWindow) {
     }
     sheetText = parts.join('\n')
     return sheetText
+  }
+  const encodedPageCss = () => {
+    if (encodedSheetText !== null) return encodedSheetText
+    encodedSheetText = encodeURIComponent(pageCss().replace(/&/g, '&amp;').replace(/</g, '&lt;'))
+    return encodedSheetText
   }
 
   // The box of everything `el` draws: an inline element's own box is one
@@ -223,18 +236,20 @@ function readPage(token, frameWindow) {
     // What a box that cuts off its overflow lets be seen of a node inside
     // it: a square root is drawn as a path far wider than the sign, cut to
     // size by the box around it.
+    const clips = new Map([[el, null]])
     const clipOf = (node) => {
-      let clip = null
-      for (let up = node.parentElement; up; up = up.parentElement) {
-        const ucs = win.getComputedStyle(up)
-        if (ucs.overflowX !== 'visible' || ucs.overflowY !== 'visible') {
-          const r = up.getBoundingClientRect()
-          clip = clip
-            ? { left: Math.max(clip.left, r.left), top: Math.max(clip.top, r.top), right: Math.min(clip.right, r.right), bottom: Math.min(clip.bottom, r.bottom) }
-            : { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
-        }
-        if (up === el) break
+      const p = node.parentElement
+      if (!p) return null
+      if (clips.has(p)) return clips.get(p)
+      let clip = p === el ? null : clipOf(p)
+      const ucs = win.getComputedStyle(p)
+      if (ucs.overflowX !== 'visible' || ucs.overflowY !== 'visible') {
+        const r = p.getBoundingClientRect()
+        clip = clip
+          ? { left: Math.max(clip.left, r.left), top: Math.max(clip.top, r.top), right: Math.min(clip.right, r.right), bottom: Math.min(clip.bottom, r.bottom) }
+          : { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
       }
+      clips.set(p, clip)
       return clip
     }
     for (const node of [el, ...el.querySelectorAll('*')]) {
@@ -265,18 +280,39 @@ function readPage(token, frameWindow) {
   // once, and each place it stands gets that drawing at its own position.
   const drawn = new Map()
   const picture = async (el) => {
+    const look = win.getComputedStyle(el)
+    const key = `${el.outerHTML}|${look.fontSize}|${look.color}|${look.accentColor}`
+    if (drawn.has(key)) {
+      const cached = await drawn.get(key)
+      if (!cached) return null
+      const r = el.getBoundingClientRect()
+      return {
+        src: cached.src,
+        box: {
+          left: r.left + cached.dx - 1,
+          top: r.top + cached.dy - 1,
+          width: cached.width,
+          height: cached.height,
+        },
+      }
+    }
     const box = inkBox(el)
     if (!box) return null
-    const look = win.getComputedStyle(el)
-    const key = `${el.outerHTML}|${look.fontSize}|${look.color}|${look.accentColor}|${look.width}|${look.height}`
-    if (drawn.has(key)) {
-      const src = await drawn.get(key)
-      return src ? { src, box: { left: box.left - 1, top: box.top - 1, width: Math.ceil(box.right - box.left) + 2, height: Math.ceil(box.bottom - box.top) + 2 } } : null
-    }
     let keep
     drawn.set(key, new Promise((resolve) => { keep = resolve }))
     const made = await drawPicture(el, box).catch(() => null)
-    keep(made ? made.src : null)
+    if (made) {
+      const r = el.getBoundingClientRect()
+      keep({
+        src: made.src,
+        dx: box.left - r.left,
+        dy: box.top - r.top,
+        width: made.box.width,
+        height: made.box.height,
+      })
+    } else {
+      keep(null)
+    }
     return made
   }
   const drawPicture = async (el, box) => {
@@ -309,17 +345,22 @@ function readPage(token, frameWindow) {
     const origin = stage.getBoundingClientRect()
     stage.remove()
     if (!alone) return null
-    const used = new Set()
-    for (const node of [el, ...el.querySelectorAll('*')]) {
-      for (const name of win.getComputedStyle(node).fontFamily.split(',')) used.add(name.replace(/["']/g, '').trim())
+    const allFaces = fontFaces()
+    let encodedFonts = ''
+    if (allFaces.length) {
+      const used = new Set()
+      const allNodes = [el, ...el.querySelectorAll('*')]
+      const textBearing = allNodes.filter((node) => [...node.childNodes].some((c) => c.nodeType === 3 && (c.nodeValue || '').trim()))
+      for (const node of (textBearing.length ? textBearing : [el])) {
+        for (const name of win.getComputedStyle(node).fontFamily.split(',')) used.add(name.replace(/["']/g, '').trim())
+      }
+      encodedFonts = allFaces.filter((face) => used.has(face.family)).map((face) => face.encoded).join('')
     }
-    const fonts = fontFaces().filter((face) => used.has(face.family)).map((face) => face.css).join('')
     const markup = new XMLSerializer().serializeToString(copy)
-    const rules = `${fonts}\n${pageCss()}`
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><style>${rules.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</style>`
-      + `<foreignObject x="0" y="0" width="${width}" height="${height}"><div xmlns="http://www.w3.org/1999/xhtml" style="position:absolute;left:${1 - (alone.left - origin.left)}px;top:${1 - (alone.top - origin.top)}px;white-space:nowrap;${context.replace(/"/g, '&quot;')}">${markup}</div></foreignObject></svg>`
+    const head = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><style>`
+    const tail = `</style><foreignObject x="0" y="0" width="${width}" height="${height}"><div xmlns="http://www.w3.org/1999/xhtml" style="position:absolute;left:${1 - (alone.left - origin.left)}px;top:${1 - (alone.top - origin.top)}px;white-space:nowrap;${context.replace(/"/g, '&quot;')}">${markup}</div></foreignObject></svg>`
     const image = new win.Image()
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(head)}${encodedFonts}%0A${encodedPageCss()}${encodeURIComponent(tail)}`
     await Promise.race([image.decode(), settle(4000).then(() => { throw new Error('too slow') })])
     const canvas = doc.createElement('canvas')
     const scale = 2
@@ -341,11 +382,32 @@ function readPage(token, frameWindow) {
     return y
   }
 
+  // Whether `el` carries words of its own outside math formulas (which are
+  // drawn as pictures).
+  const hasOutsideMathText = (el) => {
+    const walker = doc.createTreeWalker(el, 4 /* NodeFilter.SHOW_TEXT */)
+    let current = walker.nextNode()
+    while (current) {
+      if ((current.nodeValue || '').trim()) {
+        const p = current.parentElement
+        if (p && !SKIP_TAGS.has(p.tagName.toUpperCase()) && !p.closest(MATH) && !p.closest('svg')) return true
+      }
+      current = walker.nextNode()
+    }
+    return false
+  }
+
   // The words of a piece of running text with the formatting of each run,
   // as utils/richText.js keeps them. A piece that is not text (a formula, a
   // small picture, a box set in the line) is a picture in the line.
   const runsOf = (el, cs, node) => {
     const runs = []
+    const lineBaselines = new Map()
+    const lineBaseline = (child, rect) => {
+      const lineKey = Math.round(rect.top / 4)
+      if (!lineBaselines.has(lineKey)) lineBaselines.set(lineKey, baselineAt(child))
+      return lineBaselines.get(lineKey)
+    }
     const same = (a, b) => ['b', 'i', 'u', 'c', 'bg', 'f', 'z', 'v', 'href'].every((key) => a[key] === b[key])
     const push = (run) => {
       const last = runs[runs.length - 1]
@@ -368,10 +430,13 @@ function readPage(token, frameWindow) {
         const link = marks.href !== undefined ? { href: marks.href } : {}
         if (name === 'IMG') {
           const rect = child.getBoundingClientRect()
-          runs.push({ ...link, img: child.currentSrc || child.getAttribute('src') || '', w: rect.width, h: rect.height, va: baselineAt(child) - rect.bottom, alt: child.getAttribute('alt') || '' })
+          runs.push({ ...link, img: child.currentSrc || child.getAttribute('src') || '', w: rect.width, h: rect.height, va: lineBaseline(child, rect) - rect.bottom, alt: child.getAttribute('alt') || '' })
           continue
         }
         if (name === 'SVG' || child.matches(MATH) || /^inline-/.test(inner.display)) {
+          if (!inkBox(child)) continue
+          const room = child.getBoundingClientRect()
+          const baseY = lineBaseline(child, room)
           const run = { ...link, img: '', w: 0, h: 0, va: 0, alt: (child.getAttribute('aria-label') || '').slice(0, 300) }
           runs.push(run)
           jobs.push({
@@ -382,11 +447,10 @@ function readPage(token, frameWindow) {
               run.img = made.src
               run.w = made.box.width
               run.h = made.box.height
-              run.va = baselineAt(child) - (made.box.top + made.box.height)
+              run.va = baseY - (made.box.top + made.box.height)
               // The room the piece took in its line, which is not the size of
               // its ink: a formula's glyphs reach past it. The picture is set
               // back so it takes that room, its ink where it was.
-              const room = child.getBoundingClientRect()
               run.ml = Math.round((made.box.left - room.left) * 100) / 100
               run.mr = Math.round((room.right - (made.box.left + made.box.width)) * 100) / 100
             },
@@ -397,6 +461,7 @@ function readPage(token, frameWindow) {
         if (inner.fontWeight !== cs.fontWeight) next.b = inner.fontWeight
         if (inner.fontStyle !== cs.fontStyle) next.i = inner.fontStyle === 'italic' || inner.fontStyle === 'oblique' ? 'italic' : 'normal'
         if (inner.textDecorationLine !== 'none' && inner.textDecorationLine !== cs.textDecorationLine) next.u = inner.textDecorationLine
+        else if (inner.backgroundImage && inner.backgroundImage !== 'none') next.u = 'underline'
         if (inner.color !== cs.color) next.c = inner.color
         if (inner.backgroundColor !== 'rgba(0, 0, 0, 0)') next.bg = inner.backgroundColor
         if (inner.fontFamily !== cs.fontFamily) next.f = inner.fontFamily.replace(/"/g, "'")
@@ -429,6 +494,105 @@ function readPage(token, frameWindow) {
     return `data:image/svg+xml;base64,${btoa(binary)}`
   }
 
+  // A list item's marker (bullet, number or CSS counter) when the item holds
+  // rich formatting or children and so cannot be part of a plain `list` block.
+  const itemMarkerOf = (el, node, cs, firstY) => {
+    if (el.tagName !== 'LI') return null
+    const cleanStyle = (base) => ({
+      ...base,
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+      backgroundImage: 'none',
+      boxShadow: 'none',
+      borderTopWidth: '0px',
+      borderRightWidth: '0px',
+      borderBottomWidth: '0px',
+      borderLeftWidth: '0px',
+      paddingTop: '0px',
+      paddingRight: '0px',
+      paddingBottom: '0px',
+      paddingLeft: '0px',
+    })
+    const parent = el.parentElement
+    const items = parent ? [...parent.children].filter((c) => c.tagName === 'LI') : []
+    const index = Math.max(0, items.indexOf(el))
+    const fs = parseFloat(cs.fontSize) || 16
+    const lh = Math.min(node.rect.h || 24, parseFloat(cs.lineHeight) || fs * 1.4)
+    const isJsdom = /\bjsdom\b/i.test(win.navigator?.userAgent || '')
+    const beforeCs = isJsdom ? null : win.getComputedStyle(el, '::before')
+    const rawContent = (beforeCs?.content || '').trim()
+    if (rawContent && rawContent !== 'none' && rawContent !== 'normal' && !isHidden(beforeCs)) {
+      let label = ''
+      if (/^counter\(/i.test(rawContent)) label = String(index + 1)
+      else if ((rawContent.startsWith('"') && rawContent.endsWith('"')) || (rawContent.startsWith("'") && rawContent.endsWith("'"))) {
+        label = rawContent.slice(1, -1).trim()
+      }
+      if (label) {
+        const bw = Math.max(12, parseFloat(beforeCs.width) || fs * 1.7)
+        const left = node.rect.x + (parseFloat(beforeCs.left) || 0)
+        return {
+          tag: 'span',
+          kind: 'text',
+          text: label,
+          rect: { x: Math.max(0, left), y: firstY, w: bw, h: lh },
+          s: cleanStyle(readStyles(beforeCs)),
+        }
+      }
+    }
+    if (cs.display === 'list-item' && cs.listStyleType && cs.listStyleType !== 'none') {
+      const startAttr = parent?.tagName === 'OL' ? parseInt(parent.getAttribute('start') || '1', 10) : 1
+      const start = Number.isFinite(startAttr) ? startAttr : 1
+      const label = parent?.tagName === 'OL'
+        ? `${index + start}.`
+        : cs.listStyleType === 'circle' ? '◦' : cs.listStyleType === 'square' ? '▪' : '•'
+      const mw = Math.max(12, Math.ceil(fs * 1.35))
+      const markerCs = isJsdom ? null : win.getComputedStyle(el, '::marker')
+      const color = markerCs?.color || cs.color
+      return {
+        tag: 'span',
+        kind: 'text',
+        text: label,
+        rect: { x: Math.max(0, node.rect.x - mw - Math.round(fs * 0.25)), y: firstY, w: mw, h: lh },
+        s: { ...cleanStyle(node.s), color, textAlign: 'right' },
+      }
+    }
+    return null
+  }
+
+  const withItemMarker = (el, node, cs, measured) => {
+    if (!measured || el.tagName !== 'LI') return measured
+    const firstY = measured.ink?.y ?? measured.kids?.[0]?.ink?.y ?? measured.kids?.[0]?.rect?.y ?? node.rect.y
+    const marker = itemMarkerOf(el, node, cs, firstY)
+    if (!marker) return measured
+    if (measured.kind === 'text') {
+      const inner = { ...measured }
+      delete inner.id
+      delete inner.keys
+      delete inner.room
+      delete inner.actions
+      return {
+        ...node,
+        s: {
+          ...node.s,
+          backgroundColor: 'rgba(0, 0, 0, 0)',
+          backgroundImage: 'none',
+          boxShadow: 'none',
+        },
+        kids: [marker, inner],
+      }
+    }
+    if (Array.isArray(measured.kids)) {
+      return { ...measured, kids: [marker, ...measured.kids] }
+    }
+    return measured
+  }
+
+  const TEXT_CONTAINER_TAGS = new Set([
+    'P', 'LI', 'TD', 'TH', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+    'FIGCAPTION', 'SUMMARY', 'LABEL', 'CAPTION', 'DT', 'DD', 'BLOCKQUOTE',
+  ])
+
+  let holdsChapter = () => false
+
   const measureNode = (el) => {
     const tag = el.tagName.toUpperCase()
     if (SKIP_TAGS.has(tag)) return null
@@ -436,10 +600,15 @@ function readPage(token, frameWindow) {
     if (isHidden(cs)) {
       // A part with words in it that the page is not showing now: another
       // chapter, a closed menu, an answer behind a button.
-      if ((el.textContent || '').trim().length >= 40) stats.hidden += 1
+      if (!holdsChapter(el) && (el.textContent || '').trim().length >= 40) stats.hidden += 1
       return null
     }
-    const node = { tag: tag.toLowerCase(), rect: boxOf(el.getBoundingClientRect()), s: readStyles(cs) }
+    const rect = boxOf(el.getBoundingClientRect())
+    if (tag !== 'BODY' && tag !== 'HTML') {
+      if (rect.x + rect.w <= 0 || rect.y + rect.h <= 0) return null
+      if ((cs.position === 'absolute' || cs.position === 'fixed') && (cs.clip === 'rect(0px, 0px, 0px, 0px)' || cs.clip === 'rect(1px, 1px, 1px, 1px)' || /^inset\(50%/i.test(cs.clipPath || ''))) return null
+    }
+    const node = { tag: tag.toLowerCase(), rect, s: readStyles(cs) }
     if (el.hasAttribute(STICKY_ATTR)) node.s.position = 'sticky'
     if (tag === 'A') node.href = el.getAttribute('href') || ''
     if (el.id) node.id = el.id
@@ -492,6 +661,7 @@ function readPage(token, frameWindow) {
       }
     }
     if (el.matches(MATH)) {
+      if (!inkBox(el)) return null
       const drawn = { ...node, kind: 'image', src: '', alt: (el.getAttribute('aria-label') || '').slice(0, 300), s: { ...node.s, objectFit: 'fill' } }
       jobs.push({ el, node: drawn, owner: el, done: (made) => { drawn.src = made.src; drawn.rect = { x: made.box.left + win.scrollX, y: made.box.top + win.scrollY, w: made.box.width, h: made.box.height } } })
       return drawn
@@ -513,27 +683,7 @@ function readPage(token, frameWindow) {
       }
     }
 
-    // Running text: words of its own, and nothing beside them but pieces that
-    // sit in the line. One text block when its formatting is plain; kept as
-    // it is when the canvas's text block cannot hold it (a link inside the
-    // sentence, a run in another weight, slant, colour or face, a formula).
-    if (words && ownText(el) && elements.every(inlineLevel)) {
-      const simple = inside.every((child) => INLINE_TAGS.has(child.tagName.toUpperCase()))
-      const rich = !simple || inside.some((child) => {
-        if (!(child.textContent || '').trim()) return false
-        if (child.tagName === 'A' && child.getAttribute('href')) return true
-        const inner = win.getComputedStyle(child)
-        return inner.fontWeight !== cs.fontWeight || inner.fontStyle !== cs.fontStyle
-          || inner.color !== cs.color || inner.textDecorationLine !== cs.textDecorationLine
-          || inner.fontFamily !== cs.fontFamily || inner.backgroundColor !== 'rgba(0, 0, 0, 0)'
-      })
-      if (!rich) return { ...node, kind: 'text', text: words, ink: inkOf(el) }
-      const written = { ...node, kind: 'text', ink: inkOf(el) }
-      written.runs = runsOf(el, cs, written)
-      written.text = written.runs.map((run) => (run.t === undefined ? '' : run.t)).join('')
-      return written
-    }
-    if (words && elements.length === 1 && inside.every((child) => INLINE_TAGS.has(child.tagName.toUpperCase()) && inlineLevel(child))) {
+    if (words && !ownText(el) && elements.length === 1 && inside.every((child) => INLINE_TAGS.has(child.tagName.toUpperCase()) && inlineLevel(child) && !child.matches(MATH))) {
       // One run of formatting around all of the words (<h1><span>…</span></h1>,
       // <p><a>…</a></p>): the words take its look, the box stays this element's.
       let inner = elements[0]
@@ -547,8 +697,35 @@ function readPage(token, frameWindow) {
         const look = readStyles(win.getComputedStyle(inner))
         const text = {}
         for (const key of TEXT_STYLES) text[key] = look[key]
-        return { ...node, kind: 'text', text: words, ink: inkOf(el), ...(href !== undefined ? { href } : {}), s: { ...node.s, ...text } }
+        return withItemMarker(el, node, cs, { ...node, kind: 'text', text: words, ink: inkOf(el), ...(href !== undefined ? { href } : {}), s: { ...node.s, ...text } })
       }
+    }
+
+    // Running text: words of its own, and nothing beside them but pieces that
+    // sit in the line. One text block when its formatting is plain; kept as
+    // runs when a sentence mixes inline weights, colours, links or formulas.
+    const canMergeInlineRuns = ownText(el) || (
+      TEXT_CONTAINER_TAGS.has(tag)
+      && elements.length >= 1
+      && hasOutsideMathText(el)
+      && !inside.some((c) => c.hasAttribute(KEY_ATTR) || c.hasAttribute(DO_ATTR) || /^(BUTTON|INPUT|SELECT|TEXTAREA|TABLE|UL|OL)$/.test(c.tagName.toUpperCase()))
+    )
+    if (words && canMergeInlineRuns && elements.every(inlineLevel)) {
+      const simple = ownText(el) && inside.every((child) => INLINE_TAGS.has(child.tagName.toUpperCase()) && !child.matches(MATH))
+      const rich = !simple || inside.some((child) => {
+        if (!(child.textContent || '').trim()) return false
+        if (child.tagName === 'A' && child.getAttribute('href')) return true
+        const inner = win.getComputedStyle(child)
+        return inner.fontWeight !== cs.fontWeight || inner.fontStyle !== cs.fontStyle
+          || inner.color !== cs.color || inner.textDecorationLine !== cs.textDecorationLine
+          || inner.fontFamily !== cs.fontFamily || inner.backgroundColor !== 'rgba(0, 0, 0, 0)'
+          || (inner.backgroundImage && inner.backgroundImage !== 'none')
+      })
+      if (!rich) return withItemMarker(el, node, cs, { ...node, kind: 'text', text: words, ink: inkOf(el) })
+      const written = { ...node, kind: 'text', ink: inkOf(el) }
+      written.runs = runsOf(el, cs, written)
+      written.text = written.runs.map((run) => (run.t === undefined ? '' : run.t)).join('')
+      return withItemMarker(el, node, cs, written)
     }
 
     const kids = []
@@ -572,7 +749,7 @@ function readPage(token, frameWindow) {
         }
       }
     }
-    return { ...node, kids }
+    return withItemMarker(el, node, cs, { ...node, kids })
   }
 
   // A frame read from outside has no scripts of its own, and a timer set on
@@ -588,7 +765,7 @@ function readPage(token, frameWindow) {
     try {
       // Entrance effects are read as they stand once they have played.
       const still = doc.createElement('style')
-      still.textContent = '*,*::before,*::after{animation:none!important;transition:none!important}'
+      still.textContent = 'html,*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}'
       doc.head?.appendChild(still)
       await Promise.race([doc.fonts?.ready || Promise.resolve(), settle(4000)])
       await Promise.race([
@@ -615,7 +792,7 @@ function readPage(token, frameWindow) {
           const known = found.get(part)
           if (!known || (target === part && !known.exact)) found.set(part, { part, link, exact: target === part })
         }
-        for (const candidate of [...found.values()].slice(0, 30)) {
+        for (const candidate of [...found.values()].slice(0, 100)) {
           if (await linkShows(candidate)) states.push(candidate)
         }
       }
@@ -637,9 +814,8 @@ function readPage(token, frameWindow) {
   }
 
   // Whether an element is, or holds, a part of the page a link leads to (a
-  // chapter): those are read one by one, never opened to be read nor learnt
-  // as what a button shows. The chapter the page opened on counts too, once
-  // another one is shown and it is hidden.
+  // chapter), or sits inside one that is currently hidden: those are read one
+  // by one, never opened to be read nor learnt as what a button shows.
   function chapterCheck() {
     const parts = new Set(states.map(({ part }) => part))
     // The chapter the page opened on, now that another one is shown.
@@ -647,8 +823,19 @@ function readPage(token, frameWindow) {
       const root = hiddenRoot(target)
       if (root) parts.add(root)
     }
-    const list = [...parts]
-    return (el) => list.some((part) => el === part || el.contains(part))
+    const ancestors = new Set()
+    const hiddenSet = new Set()
+    for (const part of parts) {
+      if (hiddenRoot(part)) hiddenSet.add(part)
+      for (let p = part.parentElement; p; p = p.parentElement) ancestors.add(p)
+    }
+    return (el) => {
+      if (parts.has(el) || ancestors.has(el)) return true
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        if (hiddenSet.has(p)) return true
+      }
+      return false
+    }
   }
 
   // What the page's "#id" links lead to.
@@ -680,14 +867,16 @@ function readPage(token, frameWindow) {
     let shows = false
     try {
       link.click()
-      await settle(120)
+      await settle(25)
+      if (hiddenRoot(part)) await settle(95)
       if (hiddenRoot(part)) {
         go(link.getAttribute('href'))
-        await settle(150)
+        await settle(25)
+        if (hiddenRoot(part)) await settle(125)
       }
       shows = !hiddenRoot(part)
       go(home)
-      await settle(150)
+      await settle(25)
     } catch { /* not shown */ }
     log.push(...watch.takeRecords())
     watch.disconnect()
@@ -712,6 +901,15 @@ function readPage(token, frameWindow) {
   // the screen.
   function reveal() {
     const holdsState = chapterCheck()
+    for (const [el, look] of revealedLooks) {
+      if (holdsState(el)) continue
+      if (look.className && el.getAttribute('class') !== look.className) {
+        el.setAttribute('class', look.className)
+      }
+      if (look.text && el.children.length === 0 && !(el.textContent || '').trim()) {
+        el.textContent = look.text
+      }
+    }
     for (const el of doc.body.querySelectorAll('details:not([open])')) {
       if (!holdsState(el)) el.open = true
     }
@@ -727,6 +925,24 @@ function readPage(token, frameWindow) {
       if (holdsState(el) || ownShown(el) || win.getComputedStyle(el).position === 'fixed') continue
       el.hidden = false
       if (!ownShown(el)) el.style.setProperty('display', 'block', 'important')
+    }
+    for (const step of doc.body.querySelectorAll('.step')) {
+      if (!holdsState(step) && !step.hidden && !step.classList.contains('on')) step.classList.add('on')
+    }
+    for (const q of doc.body.querySelectorAll('.q')) {
+      if (holdsState(q)) continue
+      try { if (q._s?.viz?.go) q._s.viz.go(q._s.n, false) } catch { /* ignore */ }
+    }
+    for (const btn of doc.body.querySelectorAll(`button[disabled][${DO_ATTR}]`)) {
+      if (!holdsState(btn)) btn.disabled = false
+    }
+    if (states.length > 0 || openTargets.length > 0) {
+      for (const link of doc.body.querySelectorAll('aside a[href^="#"], nav a[href^="#"], header a[href^="#"], [role="navigation"] a[href^="#"]')) {
+        for (const cls of ['cur', 'done', 'active', 'current', 'is-active', 'selected']) {
+          if (link.classList.contains(cls)) link.classList.remove(cls)
+        }
+        if (link.hasAttribute('aria-current')) link.removeAttribute('aria-current')
+      }
     }
   }
 
@@ -771,6 +987,7 @@ function readPage(token, frameWindow) {
   }
   const WATCH_ALL = { subtree: true, attributes: true, attributeOldValue: true, characterData: true, characterDataOldValue: true, childList: true }
   const keyed = new Map()
+  const revealedLooks = new Map()
   let keyCount = 0
   const parent = new Map()
   const root = (key) => { let k = key; while (parent.has(k)) k = parent.get(k); return k }
@@ -786,12 +1003,38 @@ function readPage(token, frameWindow) {
     const box = el.parentElement
     return !(box && box.tagName === 'DETAILS' && !box.open && el.tagName !== 'SUMMARY')
   }
-  const pressable = (el) => !el.disabled && !el.hasAttribute(DO_ATTR) && !el.closest('a[href]')
-    && (el.checkVisibility ? el.checkVisibility({ visibilityProperty: true }) : el.getClientRects().length > 0)
-  const buttons = () => [...doc.body.querySelectorAll('button, summary, [role="button"]')].filter(pressable)
+  const rememberLook = (el, className, text) => {
+    const prev = revealedLooks.get(el) || {}
+    revealedLooks.set(el, {
+      className: className ?? prev.className,
+      text: text ?? prev.text,
+    })
+  }
+  const recordRevealed = (shown, records) => {
+    for (const el of shown) {
+      if (el.hasAttribute('class')) rememberLook(el, el.getAttribute('class'), undefined)
+      if (el.children.length === 0 && (el.textContent || '').trim()) rememberLook(el, undefined, el.textContent)
+      for (const sub of el.querySelectorAll('*')) {
+        if (sub.hasAttribute('class')) rememberLook(sub, sub.getAttribute('class'), undefined)
+        if (sub.children.length === 0 && (sub.textContent || '').trim()) rememberLook(sub, undefined, sub.textContent)
+      }
+    }
+    for (const record of records) {
+      if (record.type !== 'characterData' && record.type !== 'childList') continue
+      const targetEl = record.target.nodeType === 1 ? record.target : record.target.parentElement
+      if (!targetEl || targetEl.closest?.('button, summary, [role="button"]')) continue
+      if (targetEl.children.length === 0 && (targetEl.textContent || '').trim()) {
+        rememberLook(targetEl, undefined, targetEl.textContent)
+      }
+    }
+  }
 
   async function explore() {
     const holdsState = chapterCheck()
+    const pressable = (el) => !el.disabled && !el.hasAttribute(DO_ATTR) && !el.closest('a[href]')
+      && !holdsState(el) && !el.closest('[data-lab], .timer') && !el.classList?.contains('p-zoom')
+      && (el.checkVisibility ? el.checkVisibility({ visibilityProperty: true }) : el.getClientRects().length > 0)
+    const buttons = () => [...doc.body.querySelectorAll('button, summary, [role="button"]')].filter(pressable)
     const log = []
     const watch = new MutationObserver((list) => { log.push(...list) })
     watch.observe(doc.body, WATCH_ALL)
@@ -800,6 +1043,11 @@ function readPage(token, frameWindow) {
     const backTo = (mark) => {
       flush()
       undo(log.slice(mark))
+      for (const q of doc.body.querySelectorAll('.q')) {
+        if (holdsState(q) || !q._s || typeof q._s.i !== 'number') continue
+        const work = q.querySelector('.q-work')
+        q._s.i = work && work.hidden ? 0 : [...q.querySelectorAll('.step')].filter((s) => !s.hidden).length
+      }
       flush()
       log.length = mark
     }
@@ -807,17 +1055,18 @@ function readPage(token, frameWindow) {
       flush()
       const mark = log.length
       button.click()
-      await settle(25)
-      // A page may show what it shows a moment later (a timer, a "loading"
-      // look first): a press that has shown or hidden nothing yet is
-      // watched a while longer.
-      // 300 ms for a press that changed nothing yet, 150 ms for one that
-      // changed only a look.
-      let seen = flips(mark)
-      for (let wait = 0; !seen.shown.length && !seen.hidden.length && wait < (log.length > mark ? 3 : 6); wait++) {
-        await settle(50)
-        seen = flips(mark)
+      await settle(5)
+      flush()
+      const checked = log.length
+      let seen = checked > mark ? flips(mark) : { shown: [], hidden: [] }
+      if (!seen.shown.length && !seen.hidden.length && checked === mark) {
+        await settle(25)
+        flush()
+        if (log.length > checked) {
+          seen = flips(mark)
+        }
       }
+      if (seen.shown.length) recordRevealed(seen.shown, log.slice(mark))
       return seen
     }
     // What the changes since `mark` have shown and hidden: each changed
@@ -916,13 +1165,18 @@ function readPage(token, frameWindow) {
         idle.push(button)
         return
       }
+      flush()
+      const afterLearn = log.length
       // Buttons that came into view or became pressable through it, and
       // those that one of them brought (a "previous step" comes alive once
       // a step is shown).
       for (let round = 0; round < 20 && !out(); round++) {
         const fresh = buttons().filter((next) => !before.has(next) && !tried.has(next))
         if (!fresh.length) break
-        for (const next of fresh) await visit(next)
+        for (const next of fresh) {
+          await visit(next)
+          backTo(afterLearn)
+        }
       }
     }
     flush()
@@ -956,16 +1210,18 @@ function readPage(token, frameWindow) {
     }
     backTo(start)
     watch.disconnect()
-    // A button that shows a box of steps starts them over: the steps after
-    // the first, hidden when the page opened, are hidden by it too (or a
-    // "start over" that left them open would show them all again). Only
-    // steps a next/previous button walks through: a box of other things
+    // A button that shows or hides a box of steps starts them over: the
+    // steps after the first, hidden when the page opened, are hidden by it
+    // too (or a "start over" that left them open would show them all again).
+    // Only steps a next/previous button walks through: a box of other things
     // keeps what was opened in it.
     const steps = new Set([...plan.values()].flat().filter((action) => action.do === 'next' || action.do === 'prev').flatMap((action) => action.units))
     for (const actions of plan.values()) {
       const shown = actions.filter((action) => action.do === 'show').flatMap((action) => action.units)
-      if (!shown.length) continue
-      const inside = [...steps].filter((el) => !shown.includes(el) && !ownShown(el) && shown.some((box) => box !== el && box.contains(el)))
+      const hidden = actions.filter((action) => action.do === 'hide').flatMap((action) => action.units)
+      const boxes = [...shown, ...hidden]
+      if (!boxes.length) continue
+      const inside = [...steps].filter((el) => !shown.includes(el) && !ownShown(el) && boxes.some((box) => box !== el && box.contains(el)))
       if (!inside.length) continue
       const hide = actions.find((action) => action.do === 'hide')
       if (hide) hide.units = [...new Set([...hide.units, ...inside])]
@@ -975,8 +1231,12 @@ function readPage(token, frameWindow) {
     for (const actions of plan.values()) for (const action of actions) action.units.forEach(keyOf)
     // The page as it opened: what of it is hidden.
     const off = new Set()
-    for (const [el, key] of keyed) if (!ownShown(el)) off.add(root(key))
+    for (const [el, key] of keyed) {
+      if (holdsState(el)) continue
+      if (!ownShown(el)) off.add(root(key))
+    }
     for (const [el] of keyed) {
+      if (holdsState(el)) continue
       const mine = root(keyed.get(el))
       const had = (el.getAttribute(KEY_ATTR) || '').split(' ').filter(Boolean)
       if (!had.includes(mine)) el.setAttribute(KEY_ATTR, [...had, mine].join(' '))
@@ -995,6 +1255,7 @@ function readPage(token, frameWindow) {
   // by its height and the gap under it, but by what the browser gives back,
   // margins and the padding of the box it is in counted as they fall.
   function measureRooms() {
+    const holdsState = chapterCheck()
     const after = (el) => {
       for (let up = el; up && up !== doc.body; up = up.parentElement) {
         for (let next = up.nextElementSibling; next; next = next.nextElementSibling) {
@@ -1011,7 +1272,7 @@ function readPage(token, frameWindow) {
     const anchoring = doc.documentElement.style.getPropertyValue('overflow-anchor')
     doc.documentElement.style.setProperty('overflow-anchor', 'none')
     for (const el of doc.body.querySelectorAll(`[${KEY_ATTR}]`)) {
-      if (!el.checkVisibility()) continue
+      if (holdsState(el) || !el.checkVisibility()) continue
       const next = after(el)
       const before = next ? at(next, 'top') : at(el, 'bottom')
       const display = el.style.getPropertyValue('display')
@@ -1030,21 +1291,22 @@ function readPage(token, frameWindow) {
   async function snapshot() {
     stats.hidden = 0
     jobs = []
+    win.scrollTo(0, 0)
     let off
     try { off = await explore() } catch { off = [] }
     // What is opened to be read is closed again afterwards: the next part
     // of the page is learnt from how it opens, not from this reading.
-    // Records are handed to the observer's callback while the pictures are
-    // drawn, so they are kept as they come.
     const openedLog = []
     const opened = new MutationObserver((list) => { openedLog.push(...list) })
     opened.observe(doc.body, WATCH_ALL)
     reveal()
+    const holdsState = chapterCheck()
+    holdsChapter = holdsState
     // A box that sticks to the screen while the page scrolls (a bar of
     // buttons at the bottom of a long solution) is read where it stands in
     // the page, not where it is stuck: it says it sticks.
     for (const el of doc.body.querySelectorAll('*')) {
-      if (win.getComputedStyle(el).position !== 'sticky') continue
+      if (holdsState(el) || win.getComputedStyle(el).position !== 'sticky') continue
       el.setAttribute(STICKY_ATTR, '')
       el.style.setProperty('position', 'relative', 'important')
     }
@@ -1054,28 +1316,35 @@ function readPage(token, frameWindow) {
     // script that scrolled it to the open chapter's link would otherwise
     // leave the top of it cut off on the canvas.
     for (const el of doc.body.querySelectorAll('*')) {
+      if (holdsState(el)) continue
       if (el.scrollTop) el.scrollTop = 0
       if (el.scrollLeft) el.scrollLeft = 0
     }
     const bodyStyle = win.getComputedStyle(doc.body)
     const rootStyle = win.getComputedStyle(doc.documentElement)
     const root = measureNode(doc.body)
-    // The pictures, one after another. Where one cannot be drawn, what it
-    // was part of is kept as it is instead, in an HTML block.
-    for (const job of jobs) {
-      if (job.node.kind === 'html') continue
-      let made = null
-      try { made = await picture(job.el) } catch { /* kept as HTML below */ }
-      if (made) job.done(made)
-      else {
-        job.node.kind = 'html'
-        job.node.code = standaloneHtml(job.owner, false)
-        delete job.node.runs
-        delete job.node.src
+    openedLog.push(...opened.takeRecords())
+    opened.disconnect()
+    // The pictures, drawn with bounded concurrency. Where one cannot be
+    // drawn, what it was part of is kept as it is instead, in an HTML block.
+    let cursor = 0
+    const runWorker = async () => {
+      while (cursor < jobs.length) {
+        const job = jobs[cursor++]
+        if (job.node.kind === 'html') continue
+        let made = null
+        try { made = await picture(job.el) } catch { /* kept as HTML below */ }
+        if (made) job.done(made)
+        else {
+          job.node.kind = 'html'
+          job.node.code = standaloneHtml(job.owner, false)
+          delete job.node.runs
+          delete job.node.src
+        }
       }
     }
-    undo([...openedLog, ...opened.takeRecords()])
-    opened.disconnect()
+    await Promise.all(Array.from({ length: Math.min(16, jobs.length) }, () => runWorker()))
+    undo(openedLog)
     return root && {
       width: win.innerWidth,
       viewHeight: win.innerHeight,
@@ -1089,7 +1358,7 @@ function readPage(token, frameWindow) {
       language: doc.documentElement.getAttribute('lang') || '',
       hiddenParts: stats.hidden,
       fontLinks: [...doc.querySelectorAll('link[rel~="stylesheet"][href]')].map((link) => link.getAttribute('href')),
-      fontFaces: fontFaces(),
+      fontFaces: fontFaces().map(({ family, css }) => ({ family, css })),
       // Every id that is on show: where a link to it should lead.
       ids: [...doc.querySelectorAll('[id]')].filter((el) => !hiddenRoot(el)).map((el) => el.id),
       root,
@@ -1105,7 +1374,8 @@ function readPage(token, frameWindow) {
       const state = states[index]
       if (!state) return reply(null, 'no such state')
       state.link.click()
-      await settle(350)
+      await settle(40)
+      if (hiddenRoot(state.part)) await settle(160)
       if (hiddenRoot(state.part)) {
         // The frame's address is one the browser will not follow a "#" link
         // on, so a page that waits for its address to change never hears of
@@ -1114,10 +1384,11 @@ function readPage(token, frameWindow) {
         win.history.replaceState(null, '', state.link.getAttribute('href'))
         win.dispatchEvent(new win.HashChangeEvent('hashchange', { oldURL: before, newURL: win.location.href }))
         win.dispatchEvent(new win.PopStateEvent('popstate', { state: null }))
-        await settle(350)
+        await settle(60)
+        if (hiddenRoot(state.part)) await settle(200)
       }
       if (hiddenRoot(state.part)) return reply(null, 'still hidden')
-      await Promise.race([doc.fonts?.ready || Promise.resolve(), settle(2000)])
+      await Promise.race([doc.fonts?.ready || Promise.resolve(), settle(1000)])
       return reply(await snapshot())
     } catch (error) {
       return reply(null, String(error))
@@ -1251,7 +1522,7 @@ function readWithoutScripts(html, { width, height, timeout }) {
 // cannot be read. `ranScripts` on the reading says which way it was read.
 // `states` holds the parts the page shows one at a time, each read like the
 // page itself (`data`, null for one that did not come into view) and named.
-export async function measureHtmlPage(html, { width = 1200, height = 900, timeout = 15000, onProgress } = {}) {
+export async function measureHtmlPage(html, { width = 1280, height = 900, timeout = 45000, onProgress } = {}) {
   const options = { width, height, timeout, onProgress }
   // A browser now and then gives the frame no layout (a tab it is not
   // drawing): the reading is tried once more before going without scripts.

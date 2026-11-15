@@ -17,6 +17,7 @@ function installFrameStubs(doc, win) {
   const proto = win.Element?.prototype || Element.prototype
   proto.checkVisibility = () => true
   proto.getBoundingClientRect = function mockRect() {
+    if (this.classList?.contains('skip')) return { left: -9999, top: 0, right: -9900, bottom: 24, width: 99, height: 24 }
     const tag = this.tagName?.toUpperCase()
     if (tag === 'BODY' || tag === 'HTML') return { left: 0, top: 0, right: 1200, bottom: 900, width: 1200, height: 900 }
     if (tag === 'SVG') return { left: 20, top: 20, right: 44, bottom: 44, width: 24, height: 24 }
@@ -155,5 +156,42 @@ describe('measureHtmlPage SVG inlining', () => {
     const parsed = new DOMParser().parseFromString(formNode.code, 'text/html')
     expect(parsed.querySelector('form').hasAttribute('id')).toBe(false)
     expect(parsed.querySelector('input').getAttribute('id')).toBe('user-email')
+  })
+
+  it('merges inline-only children in text containers into rich runs, emits list item markers, and drops off-screen skip links', async () => {
+    const html = `<!doctype html><html><head><style>
+      .skip { position: absolute; left: -9999px; top: 0; }
+      .kalem { text-decoration-line: underline; }
+    </style></head><body>
+      <a class="skip" href="#main">İçeriğe geç</a>
+      <p id="highlight"><mark class="kalem"><strong>Önemli</strong><span class="tex"></span> nokta</mark></p>
+      <ol start="3">
+        <li id="rich-item"><span>Adım</span> <strong>üç</strong></li>
+      </ol>
+    </body></html>`
+
+    const reading = await measureHtmlPage(html, { width: 1280, height: 900, timeout: 2000 })
+    expect(reading).not.toBeNull()
+    const serialized = JSON.stringify(reading.root)
+    expect(serialized).not.toContain('İçeriğe geç')
+
+    const pNode = reading.root.kids.find((node) => node.id === 'highlight')
+    expect(pNode).toMatchObject({
+      tag: 'p',
+      kind: 'text',
+      text: 'Önemli nokta',
+    })
+    expect(pNode.runs).toEqual([
+      expect.objectContaining({ t: 'Önemli', u: 'underline' }),
+      expect.objectContaining({ t: ' nokta', u: 'underline' }),
+    ])
+
+    const olNode = reading.root.kids.find((node) => node.tag === 'ol')
+    expect(olNode).toBeTruthy()
+    const liNode = olNode.kids[0]
+    expect(liNode.id).toBe('rich-item')
+    expect(liNode.kids).toHaveLength(2)
+    expect(liNode.kids[0]).toMatchObject({ tag: 'span', kind: 'text', text: '3.' })
+    expect(liNode.kids[1]).toMatchObject({ tag: 'li', kind: 'text', text: 'Adım üç' })
   })
 })
