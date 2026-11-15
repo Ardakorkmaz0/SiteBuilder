@@ -1051,23 +1051,23 @@ function readPage(token, frameWindow) {
       flush()
       log.length = mark
     }
-    const press = async (button) => {
+    const press = async (button, fast = false) => {
       flush()
       const mark = log.length
       button.click()
-      await settle(5)
+      await settle(fast ? 10 : 25)
       flush()
-      const checked = log.length
-      let seen = checked > mark ? flips(mark) : { shown: [], hidden: [] }
-      if (!seen.shown.length && !seen.hidden.length && checked === mark) {
-        await settle(25)
-        flush()
-        if (log.length > checked) {
+      let seen = log.length > mark ? flips(mark) : { shown: [], hidden: [] }
+      let delayed = false
+      if (!fast) {
+        for (let wait = 0; !seen.shown.length && !seen.hidden.length && wait < (log.length > mark ? 3 : 6); wait++) {
+          delayed = true
+          await settle(50)
           seen = flips(mark)
         }
       }
       if (seen.shown.length) recordRevealed(seen.shown, log.slice(mark))
-      return seen
+      return { ...seen, delayed }
     }
     // What the changes since `mark` have shown and hidden: each changed
     // element and what is inside it, looked at with the old attributes put
@@ -1119,17 +1119,18 @@ function readPage(token, frameWindow) {
     const out = () => presses > 1500 || Date.now() - started > 60000
     const learn = async (button) => {
       presses += 1
-      const first = await press(button)
+      const first = await press(button, false)
       if (!first.shown.length && !first.hidden.length) return false
+      const fast = !first.delayed
       presses += 1
-      const second = pressable(button) || button.tagName === 'SUMMARY' ? await press(button) : { shown: [], hidden: [] }
+      const second = pressable(button) || button.tagName === 'SUMMARY' ? await press(button, fast) : { shown: [], hidden: [] }
       if (same(second.shown, first.hidden) && same(second.hidden, first.shown)) {
         plan.set(button, [{ do: 'toggle', units: [...first.shown, ...first.hidden] }])
       } else if (first.shown.length && !first.hidden.length && second.shown.length && !second.hidden.length && !second.shown.some((el) => first.shown.includes(el))) {
         const steps = [first.shown, second.shown]
         while (!out() && pressable(button)) {
           presses += 1
-          const more = await press(button)
+          const more = await press(button, fast)
           if (!more.shown.length || more.hidden.length) break
           steps.push(more.shown)
         }
@@ -1139,7 +1140,7 @@ function readPage(token, frameWindow) {
         const steps = [first.hidden, second.hidden]
         while (!out() && pressable(button)) {
           presses += 1
-          const more = await press(button)
+          const more = await press(button, fast)
           if (!more.hidden.length || more.shown.length) break
           steps.push(more.hidden)
         }
@@ -1174,8 +1175,8 @@ function readPage(token, frameWindow) {
         const fresh = buttons().filter((next) => !before.has(next) && !tried.has(next))
         if (!fresh.length) break
         for (const next of fresh) {
+          if (!pressable(next)) backTo(afterLearn)
           await visit(next)
-          backTo(afterLearn)
         }
       }
     }
