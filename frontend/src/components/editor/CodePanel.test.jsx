@@ -35,6 +35,11 @@ describe('Source workspace', () => {
   })
 
   it('shows the standalone and optimized exports as inspectable code files', () => {
+    // Plain text instead of code colours: each export is about 40 KB and
+    // colours it as ~4,600 spans, and jsdom took over a second to swap one
+    // export's spans for the other's, which timed out under the full suite.
+    // CodeField.test.jsx covers the colours.
+    localStorage.setItem('pwb_code_colors', 'off')
     renderPanel()
 
     fireEvent.click(screen.getByRole('button', { name: /home\.single\.html/i }))
