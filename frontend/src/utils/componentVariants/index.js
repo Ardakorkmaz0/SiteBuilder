@@ -8,6 +8,7 @@ import { VARIANT_SIZES } from './sizes.js'
 import { ACCORDIONS, ALERTS, CARDS, CONTAINERS, INPUTS, SELECTS } from './boxes.js'
 import { DIVIDERS, HEADINGS, IMAGES, LISTS, QUOTES, TEXTS } from './content.js'
 import { BADGES, BUTTONS, ICONS, LINK_BUTTONS } from './controls.js'
+import { STUDY_GROUPS } from './study.js'
 import { WIDGET_GROUPS } from './widgets.js'
 
 const DEFINITIONS = {
@@ -28,6 +29,9 @@ const DEFINITIONS = {
   input: INPUTS,
   select: SELECTS,
 }
+
+// Study widgets are listed after the general ones.
+const ALL_WIDGET_GROUPS = [...WIDGET_GROUPS, ...STUDY_GROUPS]
 
 const EN = translator('en')
 const TR = translator('tr')
@@ -53,13 +57,13 @@ export const EXTRA_VARIANTS = Object.fromEntries(
   Object.entries(DEFINITIONS).map(([type, definitions]) => [type, definitions.map((definition) => build(type, definition))]),
 )
 
-export const WIDGET_CATEGORIES = WIDGET_GROUPS.map((group) => ({ id: group.id, name: group.name }))
+export const WIDGET_CATEGORIES = ALL_WIDGET_GROUPS.map((group) => ({ id: group.id, name: group.name }))
 
-export const WIDGETS = WIDGET_GROUPS.flatMap((group) => group.widgets.map((widget) => ({ ...build(WIDGET_TYPE, widget), group: group.id })))
+export const WIDGETS = ALL_WIDGET_GROUPS.flatMap((group) => group.widgets.map((widget) => ({ ...build(WIDGET_TYPE, widget), group: group.id })))
 
 export const COMPONENT_VARIANT_TRANSLATIONS = collectTranslations([
   Object.values(DEFINITIONS).map((definitions) => definitions.map((definition) => definition.label)),
-  WIDGET_GROUPS.map((group) => [group.name, group.widgets.map((widget) => widget.label)]),
+  ALL_WIDGET_GROUPS.map((group) => [group.name, group.widgets.map((widget) => widget.label)]),
 ])
 
 extendTranslations(COMPONENT_VARIANT_TRANSLATIONS)
