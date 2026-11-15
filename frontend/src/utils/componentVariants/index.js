@@ -8,6 +8,7 @@ import { VARIANT_SIZES } from './sizes.js'
 import { ACCORDIONS, ALERTS, CARDS, CONTAINERS, INPUTS, SELECTS } from './boxes.js'
 import { DIVIDERS, HEADINGS, IMAGES, LISTS, QUOTES, TEXTS } from './content.js'
 import { BADGES, BUTTONS, ICONS, LINK_BUTTONS } from './controls.js'
+import { EVERYDAY_GROUPS } from './everyday.js'
 import { STUDY_GROUPS } from './study.js'
 import { WIDGET_GROUPS } from './widgets.js'
 
@@ -30,8 +31,8 @@ const DEFINITIONS = {
   select: SELECTS,
 }
 
-// Study widgets are listed after the general ones.
-const ALL_WIDGET_GROUPS = [...WIDGET_GROUPS, ...STUDY_GROUPS]
+// The themed collections follow the general widgets.
+const ALL_WIDGET_GROUPS = [...WIDGET_GROUPS, ...STUDY_GROUPS, ...EVERYDAY_GROUPS]
 
 const EN = translator('en')
 const TR = translator('tr')
