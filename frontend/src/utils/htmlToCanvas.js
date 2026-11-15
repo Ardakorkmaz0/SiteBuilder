@@ -518,14 +518,20 @@ function walkNode(n, out, origin, depth, ctx, href) {
   kids.forEach((kid) => walk(kid, out, origin, depth, ctx, inside))
 }
 
+// The most a horizontal scrollbar takes from the bottom of the view.
+const SCROLLBAR_ROOM = 20
+
 // A box the page keeps in place on the screen (`position: fixed` or `sticky`)
 // stays pinned on the canvas too. Fixed sidebars that fill the viewport get
 // `pinHeight: 'full'` and hide on narrow mobile screens.
 function pin(box, n, ctx) {
   const mode = n.s.position === 'sticky' ? 'sticky' : 'fixed'
   const view = ctx.viewHeight
-  // Measured from the screen edges it is nearer to.
-  const full = mode === 'fixed' && n.rect.y <= 1 && n.rect.h >= view - 2
+  // Measured from the screen edges it is nearer to. A part with something
+  // wider than the window gets a horizontal scrollbar, which takes its height
+  // from the bottom of the view: a full-height side menu then measures 885px
+  // of 900 and still runs to the bottom edge.
+  const full = mode === 'fixed' && n.rect.y <= 1 && n.rect.h >= view - SCROLLBAR_ROOM
   const right = n.rect.x - ctx.left + n.rect.w / 2 > ctx.width / 2
   const bottom = mode === 'fixed' && !full && n.rect.y + n.rect.h / 2 > view / 2
   box.props = {
@@ -720,10 +726,14 @@ const collectChromeHrefs = (c, out = []) => {
 const chromeLook = (c) => {
   const hrefs = collectChromeHrefs(c)
   if (hrefs.length >= 2) {
+    // A menu as tall as the screen is drawn top to bottom whatever height it
+    // measured at (a part with a horizontal scrollbar measures it shorter):
+    // its height must not make every part look like it has a menu of its own.
+    const full = c.props?.pinHeight === 'full'
     return JSON.stringify({
       type: c.type,
       scrollBehavior: c.props?.scrollBehavior,
-      layout: c.layout,
+      layout: full ? { ...c.layout, h: 'full' } : c.layout,
       hrefs,
     })
   }

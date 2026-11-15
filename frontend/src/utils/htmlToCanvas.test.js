@@ -776,4 +776,40 @@ describe('converted canvas fidelity regressions', () => {
     expect(sidebars[0].props.shownBy).toBeUndefined()
     expect(result.parts[0]).toEqual({ key: 'p0', label: 'Hata Metrikleri' })
   })
+
+  it('keeps a full-height side menu full height when a horizontal scrollbar shortens it to 885 of 900px', () => {
+    const [panel] = convert(page([
+      node('aside', [0, 0, 300, 885], {
+        kids: [text('a', [20, 30, 200, 48], 'Giriş', {}, { href: '#giris' })],
+      }, { backgroundColor: 'rgb(242, 237, 225)', position: 'fixed' }),
+    ], { viewHeight: 900 })).components
+    expect(panel.props.pinHeight).toBe('full')
+    expect(panel.styles.height).toBe('100%')
+  })
+
+  it('writes one shared side menu when some parts measure it shorter under a horizontal scrollbar', () => {
+    const makeSidebar = (height) => node('aside', [0, 0, 300, height], {
+      kids: [
+        text('a', [20, 110, 220, 28], '1. Giriş', {}, { href: '#giris' }),
+        text('a', [20, 144, 220, 28], '2. Metrikler', {}, { href: '#metrikler' }),
+        text('a', [20, 178, 220, 28], '3. Sınav', {}, { href: '#sinav' }),
+      ],
+    }, { position: 'fixed', backgroundColor: 'rgb(242, 237, 225)' })
+    const chapter = (height, title, id) => page([
+      makeSidebar(height),
+      text('h1', [320, 40, 600, 48], title, {}, { id }),
+    ], { viewHeight: 900 })
+    const result = canvasPageFromMeasured({
+      ...chapter(900, 'Giriş', 'giris'),
+      states: [
+        { label: 'Metrikler', data: chapter(885, 'Metrikler', 'metrikler') },
+        { label: 'Sınav', data: chapter(900, 'Sınav', 'sinav') },
+      ],
+    })
+
+    const menus = result.components.filter((c) => c.props.scrollBehavior === 'fixed')
+    expect(menus).toHaveLength(1)
+    expect(menus[0].props.shownBy).toBeUndefined()
+    expect(menus[0].props.pinHeight).toBe('full')
+  })
 })
