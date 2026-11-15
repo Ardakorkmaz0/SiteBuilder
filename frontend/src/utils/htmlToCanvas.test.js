@@ -656,7 +656,7 @@ describe('converted canvas fidelity regressions', () => {
     ))
     const result = convert(page([node('section', [0, 0, 1200, 2200], { kids: cards }, { backgroundColor: 'rgb(226, 232, 240)' })]))
     expect(depthOf(result.components)).toBeLessThanOrEqual(4)
-  })
+  }, 20000) // About 1.5 s alone: 65 cards of 2,400 blocks. CI runs it beside the rest of the suite.
 
   it('normalizes valid mixed-case HTML ids to lowercase anchors and retargets matching links', () => {
     const result = convert(page([
