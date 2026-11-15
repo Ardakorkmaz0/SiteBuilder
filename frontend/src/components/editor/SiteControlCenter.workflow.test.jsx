@@ -87,4 +87,17 @@ describe('control centre workflow failures and retry', () => {
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
     expect(screen.getByText(result)).toBeInTheDocument()
   })
+
+  it('shows Unknown for empty device entries in analytics without crashing', async () => {
+    getSiteAnalytics.mockResolvedValueOnce({
+      total_views: 5,
+      last_30_days: 5,
+      daily: [],
+      devices: [{ device: '', views: 3 }, { device: 'desktop', views: 2 }],
+      referrers: [],
+    })
+    show('analytics')
+    expect(await screen.findByText('Unknown')).toBeInTheDocument()
+    expect(screen.getByText('Desktop')).toBeInTheDocument()
+  })
 })

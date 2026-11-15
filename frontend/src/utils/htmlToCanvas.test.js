@@ -596,4 +596,93 @@ describe('a box the page keeps in place on the screen', () => {
     expect(panel.props.scrollBehavior).toBeUndefined()
     expect(panel.hiddenMobile).toBeUndefined()
   })
+
+  it('preserves fixed and sticky pinning on root leaves, unpainted fixed wrappers, sticky regions, and bare shapes', () => {
+    const measured = page([
+      text('button', [1120, 800, 56, 56], '+', { position: 'fixed', backgroundColor: 'rgb(37, 99, 235)', color: 'rgb(255, 255, 255)' }),
+      node('div', [20, 100, 220, 180], {
+        kids: [text('div', [20, 100, 220, 180], 'Floating card', { backgroundColor: 'rgb(241, 245, 249)' })],
+      }, { position: 'fixed' }),
+      node('header', [0, 0, 1200, 64], {
+        kids: [text('span', [24, 20, 120, 24], 'StickyBrand', { color: 'rgb(255, 255, 255)' })],
+      }, { position: 'sticky', backgroundColor: 'rgb(15, 23, 42)' }),
+      node('div', [20, 20, 80, 10], {}, { position: 'fixed', backgroundColor: 'rgb(239, 68, 68)' }),
+    ], { viewHeight: 900 })
+    const result = convert(measured)
+    const fab = result.components.find((c) => c.type === 'button' && c.props.text === '+')
+    const floating = result.components.find((c) => JSON.stringify(c).includes('Floating card'))
+    const header = result.components.find((c) => c.type === 'region' && JSON.stringify(c).includes('StickyBrand'))
+    const bar = result.components.find((c) => c.type === 'spacer' && c.layout.w === 80)
+
+    expect(fab.props.scrollBehavior).toBe('fixed')
+    expect(floating.props.scrollBehavior).toBe('fixed')
+    expect(header.props.scrollBehavior).toBe('sticky')
+    expect(bar.props.scrollBehavior).toBe('fixed')
+  })
+})
+
+describe('converted canvas fidelity regressions', () => {
+  it('converts a button with an SVG icon and text span into a native button block', () => {
+    const result = convert(page([
+      node('button', [40, 40, 140, 42], {
+        kids: [
+          node('svg', [50, 50, 18, 18], { kind: 'image', src: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' }),
+          text('span', [76, 50, 80, 20], 'Run', { color: 'rgb(255, 255, 255)' }),
+        ],
+      }, { backgroundColor: 'rgb(37, 99, 235)', color: 'rgb(255, 255, 255)' }),
+    ]))
+    expect(result.components).toHaveLength(1)
+    expect(result.components[0]).toMatchObject({
+      type: 'button',
+      props: { text: 'Run' },
+      styles: { backgroundColor: 'rgb(37, 99, 235)', color: 'rgb(255, 255, 255)' },
+    })
+  })
+
+  it('keeps fitChildren within server MAX_NESTING_DEPTH = 4 even when >60 cards each hold >2400 blocks', () => {
+    const depthOf = (list, d = 0) => list.reduce((mx, c) => Math.max(mx, d, ...(c.children?.length ? [depthOf(c.children, d + 1)] : [])), d)
+    const cards = Array.from({ length: 65 }, (_, k) => node(
+      'div',
+      [20 + (k % 5) * 220, 40 + Math.floor(k / 5) * 140, 200, 120],
+      {
+        kids: Array.from({ length: 2450 }, (_, i) => text(
+          'div',
+          [24 + (i % 10) * 16, 44 + Math.floor(i / 10) * 10, 14, 8],
+          `${i}`,
+          { backgroundColor: 'rgb(241, 245, 249)' },
+        )),
+      },
+      { backgroundColor: 'rgb(255, 255, 255)' },
+    ))
+    const result = convert(page([node('section', [0, 0, 1200, 2200], { kids: cards }, { backgroundColor: 'rgb(226, 232, 240)' })]))
+    expect(depthOf(result.components)).toBeLessThanOrEqual(4)
+  })
+
+  it('normalizes valid mixed-case HTML ids to lowercase anchors and retargets matching links', () => {
+    const result = convert(page([
+      text('h2', [40, 40, 400, 40], 'About Us', { fontSize: '28px' }, { id: 'aboutUs' }),
+      text('a', [40, 100, 160, 24], 'Jump', { color: 'rgb(37, 99, 235)' }, { href: '#aboutUs' }),
+    ]))
+    const heading = result.components.find((c) => c.type === 'heading')
+    const link = result.components.find((c) => c.type === 'text')
+    expect(heading.props.anchor).toBe('aboutus')
+    expect(link.props.href).toBe('#aboutus')
+  })
+
+  it('deduplicates fixed navigation chrome across states when active item emphasis changes', () => {
+    const makeNav = (active) => node('nav', [0, 0, 260, 900], {
+      kids: [0, 1].map((i) => text('a', [20, 40 + i * 40, 200, 30], `Chapter ${i + 1}`, {
+        color: i === active ? 'rgb(37, 99, 235)' : 'rgb(71, 85, 105)',
+        fontWeight: i === active ? '700' : '400',
+      }, { href: `#ch${i}` })),
+    }, { position: 'fixed', backgroundColor: 'rgb(248, 250, 252)' })
+    const makeDoc = (idx) => page([makeNav(idx), text('h1', [300, 40, 600, 50], `Content ${idx + 1}`)], { viewHeight: 900 })
+    const result = canvasPageFromMeasured({
+      ...makeDoc(0),
+      states: [{ label: 'Ch2', data: makeDoc(1) }],
+    })
+    const navs = result.components.filter((c) => JSON.stringify(c).includes('Chapter 1'))
+    expect(navs).toHaveLength(1)
+    expect(navs[0].props.shownBy).toBeUndefined()
+  })
 })

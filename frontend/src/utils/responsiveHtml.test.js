@@ -377,4 +377,30 @@ describe('schemaToResponsiveHtml a look its owner changed', () => {
     expect(block('list', { text: 'a\nb' }, { padding: '30px' }).getAttribute('style')).toBe('margin:0;padding-left:1.4em;padding:30px;flex:1 1 100%')
     expect(drawn('list', { text: 'a\nb' }).paddingLeft).toBe('1.4em')
   })
+
+  it('falls back to child.props.tabId inside tabs, uses min-height on collapsible nested embeds, and lets accordion inherit custom text color', () => {
+    const html = schemaToResponsiveHtml({
+      theme: {},
+      pages: [{
+        id: 'p1', name: 'Home', canvasWidth: 1000,
+        components: [{
+          id: 'tabs1', type: 'tabs',
+          props: { tabs: [{ id: 't1', label: 'A' }, { id: 't2', label: 'B' }], activeId: 't2' },
+          styles: {}, layout: { x: 0, y: 0, w: 600, h: 240 },
+          children: [{
+            id: 'acc1', type: 'accordion',
+            props: { title: 'Question', text: 'Answer', tabId: 't2' },
+            styles: { color: '#ff0000' },
+            layout: { x: 10, y: 10, w: 300, h: 80 },
+          }],
+        }],
+      }],
+    })
+    const doc = new JSDOM(html).window.document
+    const panel = doc.querySelector('[data-builder-panel="t2"]')
+    expect(panel.querySelector('#acc1')).not.toBeNull()
+    expect(panel.querySelector('#acc1').getAttribute('style')).toContain('min-height:80px')
+    expect(panel.querySelector('#acc1').getAttribute('style')).not.toContain(';height:80px')
+    expect(panel.querySelector('#acc1 > div').getAttribute('style')).not.toContain('#4b5563')
+  })
 })

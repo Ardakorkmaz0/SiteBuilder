@@ -432,6 +432,22 @@ function inlineNodesOf(components) {
 
 // `classedChildren` says a stylesheet already carries this region's per-child
 // geometry (see regionChildCss), so the inline copy is dropped and the mobile
+function nestedAbsoluteChildHtml(ch) {
+  const l = ch.layout || {}
+  // Interactive types (accordion/select/tabs) and nested containers need
+  // to grow when used — forcing height:100% would clip the open state or
+  // pinch nested content. Static types still fill the wrapper exactly.
+  // A block that fits its box keeps that box, like on the canvas.
+  const grows = ['accordion', 'select', 'tabs', 'html', 'container'].includes(ch.type) && !nativeFit(ch)
+  const filled = grows
+    ? { ...ch, styles: { ...(ch.styles || {}), width: '100%' } }
+    : { ...ch, styles: { ...(ch.styles || {}), width: '100%', height: '100%' } }
+  const wrapH = grows ? '' : `;height:${Math.round(l.h || 80)}px`
+  const wrapMinH = grows ? `;min-height:${Math.round(l.h || 80)}px` : ''
+  // nestedClass: the hook its "hide on PC / on mobile" rule names.
+  return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}"${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
+}
+
 // media query can reposition the children. Only top-level regions get those
 // rules; a region nested inside a container keeps the inline fallback.
 function inlineNode(c, classedChildren = false, { fit = false } = {}) {
@@ -463,22 +479,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
       return `<div${hook} style="${autoCss};${styleStr}">${inner}</div>`
     }
     const h = absoluteChildrenHeight(kids, Math.round(c.layout?.h || 160))
-    const inner = kids
-      .map((ch) => {
-        const l = ch.layout || {}
-        // Interactive types (accordion/select/tabs) and nested containers need
-        // to grow when used — forcing height:100% would clip the open state or
-        // pinch nested content. Static types still fill the wrapper exactly.
-        // A block that fits its box keeps that box, like on the canvas.
-        const grows = ['accordion', 'select', 'tabs', 'html', 'container'].includes(ch.type) && !nativeFit(ch)
-        const filled = grows
-          ? { ...ch, styles: { ...(ch.styles || {}), width: '100%' } }
-          : { ...ch, styles: { ...(ch.styles || {}), width: '100%', height: '100%' } }
-        const wrapH = grows ? '' : `;height:${Math.round(l.h || 80)}px`
-        const wrapMinH = grows ? `;min-height:${Math.round(l.h || 80)}px` : ''
-        return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}"${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
-      })
-      .join('')
+    const inner = kids.map(nestedAbsoluteChildHtml).join('')
     if (!kids.length) return `<div${hook} style="display:block;position:relative;min-height:${h}px;${styleStr}"></div>`
     const designW = containerDesignWidth(c)
     const scale = Math.min(1, Math.max(1, Number(c.layout?.w) || designW) / designW)
@@ -500,19 +501,9 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
       .join('')
     const panels = safeTabs
       .map((t) => {
-        const panelKids = kids.filter((ch) => (ch.tabId || safeTabs[0].id) === t.id)
+        const panelKids = kids.filter((ch) => (ch.tabId || ch.props?.tabId || safeTabs[0].id) === t.id)
         const panelH = absoluteChildrenHeight(panelKids, 120)
-        const inner = panelKids
-          .map((ch) => {
-            const l = ch.layout || {}
-            const filled = {
-              ...ch,
-              styles: { ...(ch.styles || {}), width: '100%', height: '100%' },
-            }
-            // nestedClass: the hook its "hide on PC / on mobile" rule names.
-            return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px;height:${Math.round(l.h || 80)}px"${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
-          })
-          .join('')
+        const inner = panelKids.map(nestedAbsoluteChildHtml).join('')
         const hidden = t.id === activeId ? '' : ' hidden'
         if (!panelKids.length) return `<div role="tabpanel" data-builder-panel="${esc(t.id)}"${hidden} style="display:block;position:relative;min-height:${panelH}px"></div>`
         return `<div role="tabpanel" data-builder-panel="${esc(t.id)}" data-pwb-container-width="${designW}" data-pwb-container-height="${panelH}"${hidden} style="display:block;position:relative;min-height:${panelH}px"><div data-pwb-container-root style="position:absolute;left:0;top:0;width:${designW}px;height:${panelH}px;transform-origin:0 0">${inner}</div></div>`
@@ -528,7 +519,8 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
     return `<div${hook} style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;border:1px solid ${v.border};background:${v.bg};color:${v.color};${styleStr}">${iconSvg(p.icon || 'check')}<span>${multiline(p.text)}</span></div>`
   }
   if (c.type === 'accordion') {
-    return `<details${hook} style="border:1px solid #e5e7eb;border-radius:10px;padding:2px 16px;${styleStr}"><summary style="cursor:pointer;font-weight:600;padding:12px 0">${multiline(p.title)}</summary><div style="padding-bottom:14px;color:#4b5563">${multiline(p.text)}</div></details>`
+    const bodyColor = c.styles?.color || phoneOverrides(c).color ? 'inherit' : '#4b5563'
+    return `<details${hook} style="border:1px solid #e5e7eb;border-radius:10px;padding:2px 16px;${styleStr}"><summary style="cursor:pointer;font-weight:600;padding:12px 0">${multiline(p.title)}</summary><div style="padding-bottom:14px;color:${bodyColor}">${multiline(p.text)}</div></details>`
   }
   if (c.type === 'html') {
     const code = typeof p.code === 'string' ? p.code : ''

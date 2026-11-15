@@ -141,4 +141,19 @@ describe('measureHtmlPage SVG inlining', () => {
     expect(parsed.querySelectorAll('use')[1].getAttributeNS('http://www.w3.org/1999/xlink', 'href')).toBe('#shape')
     if (insideHtml) expect(parsed.querySelector('form').hasAttribute('id')).toBe(false)
   })
+
+  it('keeps HTML ids wired to label[for] inside kept forms while removing unreferenced ids', async () => {
+    const html = `<!doctype html><html><body>
+      <form id="contact">
+        <label for="user-email">Email</label>
+        <input id="user-email" type="email" />
+      </form>
+    </body></html>`
+    const reading = await measureHtmlPage(html, { width: 1200, height: 900, timeout: 2000 })
+    const formNode = reading.root.kids.find((node) => node.kind === 'html')
+    expect(formNode).toBeTruthy()
+    const parsed = new DOMParser().parseFromString(formNode.code, 'text/html')
+    expect(parsed.querySelector('form').hasAttribute('id')).toBe(false)
+    expect(parsed.querySelector('input').getAttribute('id')).toBe('user-email')
+  })
 })

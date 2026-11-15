@@ -330,4 +330,11 @@ describe('the script a published page gets', () => {
     expect(withBuilderRuntimeHtml('<!doctype html><html><head></head><body><p>Plain</p></body></html>')).not.toContain(RUNTIME)
     expect(withBuilderRuntimeHtml('<!doctype html><html><head></head><body><div class="page" data-pwb-keys="s"><div data-pwb-show="s">x</div></div></body></html>')).toContain('__pwbShowReady')
   })
+
+  it('deduplicates keys before slicing limits in shownBy and pageShowAttrs', () => {
+    const padded = [...Array(20).fill('dup'), 'unique_17']
+    expect(shownBy({ shownBy: padded })).toEqual(['dup', 'unique_17'])
+    const attrs = pageShowAttrs({ hiddenKeys: ['k1', 'k1', 'k2'], components: [] })
+    expect(attrs).toContain('data-pwb-keys="k1 k2"')
+  })
 })

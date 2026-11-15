@@ -20,6 +20,8 @@ import { anchorOf, anchorProblem, elementIdFor, retargetLinks, slugifyAnchor } f
 import { splitPageHtml } from '../utils/projectSnapshot.js'
 import { normalizeLanguageTag } from '../utils/languages.js'
 import { containerDesignWidth } from '../utils/containerFit.js'
+import { isAutoLayout } from '../utils/autoLayout.js'
+import { absoluteChildrenHeight } from '../components/renderer/layout.js'
 import { mergeFontFaces } from '../utils/fontFaces.js'
 import { pageParts } from '../utils/pageShow.js'
 
@@ -287,12 +289,24 @@ function selectedTreeRoots(components, ids) {
   })
 }
 
-function siblingPositionInTree(components, id) {
+function tabIdOf(child, tabsParent) {
+  const first = tabsParent?.props?.tabs?.[0]?.id || ''
+  return child?.tabId || child?.props?.tabId || first
+}
+
+function siblingPositionInTree(components, id, tabsParent = null) {
   const index = components.findIndex((component) => component.id === id)
-  if (index >= 0) return { index, length: components.length }
+  if (index >= 0) {
+    if (tabsParent?.type === 'tabs') {
+      const targetTab = tabIdOf(components[index], tabsParent)
+      const panelKids = components.filter((component) => tabIdOf(component, tabsParent) === targetTab)
+      return { index: panelKids.findIndex((component) => component.id === id), length: panelKids.length }
+    }
+    return { index, length: components.length }
+  }
   for (const component of components) {
     if (!hasKids(component)) continue
-    const position = siblingPositionInTree(component.children, id)
+    const position = siblingPositionInTree(component.children, id, component)
     if (position) return position
   }
   return null
@@ -433,7 +447,7 @@ function addChildToTree(components, parentId, child, { placed = false } = {}) {
       if (c.type === 'tabs' && !placed) {
         const tabId = c.props?.activeId || (c.props?.tabs?.[0]?.id ?? '')
         const firstTabId = c.props?.tabs?.[0]?.id ?? tabId
-        const sameTab = (c.children || []).filter((kid) => (kid.tabId || firstTabId) === tabId)
+        const sameTab = (c.children || []).filter((kid) => (kid.tabId || kid.props?.tabId || firstTabId) === tabId)
         const bottom = sameTab.reduce((max, kid) => {
           const l = kid.layout || {}
           return Math.max(max, (l.y || 0) + (l.h || 0))
@@ -456,9 +470,25 @@ function addChildToTree(components, parentId, child, { placed = false } = {}) {
 }
 
 // Swap a component one step within its OWN parent array (dir +1 later, -1 earlier).
-function moveInTree(components, id, dir) {
+// Inside a Tabs parent, only swap within the same tab panel so bringing a block
+// forward/backward never stalls swapping against another panel's hidden item.
+function moveInTree(components, id, dir, tabsParent = null) {
   const i = components.findIndex((c) => c.id === id)
   if (i >= 0) {
+    if (tabsParent?.type === 'tabs') {
+      const targetTab = tabIdOf(components[i], tabsParent)
+      const indices = []
+      components.forEach((c, idx) => {
+        if (tabIdOf(c, tabsParent) === targetTab) indices.push(idx)
+      })
+      const pos = indices.indexOf(i)
+      const swapPos = dir > 0 ? pos + 1 : pos - 1
+      if (pos < 0 || swapPos < 0 || swapPos >= indices.length) return components
+      const j = indices[swapPos]
+      const next = [...components]
+      ;[next[i], next[j]] = [next[j], next[i]]
+      return next
+    }
     const j = dir > 0 ? i + 1 : i - 1
     if (j < 0 || j >= components.length) return components
     const next = [...components]
@@ -466,7 +496,7 @@ function moveInTree(components, id, dir) {
     return next
   }
   return components.map((c) =>
-    hasKids(c) ? { ...c, children: moveInTree(c.children, id, dir) } : c,
+    hasKids(c) ? { ...c, children: moveInTree(c.children, id, dir, c) } : c,
   )
 }
 
@@ -497,6 +527,9 @@ function cloneTrees(components, { keepAnchors = false } = {}) {
     }
     for (const link of Array.isArray(props?.links) ? props.links : []) {
       if (link && targets.has(link.href)) link.href = targets.get(link.href)
+    }
+    for (const run of Array.isArray(props?.rich) ? props.rich : []) {
+      if (run && targets.has(run.href)) run.href = targets.get(run.href)
     }
     if (hasKids(copy)) copy.children.forEach(relink)
   }
@@ -661,6 +694,21 @@ export function shownPartOf(page) {
 }
 export const partOfBlock = (component, keys) => (Array.isArray(component?.props?.shownBy) ? component.props.shownBy.find((key) => keys.includes(key)) : '') || ''
 
+// Remove page-part shownBy keys recursively so blocks moving inside a
+// container or tab panel don't vanish when switching parts.
+function withoutPartsFrom(list, keys) {
+  if (!keys?.length) return list
+  return list.map((child) => {
+    const own = Array.isArray(child.props?.shownBy) ? child.props.shownBy.filter((item) => !keys.includes(item)) : null
+    let props = child.props
+    if (own) {
+      props = { ...child.props, shownBy: own }
+      if (!own.length) delete props.shownBy
+    }
+    return { ...child, props, ...(Array.isArray(child.children) ? { children: withoutPartsFrom(child.children, keys) } : {}) }
+  })
+}
+
 // A block that comes onto such a page belongs to the part on show, or it
 // would stand in every part. A copy of a block of another part, pasted here,
 // leaves that part's key behind.
@@ -669,24 +717,13 @@ function inShownPart(page, components) {
   if (!keys.length) return components
   const key = shownPartOf(page)
   const there = new Set((page.components || []).map((c) => c.id))
-  // Inside a block, a part's key means nothing but hiding it: a copied box
-  // keeps none of them.
-  const withoutParts = (list) => list.map((child) => {
-    const own = Array.isArray(child.props?.shownBy) ? child.props.shownBy.filter((item) => !keys.includes(item)) : null
-    let props = child.props
-    if (own) {
-      props = { ...child.props, shownBy: own }
-      if (!own.length) delete props.shownBy
-    }
-    return { ...child, props, ...(Array.isArray(child.children) ? { children: withoutParts(child.children) } : {}) }
-  })
   return components.map((c) => {
     if (there.has(c.id)) return c
     const own = (Array.isArray(c.props?.shownBy) ? c.props.shownBy : []).filter((item) => !keys.includes(item))
     return {
       ...c,
       props: { ...c.props, shownBy: [key, ...own].slice(0, 16) },
-      ...(Array.isArray(c.children) ? { children: withoutParts(c.children) } : {}),
+      ...(Array.isArray(c.children) ? { children: withoutPartsFrom(c.children, keys) } : {}),
     }
   })
 }
@@ -794,6 +831,18 @@ function estMobileHeight(c, boxW) {
       return Math.max(120, Math.round(
         hasFlowingChildren ? c.mobileLayout?.h || c.layout?.h || 360 : c.layout?.h || 360,
       ))
+    }
+    case 'container': {
+      const designed = Math.max(40, Math.round(c.layout?.h || 80))
+      if (isAutoLayout(p)) {
+        const phone = c.props?._phoneH
+        return phone && phone.w === boxW ? Math.max(designed, Math.round(phone.h) || 0) : designed
+      }
+      const designW = Math.max(1, containerDesignWidth(c))
+      const scale = Math.min(1, boxW / designW)
+      const kids = Array.isArray(c.children) ? c.children : []
+      const freeHeight = Math.max(40, absoluteChildrenHeight(kids, designed))
+      return Math.max(40, Math.round(freeHeight * scale))
     }
     case 'tabs': {
       // Its height is its content's, measured on the phone canvas
@@ -1779,7 +1828,7 @@ export const useEditorStore = create((set, get) => ({
   // `fontFaces` are the document's own font files (utils/fontFaces.js); the
   // site keeps them beside the ones it already has. `parts` and `hiddenKeys`
   // are what the page shows one at a time and on a click (utils/pageShow.js).
-  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, fonts, fontFaces = '', parts = [], hiddenKeys = [] } = {}) => {
+  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, language, fonts, fontFaces = '', parts = [], hiddenKeys = [] } = {}) => {
     const page = get().schema.pages.find((p) => p.id === id)
     if (!page || !Array.isArray(components)) return
     get().record()
@@ -1797,6 +1846,7 @@ export const useEditorStore = create((set, get) => ({
         backgroundMobile: background,
         seoTitle: p.seoTitle || seoTitle || '',
         seoDescription: p.seoDescription || seoDescription || '',
+        language: p.language && p.language !== 'en' ? p.language : language || p.language,
         fonts: Array.isArray(fonts) ? fonts : [],
         // What the page shows one at a time or on a click (utils/pageShow.js).
         parts: Array.isArray(parts) ? parts : [],
@@ -1940,7 +1990,13 @@ export const useEditorStore = create((set, get) => ({
     if (parentId) {
       const { components = [] } = selectCurrentPage(get())
       const parent = findInTree(components, parentId)
-      if (parent && !parentHasRoom(components, parent)) return refuseInsert(set)
+      const presetProps = presetId ? componentPresetProps(type, presetId) : null
+      const fullWidth = FULL_WIDTH_TYPES.has(type) && !(type === 'navbar' && presetProps?.navLayout === 'vertical')
+      const canDropInParent = type !== 'region' && !(type === 'navbar' && fullWidth)
+      if (canDropInParent) {
+        if (!parent || !PARENT_TYPES.has(parent.type)) return
+        if (!parentHasRoom(components, parent)) return refuseInsert(set)
+      }
     }
     get().record('add')
     set((state) => insertComponent(state, selectCurrentPage(state), type, x, y, parentId, presetId, initialSize, initialProps))
@@ -2253,6 +2309,13 @@ export const useEditorStore = create((set, get) => ({
       if (ids[0]) get().alignComponent(ids[0], mode)
       return
     }
+    const pageNow = selectCurrentPage(get())
+    const siblingIdsNow = sameParentIds(pageNow.components, ids, get().selectedId)
+    const eligibleNow = siblingIdsNow.filter((id) => {
+      const c = findInTree(pageNow.components, id)
+      return c && c.type !== 'region' && (c[componentLayoutKey(pageNow, id, get().viewport)] || c.layout)
+    })
+    if (eligibleNow.length < 2) return
     get().record('align-sel-' + mode)
     set((state) => {
       const page = selectCurrentPage(state)
@@ -2306,6 +2369,13 @@ export const useEditorStore = create((set, get) => ({
   distributeSelection: (axis = 'x') => {
     const ids = get().selectedIds
     if (ids.length < 3) return
+    const pageNow = selectCurrentPage(get())
+    const siblingIdsNow = sameParentIds(pageNow.components, ids, get().selectedId)
+    const eligibleNow = siblingIdsNow.filter((id) => {
+      const c = findInTree(pageNow.components, id)
+      return c && c.type !== 'region' && (c[componentLayoutKey(pageNow, id, get().viewport)] || c.layout)
+    })
+    if (eligibleNow.length < 3) return
     get().record('distribute-sel-' + axis)
     set((state) => {
       const page = selectCurrentPage(state)
@@ -2426,6 +2496,11 @@ export const useEditorStore = create((set, get) => ({
   // equal horizontal gaps, 'y' for equal vertical gaps. Useful when a row /
   // column of cards has uneven spacing.
   distributeSiblings: (parentId, axis = 'y') => {
+    const pageNow = selectCurrentPage(get())
+    const parentNow = parentId ? findInTree(pageNow.components, parentId) : null
+    if (parentId && !parentNow) return
+    const siblingsNow = parentNow ? parentNow.children || [] : pageNow.components
+    if (siblingsNow.length < 3) return
     get().record('distribute-' + axis + '-' + (parentId || 'page'))
     set((state) => {
       const page = selectCurrentPage(state)
@@ -3042,7 +3117,10 @@ export const useEditorStore = create((set, get) => ({
   },
 
   duplicateComponent: (id) => {
-    const parent = findParentInTree(selectCurrentPage(get()).components, id)
+    const comps = selectCurrentPage(get()).components
+    const srcNow = findInTree(comps, id)
+    if (!srcNow) return
+    const parent = findParentInTree(comps, id)
     if (parent && (parent.children || []).length >= MAX_CHILDREN) return refuseInsert(set)
     get().record('dup')
     set((state) => {
@@ -3067,6 +3145,12 @@ export const useEditorStore = create((set, get) => ({
   // Copy a component (with all its properties + children) onto ANOTHER page,
   // so a tuned element survives across pages without rebuilding it.
   copyComponentToPage: (id, pageId) => {
+    const stateNow = get()
+    const pageNow = selectCurrentPage(stateNow)
+    if (!pageId || pageId === pageNow.id) return
+    const targetNow = stateNow.schema.pages.find((p) => p.id === pageId)
+    const srcNow = findInTree(pageNow.components, id)
+    if (!targetNow || targetNow.mode === 'html' || !srcNow) return
     // Choosing a destination is one action; rapid copies to other pages must
     // not disappear together when only the latest copy is undone.
     get().record()
@@ -3079,6 +3163,8 @@ export const useEditorStore = create((set, get) => ({
       if (!target || target.mode === 'html' || !src) return {}
       // Keep the section names only if the other page does not already use them.
       const [copy] = cloneTrees([src], { keepAnchors: subtreeAnchorsFree(src, target.components, state.schema.pages) })
+      delete copy.tabId
+      if (copy.props) delete copy.props.tabId
       // Use the same target bounds now that normalization applies on reload.
       // A wide free container then fits its child design from the first paint.
       if (!target.flowMode) {
@@ -3095,6 +3181,8 @@ export const useEditorStore = create((set, get) => ({
   // Re-apply the active theme to ONE component (colors, font, radius) — the
   // per-element companion to applyTheme(), which restyles the whole design.
   applyThemeToComponent: (id) => {
+    const comps = selectCurrentPage(get()).components
+    if (!findInTree(comps, id)) return
     get().record('apply-theme')
     set((state) => {
       const page = selectCurrentPage(state)
@@ -3115,6 +3203,7 @@ export const useEditorStore = create((set, get) => ({
   },
 
   bringToFront: (id) => {
+    if (!selectCanMoveComponent(get(), id, 'forward')) return
     get().record('zorder')
     set((state) => {
       const page = selectCurrentPage(state)
@@ -3126,6 +3215,7 @@ export const useEditorStore = create((set, get) => ({
   },
 
   sendToBack: (id) => {
+    if (!selectCanMoveComponent(get(), id, 'backward')) return
     get().record('zorder')
     set((state) => {
       const page = selectCurrentPage(state)
@@ -3208,8 +3298,10 @@ export const useEditorStore = create((set, get) => ({
         return Math.max(max, (l.y || 0) + (l.h || 0))
       }, 0)
       // A tab panel's tag only means something inside those tabs.
-      const rest = { ...node }
-      delete rest.tabId
+      const cleanNode = { ...node }
+      delete cleanNode.tabId
+      const pKeys = partKeys(currentPage)
+      const rest = target && pKeys.length ? withoutPartsFrom([cleanNode], pKeys)[0] : cleanNode
       let moved
       if (target) {
         const parentW = parentDesignWidth(target) || pcW
@@ -3290,6 +3382,8 @@ export const useEditorStore = create((set, get) => ({
   },
 
   removeComponent: (id) => {
+    const comps = selectCurrentPage(get()).components
+    if (!findInTree(comps, id)) return
     get().record('remove')
     set((state) => {
       const page = selectCurrentPage(state)

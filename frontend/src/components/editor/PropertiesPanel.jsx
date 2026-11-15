@@ -49,6 +49,7 @@ import { blockTextHint, linkSectionsFor } from '../../utils/linkTargets.js'
 import FieldPartsEditor from './FieldPartsEditor.jsx'
 import ColorModePanel from './ColorModePanel.jsx'
 import { FIT_TYPES } from '../../utils/boxFit.js'
+import { isAutoLayout } from '../../utils/autoLayout.js'
 import { anchorOf, anchorProblem, slugifyAnchor } from '../../utils/anchors.js'
 import HtmlPageColors from './HtmlPageColors.jsx'
 import { moveInRadioGroup } from '../../ui/radioGroupKeys.js'
@@ -101,7 +102,16 @@ const STYLE_META = {
   fontWeight: {
     label: 'Font weight',
     control: 'select',
-    options: [['normal', 'Normal'], ['500', 'Medium'], ['600', 'Semibold'], ['bold', 'Bold']],
+    options: [
+      ['300', 'Light'],
+      ['400', 'Regular'],
+      ['normal', 'Normal'],
+      ['500', 'Medium'],
+      ['600', 'Semibold'],
+      ['700', 'Bold'],
+      ['bold', 'Bold'],
+      ['800', 'Extra bold'],
+    ],
   },
   fontStyle: {
     label: 'Style',
@@ -149,6 +159,7 @@ const STYLE_META = {
   },
   lineHeight: { label: 'Line height', control: 'text', placeholder: 'e.g. 1.5' },
   letterSpacing: { label: 'Letter spacing', control: 'px' },
+  border: { label: 'Border', control: 'text', placeholder: 'e.g. 1px solid #e5e7eb' },
   borderRadius: { label: 'Corner radius', control: 'px' },
   borderWidth: { label: 'Border width', control: 'px' },
   borderStyle: {
@@ -164,6 +175,7 @@ const STYLE_META = {
       ['none', 'None'],
       ['0 1px 3px rgba(0,0,0,0.15)', 'Small'],
       ['0 4px 12px rgba(0,0,0,0.15)', 'Medium'],
+      ['0 4px 20px rgba(0,0,0,0.08)', 'Soft'],
       ['0 10px 25px rgba(0,0,0,0.2)', 'Large'],
     ],
   },
@@ -225,7 +237,7 @@ const STYLE_META = {
 const ADVANCED_STYLE_KEYS = [
   'transform', 'filter', 'backdropFilter', 'textShadow', 'aspectRatio',
   'objectPosition', 'backgroundSize', 'backgroundPosition', 'backgroundRepeat',
-  'cursor', 'overflow',
+  'cursor', 'overflow', 'border',
 ]
 
 const PROPS_TAB_KEY = 'pwb_props_tab'
@@ -308,7 +320,7 @@ const STYLE_GROUPS = [
   },
   { title: 'Colors', keys: ['color', 'backgroundColor', 'backgroundImage'] },
   { title: 'Spacing', keys: ['padding', 'margin', 'width', 'maxWidth', 'height', 'minHeight'] },
-  { title: 'Border', keys: ['borderRadius', 'borderWidth', 'borderStyle', 'borderColor'] },
+  { title: 'Border', keys: ['border', 'borderRadius', 'borderWidth', 'borderStyle', 'borderColor'] },
   { title: 'Effects', keys: ['boxShadow', 'opacity', 'objectFit'] },
 ]
 
@@ -472,17 +484,17 @@ function SectionNameControl({ component, suggestion }) {
   )
 }
 
-function PropControl({ field, value, onChange, extras, pages = [], sections = null }) {
+function PropControl({ field, value, onChange, extras, pages = [], sections = null, subject }) {
   const { t } = useLanguage()
   const label = t(field.label)
   const options = field.options?.map(([optionValue, optionLabel]) => [optionValue, t(optionLabel)])
   // An href field becomes the visual link-target picker (page / top / section
   // / URL) instead of a raw text box.
   if (field.key === 'href') {
-    return <LinkTargetControl label={label} value={value} onChange={onChange} pages={pages} sections={sections} />
+    return <LinkTargetControl label={label} value={value} onChange={onChange} pages={pages} sections={sections} subject={subject} />
   }
   if (field.control === 'link') {
-    return <LinkTargetControl label={label} value={value} onChange={onChange} pages={pages} sections={sections} />
+    return <LinkTargetControl label={label} value={value} onChange={onChange} pages={pages} sections={sections} subject={subject} />
   }
   if (field.control === 'textarea') {
     return <LabeledTextarea label={label} value={value} onChange={onChange} />
@@ -507,7 +519,7 @@ function PropControl({ field, value, onChange, extras, pages = [], sections = nu
     )
   }
   if (field.control === 'links') {
-    return <LinksEditor label={label} value={value} onChange={onChange} pages={pages} sections={sections} />
+    return <LinksEditor label={label} value={value} onChange={onChange} pages={pages} sections={sections} subject={subject} />
   }
   if (field.control === 'htmlContent') {
     return <HtmlContentControl label={label} value={value} onChange={onChange} pages={pages} />
@@ -530,10 +542,10 @@ function PropControl({ field, value, onChange, extras, pages = [], sections = nu
     return <LabeledImage label={label} value={value} onChange={onChange} />
   }
   if (field.control === 'color') {
-    return <LabeledColor label={label} value={value} onChange={onChange} fallback={field.fallback} />
+    return <LabeledColor label={label} value={value} onChange={onChange} fallback={field.fallback} subject={subject} />
   }
   if (field.control === 'px') {
-    return <LabeledPx label={label} value={value} onChange={onChange} placeholder={field.placeholder ? t(field.placeholder) : undefined} />
+    return <LabeledPx label={label} value={value} onChange={onChange} placeholder={field.placeholder ? t(field.placeholder) : undefined} subject={subject} />
   }
   if (field.control === 'align') {
     return <LabeledAlign label={label} value={value} onChange={onChange} options={options} />
@@ -551,27 +563,30 @@ function PropControl({ field, value, onChange, extras, pages = [], sections = nu
   return <LabeledText label={label} value={value} onChange={onChange} />
 }
 
-function StyleControl({ styleKey, value, onChange }) {
+function StyleControl({ styleKey, value, onChange, subject, allowInherit = false }) {
   const { t } = useLanguage()
   const meta = STYLE_META[styleKey]
   if (!meta) return null
   const label = t(meta.label)
   const options = meta.options?.map(([optionValue, optionLabel]) => [optionValue, t(optionLabel)])
   if (meta.control === 'color') {
-    return <LabeledColor label={label} value={value} onChange={onChange} />
+    return <LabeledColor label={label} value={value} onChange={onChange} subject={subject} />
   }
   if (meta.control === 'select') {
+    const selectOptions = allowInherit && options && !options.some(([optionValue]) => optionValue === '')
+      ? [['', t('Same as PC')], ...options]
+      : options
     return (
       <LabeledSelect
         label={label}
         value={value}
         onChange={onChange}
-        options={options}
+        options={selectOptions}
       />
     )
   }
   if (meta.control === 'px') {
-    return <LabeledPx label={label} value={value} onChange={onChange} />
+    return <LabeledPx label={label} value={value} onChange={onChange} subject={subject} />
   }
   if (meta.control === 'range') {
     return <LabeledRange label={label} value={value} onChange={onChange} />
@@ -734,7 +749,9 @@ export default function PropertiesPanel({
   const regionIndex = component?.type === 'region'
     ? orderedRegions.findIndex((item) => item.id === component.id)
     : -1
-  const isAbsoluteNested = parentComponent?.type === 'tabs' || parentComponent?.type === 'container' || parentComponent?.type === 'region'
+  const isAbsoluteNested = parentComponent?.type === 'tabs'
+    || (parentComponent?.type === 'container' && !isAutoLayout(parentComponent.props))
+    || parentComponent?.type === 'region'
   const showPositionControls = !isFlow || isAbsoluteNested
   // A pinned bar leaves the page and sits on the viewport edge, so anything
   // drawn under that strip is gone before the visitor scrolls — and on an
@@ -751,7 +768,10 @@ export default function PropertiesPanel({
   const selectionWidthValue = sharedLayoutValue(selectedLayoutItems, 'w')
   const selectionHeightValue = sharedLayoutValue(selectedLayoutItems, 'h')
   const multiShowPositionControls = selectedEntries.some((entry) => (
-    !isFlow || entry.parent?.type === 'tabs' || entry.parent?.type === 'container' || entry.parent?.type === 'region'
+    !isFlow
+    || entry.parent?.type === 'tabs'
+    || (entry.parent?.type === 'container' && !isAutoLayout(entry.parent.props))
+    || entry.parent?.type === 'region'
   ))
   const applySelectionSize = (patch) => {
     const updates = {}
@@ -1050,8 +1070,8 @@ export default function PropertiesPanel({
           </p>
           <LabeledImage
             label={t('Sharing image')}
-            value={page.seoImage || ''}
-            onChange={(v) => setPageMeta(page.id, { seoImage: v })}
+            value={pageSetting('seoImage')}
+            onChange={(v) => writePageMeta({ seoImage: v })}
           />
           <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
             {t('Shown when the page is shared on social apps. 1200x630 works best.')}
@@ -1515,8 +1535,11 @@ export default function PropertiesPanel({
             <PropControl
               key={`${field.key}-${field.control || 'text'}-${field.label}`}
               field={field}
-              value={component.props[field.key]}
-              onChange={(val) => updateProps(component.id, { [field.key]: val })}
+              value={component.props[field.sourceKey || field.key]}
+              pages={schema.pages}
+              sections={linkSections}
+              subject={component.id}
+              onChange={(val) => updateProps(component.id, { [field.sourceKey || field.key]: val })}
             />
           )}
         />
@@ -1528,6 +1551,7 @@ export default function PropertiesPanel({
           value={component.props[field.sourceKey || field.key]}
           pages={schema.pages}
           sections={linkSections}
+          subject={component.id}
           onChange={(val) => updateProps(component.id, { [field.sourceKey || field.key]: val })}
           extras={
             component.type === 'tabs' && field.control === 'tabs'
@@ -1551,6 +1575,7 @@ export default function PropertiesPanel({
         value={component.props.href}
         pages={schema.pages}
         sections={linkSections}
+        subject={component.id}
         onChange={(val) => updateProps(component.id, { href: val })}
       />
     </PanelGroup>
@@ -1653,9 +1678,32 @@ export default function PropertiesPanel({
       {t('Nothing to set here for this component.')}
     </p>
   )
+  const effectiveStyleKeys =
+    component.styles?.border != null || component.stylesMobile?.border != null
+      ? [...new Set([...(def.editableStyles || []), 'border'])]
+      : (def.editableStyles || [])
+  const styleGroupKeySet = new Set(effectiveStyleKeys)
+  const styleGroups = visibleStyleGroups(effectiveStyleKeys)
   const designTabEmpty =
-    visibleStyleGroups(def.editableStyles || []).filter((g) => g.title !== LAYOUT_STYLE_GROUP).length === 0
+    styleGroups.filter((g) => g.title !== LAYOUT_STYLE_GROUP).length === 0
     && !extendedMode
+  const layoutSharedAcrossScreens = isFlow || (!!parentComponent && parentComponent.type !== 'region')
+  const mobileStylesBanner = isMobile && !isFlow && (
+    <div className="space-y-2 rounded-lg bg-[#eef2ff] px-3 py-2">
+      <p className="text-[11px] leading-snug text-[#4f46e5]">
+        {t('Style edits here apply to MOBILE only. Clear a field to fall back to the PC value.')}
+      </p>
+      {component.stylesMobile && Object.keys(component.stylesMobile).length > 0 && (
+        <button
+          type="button"
+          onClick={() => clearMobileStyles(component.id)}
+          className="rounded-lg border border-[#4f46e5] bg-white px-2 py-0.5 text-xs font-semibold text-[#4f46e5] hover:bg-[#e0e7ff]"
+        >
+          {t('Reset mobile styles')} ({Object.keys(component.stylesMobile).length})
+        </button>
+      )}
+    </div>
+  )
 
   return (
     <div className="studio-properties-panel flex h-full min-w-0 flex-col overflow-hidden">
@@ -1738,23 +1786,8 @@ export default function PropertiesPanel({
             {designTabEmpty && emptyTabHint}
         {/* Mobile viewport = per-breakpoint styling: controls read the merged
             view (override ?? desktop) and writes land in stylesMobile only. */}
-        {isMobile && !isFlow && (
-          <div className="space-y-2 rounded-lg bg-[#eef2ff] px-3 py-2">
-            <p className="text-[11px] leading-snug text-[#4f46e5]">
-              {t('Style edits here apply to MOBILE only. Clear a field to fall back to the PC value.')}
-            </p>
-            {component.stylesMobile && Object.keys(component.stylesMobile).length > 0 && (
-              <button
-                type="button"
-                onClick={() => clearMobileStyles(component.id)}
-                className="rounded-lg border border-[#4f46e5] bg-white px-2 py-0.5 text-xs font-semibold text-[#4f46e5] hover:bg-[#e0e7ff]"
-              >
-                {t('Reset mobile styles')} ({Object.keys(component.stylesMobile).length})
-              </button>
-            )}
-          </div>
-        )}
-        {visibleStyleGroups(def.editableStyles || [])
+        {mobileStylesBanner}
+        {styleGroups
           .filter((group) => group.title !== LAYOUT_STYLE_GROUP)
           .map((group) => (
           <PanelGroup
@@ -1767,6 +1800,8 @@ export default function PropertiesPanel({
               <StyleControl
                 key={styleKey}
                 styleKey={styleKey}
+                subject={component.id}
+                allowInherit={isMobile && !isFlow}
                 value={
                   isMobile && !isFlow
                     ? (component.stylesMobile?.[styleKey] ?? component.styles[styleKey])
@@ -1779,10 +1814,12 @@ export default function PropertiesPanel({
           ))}
         {extendedMode && (
           <PanelGroup id="advanced-css" title={t('Advanced CSS')}>
-            {ADVANCED_STYLE_KEYS.map((styleKey) => (
+            {ADVANCED_STYLE_KEYS.filter((styleKey) => !styleGroupKeySet.has(styleKey)).map((styleKey) => (
               <StyleControl
                 key={styleKey}
                 styleKey={styleKey}
+                subject={component.id}
+                allowInherit={isMobile && !isFlow}
                 value={
                   isMobile && !isFlow
                     ? (component.stylesMobile?.[styleKey] ?? component.styles[styleKey])
@@ -1815,7 +1852,7 @@ export default function PropertiesPanel({
             <>
               {t(showPositionControls ? 'Position & Size' : 'Layout Size')}
               <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">
-                ({t(isFlow ? 'all screens' : isMobile ? 'mobile' : 'PC')})
+                ({t(layoutSharedAcrossScreens ? 'all screens' : isMobile ? 'mobile' : 'PC')})
               </span>
             </>
           }
@@ -1826,6 +1863,7 @@ export default function PropertiesPanel({
                 {!viewportStretchComponent && (
                   <LabeledNumber
                     label="X"
+                    subject={component.id}
                     value={layout.x}
                     onChange={(v) => setLayout(component.id, { x: v })}
                   />
@@ -1833,6 +1871,7 @@ export default function PropertiesPanel({
                 {component.type !== 'region' && (
                   <LabeledNumber
                     label="Y"
+                    subject={component.id}
                     value={layout.y}
                     onChange={(v) => setLayout(component.id, { y: v })}
                   />
@@ -1842,12 +1881,14 @@ export default function PropertiesPanel({
             {!viewportStretchComponent && (
               <LabeledNumber
                 label={t(isFlow ? 'Max width' : 'Width')}
+                subject={component.id}
                 value={layout.w}
                 onChange={(v) => setLayout(component.id, { w: v })}
               />
             )}
             <LabeledNumber
               label={t(isFlow ? 'Min height' : 'Height')}
+              subject={component.id}
               value={layout.h}
               onChange={(v) => setLayout(component.id, { h: v })}
             />
@@ -1886,7 +1927,8 @@ export default function PropertiesPanel({
           )}
         </PanelGroup>
         {layoutSection}
-        {visibleStyleGroups(def.editableStyles || [])
+        {styleGroups.some((group) => group.title === LAYOUT_STYLE_GROUP) && mobileStylesBanner}
+        {styleGroups
           .filter((group) => group.title === LAYOUT_STYLE_GROUP)
           .map((group) => (
           <PanelGroup
@@ -1899,6 +1941,8 @@ export default function PropertiesPanel({
               <StyleControl
                 key={styleKey}
                 styleKey={styleKey}
+                subject={component.id}
+                allowInherit={isMobile && !isFlow}
                 value={
                   isMobile && !isFlow
                     ? (component.stylesMobile?.[styleKey] ?? component.styles[styleKey])
@@ -2269,20 +2313,22 @@ export default function PropertiesPanel({
 function MixedNumber({ label, value, mixed, onChange }) {
   const { t } = useLanguage()
   const displayValue = mixed ? '' : Math.round(value ?? 0)
+  const [draft, setDraft] = useState(null)
 
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-semibold text-[var(--studio-text-muted)]">{label}</span>
       <input
-        key={`${label}-${mixed ? 'mixed' : displayValue}`}
         type="number"
         className="w-full rounded-lg border border-[#d1d5db] px-2 py-1 text-sm text-[#111827] placeholder:text-[#9ca3af] focus:border-[#4f46e5] focus:outline-none"
-        defaultValue={displayValue}
+        value={draft ?? displayValue}
         placeholder={mixed ? t('Mixed') : undefined}
         onChange={(e) => {
           const next = e.target.value
+          setDraft(next)
           if (next !== '') onChange(Number(next))
         }}
+        onBlur={() => setDraft(null)}
       />
     </label>
   )

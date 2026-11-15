@@ -387,7 +387,7 @@ def sanitize_props(ctype, props):
             'buttonHref': sanitize_url(props.get('buttonHref')),
         }
     if ctype == 'region':
-        return {'contentWidth': _num(props.get('contentWidth'), 980, 320, 2000)}
+        return {'contentWidth': _num(props.get('contentWidth'), 980, 320, 4000)}
     if ctype == 'card':
         return {
             'title': _str(props.get('title')),
@@ -577,7 +577,7 @@ def _optional_width(value):
     """A width the user may leave empty: '' stays '' (no limit)."""
     if value is None or (isinstance(value, str) and not value.strip()):
         return ''
-    return _num(value, 980, 320, 2000)
+    return _num(value, 980, 320, 4000)
 
 
 def _num(value, default, lo, hi):
@@ -807,7 +807,12 @@ def sanitize_component(comp, depth=0):
                 except serializers.ValidationError:
                     continue
                 if ctype == 'tabs':
-                    raw_tab_id = ch.get('tabId') if isinstance(ch, dict) else None
+                    raw_tab_id = (
+                        ch.get('tabId')
+                        or (ch.get('props', {}).get('tabId') if isinstance(ch.get('props'), dict) else None)
+                        if isinstance(ch, dict)
+                        else None
+                    )
                     tab_id = _str(raw_tab_id)
                     if tab_id not in valid_tab_ids:
                         tab_id = fallback_tab

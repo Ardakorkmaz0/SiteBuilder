@@ -88,6 +88,23 @@ describe('retargetLinks', () => {
     const components = [{ id: 'a', props: { href: '#x' }, children: [{ id: 'b', props: {} }] }]
     expect(retargetLinks(components, 'region_1', 'about')).toBe(components)
   })
+
+  it('updates inline rich run links targeting the renamed anchor', () => {
+    const components = [{
+      id: 'p1',
+      type: 'text',
+      props: {
+        text: 'Read more',
+        rich: [{ t: 'Read ' }, { t: 'more', href: '#aboutUs' }, { t: ' here', href: '#other' }],
+      },
+    }]
+    const out = retargetLinks(components, 'aboutUs', 'aboutus')
+    expect(out[0].props.rich).toEqual([
+      { t: 'Read ' },
+      { t: 'more', href: '#aboutus' },
+      { t: ' here', href: '#other' },
+    ])
+  })
 })
 
 // ---- store ------------------------------------------------------------------

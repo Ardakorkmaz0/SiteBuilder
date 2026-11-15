@@ -2321,19 +2321,22 @@ function SiteEditor() {
       setConvertNote('')
       if (!window.confirm(lines.join('\n\n'))) return
       // One Undo step for the schema and the document together, as in
-      // "Remove HTML".
+      // "Remove HTML". Re-read the live HTML map after async measurement and
+      // confirm so concurrent edits on other pages are not overwritten.
       const state = useEditorStore.getState()
-      rememberHtmlForSchema(state.schema, currentMap)
+      const latestMap = liveHtmlMap()
+      rememberHtmlForSchema(state.schema, latestMap)
       state.convertPageToCanvas(pageId, {
         ...result,
-        htmlBackup: html,
+        htmlBackup: latestMap[pageId] || html,
         seoTitle: result.title,
         seoDescription: result.description,
+        language: result.language,
         fontFaces: result.fontFaces,
         parts: result.parts,
         hiddenKeys: result.hiddenKeys,
       })
-      const nextMap = { ...currentMap, [pageId]: '' }
+      const nextMap = { ...latestMap, [pageId]: '' }
       rememberHtmlForSchema(useEditorStore.getState().schema, nextMap)
       setPageHtmlMap(nextMap)
       markHtmlDirty()

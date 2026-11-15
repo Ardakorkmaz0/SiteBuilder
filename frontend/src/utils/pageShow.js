@@ -19,9 +19,16 @@
 export const SHOW_KEY = /^[a-z0-9_-]{1,40}$/
 export const SHOW_ACTIONS = ['show', 'hide', 'toggle', 'next', 'prev']
 
-const keysOf = (value, limit) => (Array.isArray(value) ? value : [])
-  .filter((key) => typeof key === 'string' && SHOW_KEY.test(key))
-  .slice(0, limit)
+const keysOf = (value, limit) => {
+  const seen = new Set()
+  for (const key of Array.isArray(value) ? value : []) {
+    if (typeof key === 'string' && SHOW_KEY.test(key) && !seen.has(key)) {
+      seen.add(key)
+      if (seen.size >= limit) break
+    }
+  }
+  return [...seen]
+}
 
 export function shownBy(props) {
   return [...new Set(keysOf(props?.shownBy, 16))]

@@ -31,11 +31,15 @@ function metaContent(doc, name) {
   return doc.querySelector(`meta[name="${name}"]`)?.getAttribute('content') || ''
 }
 
+function metaProperty(doc, property) {
+  return doc.querySelector(`meta[property="${property}"]`)?.getAttribute('content') || ''
+}
+
 // What the document currently says. Unset fields come back empty/false, which
 // is what an unset control shows.
 export function readHtmlPageSettings(html) {
   const doc = parse(html)
-  if (!doc) return { language: 'en', direction: '', themeColor: '', smoothScroll: false, noIndex: false, canonicalUrl: '', seoTitle: '', seoDescription: '' }
+  if (!doc) return { language: 'en', direction: '', themeColor: '', smoothScroll: false, noIndex: false, canonicalUrl: '', seoTitle: '', seoDescription: '', seoImage: '' }
   const root = doc.documentElement
   const direction = (root.getAttribute('dir') || '').toLowerCase()
   const robots = metaContent(doc, 'robots').toLowerCase()
@@ -48,6 +52,7 @@ export function readHtmlPageSettings(html) {
     canonicalUrl: doc.querySelector('link[rel="canonical"]')?.getAttribute('href') || '',
     seoTitle: doc.querySelector('title')?.textContent || '',
     seoDescription: metaContent(doc, 'description'),
+    seoImage: metaProperty(doc, 'og:image') || metaContent(doc, 'twitter:image'),
   }
 }
 
@@ -56,8 +61,8 @@ function head(doc) {
   return doc.head
 }
 
-function setMeta(doc, name, value) {
-  const existing = doc.querySelector(`meta[name="${name}"]`)
+function setMetaAttr(doc, attr, key, value) {
+  const existing = doc.querySelector(`meta[${attr}="${key}"]`)
   if (!value) {
     existing?.remove()
     return
@@ -67,9 +72,13 @@ function setMeta(doc, name, value) {
     return
   }
   const meta = doc.createElement('meta')
-  meta.setAttribute('name', name)
+  meta.setAttribute(attr, key)
   meta.setAttribute('content', value)
   head(doc).append(meta)
+}
+
+function setMeta(doc, name, value) {
+  setMetaAttr(doc, 'name', name, value)
 }
 
 // Writes only the keys the patch carries, so one control never clears another's
@@ -133,6 +142,13 @@ export function applyHtmlPageSettings(html, patch = {}) {
   }
 
   if ('seoDescription' in patch) setMeta(doc, 'description', String(patch.seoDescription || ''))
+
+  if ('seoImage' in patch) {
+    const image = String(patch.seoImage || '').trim()
+    setMetaAttr(doc, 'property', 'og:image', image)
+    setMeta(doc, 'twitter:image', image)
+    if (image) setMeta(doc, 'twitter:card', 'summary_large_image')
+  }
 
   return serialize(doc, html)
 }

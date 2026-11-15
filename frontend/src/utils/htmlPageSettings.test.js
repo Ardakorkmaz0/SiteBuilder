@@ -22,6 +22,7 @@ describe('reading an uploaded page', () => {
       canonicalUrl: 'https://example.com/about',
       seoTitle: 'About us',
       seoDescription: 'Who we are',
+      seoImage: '',
     })
   })
 
@@ -92,5 +93,19 @@ describe('writing to an uploaded page', () => {
     expect(after).toContain('lang="fr"')
     expect(after).toContain('<h1>Hi</h1>')
     expect(after.startsWith('<!DOCTYPE html>')).toBe(true)
+  })
+
+  it('reads and writes og:image / twitter:image via seoImage and removes them when cleared', () => {
+    const withImage = applyHtmlPageSettings(doc(), { seoImage: 'https://example.com/share.png' })
+    expect(withImage).toContain('property="og:image"')
+    expect(withImage).toContain('content="https://example.com/share.png"')
+    expect(withImage).toContain('name="twitter:image"')
+    expect(withImage).toContain('name="twitter:card"')
+    expect(readHtmlPageSettings(withImage).seoImage).toBe('https://example.com/share.png')
+
+    const cleared = applyHtmlPageSettings(withImage, { seoImage: '' })
+    expect(readHtmlPageSettings(cleared).seoImage).toBe('')
+    expect(cleared).not.toContain('og:image')
+    expect(cleared).not.toContain('twitter:image')
   })
 })

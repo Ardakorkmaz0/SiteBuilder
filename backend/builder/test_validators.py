@@ -849,3 +849,46 @@ def test_a_box_is_still_held_to_a_limit():
         'layout': {'x': 9000000, 'y': 9000000, 'w': 9000000, 'h': 9000000},
     })
     assert saved['layout'] == {'x': 5000, 'y': 200000, 'w': 4000, 'h': 100000}
+
+
+def test_tabs_children_fall_back_to_props_tab_id():
+    saved = _one_component({
+        'id': 'tabs_1',
+        'type': 'tabs',
+        'props': {
+            'tabs': [{'id': 't1', 'label': 'One'}, {'id': 't2', 'label': 'Two'}],
+            'activeId': 't1',
+        },
+        'styles': {},
+        'layout': {'x': 0, 'y': 0, 'w': 600, 'h': 240},
+        'children': [{
+            'id': 'child_1',
+            'type': 'text',
+            'props': {'text': 'Second', 'tabId': 't2'},
+            'styles': {},
+            'layout': {'x': 10, 'y': 10, 'w': 200, 'h': 40},
+        }],
+    })
+    assert saved['children'][0]['tabId'] == 't2'
+
+
+def test_region_and_navbar_allow_content_width_up_to_4000():
+    reg_props = _saved_props({'contentWidth': 2560}, ctype='region')
+    nav_props = _saved_props({'contentWidth': 4000}, ctype='navbar')
+    clamped = _saved_props({'contentWidth': 6500}, ctype='region')
+    assert reg_props['contentWidth'] == 2560
+    assert nav_props['contentWidth'] == 4000
+    assert clamped['contentWidth'] == 4000
+
+
+def test_converted_subtree_at_max_nesting_depth_4_is_preserved():
+    leaf = {'id': 'leaf_1', 'type': 'text', 'props': {'text': 'Deep'}, 'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 100, 'h': 20}}
+    grp = {'id': 'grp_1', 'type': 'container', 'props': {}, 'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 200, 'h': 100}, 'children': [leaf]}
+    card = {'id': 'card_1', 'type': 'container', 'props': {}, 'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 300, 'h': 200}, 'children': [grp]}
+    batch = {'id': 'batch_1', 'type': 'container', 'props': {}, 'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 400, 'h': 400}, 'children': [card]}
+    saved = _one_component({
+        'id': 'sec_1', 'type': 'region', 'props': {}, 'styles': {},
+        'layout': {'x': 0, 'y': 0, 'w': 1200, 'h': 600},
+        'children': [batch],
+    })
+    assert saved['children'][0]['children'][0]['children'][0]['children'][0]['id'] == 'leaf_1'

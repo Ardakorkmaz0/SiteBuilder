@@ -573,6 +573,30 @@ function FormField({ componentType, props, style, boxScale = 1 }) {
   const uid = useId()
   const inputId = `f-${uid.replace(/[^a-zA-Z0-9_-]/g, '')}`
   const [revealed, setRevealed] = useState(false)
+  const propChecked = props.checked === 'on'
+  const [localChecked, setLocalChecked] = useState(propChecked)
+  const [prevPropChecked, setPrevPropChecked] = useState(propChecked)
+  if (propChecked !== prevPropChecked) {
+    setPrevPropChecked(propChecked)
+    setLocalChecked(propChecked)
+  }
+  const r = rangeAttrs(props)
+  const propRangeKey = `${r.min}|${r.max}|${r.step}|${r.value}`
+  const [localRange, setLocalRange] = useState(String(r.value))
+  const [prevRangeKey, setPrevRangeKey] = useState(propRangeKey)
+  if (propRangeKey !== prevRangeKey) {
+    setPrevRangeKey(propRangeKey)
+    setLocalRange(String(r.value))
+  }
+  const options = choiceList(props)
+  const defaultSelect = props.placeholder ? '' : options[0] || ''
+  const propSelectKey = `${props.placeholder ? '1' : '0'}|${options.join('\0')}`
+  const [localSelect, setLocalSelect] = useState(defaultSelect)
+  const [prevSelectKey, setPrevSelectKey] = useState(propSelectKey)
+  if (propSelectKey !== prevSelectKey) {
+    setPrevSelectKey(propSelectKey)
+    setLocalSelect(defaultSelect)
+  }
   const s = fieldStyles(componentType, props, (value) => scaleCssValue(value, boxScale))
   const required = props.required === 'on'
   const labelText = props.label
@@ -586,11 +610,28 @@ function FormField({ componentType, props, style, boxScale = 1 }) {
     const control = s.kind === 'switch'
       ? (
         <span className="pwb-switch" data-field-part="control" style={s.switchBox}>
-          <input id={inputId} type="checkbox" role="switch" defaultChecked={props.checked === 'on'} required={required} />
+          <input
+            id={inputId}
+            type="checkbox"
+            role="switch"
+            checked={localChecked}
+            onChange={(e) => setLocalChecked(e.target.checked)}
+            required={required}
+          />
           <span className="pwb-switch-track" />
         </span>
       )
-      : <input id={inputId} data-field-part="control" type="checkbox" defaultChecked={props.checked === 'on'} required={required} style={s.control} />
+      : (
+        <input
+          id={inputId}
+          data-field-part="control"
+          type="checkbox"
+          checked={localChecked}
+          onChange={(e) => setLocalChecked(e.target.checked)}
+          required={required}
+          style={s.control}
+        />
+      )
     return (
       <div style={outer}>
         <div style={s.root}>
@@ -626,12 +667,30 @@ function FormField({ componentType, props, style, boxScale = 1 }) {
     : null
   let control
   if (s.kind === 'range') {
-    const r = rangeAttrs(props)
-    control = <input id={inputId} data-field-part="control" type="range" min={r.min} max={r.max} step={r.step} defaultValue={r.value} style={s.range} />
-  } else if (s.kind === 'select') {
-    const options = choiceList(props)
     control = (
-      <select id={inputId} data-field-part="field" className={className} required={required} defaultValue={props.placeholder ? '' : options[0] || ''} style={s.field}>
+      <input
+        id={inputId}
+        data-field-part="control"
+        type="range"
+        min={r.min}
+        max={r.max}
+        step={r.step}
+        value={localRange}
+        onChange={(e) => setLocalRange(e.target.value)}
+        style={s.range}
+      />
+    )
+  } else if (s.kind === 'select') {
+    control = (
+      <select
+        id={inputId}
+        data-field-part="field"
+        className={className}
+        required={required}
+        value={localSelect}
+        onChange={(e) => setLocalSelect(e.target.value)}
+        style={s.field}
+      >
         {props.placeholder ? <option value="" disabled>{props.placeholder}</option> : null}
         {options.map((option, index) => <option key={`${index}-${option}`} value={option}>{option}</option>)}
       </select>
@@ -740,7 +799,7 @@ export function Accordion({ props, style, boxScale = 1 }) {
       <summary style={{ cursor: 'pointer', fontWeight: 600, padding: `${scaledPx(12, boxScale)} 0`, ...multilineTextStyle }}>
         {props.title}
       </summary>
-      <div style={{ paddingBottom: scaledPx(14, boxScale), color: '#4b5563', ...multilineTextStyle }}>
+      <div style={{ paddingBottom: scaledPx(14, boxScale), color: style?.color ? 'inherit' : '#4b5563', ...multilineTextStyle }}>
         {props.text}
       </div>
     </details>

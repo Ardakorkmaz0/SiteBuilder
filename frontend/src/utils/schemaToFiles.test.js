@@ -792,3 +792,31 @@ describe('a style field that was emptied', () => {
     expect(style.split(';').filter((part) => !/^[a-z-]+:.+$/.test(part))).toEqual([])
   })
 })
+
+describe('nested accordion & tabs export regressions', () => {
+  it('places props.tabId children in the matching panel, avoids hardcoded fixed height on collapsible widgets, and respects custom accordion color', () => {
+    const files = schemaToFiles({
+      theme: {},
+      pages: [{
+        id: 'p1', name: 'Home', canvasWidth: 1000,
+        components: [{
+          id: 'tabs1', type: 'tabs',
+          props: { tabs: [{ id: 't1', label: 'One' }, { id: 't2', label: 'Two' }], activeId: 't2' },
+          styles: {}, layout: { x: 0, y: 0, w: 600, h: 240 },
+          children: [{
+            id: 'acc_nested', type: 'accordion',
+            props: { title: 'Q', text: 'Long answer', tabId: 't2' },
+            styles: { color: '#ef4444' },
+            layout: { x: 0, y: 0, w: 300, h: 80 },
+          }],
+        }],
+      }],
+    })
+    const html = files.find((f) => f.name === 'index.html').content
+    const panel2 = html.split('data-builder-panel="t2"')[1] || ''
+    expect(panel2).toContain('acc_nested')
+    expect(panel2).not.toContain('width:300px;height:80px')
+    expect(panel2).toContain('min-height:80px')
+    expect(panel2).not.toContain('color:#4b5563')
+  })
+})

@@ -8,16 +8,18 @@
 // which moves and resizes like any other block. Nothing is dropped silently:
 // the report counts what was kept as HTML and what could not be carried.
 
-import { ANCHOR_RE } from './anchors.js'
+import { ANCHOR_RE, retargetLinks } from './anchors.js'
 import { fontFacesUsedBy } from './fontFaces.js'
 
-// Mirrors MAX_CHILDREN and MAX_HTML_EMBED in backend/builder/validators.py.
+// Mirrors MAX_CHILDREN, MAX_NESTING_DEPTH and MAX_HTML_EMBED in backend/builder/validators.py.
 const MAX_CHILDREN = 60
+const MAX_NESTING_DEPTH = 4
 const MAX_HTML_CODE = 50 * 1024
 // A section holds containers, and those hold blocks: one level of boxes with
 // children inside a section keeps the page inside the server's nesting limit.
 const MAX_BOX_DEPTH = 2
 const GROUP_SIZE = 40
+const isPinnedPos = (pos) => pos === 'fixed' || pos === 'sticky'
 
 const SEMANTIC = new Set(['section', 'header', 'footer', 'nav', 'article', 'aside', 'main'])
 const HEADINGS = { h1: 'h1', h2: 'h2', h3: 'h3', h4: 'h3', h5: 'h3', h6: 'h3' }
@@ -161,13 +163,52 @@ function block(ctx, type, props, styles, layout, children) {
 }
 
 // The element's id as the block's anchor, so a "#id" link on the page still
-// finds it. One block per id, and only an id the canvas can keep.
+// finds it. One block per id, normalized to lowercase when an HTML token uses uppercase letters.
 function named(made, n, ctx) {
   const target = made[made.length - 1]
-  if (!target || !n.id || !ANCHOR_RE.test(n.id) || ctx.anchors.has(n.id)) return made
-  ctx.anchors.add(n.id)
-  target.props = { ...target.props, anchor: n.id }
+  if (!target || !n.id) return made
+  const lower = n.id.toLowerCase()
+  const anchor = ANCHOR_RE.test(lower) && lower !== 'top' ? lower : ''
+  if (!anchor || ctx.anchors.has(anchor)) return made
+  ctx.anchors.add(anchor)
+  if (anchor !== n.id && ctx.renames) ctx.renames.set(n.id, anchor)
+  target.props = { ...target.props, anchor }
   return made
+}
+
+// Extract label text + sample text style from a <button> holding an SVG/image icon
+// beside nested label spans, without absorbing real inputs or multi-link widgets.
+function readButtonContent(n, state = { parts: [], sample: null }) {
+  for (const kid of n.kids || []) {
+    if (kid.kind === 'field' || kid.kind === 'list' || kid.tag === 'a' || kid.tag === 'button' || kid.tag === 'table') return null
+    if (kid.kind === 'html' && kid.tag !== 'svg') return null
+    if (kid.kind === 'text') {
+      const words = (kid.text || '').trim()
+      if (words) {
+        state.parts.push(words)
+        if (!state.sample) state.sample = kid.s
+      }
+      continue
+    }
+    if (kid.kind === 'image' || kid.kind === 'line' || kid.tag === 'svg') continue
+    if (!readButtonContent(kid, state)) return null
+  }
+  return state
+}
+
+function buttonFrom(n, origin, ctx, href) {
+  if (n.tag !== 'button' || n.kind) return null
+  const content = readButtonContent(n)
+  const label = content?.parts.join(' ').replace(/\s+/g, ' ').trim() || ''
+  if (!label) return null
+  const target = n.href !== undefined ? n.href : href
+  return block(
+    ctx,
+    'button',
+    { text: label, href: target || '', icon: '' },
+    { backgroundColor: 'transparent', ...textStyles(content.sample || n.s), ...boxStyles(n.s), textAlign: 'center', padding: paddingOf(n.s) },
+    place(n.rect, origin, 1),
+  )
 }
 
 // A box that became no block of its own hands its id to the first block made
@@ -297,10 +338,18 @@ function backdropOver(n, origin, ctx) {
   return backdrop(n, ctx).map((image) => ({ ...image, layout: { ...image.layout, ...place(n.rect, origin) } }))
 }
 
+const subtreeDepth = (c) => (Array.isArray(c?.children) && c.children.length
+  ? 1 + Math.max(...c.children.map(subtreeDepth))
+  : 0)
+
 // A parent holds at most MAX_CHILDREN blocks. More than that are gathered,
-// in reading order, into plain containers the eye cannot see.
-function fitChildren(children, ctx) {
-  if (children.length <= MAX_CHILDREN) return children
+// in reading order, into plain containers the eye cannot see, within the
+// remaining server nesting budget (`maxLevels`).
+function fitChildren(children, ctx, maxLevels = 2) {
+  if (children.length <= MAX_CHILDREN || maxLevels <= 0) return children
+  const size = maxLevels === 1 && children.length > MAX_CHILDREN * GROUP_SIZE
+    ? Math.min(MAX_CHILDREN, Math.ceil(children.length / MAX_CHILDREN))
+    : GROUP_SIZE
   // What runs down most of the box (its edges, its background) stays as it
   // is: in a group it would stretch that group over all the others, and the
   // groups would lie over each other instead of one under the next.
@@ -313,14 +362,15 @@ function fitChildren(children, ctx) {
   const rest = children.filter((c) => !tall.includes(c))
   // Only when that leaves fewer pieces: sixty edges and one word would
   // come back as the same sixty-one, for ever.
-  const after = tall.length + (rest.length <= MAX_CHILDREN ? rest.length : Math.ceil(rest.length / GROUP_SIZE))
-  if (tall.length && rest.length && after < children.length) {
-    return fitChildren([...tall, ...fitChildren(rest, ctx)], ctx)
+  const after = tall.length + (rest.length <= MAX_CHILDREN ? rest.length : Math.ceil(rest.length / size))
+  if (tall.length && rest.length && after < children.length && (after <= MAX_CHILDREN || maxLevels > 1)) {
+    const groupedRest = rest.length <= MAX_CHILDREN ? rest : fitChildren(rest, ctx, Math.max(1, maxLevels - (after > MAX_CHILDREN ? 1 : 0)))
+    return fitChildren([...tall, ...groupedRest], ctx, maxLevels)
   }
   const ordered = [...children].sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x)
   const groups = []
-  for (let start = 0; start < ordered.length; start += GROUP_SIZE) {
-    const members = ordered.slice(start, start + GROUP_SIZE)
+  for (let start = 0; start < ordered.length; start += size) {
+    const members = ordered.slice(start, start + size)
     const x = Math.min(...members.map((c) => c.layout.x))
     const y = Math.min(...members.map((c) => c.layout.y))
     const right = Math.max(...members.map((c) => c.layout.x + c.layout.w))
@@ -335,7 +385,24 @@ function fitChildren(children, ctx) {
       children: members.map((c) => ({ ...c, layout: { ...c.layout, x: c.layout.x - x, y: c.layout.y - y } })),
     })
   }
-  return fitChildren(groups, ctx)
+  return fitChildren(groups, ctx, maxLevels - 1)
+}
+
+function pinBlocks(blocks, origin, n, ctx) {
+  if (!isPinnedPos(n.s.position) || !blocks.length) return blocks
+  for (const b of blocks) {
+    if (b.props?.scrollBehavior) continue
+    const rect = blocks.length === 1
+      ? n.rect
+      : {
+          x: origin.x + (b.layout?.x || 0),
+          y: origin.y + (b.layout?.y || 0),
+          w: b.layout?.w || n.rect.w,
+          h: b.layout?.h || n.rect.h,
+        }
+    pin(b, { ...n, rect }, ctx)
+  }
+  return blocks
 }
 
 // What the page shows only on a click, and what a click on it does
@@ -369,12 +436,33 @@ function walk(n, out, origin, depth, ctx, href) {
 function walkNode(n, out, origin, depth, ctx, href) {
   const made = leaf(n, origin, ctx, href)
   if (made) {
+    if (depth === 0) pinBlocks(made, origin, n, ctx)
     out.push(...named(made, n, ctx))
+    return
+  }
+  const btn = buttonFrom(n, origin, ctx, href)
+  if (btn) {
+    if (depth === 0 && isPinnedPos(n.s.position)) pin(btn, n, ctx)
+    out.push(...named([btn], n, ctx))
     return
   }
   const inside = n.tag === 'a' && n.href !== undefined ? n.href : href
   const kids = n.kids || []
   if (!isPainted(n.s) || n.rect.w < 1 || n.rect.h < 1) {
+    // An unpainted fixed/sticky root wrapper must stay a pinned box around
+    // its children so viewport pinning is not lost.
+    if (depth === 0 && isPinnedPos(n.s.position) && n.rect.w >= 1 && n.rect.h >= 1) {
+      const children = []
+      kids.forEach((kid) => walk(kid, children, { x: n.rect.x, y: n.rect.y }, depth + 1, ctx, inside))
+      if (children.length) {
+        const innerMax = children.reduce((max, c) => Math.max(max, subtreeDepth(c)), 0)
+        const budget = Math.max(1, MAX_NESTING_DEPTH - 1 - innerMax)
+        const box = block(ctx, 'container', {}, { backgroundColor: 'transparent', padding: '0px', borderRadius: '0px' }, place(n.rect, origin), fitChildren(children, ctx, budget))
+        pin(box, n, ctx)
+        out.push(...named([box], n, ctx))
+      }
+      return
+    }
     // Nothing of its own to show: what it holds stands where it stood, and
     // the first of it takes the box's id, so a link to the box still lands.
     const first = out.length
@@ -389,35 +477,39 @@ function walkNode(n, out, origin, depth, ctx, href) {
     const children = [...backdrop(n, ctx)]
     kids.forEach((kid) => walk(kid, children, innerOrigin(n), depth + 1, ctx, inside))
     children.push(...edgeLines(n, ctx))
-    const box = block(ctx, 'container', {}, styles, layout, fitChildren(children, ctx))
-    if (depth === 0 && n.s.position === 'fixed') pin(box, n, ctx)
+    const innerMax = children.reduce((max, c) => Math.max(max, subtreeDepth(c)), 0)
+    const reservedTop = depth === 0 ? 0 : 1
+    const budget = Math.max(1, MAX_NESTING_DEPTH - 1 - depth - reservedTop - innerMax)
+    const box = block(ctx, 'container', {}, styles, layout, fitChildren(children, ctx, budget))
+    if (depth === 0 && isPinnedPos(n.s.position)) pin(box, n, ctx)
     out.push(...named([box], n, ctx))
     return
   }
   // Nothing inside it, or too deep (or too flat) for a box with children:
   // the box is drawn as a shape, and what it held is laid over it.
-  out.push(shape(ctx, boxStyles(n.s), n.rect, origin), ...backdropOver(n, origin, ctx))
+  const drawn = [shape(ctx, boxStyles(n.s), n.rect, origin), ...backdropOver(n, origin, ctx)]
+  if (depth === 0) pinBlocks(drawn, origin, n, ctx)
+  out.push(...named(drawn, n, ctx))
   kids.forEach((kid) => walk(kid, out, origin, depth, ctx, inside))
 }
 
-// A box the page keeps in place on the screen (position: fixed) stays there
-// on the canvas too, at the same distance from the same screen edges. One
-// that runs down the whole screen (a side menu) does so at any screen height
-// and scrolls inside itself when it does not fit; on a phone it is hidden, as
-// such a menu is on the page itself, where it would cover most of the screen.
+// A box the page keeps in place on the screen (`position: fixed` or `sticky`)
+// stays pinned on the canvas too. Fixed sidebars that fill the viewport get
+// `pinHeight: 'full'` and hide on narrow mobile screens.
 function pin(box, n, ctx) {
+  const mode = n.s.position === 'sticky' ? 'sticky' : 'fixed'
   const view = ctx.viewHeight
   // Measured from the screen edges it is nearer to.
-  const full = n.rect.y <= 1 && n.rect.h >= view - 2
+  const full = mode === 'fixed' && n.rect.y <= 1 && n.rect.h >= view - 2
   const right = n.rect.x - ctx.left + n.rect.w / 2 > ctx.width / 2
-  const bottom = !full && n.rect.y + n.rect.h / 2 > view / 2
+  const bottom = mode === 'fixed' && !full && n.rect.y + n.rect.h / 2 > view / 2
   box.props = {
     ...box.props,
-    scrollBehavior: 'fixed',
+    scrollBehavior: mode,
     pinX: right ? 'right' : 'left',
     pinY: bottom ? 'bottom' : 'top',
     pinOffsetX: Math.round(right ? ctx.left + ctx.width - (n.rect.x + n.rect.w) : n.rect.x - ctx.left),
-    pinOffsetY: Math.round(bottom ? view - (n.rect.y + n.rect.h) : n.rect.y),
+    pinOffsetY: mode === 'sticky' ? 0 : Math.round(bottom ? view - (n.rect.y + n.rect.h) : n.rect.y),
     ...(full ? { pinHeight: 'full' } : {}),
   }
   if (full) {
@@ -498,11 +590,15 @@ function section(n, ctx) {
   const inside = n.tag === 'a' && n.href !== undefined ? n.href : undefined
   ;(n.kids || []).forEach((kid) => walk(kid, children, innerOrigin(n), 1, ctx, inside))
   children.push(...edgeLines(n, ctx))
-  return block(ctx, 'region', { contentWidth: ctx.width }, {
+  const innerMax = children.reduce((max, c) => Math.max(max, subtreeDepth(c)), 0)
+  const budget = Math.max(1, MAX_NESTING_DEPTH - 1 - innerMax)
+  const box = block(ctx, 'region', { contentWidth: ctx.width }, {
     backgroundColor: 'transparent',
     ...boxStyles(n.s),
     overflow: 'hidden',
-  }, { x: 0, y: Math.max(0, Math.round(n.rect.y)), w: ctx.width, h: Math.max(8, Math.ceil(n.rect.h)) }, fitChildren(children, ctx))
+  }, { x: 0, y: Math.max(0, Math.round(n.rect.y)), w: ctx.width, h: Math.max(8, Math.ceil(n.rect.h)) }, fitChildren(children, ctx, budget))
+  if (isPinnedPos(n.s.position)) pin(box, n, ctx)
+  return box
 }
 
 // The page from the top: full-width pieces become sections, and a wrapper
@@ -539,29 +635,63 @@ function band(kid, out, ctx) {
 
 const randomId = (type) => `${type}_${Math.random().toString(36).slice(2, 8)}`
 
-export function canvasFromMeasured(measured, { makeId = randomId } = {}) {
+function retargetAll(components, renames) {
+  if (!renames?.size) return components
+  let out = components
+  for (const [from, to] of renames) out = retargetLinks(out, from, to)
+  return out
+}
+
+function buildMeasured(measured, { makeId = randomId } = {}) {
   const page = measured?.root?.rect
   const width = Math.max(320, Math.min(4000, Math.round(page?.w || measured?.width || 1200)))
-  const ctx = { width, left: page?.x || 0, viewHeight: Math.max(1, Number(measured?.viewHeight) || 900), id: makeId, anchors: new Set(), report: { native: 0, html: 0, tooLarge: 0 } }
+  const ctx = { width, left: page?.x || 0, viewHeight: Math.max(1, Number(measured?.viewHeight) || 900), id: makeId, anchors: new Set(), renames: new Map(), report: { native: 0, html: 0, tooLarge: 0 } }
   const components = []
   if (measured?.root) bands(measured.root, components, ctx)
   const [body, root] = measured?.background || []
   return {
-    components,
-    canvasWidth: width,
-    background: hexOf(alphaOf(body) > 0 ? body : root),
-    fonts: Array.isArray(measured?.fonts) ? measured.fonts : [],
-    // The document's own font files, for the families the blocks use.
-    fontFaces: fontFacesUsedBy((measured?.fontFaces || []).map((face) => face?.css || '').join('\n'), components),
-    title: measured?.title || '',
-    description: measured?.description || '',
-    language: measured?.language || '',
-    report: { ...ctx.report, scripts: measured?.scripts || 0, hidden: measured?.hiddenParts || 0 },
+    renames: ctx.renames,
+    page: {
+      components: retargetAll(components, ctx.renames),
+      canvasWidth: width,
+      background: hexOf(alphaOf(body) > 0 ? body : root),
+      fonts: Array.isArray(measured?.fonts) ? measured.fonts : [],
+      // The document's own font files, for the families the blocks use.
+      fontFaces: fontFacesUsedBy((measured?.fontFaces || []).map((face) => face?.css || '').join('\n'), components),
+      title: measured?.title || '',
+      description: measured?.description || '',
+      language: measured?.language || '',
+      report: { ...ctx.report, scripts: measured?.scripts || 0, hidden: measured?.hiddenParts || 0 },
+    },
   }
+}
+
+export function canvasFromMeasured(measured, { makeId = randomId } = {}) {
+  return buildMeasured(measured, { makeId }).page
 }
 
 // A block as drawn, whatever it is called.
 const look = (c) => JSON.stringify(c, (key, value) => (key === 'id' ? undefined : value))
+
+const isChrome = (c) => c?.type === 'navbar' || isPinnedPos(c?.props?.scrollBehavior)
+const CHROME_PAINT_KEYS = new Set([
+  'color', 'backgroundColor', 'backgroundImage', 'borderColor',
+  'border', 'boxShadow', 'fontWeight', 'textDecoration', 'opacity',
+])
+// Persistent pinned/navbar chrome often flips link colour or weight for the
+// active section across states; compare its structure and layout without those
+// paint tokens so it stays emitted once rather than per part.
+const chromeLook = (c) => JSON.stringify(c, (key, value) => {
+  if (key === 'id') return undefined
+  if (key === 'styles' && value && typeof value === 'object') {
+    const stripped = {}
+    for (const [k, v] of Object.entries(value)) {
+      if (!CHROME_PAINT_KEYS.has(k)) stripped[k] = v
+    }
+    return stripped
+  }
+  return value
+})
 
 // How many blocks of each kind a list holds, as the report counts them.
 function tally(list, into) {
@@ -605,17 +735,31 @@ const withKey = (c, key) => ({ ...c, props: { ...c.props, shownBy: [...new Set([
 // and a "#id" link to a block of another part shows that part. The keys of
 // what a click shows are off when the page opens, as they were.
 export function canvasPageFromMeasured(measured, { makeId = randomId } = {}) {
-  const page = canvasFromMeasured(measured, { makeId })
+  const baseBuilt = buildMeasured(measured, { makeId })
   const offOf = (data) => (Array.isArray(data?.offKeys) ? data.offKeys : [])
   const states = (measured?.states || []).filter((state) => state?.data?.root)
-  if (!states.length) return { ...page, parts: [], hiddenKeys: offOf(measured), partCount: 1 }
-  const made = states.map((state) => canvasFromMeasured(state.data, { makeId }))
+  if (!states.length) return { ...baseBuilt.page, parts: [], hiddenKeys: offOf(measured), partCount: 1 }
+  const stateBuilt = states.map((state) => buildMeasured(state.data, { makeId }))
+  const allRenames = new Map(baseBuilt.renames)
+  for (const built of stateBuilt) {
+    for (const [from, to] of built.renames) if (!allRenames.has(from)) allRenames.set(from, to)
+  }
+  const page = { ...baseBuilt.page, components: retargetAll(baseBuilt.page.components, allRenames) }
+  const made = stateBuilt.map((built) => ({ ...built.page, components: retargetAll(built.page.components, allRenames) }))
   const looks = made.map((part) => new Set(part.components.map(look)))
+  const chromeLooks = made.map((part) => new Set(part.components.filter(isChrome).map(chromeLook)))
   const shared = new Set(page.components.map(look).filter((drawn) => looks.every((set) => set.has(drawn))))
-  const own = (list) => list.filter((c) => !shared.has(look(c)))
+  const sharedChrome = new Set(
+    page.components
+      .filter((c) => !shared.has(look(c)) && isChrome(c))
+      .map(chromeLook)
+      .filter((drawn) => chromeLooks.every((set) => set.has(drawn))),
+  )
+  const isShared = (c) => shared.has(look(c)) || (isChrome(c) && sharedChrome.has(chromeLook(c)))
+  const own = (list) => list.filter((c) => !isShared(c))
   const parts = [{ key: 'p0', label: headingOf(own(page.components)) || page.title || 'Start' }]
   const components = [
-    ...page.components.filter((c) => shared.has(look(c))),
+    ...page.components.filter(isShared),
     ...own(page.components).map((c) => withKey(c, 'p0')),
   ]
   const report = { ...page.report, hidden: 0 }

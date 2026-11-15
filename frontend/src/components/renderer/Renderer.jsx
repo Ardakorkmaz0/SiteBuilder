@@ -152,7 +152,7 @@ function TabsRender({ component, style, viewport, boxScale = 1, editorPreview = 
       {tabs.map((tab) => {
         const sel = tab.id === activeId
         const panelKids = kids.filter((c) => {
-          const id = c.props?.tabId || c.tabId || tabs[0].id
+          const id = c.tabId || c.props?.tabId || tabs[0].id
           return id === tab.id
         })
         const panelHeight = absoluteChildrenHeight(panelKids, 120)
@@ -382,6 +382,7 @@ export function Renderer({
   const baseDesignW = designWidth || canvasW
   const designOffset = Math.max(0, (canvasW - baseDesignW) / 2)
   const sidePad = flowSidePad(viewport)
+  const railInset = viewport !== 'mobile' ? fixedRailInset(list) : null
   if (flowMode) {
     return (
       <div
@@ -410,7 +411,7 @@ export function Renderer({
           if (isHidden(c, viewport)) return null
           return (
             // id lets in-page links (#componentId) scroll to this component.
-            <div key={c.id} id={elementIdFor(c)} style={pinnedLayoutStyle(c, flowItemStyle(c, viewport, canvasW))}>
+            <div key={c.id} id={elementIdFor(c)} style={pinnedLayoutStyle(c, flowItemStyle(c, viewport, canvasW), railInset)}>
               <RenderComponent component={c} flowMode viewport={viewport} canvasDesignWidth={baseDesignW} />
             </div>
           )
@@ -418,8 +419,6 @@ export function Renderer({
       </div>
     )
   }
-
-  const railInset = viewport !== 'mobile' ? fixedRailInset(list) : null
 
   return (
     <div

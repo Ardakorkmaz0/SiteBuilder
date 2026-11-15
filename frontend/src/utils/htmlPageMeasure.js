@@ -125,6 +125,11 @@ function readPage(token, frameWindow) {
   const standaloneHtml = (el, fill) => standaloneCopy(el, fill).outerHTML
   const standaloneCopy = (el, fill) => {
     const copy = el.cloneNode(true)
+    const referencedIds = new Set(
+      [...copy.querySelectorAll('[for]')]
+        .map((node) => node.getAttribute('for'))
+        .filter(Boolean),
+    )
     const from = [el, ...el.querySelectorAll('*')]
     const to = [copy, ...copy.querySelectorAll('*')]
     from.forEach((node, index) => {
@@ -156,8 +161,9 @@ function readPage(token, frameWindow) {
       target.setAttribute('style', css.join(';'))
       target.removeAttribute('class')
       // SVG definitions are addressed by url(#id), href and xlink:href. Each
-      // exported image/HTML block is its own document, so keep these targets.
-      if (ns === HTML_NS) target.removeAttribute('id')
+      // exported image/HTML block is its own document, so keep these targets
+      // along with any HTML ids wired to a <label for="..."> inside this block.
+      if (ns === HTML_NS && (!target.id || !referencedIds.has(target.id))) target.removeAttribute('id')
     })
     return copy
   }

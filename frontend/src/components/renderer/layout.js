@@ -166,7 +166,7 @@ export function flowSidePad(viewport = 'pc') {
   return viewport === 'mobile' ? FLOW_MOBILE_SIDE_PAD : FLOW_SIDE_PAD
 }
 
-const FLOW_INLINE_TYPES = new Set(['button', 'linkbutton', 'badge', 'icon'])
+const FLOW_INLINE_TYPES = new Set(['button', 'linkbutton', 'badge', 'icon', 'themeToggle'])
 // Components whose children live inside an absolute mini-canvas at PC design
 // pixels — these MUST keep their layout.w as the rendered width on PC (no
 // flex-grow stretching), so the inner mini-canvas matches the visible box and

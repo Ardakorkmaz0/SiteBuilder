@@ -14,7 +14,7 @@ function unmeasured(components) {
   const out = []
   const visit = (list) => {
     for (const c of list || []) {
-      if (c.type === 'region') visit(c.children)
+      if (c.type === 'region' || c.type === 'container' || c.type === 'tabs') visit(c.children)
       if (c.type !== 'html' || c.hiddenMobile) continue
       const w = Math.round(c.mobileLayout?.w || 0)
       if (!w || w >= Math.round(c.layout?.w || 0)) continue

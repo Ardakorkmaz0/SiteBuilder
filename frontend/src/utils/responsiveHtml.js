@@ -404,8 +404,10 @@ function itemElHtml(c, multi, colOverride) {
       const v = ALERT_VARIANTS[p.variant] || ALERT_VARIANTS.info
       return `<div class="${cls}"${styleAttr(c, `${col};display:flex;align-items:center;gap:10px`, `padding:12px 16px;border-radius:10px;border:1px solid ${v.border};background:${v.bg};color:${v.color}`)}>${iconSvg(p.icon || 'check')}<span>${multiline(p.text)}</span></div>`
     }
-    case 'accordion':
-      return `<details class="${cls}"${styleAttr(c, col, 'border:1px solid #e5e7eb;border-radius:10px;padding:2px 16px')}><summary style="cursor:pointer;font-weight:600;padding:12px 0">${multiline(p.title)}</summary><div style="padding-bottom:14px;color:#4b5563">${multiline(p.text)}</div></details>`
+    case 'accordion': {
+      const bodyColor = c.styles?.color || phoneOverrides(c).color ? '' : ';color:#4b5563'
+      return `<details class="${cls}"${styleAttr(c, col, 'border:1px solid #e5e7eb;border-radius:10px;padding:2px 16px')}><summary style="cursor:pointer;font-weight:600;padding:12px 0">${multiline(p.title)}</summary><div style="padding-bottom:14px${bodyColor}">${multiline(p.text)}</div></details>`
+    }
     case 'container': {
       const kids = shown(c.children)
       // Auto-layout containers flow their children as flex/grid. Same shared
@@ -419,14 +421,7 @@ function itemElHtml(c, multi, colOverride) {
       }
       const h = absolutePanelHeight(kids, Math.round(c.layout?.h || 160))
       const inner = kids
-        .map((ch) => {
-          const l = ch.layout || {}
-          return item(
-            ch,
-            false,
-            `position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px;height:${Math.round(l.h || 80)}px`,
-          )
-        })
+        .map((ch) => item(ch, false, nestedAbsoluteCss(ch)))
         .join('')
       return `<div class="${cls}"${styleAttr(c, `${col};display:block;position:relative;min-height:${h}px`)}>${inner}</div>`
     }
@@ -465,6 +460,13 @@ function htmlEmbed(c, cls, col) {
 
 // Render a `tabs` widget as a tab strip + one panel per tab. The runtime JS
 // shim toggles `[hidden]` on panels and `aria-selected` on tabs on click.
+function nestedAbsoluteCss(ch) {
+  const l = ch.layout || {}
+  const grows = ['accordion', 'select', 'tabs', 'html', 'container'].includes(ch.type)
+  const hRule = grows ? `min-height:${Math.round(l.h || 80)}px` : `height:${Math.round(l.h || 80)}px`
+  return `position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px;${hRule}`
+}
+
 function absolutePanelHeight(children, minHeight = 120) {
   return Math.max(
     minHeight,
@@ -491,17 +493,10 @@ function tabsHtml(c, cls, col) {
     .join('')
   const panels = safeTabs
     .map((t) => {
-      const panelKids = kids.filter((ch) => (ch.tabId || safeTabs[0].id) === t.id)
+      const panelKids = kids.filter((ch) => (ch.tabId || ch.props?.tabId || safeTabs[0].id) === t.id)
       const panelH = absolutePanelHeight(panelKids, 120)
       const inner = panelKids
-        .map((ch) => {
-          const l = ch.layout || {}
-          return item(
-            ch,
-            false,
-            `position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px;height:${Math.round(l.h || 80)}px`,
-          )
-        })
+        .map((ch) => item(ch, false, nestedAbsoluteCss(ch)))
         .join('')
       const hidden = t.id === activeId ? '' : ' hidden'
       return `<div role="tabpanel" data-builder-panel="${esc(t.id)}"${hidden} style="display:block;position:relative;min-height:${panelH}px">${inner}</div>`

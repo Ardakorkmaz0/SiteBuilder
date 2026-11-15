@@ -62,9 +62,9 @@ export default function FreeCanvasItem({
   const isPrimarySingle = !brushMode && selectedIds.length <= 1 && selectedId === component.id
   // Edit the layout of the active breakpoint only.
   const layout =
-    viewport === 'mobile'
+    (viewport === 'mobile'
       ? component.mobileLayout || component.layout
-      : component.layout
+      : component.layout) || {}
   const page = useEditorStore(selectCurrentPage)
   const trackDrag = usePointerDrag(page.id, viewport)
   const canvasWidth = viewport === 'mobile' ? page.mobileWidth || 390 : page.canvasWidth || 1000

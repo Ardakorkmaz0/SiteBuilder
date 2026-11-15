@@ -493,8 +493,8 @@ function BlockThumb({ block, theme }) {
   const bar = (w, h, c, key, extra) => (
     <div key={key} style={{ width: w, height: h, background: c, borderRadius: 3, ...extra }} />
   )
-  const p = theme.primaryColor
-  const soft = theme.softColor
+  const p = theme?.primaryColor || '#4f46e5'
+  const soft = theme?.softColor || '#eef2ff'
   const muted = 'rgba(0,0,0,0.18)'
   let inner
   if (block.id === 'hero') {
@@ -613,7 +613,7 @@ export default function Sidebar({ onPickComponent, onArmPlacement, onCollapse, f
   const [openType, setOpenType] = useState(null)
   const [preview, setPreview] = useState(null)
   const [libraryOpen, setLibraryOpen] = useState(false)
-  const theme = useEditorStore((s) => s.schema.theme)
+  const theme = useEditorStore((s) => s.schema.theme) || {}
   return (
     <aside data-tour="rail-left" className="studio-panel flex w-60 shrink-0 flex-col overflow-hidden border-r">
       <div className="studio-panel flex shrink-0 items-center border-b">

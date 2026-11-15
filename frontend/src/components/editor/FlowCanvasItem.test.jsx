@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render } from '@testing-library/react'
 import { DndContext } from '@dnd-kit/core'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
-import FlowCanvasItem, { RegionEditor } from './FlowCanvasItem.jsx'
+import FlowCanvasItem, { RegionEditor, TabsEditor } from './FlowCanvasItem.jsx'
+import FreeCanvasItem from './FreeCanvasItem.jsx'
 
 const s = () => useEditorStore.getState()
 const rect = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
@@ -100,5 +101,91 @@ describe('FlowCanvasItem', () => {
     const resized = selectCurrentPage(s()).components[0].children[0]
     expect(resized.layout.w).toBe(140)
     expect(resized.layout.h).toBe(140)
+  })
+
+  it('keeps aspect ratio locked when resizing a shaped embed in FlowCanvasItem', () => {
+    const badge = {
+      id: 'circle_html',
+      type: 'html',
+      props: { code: '<p>Badge</p>', shape: 'circle' },
+      styles: {},
+      layout: { w: 120, h: 120 },
+    }
+    s().loadSchema({
+      pages: [{ id: 'home', name: 'Home', canvasWidth: 1000, flowMode: true, components: [badge] }],
+    })
+    s().setViewport('pc')
+    s().selectComponent('circle_html')
+
+    const view = render(
+      <LanguageProvider>
+        <DndContext>
+          <FlowCanvasItem component={badge} canvasWidth={1000} canvasScale={1} />
+        </DndContext>
+      </LanguageProvider>,
+    )
+    const eastHandle = view.container.querySelector('[data-cid="circle_html"] [data-resize-handle="e"]')
+    fireEvent.pointerDown(eastHandle, { button: 0, clientX: 120, clientY: 60 })
+    fireEvent(window, new MouseEvent('pointermove', { bubbles: true, clientX: 160, clientY: 60 }))
+    fireEvent(window, new MouseEvent('pointerup', { bubbles: true, clientX: 160, clientY: 60 }))
+
+    const resized = selectCurrentPage(s()).components[0]
+    expect(resized.layout.w).toBe(160)
+    expect(resized.layout.h).toBe(160)
+  })
+
+  it('renders TabsEditor children whose tab id is stored on props.tabId', () => {
+    const tabs = {
+      id: 'tabs_1',
+      type: 'tabs',
+      props: {
+        tabs: [{ id: 't1', label: 'One' }, { id: 't2', label: 'Two' }],
+        activeId: 't2',
+      },
+      styles: {},
+      layout: { x: 0, y: 0, w: 600, h: 240 },
+      children: [{
+        id: 'tab_child',
+        type: 'text',
+        props: { text: 'Second tab body', tabId: 't2' },
+        styles: {},
+        layout: { x: 10, y: 10, w: 200, h: 40 },
+      }],
+    }
+    s().loadSchema({
+      pages: [{ id: 'home', name: 'Home', canvasWidth: 1000, components: [tabs] }],
+    })
+    s().setViewport('pc')
+
+    const view = render(
+      <LanguageProvider>
+        <DndContext>
+          <TabsEditor component={tabs} canvasScale={1} />
+        </DndContext>
+      </LanguageProvider>,
+    )
+    expect(view.container.querySelector('[data-cid="tab_child"]')).not.toBeNull()
+  })
+
+  it('renders FreeCanvasItem safely when layout is undefined on pc or mobile', () => {
+    const bare = {
+      id: 'bare_1',
+      type: 'text',
+      props: { text: 'Missing box' },
+      styles: {},
+    }
+    s().loadSchema({
+      pages: [{ id: 'home', name: 'Home', canvasWidth: 1000, components: [bare] }],
+    })
+    s().setViewport('mobile')
+
+    const view = render(
+      <LanguageProvider>
+        <DndContext>
+          <FreeCanvasItem component={bare} canvasScale={1} />
+        </DndContext>
+      </LanguageProvider>,
+    )
+    expect(view.container.querySelector('[data-cid="bare_1"]')).not.toBeNull()
   })
 })

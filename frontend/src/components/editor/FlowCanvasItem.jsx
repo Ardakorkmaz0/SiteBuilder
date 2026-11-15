@@ -168,10 +168,14 @@ export default function FlowCanvasItem({
       w: Math.round(component.layout?.w || 240),
       h: Math.round(component.layout?.h || 80),
     }
+    const aspect = embedAspectLock(component)
     function onMove(ev) {
+      const dx = (ev.clientX - sx) / canvasScale
+      const dy = (ev.clientY - sy) / canvasScale
+      const box = resizedBox({ x: 0, y: 0, ...orig }, dir, dx, dy, MIN, aspect)
       const patch = {}
-      if (dir.includes('e')) patch.w = Math.max(MIN, orig.w + (ev.clientX - sx) / canvasScale)
-      if (dir.includes('s')) patch.h = Math.max(MIN, orig.h + (ev.clientY - sy) / canvasScale)
+      if (dir.includes('e') || aspect) patch.w = box.w
+      if (dir.includes('s') || aspect) patch.h = box.h
       setLayout(component.id, patch)
     }
     // One undo step per gesture; ends on pointerup, cancel or loss of focus.
@@ -853,7 +857,7 @@ export function TabsEditor({
   const setActiveTab = useEditorStore((s) => s.setActiveTab)
   const select = useEditorStore((s) => s.selectComponent)
   const kids = Array.isArray(component.children) ? component.children : []
-  const panelKids = kids.filter((c) => (c.tabId || tabsList[0].id) === activeId)
+  const panelKids = kids.filter((c) => (c.tabId || c.props?.tabId || tabsList[0].id) === activeId)
   const designW = Math.max(1, Math.round(component.layout?.w || 600))
   const designH = absoluteChildrenHeight(panelKids, 120)
   const boundsH = Math.max(1, Math.round(component.layout?.h || designH))

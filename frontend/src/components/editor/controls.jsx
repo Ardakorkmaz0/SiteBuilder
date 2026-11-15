@@ -302,11 +302,17 @@ function ImageLibrary({ value, onPick }) {
 // `subject` names what the value belongs to, for a field that can change hands
 // while it is being typed in.
 function pickerHex(color) {
-  const hex = String(color || '').trim()
-  if (/^#[0-9a-fA-F]{6}$/.test(hex)) return hex
-  if (/^#[0-9a-fA-F]{8}$/.test(hex)) return `#${hex.slice(1, 7)}`
-  if (/^#[0-9a-fA-F]{3,4}$/.test(hex)) {
-    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+  const raw = String(color || '').trim()
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw
+  if (/^#[0-9a-fA-F]{8}$/.test(raw)) return `#${raw.slice(1, 7)}`
+  if (/^#[0-9a-fA-F]{3,4}$/.test(raw)) {
+    return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`
+  }
+  const m = /^rgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})(?:[\s,/]+[\d.]+%?)?\s*\)$/i.exec(raw)
+  if (m) {
+    return '#' + [m[1], m[2], m[3]]
+      .map((n) => Math.max(0, Math.min(255, Number(n))).toString(16).padStart(2, '0'))
+      .join('')
   }
   return '#000000'
 }
@@ -361,14 +367,21 @@ export function LabeledColor({ label, value, onChange, fallback, accepts, subjec
 }
 
 export function LabeledSelect({ label, value, onChange, options }) {
+  const current = value ?? ''
+  const hasMatch = options.some(([val]) => val === current)
   return (
     <label className="block">
       <span className={labelCls}>{label}</span>
       <select
         className={inputCls}
-        value={value ?? ''}
+        value={current}
         onChange={(e) => onChange(e.target.value)}
       >
+        {current !== '' && !hasMatch && (
+          <option key={current} value={current}>
+            {current}
+          </option>
+        )}
         {options.map(([val, text]) => (
           <option key={val} value={val}>
             {text}
@@ -435,14 +448,23 @@ const CSS_LENGTH_RE = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|em|rem|%|vw|vh)?\s*$/i
 // 2.5px, 50% became 51px, and "10px 24px" lost its horizontal padding. The unit
 // is now kept and shown; a value that is not a single length (several values,
 // calc(), clamp()) is edited as text so nothing is thrown away.
-export function LabeledPx({ label, value, onChange, placeholder }) {
+export function LabeledPx({ label, value, onChange, placeholder, subject }) {
   const raw = String(value ?? '')
   const match = CSS_LENGTH_RE.exec(raw)
+  const explicitUnit = match?.[2]?.toLowerCase() || ''
+  const [lastSubject, setLastSubject] = useState(subject)
+  const [lastUnit, setLastUnit] = useState(explicitUnit || 'px')
+  if (subject !== lastSubject) {
+    setLastSubject(subject)
+    setLastUnit(explicitUnit || 'px')
+  } else if (explicitUnit && explicitUnit !== lastUnit) {
+    setLastUnit(explicitUnit)
+  }
   if (raw.trim() && !match) {
     return <LabeledText label={label} value={raw} onChange={onChange} />
   }
   const num = match ? match[1] : ''
-  const unit = (match?.[2] || 'px').toLowerCase()
+  const unit = explicitUnit || (raw.trim() ? 'px' : lastUnit)
   const fine = unit === 'em' || unit === 'rem'
   return (
     <label className="block">
@@ -467,13 +489,23 @@ export function LabeledPx({ label, value, onChange, placeholder }) {
 // Whole numbers unless `step` is a fraction. A line height of 1.2 and letter
 // spacing of 0.05em used to be rounded on the way in and out: they read as 1
 // and 0, and typing 1.5 turned into 2 under the cursor.
-export function LabeledNumber({ label, value, onChange, step = 1, allowEmpty = false }) {
+export function LabeledNumber({ label, value, onChange, step = 1, allowEmpty = false, subject }) {
   const fractional = step < 1
   const keepDraft = fractional || allowEmpty
   // What the person is typing ("1.", "0.0") until they leave the field; the
   // value that comes back from the page would otherwise overwrite it.
   const [draft, setDraft] = useState(null)
-  const shown = fractional ? String(Number(value) || 0) : Math.round(value ?? 0)
+  const [draftSubject, setDraftSubject] = useState(subject)
+  if (subject !== draftSubject) {
+    setDraftSubject(subject)
+    setDraft(null)
+  }
+  const isEmpty = allowEmpty && (value === '' || value === null || value === undefined)
+  const shown = isEmpty
+    ? ''
+    : fractional
+      ? String(Number(value) || 0)
+      : Math.round(value ?? 0)
   return (
     <label className="block">
       <span className={labelCls}>{label}</span>
@@ -567,7 +599,16 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
       // Reassign any children that pointed at the removed tab.
       if (children && onChildrenChange) {
         onChildrenChange(
-          children.map((c) => (c.tabId === id ? { ...c, tabId: next[0].id } : c)),
+          children.map((c) => {
+            if ((c.tabId || c.props?.tabId) !== id) return c
+            const nextChild = { ...c, tabId: next[0].id }
+            if (nextChild.props && 'tabId' in nextChild.props) {
+              const nextProps = { ...nextChild.props }
+              delete nextProps.tabId
+              nextChild.props = nextProps
+            }
+            return nextChild
+          }),
         )
       }
       if (activeId === id && onActiveChange) onActiveChange(next[0].id)
@@ -672,12 +713,19 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
 // author wrote) the id is typed, as before.
 const CUSTOM_SECTION = '__custom'
 
-export function LinkTargetControl({ label, value, onChange, pages = [], sections = null }) {
+export function LinkTargetControl({ label, value, onChange, pages = [], sections = null, subject }) {
   const { t } = useLanguage()
   const labelId = useId()
   const href = typeof value === 'string' ? value : ''
   const pageIds = new Set(pages.map((p) => p.id))
+  const [lastSubject, setLastSubject] = useState(subject)
   const [keepSectionOnHash, setKeepSectionOnHash] = useState(false)
+  const [urlPickedOver, setUrlPickedOver] = useState(null)
+  if (subject !== lastSubject) {
+    setLastSubject(subject)
+    setKeepSectionOnHash(false)
+    setUrlPickedOver(null)
+  }
   if (keepSectionOnHash && href !== '#') setKeepSectionOnHash(false)
   // A link to a page that has since been deleted. It used to show as a
   // "section on this page" named after the old page id.
@@ -695,7 +743,6 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
   // published if the person then looked elsewhere. The link keeps what it had
   // until an address is typed; this remembers which value it was picked over,
   // so it lets go by itself once the link changes.
-  const [urlPickedOver, setUrlPickedOver] = useState(null)
   const typingUrl = urlPickedOver !== null && urlPickedOver === href
   if (typingUrl) kind = 'url'
 
@@ -814,21 +861,52 @@ export function LinkTargetControl({ label, value, onChange, pages = [], sections
   )
 }
 
-export function LinksEditor({ label, value, onChange, pages = [], sections = null }) {
+export function LinksEditor({ label, value, onChange, pages = [], sections = null, subject }) {
   const { t } = useLanguage()
-  const links = Array.isArray(value) ? value : []
+  const links = useMemo(() => (Array.isArray(value) ? value : []), [value])
+  const [keyState, setKeyState] = useState(() => ({
+    subject,
+    seq: links.length,
+    keys: links.map((_, idx) => `lk_${idx}`),
+  }))
+  if (subject !== keyState.subject) {
+    const base = keyState.seq
+    setKeyState({
+      subject,
+      seq: base + links.length,
+      keys: links.map((_, idx) => `lk_${base + idx}`),
+    })
+  } else if (keyState.keys.length !== links.length) {
+    let nextSeq = keyState.seq
+    const keys = links.map((_, idx) => keyState.keys[idx] ?? `lk_${nextSeq++}`)
+    setKeyState({ subject, seq: nextSeq, keys })
+  }
+  const keys = keyState.keys
 
   const update = (i, patch) =>
     onChange(links.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
-  const remove = (i) => onChange(links.filter((_, idx) => idx !== i))
-  const add = () => onChange([...links, { label: t('New link'), href: '#top' }])
+  const remove = (i) => {
+    setKeyState((prev) => ({
+      ...prev,
+      keys: prev.keys.filter((_, idx) => idx !== i),
+    }))
+    onChange(links.filter((_, idx) => idx !== i))
+  }
+  const add = () => {
+    setKeyState((prev) => ({
+      ...prev,
+      seq: prev.seq + 1,
+      keys: [...prev.keys, `lk_${prev.seq}`],
+    }))
+    onChange([...links, { label: t('New link'), href: '#top' }])
+  }
 
   return (
     <div>
       <span className={labelCls}>{label}</span>
       <div className="space-y-2">
         {links.map((link, i) => (
-          <div key={i} className="rounded-lg border border-[#e5e7eb] p-2">
+          <div key={keys[i] ?? i} className="rounded-lg border border-[#e5e7eb] p-2">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-xs text-[var(--studio-text-muted)]">{t('Link')} {i + 1}</span>
               <button
@@ -849,6 +927,7 @@ export function LinksEditor({ label, value, onChange, pages = [], sections = nul
             <LinkTargetControl
               label=""
               value={link.href ?? ''}
+              subject={`${subject ?? 'links'}-${keys[i] ?? i}`}
               onChange={(href) => update(i, { href })}
               pages={pages}
               sections={sections}

@@ -101,6 +101,9 @@ export function retargetLinks(components, from, to) {
       if (Array.isArray(props.links) && props.links.some((l) => l?.href === old)) {
         patch = { ...(patch || {}), links: props.links.map((l) => (l?.href === old ? { ...l, href: fix(l.href) } : l)) }
       }
+      if (Array.isArray(props.rich) && props.rich.some((r) => r?.href === old)) {
+        patch = { ...(patch || {}), rich: props.rich.map((r) => (r?.href === old ? { ...r, href: fix(r.href) } : r)) }
+      }
       const kids = Array.isArray(c.children) ? walk(c.children) : c.children
       if (!patch && kids === c.children) return c
       any = true

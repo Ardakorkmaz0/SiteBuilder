@@ -3332,6 +3332,7 @@ export const TURKISH_TRANSLATIONS = {
   'A published page is too large (max 100 MB).': 'Yayınlanan bir sayfa çok büyük (en fazla 100 MB).',
   'The published site is too large (max 250 MB).': 'Yayınlanan site çok büyük (en fazla 250 MB).',
   'Upload too large. A file may be at most 100 MB.': 'Yükleme çok büyük. Bir dosya en fazla 100 MB olabilir.',
+  'Same as PC': 'Bilgisayarla aynı',
 }
 
 // Content libraries (templates, section blocks and component variants) carry
