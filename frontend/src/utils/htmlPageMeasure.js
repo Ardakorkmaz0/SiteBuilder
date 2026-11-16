@@ -89,6 +89,9 @@ function readPage(token, frameWindow) {
   // Every node read, with what it was read from (an element, or a run of
   // words with no element of its own): the phone reading reads them again.
   let seen = []
+  // Elements the page does not show at the width it is read at: the phone
+  // reading looks for those it shows on a phone (readPhone).
+  let unshown = []
 
   const readStyles = (cs) => {
     const out = {}
@@ -607,6 +610,7 @@ function readPage(token, frameWindow) {
     if (SKIP_TAGS.has(tag)) return null
     const cs = win.getComputedStyle(el)
     if (isHidden(cs)) {
+      unshown.push(el)
       // A part with words in it that the page is not showing now: another
       // chapter, a closed menu, an answer behind a button.
       if (!holdsChapter(el) && (el.textContent || '').trim().length >= 40) stats.hidden += 1
@@ -1362,10 +1366,48 @@ function readPage(token, frameWindow) {
     }
     return Math.abs(win.innerWidth - width) <= 1
   }
+  // A node and all it holds moved by the same distance.
+  const moveBy = (node, dx, dy, done = new Set()) => {
+    if (!node || done.has(node)) return
+    done.add(node)
+    if (node.rect) node.rect = { ...node.rect, x: node.rect.x + dx, y: node.rect.y + dy }
+    if (node.ink) node.ink = { ...node.ink, x: node.ink.x + dx, y: node.ink.y + dy }
+    for (const kid of node.kids || []) moveBy(kid, dx, dy, done)
+  }
+  // What the page shows only on a phone (a bar with a menu button, a
+  // "Contents" heading): read there, with its pictures, and put in the node
+  // that holds it, `phoneOnly`. On the desktop it stands where it stands on
+  // the phone in that node.
+  const readPhoneOnly = async (read) => {
+    const nodeOf = new Map(read.map(([node, target]) => [target, node]))
+    const added = []
+    for (const el of unshown) {
+      if (nodeOf.has(el) || !el.isConnected || holdsChapter(el) || isHidden(win.getComputedStyle(el)) || !shownBox(el)) continue
+      let up = el.parentElement
+      while (up && !nodeOf.has(up)) up = up.parentElement
+      const parent = up && nodeOf.get(up)
+      if (!parent?.m || parent.m.hidden) continue
+      const from = seen.length
+      const queued = jobs.length
+      const node = measureNode(el)
+      if (!node) continue
+      await Promise.all(jobs.splice(queued).map(runJob))
+      for (const [made, target] of seen.slice(from)) {
+        made.m = { ...made.rect }
+        nodeOf.set(target, made)
+      }
+      moveBy(node, parent.rect.x - parent.m.x, parent.rect.y - parent.m.y)
+      node.phoneOnly = true
+      parent.kids = [...(parent.kids || []), node]
+      added.push([parent, node])
+    }
+    return added
+  }
   async function readPhone(read) {
     const wide = win.innerWidth
     if (wide <= PHONE_WIDTH + 40 || !read.length) return null
     let result = null
+    let added = []
     if ((await askWidth(PHONE_WIDTH)) && (await reachWidth(PHONE_WIDTH))) {
       await settle(120)
       win.scrollTo(0, 0)
@@ -1375,6 +1417,7 @@ function readPage(token, frameWindow) {
         const changed = node.m.hidden ? null : phoneStyles(node, target)
         if (changed) node.ms = changed
       }
+      added = await readPhoneOnly(read)
       result = {
         width: doc.documentElement.clientWidth,
         height: Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight),
@@ -1388,6 +1431,7 @@ function readPage(token, frameWindow) {
         delete node.m
         delete node.ms
       }
+      for (const [parent, node] of added) parent.kids = parent.kids.filter((kid) => kid !== node)
       result = null
     }
     await settle(120)
@@ -1395,10 +1439,26 @@ function readPage(token, frameWindow) {
     return result
   }
 
+  // One picture drawn; where it cannot be, what it was part of is kept as it
+  // is instead, in an HTML block.
+  async function runJob(job) {
+    if (job.node.kind === 'html') return
+    let made = null
+    try { made = await picture(job.el) } catch { /* kept as HTML below */ }
+    if (made) job.done(made)
+    else {
+      job.node.kind = 'html'
+      job.node.code = standaloneHtml(job.owner, false)
+      delete job.node.runs
+      delete job.node.src
+    }
+  }
+
   async function snapshot() {
     stats.hidden = 0
     jobs = []
     seen = []
+    unshown = []
     win.scrollTo(0, 0)
     let off
     try { off = await explore() } catch { off = [] }
@@ -1438,19 +1498,7 @@ function readPage(token, frameWindow) {
     // drawn, what it was part of is kept as it is instead, in an HTML block.
     let cursor = 0
     const runWorker = async () => {
-      while (cursor < jobs.length) {
-        const job = jobs[cursor++]
-        if (job.node.kind === 'html') continue
-        let made = null
-        try { made = await picture(job.el) } catch { /* kept as HTML below */ }
-        if (made) job.done(made)
-        else {
-          job.node.kind = 'html'
-          job.node.code = standaloneHtml(job.owner, false)
-          delete job.node.runs
-          delete job.node.src
-        }
-      }
+      while (cursor < jobs.length) await runJob(jobs[cursor++])
     }
     await Promise.all(Array.from({ length: Math.min(16, jobs.length) }, () => runWorker()))
     undo(openedLog)

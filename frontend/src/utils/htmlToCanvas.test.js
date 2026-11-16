@@ -908,6 +908,36 @@ describe('a page read at a phone\'s width too', () => {
     expect(title.stylesMobile).toEqual({ fontSize: '30px', lineHeight: '36px', padding: '12px 8px 12px 8px' })
   })
 
+  it('hides on the desktop what the page shows only on a phone, and puts it where the phone shows it', () => {
+    const result = convert(phonePage([
+      node('section', [0, 0, 1200, 300], {
+        m: { x: 0, y: 0, w: 390, h: 400 },
+        kids: [
+          text('p', [40, 40, 500, 24], 'On both', {}, { m: { x: 16, y: 60, w: 358, h: 48 } }),
+          node('div', [16, 8, 358, 40], {
+            phoneOnly: true,
+            m: { x: 16, y: 8, w: 358, h: 40 },
+            kids: [text('button', [24, 12, 120, 32], 'Contents', { backgroundColor: 'rgb(0, 0, 0)' }, { m: { x: 24, y: 12, w: 120, h: 32 } })],
+          }, { backgroundColor: 'rgb(238, 238, 238)' }),
+        ],
+      }),
+    ]))
+
+    const all = (list) => list.flatMap((c) => [c, ...all(c.children || [])])
+    const blocks = all(result.components)
+    const contents = blocks.find((c) => c.props?.text === 'Contents')
+    expect(contents.hidden).toBe(true)
+    expect(contents.hiddenMobile).toBeUndefined()
+    const bar = blocks.find((c) => c.type === 'container')
+    expect(bar.children).toEqual([contents])
+    expect(bar.mobileLayout).toEqual({ x: 16, y: 8, w: 358, h: 40 })
+    expect(contents.mobileLayout).toEqual({ x: 8, y: 4, w: 120, h: 32 })
+    expect(blocks.find((c) => c.props?.text === 'On both').hidden).toBeUndefined()
+    // The bar's paint is hidden on the desktop as well.
+    expect(blocks.filter((c) => c.styles?.backgroundColor === 'rgb(238, 238, 238)').map((c) => c.hidden)).toEqual([true])
+    expect(result.components[0].hidden).toBeUndefined()
+  })
+
   it('leaves the phone layout to be worked out when the page was not read at a phone\'s width', () => {
     const result = convert(page([
       node('section', [0, 0, 1200, 300], { kids: [text('p', [40, 40, 500, 24], 'Only a desktop reading')] }),

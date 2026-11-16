@@ -217,6 +217,11 @@ function phoneLayouts(components, ctx, origin) {
     for (let n = node; n; n = ctx.parentOf.get(n)) if (n.m?.hidden) return true
     return false
   }
+  // What the page shows only on a phone is hidden on the desktop.
+  const phoneOnlyUp = (node) => {
+    for (let n = node; n; n = ctx.parentOf.get(n)) if (n.phoneOnly) return true
+    return false
+  }
   const readUp = (node) => {
     for (let n = node; n; n = ctx.parentOf.get(n)) if (n.m && !n.m.hidden) return n
     return null
@@ -281,6 +286,7 @@ function phoneLayouts(components, ctx, origin) {
       const styleFrom = own ? c._from : c._styleFrom
       const onPhone = box && styleFrom ? phoneLook(c, styleFrom, own) : null
       if (onPhone) c.stylesMobile = { ...(c.stylesMobile || {}), ...onPhone }
+      if (box && c._from && phoneOnlyUp(c._from)) c.hidden = true
       if (box === null) c.hiddenMobile = true
       else if (box) {
         c.mobileLayout = {
