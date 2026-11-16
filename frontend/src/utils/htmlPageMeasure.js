@@ -86,6 +86,9 @@ function readPage(token, frameWindow) {
   const stats = { hidden: 0 }
   // Pictures still to be drawn once the page has been walked.
   let jobs = []
+  // Every node read, with what it was read from (an element, or a run of
+  // words with no element of its own): the phone reading reads them again.
+  let seen = []
 
   const readStyles = (cs) => {
     const out = {}
@@ -593,7 +596,13 @@ function readPage(token, frameWindow) {
 
   let holdsChapter = () => false
 
+  // Each node as it is handed back, with the element it was read from.
   const measureNode = (el) => {
+    const node = measureElement(el)
+    if (node) seen.push([node, el])
+    return node
+  }
+  const measureElement = (el) => {
     const tag = el.tagName.toUpperCase()
     if (SKIP_TAGS.has(tag)) return null
     const cs = win.getComputedStyle(el)
@@ -739,13 +748,15 @@ function readPage(token, frameWindow) {
         range.selectNodeContents(child)
         const box = boxOf(range.getBoundingClientRect())
         if (box.w >= 1 && box.h >= 1) {
-          kids.push({
+          const words = {
             tag: '#text',
             kind: 'text',
             text: child.textContent.trim().replace(/\s+/g, ' '),
             rect: box,
             s: { ...node.s, backgroundColor: 'rgba(0, 0, 0, 0)', backgroundImage: 'none', boxShadow: 'none', borderTopWidth: '0px', borderRightWidth: '0px', borderBottomWidth: '0px', borderLeftWidth: '0px', paddingTop: '0px', paddingRight: '0px', paddingBottom: '0px', paddingLeft: '0px' },
-          })
+          }
+          seen.push([words, child])
+          kids.push(words)
         }
       }
     }
@@ -1289,9 +1300,87 @@ function readPage(token, frameWindow) {
   }
 
   // The page as it stands now, read whole.
+  // The page at a phone's width, read where it stands now: most pages lay
+  // themselves out for a phone with their own CSS, and the canvas takes that
+  // layout instead of guessing one. The frame is narrowed by the editor
+  // (this document cannot resize the frame it is in, unless it shares the
+  // editor's origin), read, and widened again. Each node gets `m`: its box at
+  // the phone's width, or `{ hidden: true }` where the page does not show it.
+  const PHONE_WIDTH = 390
+  const askWidth = (width) => new Promise((resolve) => {
+    if (!token) {
+      try {
+        win.frameElement.style.width = `${width}px`
+        return resolve(true)
+      } catch {
+        return resolve(false)
+      }
+    }
+    let timer = 0
+    const onReply = (event) => {
+      if (event.source !== win.parent || event.data?.type !== 'pwb-page-width' || event.data.token !== token || event.data.width !== width) return
+      win.removeEventListener('message', onReply)
+      window.clearTimeout(timer)
+      resolve(true)
+    }
+    win.addEventListener('message', onReply)
+    timer = window.setTimeout(() => {
+      win.removeEventListener('message', onReply)
+      resolve(false)
+    }, 2000)
+    try { win.parent.postMessage({ type: 'pwb-page-resize', token, width }, '*') } catch { resolve(false) }
+  })
+  const shownBox = (target) => {
+    if (target.nodeType === 3) {
+      const range = doc.createRange()
+      range.selectNodeContents(target)
+      const box = boxOf(range.getBoundingClientRect())
+      return box.w >= 1 && box.h >= 1 ? box : null
+    }
+    if (!target.isConnected || !target.getClientRects().length) return null
+    if (win.getComputedStyle(target).visibility !== 'visible') return null
+    const box = boxOf(target.getBoundingClientRect())
+    return box.w > 0 || box.h > 0 ? box : null
+  }
+  // A frame of another origin is resized by the next frame the browser draws,
+  // not at once: wait until the width has really changed (or give up). One of
+  // the editor's own origin is resized at once, or not at all.
+  const reachWidth = async (width) => {
+    for (let waited = 0; token && waited < 3000; waited += 50) {
+      if (Math.abs(win.innerWidth - width) <= 1) return true
+      await settle(50)
+    }
+    return Math.abs(win.innerWidth - width) <= 1
+  }
+  async function readPhone(read) {
+    const wide = win.innerWidth
+    if (wide <= PHONE_WIDTH + 40 || !read.length) return null
+    let result = null
+    if ((await askWidth(PHONE_WIDTH)) && (await reachWidth(PHONE_WIDTH))) {
+      await settle(120)
+      win.scrollTo(0, 0)
+      for (const [node, target] of read) node.m = shownBox(target) || { hidden: true }
+      result = {
+        width: doc.documentElement.clientWidth,
+        height: Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight),
+      }
+    }
+    // Back to the width the rest of the reading is done at, whatever
+    // happened above; the next part must not be read at a phone's width.
+    await askWidth(wide)
+    if (!(await reachWidth(wide))) {
+      for (const [node] of read) delete node.m
+      result = null
+    }
+    await settle(120)
+    win.scrollTo(0, 0)
+    return result
+  }
+
   async function snapshot() {
     stats.hidden = 0
     jobs = []
+    seen = []
     win.scrollTo(0, 0)
     let off
     try { off = await explore() } catch { off = [] }
@@ -1324,6 +1413,7 @@ function readPage(token, frameWindow) {
     const bodyStyle = win.getComputedStyle(doc.body)
     const rootStyle = win.getComputedStyle(doc.documentElement)
     const root = measureNode(doc.body)
+    const phone = root ? await readPhone(seen).catch(() => null) : null
     openedLog.push(...opened.takeRecords())
     opened.disconnect()
     // The pictures, drawn with bounded concurrency. Where one cannot be
@@ -1362,6 +1452,9 @@ function readPage(token, frameWindow) {
       fontFaces: fontFaces().map(({ family, css }) => ({ family, css })),
       // Every id that is on show: where a link to it should lead.
       ids: [...doc.querySelectorAll('[id]')].filter((el) => !hiddenRoot(el)).map((el) => el.id),
+      // The width and height of the page at a phone's width; null when it
+      // could not be read that way (each node's `m` then is missing).
+      phone,
       root,
     }
   }
@@ -1447,6 +1540,17 @@ function readWithScripts(html, { width, height, timeout, onProgress }) {
     const onMessage = (event) => {
       // Only the frame made here, and only its answers to this reading.
       if (event.source !== frame?.contentWindow || event.data?.token !== token) return
+      if (event.data.type === 'pwb-page-resize') {
+        // The reader reads the page at a phone's width too (readPhone).
+        const asked = Number(event.data.width)
+        if (Number.isFinite(asked) && asked >= 200 && asked <= 4000) {
+          frame.style.width = `${asked}px`
+          win.setTimeout(() => {
+            try { frame.contentWindow.postMessage({ type: 'pwb-page-width', token, width: asked }, '*') } catch { /* gone */ }
+          }, 30)
+        }
+        return
+      }
       if (event.data.type === 'pwb-page-measured' && !first) {
         if (!laidOut(event.data.data)) return done(null)
         first = { ...event.data.data, states: Array.isArray(event.data.data.states) ? event.data.data.states : [] }
