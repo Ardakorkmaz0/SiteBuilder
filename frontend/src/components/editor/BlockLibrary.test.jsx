@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import BlockLibrary from './BlockLibrary.jsx'
@@ -112,7 +112,7 @@ describe('BlockLibrary', () => {
     const input = screen.getByPlaceholderText('Search blocks')
     await user.type(input, 'qqxzzq')
     expect(screen.getByText('No blocks match your search')).toBeInTheDocument()
-  })
+  }, 20000) // Each keystroke draws a page of live previews.
 
   it('clicking a card arms placement on the canvas and closes the overlay', async () => {
     localStorage.setItem('pwb_language', 'en')
@@ -160,5 +160,45 @@ describe('BlockLibrary from the keyboard', () => {
     await user.click(document.querySelector('[data-block-library] .grid > button'))
 
     expect(armed).toEqual([{ atEnd: true }, { atEnd: false }])
+  })
+})
+
+describe('BlockLibrary memory and marks', () => {
+  it('shows what this viewer added last on top, and remembers a block when it is used', async () => {
+    localStorage.clear()
+    localStorage.setItem('pwb_language', 'en')
+    localStorage.setItem('pwb_recent_blocks', JSON.stringify(['widget-rating-summary', 'no-such-block']))
+    const user = userEvent.setup()
+    const onArm = vi.fn()
+    renderLibrary({ onArmPlacement: onArm })
+    const recent = screen.getByRole('region', { name: 'Recently used' })
+    const recentCards = within(recent).getAllByRole('button')
+    expect(recentCards).toHaveLength(1)
+    expect(recentCards[0]).toHaveTextContent('Rating summary')
+
+    await user.click(within(recent).getByText('Rating summary'))
+    expect(onArm).toHaveBeenCalledTimes(1)
+    // A key the library no longer has is skipped, not shown.
+    expect(JSON.parse(localStorage.getItem('pwb_recent_blocks'))).toEqual(['widget-rating-summary', 'no-such-block'])
+  })
+
+  it('has no recent row while a search is typed', () => {
+    localStorage.clear()
+    localStorage.setItem('pwb_language', 'en')
+    localStorage.setItem('pwb_recent_blocks', JSON.stringify(['widget-rating-summary']))
+    renderLibrary()
+    expect(screen.getByRole('region', { name: 'Recently used' })).toBeInTheDocument()
+    fireEvent.change(screen.getByPlaceholderText('Search blocks'), { target: { value: 'gal' } })
+    expect(screen.queryByRole('region', { name: 'Recently used' })).toBeNull()
+  })
+
+  it('marks the searched words in the names it found', () => {
+    localStorage.clear()
+    localStorage.setItem('pwb_language', 'en')
+    renderLibrary()
+    fireEvent.change(screen.getByPlaceholderText('Search blocks'), { target: { value: 'gallery' } })
+    const marks = [...document.querySelectorAll('[data-block-library] mark')].map((mark) => mark.textContent.toLowerCase())
+    expect(marks.length).toBeGreaterThan(0)
+    expect(new Set(marks)).toEqual(new Set(['gallery']))
   })
 })

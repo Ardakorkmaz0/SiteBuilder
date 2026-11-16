@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { WIDGET_CATEGORIES } from '../../utils/componentVariants/index.js'
 import { SECTION_CATEGORIES } from '../../utils/sectionBlocks/index.js'
-import { buildSearchIndex, searchComponents } from '../../utils/componentSearch.js'
+import { buildSearchIndex, highlightParts, searchComponents } from '../../utils/componentSearch.js'
+import { noteRecentBlock, readRecentBlocks } from '../../utils/paletteQuick.js'
 import { buildEntries, matchesCategory } from './libraryEntries.js'
 import { LayersIcon, SearchIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
@@ -55,7 +56,15 @@ function SectionPreview({ html }) {
   )
 }
 
-function LibraryCard({ entry, onUse }) {
+// A result's name with the words the search found in it marked.
+function MarkedLabel({ text, query }) {
+  if (!query) return text
+  return highlightParts(text, query).map((part, index) => (part.match
+    ? <mark key={index} className="rounded-sm bg-[var(--studio-accent-soft)] px-0.5 text-[var(--studio-accent-hover)]">{part.text}</mark>
+    : <span key={index}>{part.text}</span>))
+}
+
+function LibraryCard({ entry, onUse, query = '' }) {
   const { language, t } = useLanguage()
   const label = t(entry.label)
   const html = localizedHtml(entry, language)
@@ -69,7 +78,7 @@ function LibraryCard({ entry, onUse }) {
       {entry.kind === 'section'
         ? <SectionPreview html={html} />
         : <BigPreview html={html} wide={entry.wide} fit={entry.fit} />}
-      <span className="mt-2 truncate text-xs font-semibold text-[var(--studio-text,#374151)]">{label}</span>
+      <span className="mt-2 truncate text-xs font-semibold text-[var(--studio-text,#374151)]"><MarkedLabel text={label} query={query} /></span>
       <span className="truncate text-[11px] text-[var(--studio-text-faint,#9ca3af)]">
         {t(entry.categoryLabel)}
       </span>
@@ -127,6 +136,11 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
   if (!open) return null
 
   const visible = results ? results.best : entries.filter((entry) => matchesCategory(entry, category))
+  // What this viewer added last, on top of the whole library when nothing is
+  // searched for.
+  const recent = !results && category === 'all'
+    ? readRecentBlocks().map((key) => entries.find((entry) => entry.key === key)).filter(Boolean).slice(0, 4)
+    : []
   const related = results ? results.related : []
   const shown = visible.slice(0, limit)
 
@@ -139,6 +153,7 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
   // A card pressed with Enter or Space (a click with no pointer: detail 0)
   // goes straight to the end of the page; the keyboard has no spot to click.
   const use = (entry, { atEnd = false } = {}) => {
+    noteRecentBlock(entry.key)
     const html = localizedHtml(entry, language)
     if (onPickComponent) {
       onPickComponent(entry.use.type, html, { atEnd })
@@ -268,9 +283,21 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
                   {visible.length === 0 && (
                     <p className="mb-3 text-sm text-[var(--studio-text-muted,#6b7280)]">{t('No exact match. These come close:')}</p>
                   )}
+                  {recent.length > 0 && (
+                    <section aria-labelledby="block-library-recent" className="mb-5">
+                      <h3 id="block-library-recent" className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--studio-text-faint,#9ca3af)]">
+                        {t('Recently used')}
+                      </h3>
+                      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                        {recent.map((entry) => (
+                          <LibraryCard key={`recent-${entry.key}`} entry={entry} onUse={use} />
+                        ))}
+                      </div>
+                    </section>
+                  )}
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
                     {shown.map((entry) => (
-                      <LibraryCard key={entry.key} entry={entry} onUse={use} />
+                      <LibraryCard key={entry.key} entry={entry} onUse={use} query={q} />
                     ))}
                   </div>
                   {visible.length > shown.length && (
@@ -296,7 +323,7 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
                       )}
                       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
                         {related.map((entry) => (
-                          <LibraryCard key={entry.key} entry={entry} onUse={use} />
+                          <LibraryCard key={entry.key} entry={entry} onUse={use} query={q} />
                         ))}
                       </div>
                     </section>

@@ -783,6 +783,7 @@ export const TURKISH_TRANSLATIONS = {
   'Did you mean “{query}”?': 'Bunu mu demek istediniz: “{query}”?',
   'No exact match. These come close:': 'Tam eşleşme yok. Şunlar yakın:',
   'Might be related': 'İlgili olabilir',
+  'Recently used': 'Son kullanılanlar',
   'Quick add: {name}': 'Hızlı ekle: {name}',
   'Press 1 to {count} to add': 'Eklemek için 1–{count} tuşlarına basın',
   'See all ({count})': 'Tümünü gör ({count})',

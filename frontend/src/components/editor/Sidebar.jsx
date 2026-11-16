@@ -6,7 +6,7 @@ import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
 import { CodeIcon, FolderIcon, LayersIcon, PlusIcon, SaveIcon, SparklesIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
-import { notePaletteUse, quickPicks, readPaletteUsage } from '../../utils/paletteQuick.js'
+import { notePaletteUse, noteRecentBlock, quickPicks, readPaletteUsage } from '../../utils/paletteQuick.js'
 import BlockLibrary from './BlockLibrary.jsx'
 import AnimationPanel from './AnimationPanel.jsx'
 import {
@@ -309,6 +309,7 @@ function PaletteFlyout({ item, anchor, onPick, onArm, onEnter, onLeave, onClose,
     if (!variant) return
     const { html, data } = dataFor(variant)
     notePaletteUse(item.type, variant.id)
+    noteRecentBlock(`${item.type}-${variant.id}`)
     if (onPick) onPick(item.type, html, { atEnd: true })
     else onArm?.(data, { inView: true })
     setAdded(index)
@@ -373,6 +374,7 @@ function PaletteFlyout({ item, anchor, onPick, onArm, onEnter, onLeave, onClose,
               onClick={() => {
                 const { data } = dataFor(variant)
                 notePaletteUse(item.type, variant.id)
+                noteRecentBlock(`${item.type}-${variant.id}`)
                 if (onPick) onPick(item.type, html)
                 else onArm?.(data)
                 onClose()

@@ -60,3 +60,25 @@ export function inViewSpot({ selected = null, view, canvasWidth, height = 120, g
     y: Math.max(height / 2, (view?.top || 0) + (view?.height || 0) / 2),
   }
 }
+
+const RECENT_KEY = 'pwb_recent_blocks'
+const RECENT_LIMIT = 8
+
+/** Library entry keys this viewer added last, newest first. */
+export function readRecentBlocks() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
+    return Array.isArray(parsed) ? parsed.filter((key) => typeof key === 'string').slice(0, RECENT_LIMIT) : []
+  } catch {
+    return []
+  }
+}
+
+export function noteRecentBlock(key) {
+  try {
+    const keys = [key, ...readRecentBlocks().filter((item) => item !== key)].slice(0, RECENT_LIMIT)
+    localStorage.setItem(RECENT_KEY, JSON.stringify(keys))
+  } catch {
+    /* private mode */
+  }
+}

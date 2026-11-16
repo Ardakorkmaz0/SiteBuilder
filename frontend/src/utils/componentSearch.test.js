@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildEntries } from '../components/editor/libraryEntries.js'
-import { buildSearchIndex, foldText, searchComponents } from './componentSearch.js'
+import { buildSearchIndex, foldText, highlightParts, searchComponents } from './componentSearch.js'
 
 const index = buildSearchIndex(buildEntries())
 const search = (query) => searchComponents(index, query)
@@ -71,5 +71,25 @@ describe('searching the block library', () => {
     const perQuery = (performance.now() - start) / (queries.length * 5)
     // About 2 ms here; a frame is 16 ms. The bound leaves room for a slow CI.
     expect(perQuery).toBeLessThan(16)
+  })
+})
+
+describe('marking the words a search found in a name', () => {
+  it('marks a word written without Turkish letters in the name that has them', () => {
+    expect(highlightParts('Görsel kartı', 'gorsel')).toEqual([
+      { text: 'Görsel', match: true },
+      { text: ' kartı', match: false },
+    ])
+    expect(highlightParts('İletişim formu', 'iletisim form')).toEqual([
+      { text: 'İletişim', match: true },
+      { text: ' ', match: false },
+      { text: 'form', match: true },
+      { text: 'u', match: false },
+    ])
+  })
+
+  it('leaves a name unmarked when no word of two letters or more is in it', () => {
+    expect(highlightParts('Gallery', 'z')).toEqual([{ text: 'Gallery', match: false }])
+    expect(highlightParts('Gallery', '')).toEqual([{ text: 'Gallery', match: false }])
   })
 })

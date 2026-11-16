@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { inViewSpot, notePaletteUse, quickPicks, readPaletteUsage } from './paletteQuick.js'
+import { inViewSpot, notePaletteUse, noteRecentBlock, quickPicks, readPaletteUsage, readRecentBlocks } from './paletteQuick.js'
 
 const variants = [
   { id: 'a' }, { id: 'b' }, { id: 'c', recommended: true }, { id: 'd' }, { id: 'e' }, { id: 'f' },
@@ -49,5 +49,21 @@ describe('where a block added by its number key lands', () => {
 
   it('never lands above the top of the page', () => {
     expect(inViewSpot({ view: { top: 0, height: 0 }, canvasWidth: 800, height: 120 })).toEqual({ x: 400, y: 60 })
+  })
+})
+
+describe('the blocks this viewer added last', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('keeps the newest first, once each, eight at most', () => {
+    for (const key of ['a', 'b', 'c', 'a']) noteRecentBlock(key)
+    expect(readRecentBlocks()).toEqual(['a', 'c', 'b'])
+    for (const key of ['1', '2', '3', '4', '5', '6', '7', '8']) noteRecentBlock(key)
+    expect(readRecentBlocks()).toEqual(['8', '7', '6', '5', '4', '3', '2', '1'])
+  })
+
+  it('reads a broken store as empty', () => {
+    localStorage.setItem('pwb_recent_blocks', '{"a":1}')
+    expect(readRecentBlocks()).toEqual([])
   })
 })
