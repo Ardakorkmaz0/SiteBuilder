@@ -8,10 +8,11 @@ body{margin:0;font:16px sans-serif}
 .cols{display:flex;gap:20px;padding:20px}
 .col{flex:1;background:#eee;padding:10px}
 nav a{margin-right:10px}
-@media (max-width:600px){.cols{flex-direction:column} nav .links{display:none}}
+h1{font-size:40px;padding:0 20px}
+@media (max-width:600px){.cols{flex-direction:column} nav .links{display:none} h1{font-size:24px;padding:0 8px}}
 </style></head><body>
 <nav><span class="links" id="links"><a href="#a">Home</a><a href="#b">About</a></span><span>Brand</span></nav>
-<h1>Title of the page</h1>
+<h1 id="title">Title of the page</h1>
 <div class="cols"><div class="col" id="left">Left column</div><div class="col" id="right">Right column</div></div>
 </body></html>`
 
@@ -37,7 +38,7 @@ async function measure(page, html) {
     const byId = (root) => {
       const out = {}
       const walk = (node) => {
-        if (node.id) out[node.id] = { rect: node.rect, m: node.m || null }
+        if (node.id) out[node.id] = { rect: node.rect, m: node.m || null, ms: node.ms || null }
         for (const kid of node.kids || []) walk(kid)
       }
       walk(root)
@@ -69,6 +70,9 @@ test('a page is read at a phone width as its own CSS lays it out there', async (
   expect(left.m.w).toBeLessThan(read.phone.width)
   // What the phone does not show is said to be hidden there.
   expect(links.m).toEqual({ hidden: true })
+  // What the phone's CSS changes in how it is written is read too.
+  expect(read.nodes.title.ms).toEqual({ fontSize: '24px', paddingRight: '8px', paddingLeft: '8px' })
+  expect(left.ms).toBeNull()
 })
 
 test('each part shown one at a time is read at a phone width too, and the next is read at the desktop width again', async ({ page }) => {

@@ -1307,6 +1307,16 @@ function readPage(token, frameWindow) {
   // editor's origin), read, and widened again. Each node gets `m`: its box at
   // the phone's width, or `{ hidden: true }` where the page does not show it.
   const PHONE_WIDTH = 390
+  // What a page's CSS commonly changes for a phone, beside where things go.
+  const PHONE_STYLES = ['fontSize', 'lineHeight', 'letterSpacing', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']
+  const phoneStyles = (node, target) => {
+    const el = target.nodeType === 3 ? target.parentElement : target
+    if (!el || !node.s) return null
+    const cs = win.getComputedStyle(el)
+    const changed = {}
+    for (const key of PHONE_STYLES) if (cs[key] && cs[key] !== node.s[key]) changed[key] = cs[key]
+    return Object.keys(changed).length ? changed : null
+  }
   const askWidth = (width) => new Promise((resolve) => {
     if (!token) {
       try {
@@ -1359,7 +1369,12 @@ function readPage(token, frameWindow) {
     if ((await askWidth(PHONE_WIDTH)) && (await reachWidth(PHONE_WIDTH))) {
       await settle(120)
       win.scrollTo(0, 0)
-      for (const [node, target] of read) node.m = shownBox(target) || { hidden: true }
+      for (const [node, target] of read) {
+        node.m = shownBox(target) || { hidden: true }
+        // `ms`: the styles the phone gives it that differ from the desktop's.
+        const changed = node.m.hidden ? null : phoneStyles(node, target)
+        if (changed) node.ms = changed
+      }
       result = {
         width: doc.documentElement.clientWidth,
         height: Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight),
@@ -1369,7 +1384,10 @@ function readPage(token, frameWindow) {
     // happened above; the next part must not be read at a phone's width.
     await askWidth(wide)
     if (!(await reachWidth(wide))) {
-      for (const [node] of read) delete node.m
+      for (const [node] of read) {
+        delete node.m
+        delete node.ms
+      }
       result = null
     }
     await settle(120)

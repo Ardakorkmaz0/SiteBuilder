@@ -1828,7 +1828,7 @@ export const useEditorStore = create((set, get) => ({
   // `fontFaces` are the document's own font files (utils/fontFaces.js); the
   // site keeps them beside the ones it already has. `parts` and `hiddenKeys`
   // are what the page shows one at a time and on a click (utils/pageShow.js).
-  convertPageToCanvas: (id, { components, canvasWidth, background, htmlBackup, seoTitle, seoDescription, language, fonts, fontFaces = '', parts = [], hiddenKeys = [] } = {}) => {
+  convertPageToCanvas: (id, { components, canvasWidth, mobileWidth, background, htmlBackup, seoTitle, seoDescription, language, fonts, fontFaces = '', parts = [], hiddenKeys = [] } = {}) => {
     const page = get().schema.pages.find((p) => p.id === id)
     if (!page || !Array.isArray(components)) return
     get().record()
@@ -1840,7 +1840,10 @@ export const useEditorStore = create((set, get) => ({
         htmlBackup: typeof htmlBackup === 'string' ? htmlBackup : '',
         components,
         flowMode: false,
-        mobileManual: false,
+        // A page read at a phone's width brings its own phone layout
+        // (htmlToCanvas.js phoneLayouts): it is kept, not re-derived.
+        mobileManual: Number.isFinite(mobileWidth),
+        ...(Number.isFinite(mobileWidth) ? { mobileWidth } : {}),
         canvasWidth,
         background,
         backgroundMobile: background,

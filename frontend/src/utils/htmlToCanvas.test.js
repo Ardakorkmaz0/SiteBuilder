@@ -813,3 +813,108 @@ describe('converted canvas fidelity regressions', () => {
     expect(menus[0].props.pinHeight).toBe('full')
   })
 })
+
+// The reader reads the page again at a phone's width (htmlPageMeasure.js
+// readPhone): `m` is where a node stood there, `ms` the styles that changed.
+describe('a page read at a phone\'s width too', () => {
+  const phonePage = (kids) => page(kids, {
+    phone: { width: 390, height: 1400 },
+    root: node('body', [0, 0, 1200, 2000], { kids, m: { x: 0, y: 0, w: 390, h: 1400 } }),
+  })
+
+  it('puts each block where the page put it on a phone, in its parent\'s phone box', () => {
+    const result = convert(phonePage([
+      node('section', [0, 100, 1200, 300], {
+        m: { x: 0, y: 60, w: 390, h: 500 },
+        kids: [
+          text('p', [40, 140, 500, 24], 'Left column', {}, { m: { x: 16, y: 76, w: 358, h: 48 } }),
+          text('p', [600, 140, 500, 24], 'Right column', {}, { m: { x: 16, y: 140, w: 358, h: 48 } }),
+        ],
+      }),
+    ]))
+
+    const [section] = result.components
+    expect(section.mobileLayout).toEqual({ x: 0, y: 60, w: 390, h: 500 })
+    expect(section.children.map((c) => c.mobileLayout)).toEqual([
+      { x: 16, y: 16, w: 358, h: 48 },
+      { x: 16, y: 80, w: 358, h: 48 },
+    ])
+    expect(result.mobileWidth).toBe(390)
+    // Nothing used only while building is left on the blocks.
+    expect(JSON.stringify(result.components)).not.toMatch(/"_(from|drawn|phone|styleFrom)"/)
+  })
+
+  it('hides on the phone what the page does not show there, and what that holds', () => {
+    const result = convert(phonePage([
+      node('section', [0, 0, 1200, 300], {
+        m: { x: 0, y: 0, w: 390, h: 300 },
+        kids: [
+          node('div', [40, 40, 500, 100], {
+            m: { hidden: true },
+            kids: [text('a', [40, 40, 80, 24], 'Home', {}, { href: '#home', m: { x: 0, y: 0, w: 80, h: 24 } })],
+          }, { backgroundColor: 'rgb(238, 238, 238)' }),
+          text('p', [600, 40, 300, 24], 'Brand', {}, { m: { x: 16, y: 16, w: 300, h: 24 } }),
+        ],
+      }),
+    ]))
+
+    const kids = result.components[0].children
+    const hidden = (list) => list.flatMap((c) => [c, ...hidden(c.children || [])]).filter((c) => c.hiddenMobile)
+    expect(hidden(kids).map((c) => c.props.text || c.type)).toEqual(expect.arrayContaining(['Home']))
+    expect(kids.find((c) => c.props.text === 'Brand').hiddenMobile).toBeUndefined()
+    expect(kids.find((c) => c.props.text === 'Brand').mobileLayout).toEqual({ x: 16, y: 16, w: 300, h: 24 })
+  })
+
+  it('keeps a list item\'s number beside the item\'s first line, the size it was, in the item\'s font', () => {
+    const result = convert(phonePage([
+      node('section', [0, 0, 1200, 400], {
+        m: { x: 0, y: 0, w: 390, h: 600 },
+        kids: [
+          node('li', [80, 100, 600, 48], {
+            m: { x: 40, y: 300, w: 310, h: 96 },
+            ms: { fontSize: '15px', lineHeight: '22px' },
+            kids: [
+              text('span', [54, 100, 22, 24], '2.', { textAlign: 'right' }),
+              text('p', [80, 100, 600, 48], 'An item that runs to two lines on a desktop and four on a phone.', {}, { m: { x: 40, y: 300, w: 310, h: 96 }, ms: { fontSize: '15px', lineHeight: '22px' } }),
+            ],
+          }),
+        ],
+      }),
+    ]))
+
+    const all = (list) => list.flatMap((c) => [c, ...all(c.children || [])])
+    const number = all(result.components).find((c) => c.props?.text === '2.')
+    // 26 px left of the item and level with its top, as on the desktop; not
+    // stretched over the item's four lines.
+    expect(number.mobileLayout).toEqual({ x: 14, y: 300, w: 23, h: 24 })
+    expect(number.stylesMobile).toEqual({ fontSize: '15px', lineHeight: '22px' })
+  })
+
+  it('gives a block the text size and padding the page gives it on a phone', () => {
+    const result = convert(phonePage([
+      node('section', [0, 0, 1200, 300], {
+        m: { x: 0, y: 0, w: 390, h: 300 },
+        kids: [
+          text('h1', [40, 40, 600, 80], 'Title of the page', { fontSize: '48px', lineHeight: '56px', paddingTop: '12px', paddingRight: '24px', paddingBottom: '12px', paddingLeft: '24px' }, {
+            m: { x: 16, y: 16, w: 358, h: 100 },
+            ms: { fontSize: '30px', lineHeight: '36px', paddingRight: '8px', paddingLeft: '8px' },
+          }),
+        ],
+      }),
+    ]))
+
+    const [title] = result.components[0].children
+    expect(title.styles).toMatchObject({ fontSize: '48px', padding: '12px 24px 12px 24px' })
+    expect(title.stylesMobile).toEqual({ fontSize: '30px', lineHeight: '36px', padding: '12px 8px 12px 8px' })
+  })
+
+  it('leaves the phone layout to be worked out when the page was not read at a phone\'s width', () => {
+    const result = convert(page([
+      node('section', [0, 0, 1200, 300], { kids: [text('p', [40, 40, 500, 24], 'Only a desktop reading')] }),
+    ]))
+
+    expect(result.mobileWidth).toBeUndefined()
+    expect(result.components[0].mobileLayout).toBeUndefined()
+    expect(result.components[0].children[0].mobileLayout).toBeUndefined()
+  })
+})

@@ -62,6 +62,22 @@ describe('turning an HTML page into a canvas', () => {
   })
 })
 
+describe('turning an HTML page read at a phone\'s width into a canvas', () => {
+  it('keeps the phone layout the page brought and the width it was read at', () => {
+    const [region] = blocks()
+    const read = {
+      ...region,
+      mobileLayout: { x: 0, y: 12, w: 375, h: 520 },
+      children: [{ ...region.children[0], mobileLayout: { x: 5, y: 7, w: 300, h: 90 }, stylesMobile: { fontSize: '30px' } }],
+    }
+    s().convertPageToCanvas('page_home', { components: [read], canvasWidth: 1200, mobileWidth: 375, background: '#0f172a', htmlBackup: DOCUMENT })
+
+    expect(home()).toMatchObject({ mobileManual: true, mobileWidth: 375 })
+    expect(home().components[0].mobileLayout).toEqual({ x: 0, y: 12, w: 375, h: 520 })
+    expect(home().components[0].children[0]).toMatchObject({ mobileLayout: { x: 5, y: 7, w: 300, h: 90 }, stylesMobile: { fontSize: '30px' } })
+  })
+})
+
 describe('turning an HTML page that shows its parts one at a time into a canvas', () => {
   const heading = (id, text, part) => ({ id, type: 'heading', props: { text, level: 'h1', shownBy: [part] }, styles: {}, layout: { x: 340, y: 40, w: 600, h: 60 } })
   const menu = { id: 'menu', type: 'text', props: { text: 'Chapters' }, styles: {}, layout: { x: 0, y: 0, w: 300, h: 40 } }

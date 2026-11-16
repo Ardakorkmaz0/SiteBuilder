@@ -143,13 +143,19 @@ function paddingOf(s) {
 }
 
 // A box in the coordinates of what holds it.
+// Where on the page (not in its parent) each layout made here was drawn, for
+// the phone layout (phoneLayouts below).
+const drawnAt = new WeakMap()
+
 function place(rect, origin, grow = 0) {
-  return {
+  const layout = {
     x: Math.max(0, Math.round(rect.x - origin.x)),
     y: Math.max(0, Math.round(rect.y - origin.y)),
     w: Math.max(8, Math.ceil(rect.w) + grow),
     h: Math.max(4, Math.ceil(rect.h)),
   }
+  drawnAt.set(layout, { x: rect.x, y: rect.y, w: rect.w + grow, h: rect.h })
+  return layout
 }
 
 // The smallest box the canvas keeps (the store and the published page both
@@ -164,6 +170,7 @@ function shape(ctx, look, rect, origin, corner = 'left top') {
   const w = Math.max(1, Math.round(rect.w))
   const h = Math.max(1, Math.round(rect.h))
   const layout = { x: Math.max(0, Math.round(rect.x - origin.x)), y: Math.max(0, Math.round(rect.y - origin.y)), w: Math.max(MIN_W, w), h: Math.max(MIN_H, h) }
+  drawnAt.set(layout, { x: rect.x, y: rect.y, w: rect.w, h: rect.h })
   if (w >= MIN_W && h >= MIN_H) return block(ctx, 'spacer', {}, look, layout)
   const colour = look.backgroundColor || 'transparent'
   if (corner.includes('bottom')) layout.y = Math.max(0, layout.y - (layout.h - h))
@@ -178,7 +185,148 @@ function shape(ctx, look, rect, origin, corner = 'left top') {
 
 function block(ctx, type, props, styles, layout, children) {
   ctx.report[type === 'html' ? 'html' : 'native'] += 1
-  return { id: ctx.id(type), type, props, styles, layout, ...(children ? { children } : {}) }
+  const made = { id: ctx.id(type), type, props, styles, layout, ...(children ? { children } : {}) }
+  // What it was made from, for its phone layout; taken off again there.
+  if (ctx.at) made._from = ctx.at
+  const drawn = drawnAt.get(layout)
+  if (drawn) made._drawn = drawn
+  return made
+}
+
+// The node being turned into blocks, and the node it sits in.
+function entering(ctx, n, run) {
+  const outer = ctx.at
+  if (!ctx.parentOf.has(n)) ctx.parentOf.set(n, outer)
+  ctx.at = n
+  try {
+    return run()
+  } finally {
+    ctx.at = outer
+  }
+}
+
+// The phone layout the page itself has. The reader read every node again at
+// a phone's width (`m`, see readPhone in htmlPageMeasure.js); each block is
+// put where what it was made from stood there, in its parent's phone box, and
+// is hidden on the phone where that (or what holds it) is not shown there. A
+// group of blocks made here, with nothing of its own on the page, spans its
+// blocks. A block made from part of a node (a line on one side, the words
+// inside a box) keeps its place in that node, scaled to the node's phone box.
+function phoneLayouts(components, ctx, origin) {
+  const hiddenUp = (node) => {
+    for (let n = node; n; n = ctx.parentOf.get(n)) if (n.m?.hidden) return true
+    return false
+  }
+  const readUp = (node) => {
+    for (let n = node; n; n = ctx.parentOf.get(n)) if (n.m && !n.m.hidden) return n
+    return null
+  }
+  const near = (a, b) => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1 && Math.abs(a.w - b.w) <= 1.5 && Math.abs(a.h - b.h) <= 1.5
+  // A piece of a node (a list's number, a line on one side, the words inside
+  // a box) keeps its own size and its distance from the nearer edges of the
+  // node; one that spans the node spans it on the phone too. The words of a
+  // box keep its padding around them and take the rest of it.
+  const mapped = (drawn, node, words) => {
+    if (near(drawn, node.rect)) return node.m
+    const left = drawn.x - node.rect.x
+    const right = node.rect.x + node.rect.w - (drawn.x + drawn.w)
+    const top = drawn.y - node.rect.y
+    const bottom = node.rect.y + node.rect.h - (drawn.y + drawn.h)
+    // Spanning the node means meeting both of its edges, not only being as
+    // long as it: a number as tall as its one-line item does not span it.
+    const across = (size, spans, room) => (spans ? room : Math.min(size, Math.max(1, room)))
+    const w = words ? Math.max(MIN_W, node.m.w - Math.max(0, left) - Math.max(0, right)) : across(drawn.w, Math.abs(left) <= 1 && Math.abs(right) <= 1, node.m.w)
+    const h = words ? Math.max(drawn.h, node.m.h - Math.max(0, top) - Math.max(0, bottom)) : across(drawn.h, Math.abs(top) <= 1 && Math.abs(bottom) <= 1, node.m.h)
+    // A piece drawn outside its node (a list's number in the margin) stays
+    // outside it by as much.
+    // It goes with the far edge only when it starts in the far half: a number
+    // a few pixels taller than its one-line item stays with the first line.
+    const x = words || left <= node.rect.w / 2 ? node.m.x + (words ? Math.max(0, left) : left) : node.m.x + node.m.w - w - Math.max(0, right)
+    const y = words || top <= node.rect.h / 2 ? node.m.y + (words ? Math.max(0, top) : top) : node.m.y + node.m.h - h - Math.max(0, bottom)
+    return { x, y, w, h }
+  }
+  // A block's box on the page at the phone's width: a box, null where the
+  // phone does not show it, undefined where nothing says.
+  const phoneOf = (c) => {
+    const kids = Array.isArray(c.children) ? c.children : null
+    const boxes = kids ? kids.map(phoneOf) : []
+    let box
+    if (c._from) {
+      if (hiddenUp(c._from)) box = null
+      else {
+        const node = readUp(c._from)
+        if (node) {
+          box = mapped(c._drawn || c._from.rect, node, node === c._from && WORD_TYPES.has(c.type))
+          // Words made here inside a read node (a list's number) take its
+          // phone styles: they inherit its font.
+          if (node !== c._from && node.ms && !c._from.ms) c._styleFrom = node
+        }
+      }
+    }
+    if (box === undefined && kids) {
+      const shown = boxes.filter(Boolean)
+      if (shown.length) {
+        const x = Math.min(...shown.map((b) => b.x))
+        const y = Math.min(...shown.map((b) => b.y))
+        box = { x, y, w: Math.max(...shown.map((b) => b.x + b.w)) - x, h: Math.max(...shown.map((b) => b.y + b.h)) - y }
+      } else if (boxes.every((b) => b === null)) box = null
+    }
+    c._phone = box
+    return box
+  }
+  const assign = (list, outer) => {
+    for (const c of list) {
+      const box = c._phone
+      const own = !!c._from?.ms
+      const styleFrom = own ? c._from : c._styleFrom
+      const onPhone = box && styleFrom ? phoneLook(c, styleFrom, own) : null
+      if (onPhone) c.stylesMobile = { ...(c.stylesMobile || {}), ...onPhone }
+      if (box === null) c.hiddenMobile = true
+      else if (box) {
+        c.mobileLayout = {
+          x: Math.max(0, Math.round(box.x - outer.x)),
+          y: Math.max(0, Math.round(box.y - outer.y)),
+          w: Math.max(MIN_W, Math.ceil(box.w)),
+          h: Math.max(MIN_H, Math.ceil(box.h)),
+        }
+      }
+      if (Array.isArray(c.children)) assign(c.children, box || outer)
+      delete c._phone
+      delete c._styleFrom
+    }
+  }
+  components.forEach(phoneOf)
+  assign(components, origin)
+}
+
+// The styles the page's CSS gives a node on a phone, for the block made from
+// it: the size and spacing of its words, and its padding where the block
+// took the node's whole padding.
+const WORD_TYPES = new Set(['text', 'heading', 'list', 'button', 'linkbutton'])
+function phoneLook(c, node, own = true) {
+  const out = {}
+  if (WORD_TYPES.has(c.type)) {
+    for (const key of ['fontSize', 'lineHeight', 'letterSpacing']) {
+      if (node.ms[key] && c.styles?.[key] !== undefined) out[key] = node.ms[key]
+      else if (key === 'letterSpacing' && node.ms[key] && node.ms[key] !== 'normal') out[key] = node.ms[key]
+    }
+  }
+  const sides = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']
+  if (own && sides.some((key) => node.ms[key]) && c.styles?.padding === paddingOf(node.s)) {
+    out.padding = paddingOf({ ...node.s, ...node.ms })
+  }
+  return Object.keys(out).length ? out : null
+}
+
+// Takes off what blocks carried only while being made.
+function strip(list) {
+  for (const c of list) {
+    delete c._from
+    delete c._drawn
+    delete c._phone
+    if (Array.isArray(c.children)) strip(c.children)
+  }
+  return list
 }
 
 // The element's id as the block's anchor, so a "#id" link on the page still
@@ -452,7 +600,7 @@ function marked(made, n, origin) {
 
 function walk(n, out, origin, depth, ctx, href) {
   const first = out.length
-  walkNode(n, out, origin, depth, ctx, href)
+  entering(ctx, n, () => walkNode(n, out, origin, depth, ctx, href))
   marked(out.slice(first), n, origin)
 }
 
@@ -637,7 +785,7 @@ function section(n, ctx) {
 function bands(n, out, ctx) {
   for (const kid of n.kids || []) {
     const first = out.length
-    band(kid, out, ctx)
+    entering(ctx, kid, () => band(kid, out, ctx))
     marked(out.slice(first), kid, { x: ctx.left, y: 0 })
   }
 }
@@ -676,9 +824,13 @@ function retargetAll(components, renames) {
 function buildMeasured(measured, { makeId = randomId } = {}) {
   const page = measured?.root?.rect
   const width = Math.max(320, Math.min(4000, Math.round(page?.w || measured?.width || 1200)))
-  const ctx = { width, left: page?.x || 0, viewHeight: Math.max(1, Number(measured?.viewHeight) || 900), id: makeId, anchors: new Set(), renames: new Map(), report: { native: 0, html: 0, tooLarge: 0 } }
+  const ctx = { width, left: page?.x || 0, viewHeight: Math.max(1, Number(measured?.viewHeight) || 900), id: makeId, anchors: new Set(), renames: new Map(), report: { native: 0, html: 0, tooLarge: 0 }, at: null, parentOf: new WeakMap() }
   const components = []
-  if (measured?.root) bands(measured.root, components, ctx)
+  if (measured?.root) entering(ctx, measured.root, () => bands(measured.root, components, ctx))
+  // The phone layout, when the reader read the page at a phone's width.
+  const phone = measured?.phone && measured.root?.m && !measured.root.m.hidden ? measured.phone : null
+  if (phone) phoneLayouts(components, ctx, { x: measured.root.m.x || 0, y: 0 })
+  strip(components)
   const [body, root] = measured?.background || []
   return {
     renames: ctx.renames,
@@ -689,6 +841,8 @@ function buildMeasured(measured, { makeId = randomId } = {}) {
       fonts: Array.isArray(measured?.fonts) ? measured.fonts : [],
       // The document's own font files, for the families the blocks use.
       fontFaces: fontFacesUsedBy((measured?.fontFaces || []).map((face) => face?.css || '').join('\n'), components),
+      // The phone's width the layouts above were read at.
+      ...(phone ? { mobileWidth: Math.max(240, Math.min(1200, Math.round(phone.width))) } : {}),
       title: measured?.title || '',
       description: measured?.description || '',
       language: measured?.language || '',
@@ -702,7 +856,9 @@ export function canvasFromMeasured(measured, { makeId = randomId } = {}) {
 }
 
 // A block as drawn, whatever it is called.
-const look = (c) => JSON.stringify(c, (key, value) => (key === 'id' ? undefined : value))
+// The phone layout is left out: the same block in two parts is the same
+// block, though the page under it is longer in one of them.
+const look = (c) => JSON.stringify(c, (key, value) => (key === 'id' || key === 'mobileLayout' || key === 'hiddenMobile' ? undefined : value))
 
 const isChrome = (c) => c?.type === 'navbar' || isPinnedPos(c?.props?.scrollBehavior)
 const CHROME_PAINT_KEYS = new Set([
