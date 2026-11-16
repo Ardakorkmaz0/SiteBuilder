@@ -32,6 +32,28 @@ Many visual builders keep your page inside them. Here the page is an HTML docume
 - **Code and canvas together.** Every page has a source view with colored code, and you can see what each visual change wrote.
 - **Nothing locks you in.** Export a site as an editable project or a single file, or host the whole builder yourself.
 
+## How it compares
+
+SiteBuilder is built around one workflow: bring a page you already have, make small changes to it as HTML, and convert it to the canvas when you want full freedom. The table compares that workflow, and the usual builder features, with the main hosted builders.
+
+|  | SiteBuilder | Webflow | Framer | Wix | Squarespace | WordPress + Elementor |
+|---|---|---|---|---|---|---|
+| Upload your own HTML and keep editing it | ✓ | Embed only | Embed only | Static files¹ | Code blocks | HTML widget |
+| Convert an uploaded page into visual blocks | ✓ Whole page² | — | Sections³ | — | — | Third-party plugins |
+| Export the site as code | ✓ | Paid plans | — | — | Content only (XML) | ✓ |
+| Open source and self-hostable | ✓ AGPL-3.0 | — | — | — | — | ✓ GPL |
+| CMS / blog | — | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Online store | — | ✓ | Plugins | ✓ | ✓ | ✓ WooCommerce |
+| Member areas | — | Retired in 2026⁴ | Third-party | ✓ | ✓ | Plugins |
+| Team editing | — | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+1. Wix serves uploaded HTML as static files; they do not become editable in the Wix editor.
+2. Its chapters, step-by-step reveals, answers and links keep working on the canvas and on the published page.
+3. Framer's browser extension copies chosen sections of a live page onto the canvas, as a starting point.
+4. Webflow switched off its native User Accounts on January 29, 2026.
+
+Compared with public documentation as of November 2026; these products change often. Sources: [Webflow wishlist](https://wishlist.webflow.com/ideas/DESIGNER-I-12), [Webflow User Accounts sunset](https://help.webflow.com/hc/en-us/articles/36046006227731), [Framer import](https://www.framer.com/academy/lessons/import-from-figma), [Wix HTML upload](https://dev.wix.com/docs/api-reference/account-level/sites/skills/upload-a-website-or-html-files), [Squarespace export](https://www.browsercat.com/post/migrate-squarespace-to-code), [HTML importer for Elementor](https://wordpress.org/plugins/aitoel-html-importer/).
+
 ## Features
 
 - A free canvas with ready-made blocks, or one of 500 templates
