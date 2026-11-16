@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readElementMultilineText, writeElementMultilineText } from './domMultilineText.js'
+import { listHtmlContentFields, updateHtmlTextAtPath } from './htmlQuickEdit.js'
 
 const element = (html) => {
   const box = document.createElement('div')
@@ -63,5 +64,35 @@ describe('writing copy back into preformatted text', () => {
   it('keeps newlines as text inside <pre>', () => {
     expect(write('<pre>$ run\nok</pre>', '$ run\nok!').innerHTML).toBe('$ run\nok!')
     expect(write('<pre><b>$</b> run\nok</pre>', '$ run\nfine').innerHTML).toBe('<b>$</b> run\nfine')
+  })
+})
+
+describe('writing copy through the side panel and reading the saved HTML back', () => {
+  const fields = (html) => listHtmlContentFields(html).texts
+
+  it('keeps a newline that opens a <pre> after the HTML is parsed again', () => {
+    const saved = updateHtmlTextAtPath('<pre>alpha</pre>', '0', '\nalpha')
+    expect(fields(saved)[0].text).toBe('\nalpha')
+    // And through a second edit of the saved HTML.
+    const again = updateHtmlTextAtPath(saved, '0', '\nalpha!')
+    expect(fields(again)[0].text).toBe('\nalpha!')
+  })
+
+  it('writes a new button label where a screen reader reads it, not into a hidden icon', () => {
+    const saved = updateHtmlTextAtPath('<button><span aria-hidden="true">★</span> Save</button>', '0', 'Publish')
+    const button = new DOMParser().parseFromString(saved, 'text/html').querySelector('button')
+    const spoken = button.cloneNode(true)
+    spoken.querySelectorAll('[aria-hidden="true"]').forEach((node) => node.remove())
+    expect(spoken.textContent.trim()).toBe('Publish')
+  })
+
+  it('still changes the icon itself when only the icon is edited', () => {
+    const saved = updateHtmlTextAtPath('<button><span aria-hidden="true">★</span> Save</button>', '0', '☆ Save')
+    expect(saved).toBe('<button><span aria-hidden="true">☆</span> Save</button>')
+  })
+
+  it('keeps newlines as text in a <pre> inside the edited element', () => {
+    expect(write('<a href="#"><pre>first\nsecond</pre></a>', 'first\nextra\nsecond').innerHTML)
+      .toBe('<pre>first\nextra\nsecond</pre>')
   })
 })

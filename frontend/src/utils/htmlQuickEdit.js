@@ -1,4 +1,4 @@
-import { readElementMultilineText, writeElementMultilineText } from './domMultilineText.js'
+import { readElementMultilineText, serializeKeepingPreNewlines, writeElementMultilineText } from './domMultilineText.js'
 
 const TEXT_SKIP_TAGS = new Set([
   'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'META', 'LINK', 'IMG', 'INPUT',
@@ -26,9 +26,9 @@ function parseEditableHtml(code) {
 }
 
 function serializeEditableHtml(parsed) {
-  if (!parsed.full) return parsed.root.innerHTML
+  if (!parsed.full) return serializeKeepingPreNewlines(parsed.root, () => parsed.root.innerHTML)
   const doctype = parsed.hadDoctype ? '<!DOCTYPE html>\n' : ''
-  return `${doctype}${parsed.doc.documentElement.outerHTML}`
+  return `${doctype}${serializeKeepingPreNewlines(parsed.doc.documentElement, () => parsed.doc.documentElement.outerHTML)}`
 }
 
 function normalizeText(value) {

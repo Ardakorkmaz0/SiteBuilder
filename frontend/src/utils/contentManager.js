@@ -1,4 +1,4 @@
-import { readElementMultilineText, writeElementMultilineText } from './domMultilineText.js'
+import { readElementMultilineText, serializeKeepingPreNewlines, writeElementMultilineText } from './domMultilineText.js'
 import { listHtmlContentFields, updateHtmlTextAtPath } from './htmlQuickEdit.js'
 
 const HTML_SELECTOR = 'h1,h2,h3,p,a,button,img'
@@ -85,7 +85,7 @@ export function updateHtmlContent(html, entry, value) {
   if (!doc || !node) return html
   if (entry.field === 'alt') node.setAttribute('alt', value)
   else writeElementMultilineText(node, value)
-  return '<!doctype html>\n' + doc.documentElement.outerHTML
+  return '<!doctype html>\n' + serializeKeepingPreNewlines(doc.documentElement, () => doc.documentElement.outerHTML)
 }
 
 export function updateSchemaContent(schema, entry, value) {

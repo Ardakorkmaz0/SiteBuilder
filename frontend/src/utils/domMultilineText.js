@@ -30,13 +30,34 @@ export function writeElementMultilineText(element, value) {
   // keep it: only the part of the copy that changed is written, into the text
   // it replaces. Rewriting the whole element used to flatten a formula such as
   // f(x<sub>n</sub>) to "f(xn)" the moment one letter was corrected.
-  // Inside <pre> a newline is copy, not a <br>.
-  const raw = !!element.closest('pre')
   if ([...element.children].some((child) => child.tagName !== 'BR')) {
-    spliceElementText(element, readElementMultilineText(element), text, raw)
+    spliceElementText(element, readElementMultilineText(element), text)
     return
   }
-  element.replaceChildren(...lineNodes(document, text, raw))
+  // Inside <pre> a newline is copy, not a <br>.
+  element.replaceChildren(...lineNodes(document, text, !!element.closest('pre')))
+}
+
+/**
+ * Serialize with the newline that opens a <pre> kept: the HTML parser drops a
+ * newline right after <pre>, so a <pre> whose copy starts with one is written
+ * with one more. The DOM is left as it was.
+ */
+export function serializeKeepingPreNewlines(root, serialize) {
+  const pres = [...(root.matches?.('pre') ? [root] : []), ...root.querySelectorAll('pre')]
+  const doubled = []
+  for (const pre of pres) {
+    const first = pre.firstChild
+    if (first?.nodeType === 3 && first.nodeValue.startsWith('\n')) {
+      first.nodeValue = `\n${first.nodeValue}`
+      doubled.push(first)
+    }
+  }
+  try {
+    return serialize()
+  } finally {
+    for (const node of doubled) node.nodeValue = node.nodeValue.slice(1)
+  }
 }
 
 function lineNodes(document, text, raw = false) {
@@ -74,7 +95,9 @@ function textPieces(element) {
   return pieces
 }
 
-function spliceElementText(element, before, after, raw) {
+const hidden = (node) => !!node.parentElement?.closest('[aria-hidden="true"]')
+
+function spliceElementText(element, before, after) {
   if (before === after) return
   const document = element.ownerDocument
   let head = 0
@@ -90,10 +113,15 @@ function spliceElementText(element, before, after, raw) {
   const insert = after.slice(head, after.length - tail)
 
   const pieces = textPieces(element)
-  const texts = pieces.filter((piece) => !piece.br && piece.start <= from && from <= piece.end)
-  // A deletion starts in the piece holding its first character; an insertion
-  // at a boundary joins the copy before it.
-  let anchor = (to > from ? texts.find((piece) => from < piece.end) : null) || texts[0] || null
+  // The new copy goes into a text the edit touches: for a deletion one that
+  // holds part of it, for an insertion one at its spot (the copy before a
+  // boundary first). A text a screen reader cannot read (inside
+  // aria-hidden, an icon) is used only when nothing else is there, so a new
+  // button label never ends up hidden in the icon beside the old one.
+  const texts = pieces.filter((piece) => !piece.br && (to > from
+    ? piece.start < to && from < piece.end
+    : piece.start <= from && from <= piece.end))
+  let anchor = texts.find((piece) => !hidden(piece.node)) || texts[0] || null
   if (!anchor) {
     const node = document.createTextNode('')
     const next = pieces.find((piece) => piece.start >= from)
@@ -102,19 +130,22 @@ function spliceElementText(element, before, after, raw) {
     anchor = { node, br: false, start: from, end: from }
   }
 
-  // Drop the old copy the edit replaced, after the anchor.
+  // Drop the old copy the edit replaced from every other piece.
   for (const piece of pieces) {
-    if (piece === anchor || piece.end <= from || piece.start >= to || piece.start < anchor.start) continue
+    if (piece === anchor || piece.end <= from || piece.start >= to) continue
     if (piece.br || (piece.start >= from && piece.end <= to)) {
       piece.node.remove()
     } else {
-      piece.node.nodeValue = piece.node.nodeValue.slice(to - piece.start)
+      const value = piece.node.nodeValue
+      piece.node.nodeValue = value.slice(0, Math.max(0, from - piece.start)) + value.slice(Math.min(to, piece.end) - piece.start)
     }
   }
 
   const value = anchor.node.nodeValue || ''
-  const keepBefore = value.slice(0, from - anchor.start)
-  const keepAfter = value.slice(Math.min(to, anchor.end) - anchor.start)
+  const keepBefore = value.slice(0, Math.max(0, from - anchor.start))
+  const keepAfter = value.slice(Math.min(Math.max(to, anchor.start), anchor.end) - anchor.start)
+  // Inside <pre> a newline is copy, not a <br>.
+  const raw = !!anchor.node.parentElement?.closest('pre')
   const lines = raw ? [insert] : insert.split('\n')
   if (lines.length === 1) {
     anchor.node.nodeValue = keepBefore + insert + keepAfter
