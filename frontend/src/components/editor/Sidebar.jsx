@@ -225,6 +225,8 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
 // A component category: click the row to reveal its variants. Same in both modes.
 function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle, onHover, onLeave }) {
   const { language, t } = useLanguage()
+  // A tap focuses the row too; only focus from the keyboard opens the flyout.
+  const pressedAt = useRef(-Infinity)
   const variants = variantsForType(item.type)
   const wide = WIDE_HTML.has(item.type)
   const firstVariant = variants[0]
@@ -238,7 +240,10 @@ function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle, onHov
           if (event.pointerType !== 'touch' && event.pointerType !== 'pen') onHover?.(event.currentTarget)
         }}
         onPointerLeave={() => onLeave?.()}
-        onFocus={(event) => onHover?.(event.currentTarget)}
+        onPointerDown={() => { pressedAt.current = Date.now() }}
+        onFocus={(event) => {
+          if (Date.now() - pressedAt.current > 800) onHover?.(event.currentTarget)
+        }}
         onBlur={() => onLeave?.()}
         onClick={() => {
           onToggle()

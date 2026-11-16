@@ -118,10 +118,28 @@ describe('the quick-add flyout of a palette row', () => {
     expect(within(library).getByRole('button', { current: true })).toHaveTextContent(/^Navbar\d+$/)
   })
 
-  it('does not open for a touch', () => {
+  it('does not open for a touch, though the tap focuses the row', () => {
     renderSidebar({ onArmPlacement: vi.fn() })
     fireEvent.pointerEnter(navbarRow(), { pointerType: 'touch' })
+    fireEvent.pointerDown(navbarRow(), { pointerType: 'touch' })
+    fireEvent.focus(navbarRow())
     wait(400)
     expect(flyout()).toBeNull()
+  })
+
+  it('opens for a row reached with the keyboard', () => {
+    renderSidebar({ onArmPlacement: vi.fn() })
+    fireEvent.focus(navbarRow())
+    wait(200)
+    expect(flyout()).not.toBeNull()
+  })
+
+  it('waits for the pointer to rest before opening, so crossing rows opens nothing', () => {
+    renderSidebar({ onArmPlacement: vi.fn() })
+    hover(navbarRow())
+    wait(179)
+    expect(flyout()).toBeNull()
+    wait(1)
+    expect(flyout()).not.toBeNull()
   })
 })

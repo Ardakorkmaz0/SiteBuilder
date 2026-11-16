@@ -164,6 +164,8 @@ describe('BlockLibrary from the keyboard', () => {
 })
 
 describe('BlockLibrary memory and marks', () => {
+  const rail = () => within(document.querySelector('[data-block-library] nav'))
+
   it('shows what this viewer added last on top, and remembers a block when it is used', async () => {
     localStorage.clear()
     localStorage.setItem('pwb_language', 'en')
@@ -176,10 +178,12 @@ describe('BlockLibrary memory and marks', () => {
     expect(recentCards).toHaveLength(1)
     expect(recentCards[0]).toHaveTextContent('Rating summary')
 
-    await user.click(within(recent).getByText('Rating summary'))
+    // A block used from the grid moves to the front of the list; a key the
+    // library no longer has is skipped on screen, not dropped.
+    await user.click(rail().getByText('Ratings and reviews'))
+    await user.click(screen.getByText('Rating bars'))
     expect(onArm).toHaveBeenCalledTimes(1)
-    // A key the library no longer has is skipped, not shown.
-    expect(JSON.parse(localStorage.getItem('pwb_recent_blocks'))).toEqual(['widget-rating-summary', 'no-such-block'])
+    expect(JSON.parse(localStorage.getItem('pwb_recent_blocks'))).toEqual(['widget-rating-bars', 'widget-rating-summary', 'no-such-block'])
   })
 
   it('has no recent row while a search is typed', () => {
