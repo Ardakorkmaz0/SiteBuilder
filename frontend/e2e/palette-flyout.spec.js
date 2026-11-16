@@ -3,6 +3,9 @@
 import { test, expect, api, openEditor } from './support.js'
 
 const blocks = (page) => page.locator('main [data-cid]')
+// A palette row by its label; the icon, the count and the arrow sit beside it.
+const paletteRow = (page, label) => page.locator('[role=tabpanel] button[aria-expanded]')
+  .filter({ has: page.getByText(label, { exact: true }) })
 const box = (locator) => locator.evaluate((el) => ({
   left: parseFloat(el.style.left),
   top: parseFloat(el.style.top),
@@ -15,7 +18,8 @@ test('a number key adds a variant into view, then below the selected block, and 
   await openEditor(page, site.id)
   await page.getByRole('tab', { name: 'Components' }).click()
 
-  const row = page.locator('[role=tabpanel]').getByRole('button', { name: /^\W*Image\d+▸$/ })
+  const row = paletteRow(page, 'Image')
+  await expect(row).toHaveCount(1)
   await row.hover()
   const flyout = page.locator('[data-palette-flyout="image"]')
   await expect(flyout).toBeVisible()
@@ -56,7 +60,8 @@ test('a field being typed in keeps its digits, and the flyout closes once the po
   await openEditor(page, site.id)
   await page.getByRole('tab', { name: 'Components' }).click()
 
-  const row = page.locator('[role=tabpanel]').getByRole('button', { name: /^\W*Button\d+▸$/ })
+  const row = paletteRow(page, 'Button')
+  await expect(row).toHaveCount(1)
   await row.hover()
   const flyout = page.locator('[data-palette-flyout="button"]')
   await expect(flyout).toBeVisible()
