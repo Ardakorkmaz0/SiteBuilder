@@ -165,6 +165,20 @@ describe('insertSnippet', () => {
     insertSnippet(document, '<div id="end2">E2</div>', null)
     expect(document.body.lastElementChild.id).toBe('end2')
   })
+
+  it('gives each copy of a snippet its own group of one-at-a-time answers', () => {
+    // A group spans the whole document: a second copy with the same name
+    // would close the first copy's open step.
+    const timeline = '<div><details name="steps" open><summary>1</summary>a</details><details name="steps"><summary>2</summary>b</details></div>'
+    const names = (node) => [...node.querySelectorAll('details')].map((el) => el.getAttribute('name'))
+    const first = insertSnippet(document, timeline, null)
+    const second = insertSnippet(document, timeline, null)
+    const third = insertSnippet(document, timeline, null)
+    expect(names(first)).toEqual(['steps', 'steps'])
+    expect(names(second)).toEqual(['steps-2', 'steps-2'])
+    expect(names(third)).toEqual(['steps-3', 'steps-3'])
+    expect(insertSnippet(document, '<details><summary>x</summary>y</details>', null).hasAttribute('name')).toBe(false)
+  })
 })
 
 // The page on screen takes a block anywhere. The saved file is read back by

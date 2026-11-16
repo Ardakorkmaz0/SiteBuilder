@@ -149,9 +149,29 @@ export function snippetToNode(doc, snippet) {
 // insertAdjacentElement keywords ('beforebegin' | 'afterend' | 'beforeend').
 // Falls back to appending to <body> when target is missing. Returns the
 // inserted node (handy for scroll-into-view / flash highlight).
+// Disclosures that open one at a time share a name (`<details name>`), and the
+// group spans the whole document: a second copy of the same snippet would
+// close the first copy's answers. Each copy gets a name of its own when its
+// name is taken.
+function ownDetailsGroups(doc, node) {
+  const taken = new Set([...doc.querySelectorAll('details[name]')].map((el) => el.getAttribute('name')))
+  const renamed = new Map()
+  for (const details of node.querySelectorAll('details[name]')) {
+    const name = details.getAttribute('name')
+    if (!renamed.has(name)) {
+      let fresh = name
+      for (let n = 2; taken.has(fresh); n++) fresh = `${name}-${n}`
+      taken.add(fresh)
+      renamed.set(name, fresh)
+    }
+    details.setAttribute('name', renamed.get(name))
+  }
+}
+
 export function insertSnippet(doc, snippet, target, position = 'afterend') {
   if (!doc) return null
   const node = snippetToNode(doc, snippet)
+  ownDetailsGroups(doc, node)
   const body = doc.body
   if (!target || target === body) {
     body.appendChild(node)
