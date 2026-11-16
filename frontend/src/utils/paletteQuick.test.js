@@ -67,3 +67,16 @@ describe('the blocks this viewer added last', () => {
     expect(readRecentBlocks()).toEqual([])
   })
 })
+
+describe('where a quick add lands on a canvas zoomed or scrolled sideways', () => {
+  it('goes to the middle of the part on screen, across as well as down', () => {
+    // 500 px canvas at 200 percent: design x 0 to 200 on screen.
+    expect(inViewSpot({ view: { top: 0, height: 200, left: 0, width: 200 }, canvasWidth: 500, width: 90, height: 40 }))
+      .toEqual({ x: 100, y: 100 })
+  })
+
+  it('keeps the block inside the canvas when the part on screen is at its edge', () => {
+    expect(inViewSpot({ view: { top: 0, height: 200, left: 460, width: 40 }, canvasWidth: 500, width: 90, height: 40 }))
+      .toEqual({ x: 455, y: 100 })
+  })
+})

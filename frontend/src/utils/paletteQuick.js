@@ -46,17 +46,21 @@ export function quickPicks(variants, counts = {}, count = 4) {
 /**
  * Centre of a block added by its number key, in canvas coordinates: below the
  * selected block when there is one, else in the middle of the part of the
- * canvas on screen.
+ * canvas on screen (`view`: top/height, and left/width when the canvas is
+ * zoomed or scrolled sideways), kept inside the canvas.
  */
-export function inViewSpot({ selected = null, view, canvasWidth, height = 120, gap = 24 }) {
+export function inViewSpot({ selected = null, view, canvasWidth, width = 360, height = 120, gap = 24 }) {
   if (selected) {
     return {
       x: (selected.x || 0) + (selected.w || 0) / 2,
       y: (selected.y || 0) + (selected.h || 0) + gap + height / 2,
     }
   }
+  const seenWidth = Number(view?.width)
+  const middle = seenWidth > 0 ? (Number(view.left) || 0) + seenWidth / 2 : canvasWidth / 2
+  const half = Math.min(width / 2, canvasWidth / 2)
   return {
-    x: canvasWidth / 2,
+    x: Math.min(Math.max(middle, half), canvasWidth - half),
     y: Math.max(height / 2, (view?.top || 0) + (view?.height || 0) / 2),
   }
 }

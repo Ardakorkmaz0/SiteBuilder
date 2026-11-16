@@ -1318,14 +1318,18 @@ function SiteEditor() {
     const canvasEl = document.getElementById('free-canvas')
     const scroller = document.getElementById('canvas-scroll')
     if (canvasEl && scroller) {
+      // The part of the canvas the scroller shows, in canvas coordinates: a
+      // zoomed canvas can be scrolled sideways as well as down.
       const scale = Number(canvasEl.dataset?.builderCanvasScale) || 1
       const canvasRect = canvasEl.getBoundingClientRect()
       const scrollRect = scroller.getBoundingClientRect()
-      const from = Math.max(0, (scrollRect.top - canvasRect.top) / scale)
-      const to = Math.max(from, (Math.min(scrollRect.bottom, canvasRect.bottom) - canvasRect.top) / scale)
-      view = { top: from, height: to - from }
+      const top = Math.max(0, (scrollRect.top - canvasRect.top) / scale)
+      const bottom = Math.max(top, (Math.min(scrollRect.bottom, canvasRect.bottom) - canvasRect.top) / scale)
+      const left = Math.max(0, (scrollRect.left - canvasRect.left) / scale)
+      const right = Math.max(left, (Math.min(scrollRect.right, canvasRect.right) - canvasRect.left) / scale)
+      view = { top, height: bottom - top, left, width: right - left }
     }
-    const spot = inViewSpot({ selected, view, canvasWidth: width, height: d.h || 120 })
+    const spot = inViewSpot({ selected, view, canvasWidth: width, width: d.w || 360, height: d.h || 120 })
     placeData(d, spot.x, spot.y)
   }
 
@@ -1401,8 +1405,11 @@ function SiteEditor() {
     }, { font: canvasFontFamily(useEditorStore.getState().schema, selectCurrentPage(useEditorStore.getState())) })
   }
 
+  // The block just dropped is the one selected now; it is read here, not when
+  // the timer fires, so two quick adds each get their own fit.
   function autoFitDroppedEmbed() {
-    window.setTimeout(() => fitEmbedNow(useEditorStore.getState().selectedId), 30)
+    const dropped = useEditorStore.getState().selectedId
+    window.setTimeout(() => fitEmbedNow(dropped), 30)
   }
 
   // Keep the box hugging the content AFTER the drop too: edit a block's text or
