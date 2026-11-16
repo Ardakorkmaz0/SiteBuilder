@@ -230,10 +230,14 @@ export function searchComponents(index, query, { relatedLimit = 12 } = {}) {
     const scores = reads.map((read) => scoreWord(record, read))
     const total = scores.reduce((sum, value) => sum + value, 0)
     if (!total) continue
+    // The name begins with, or holds, the query as whole words: "form" lifts
+    // "Contact form", not "Formula card" (which only starts with the letters).
+    const spaced = ` ${record.labelText} `
     let bonus = 0
     if (record.labelText === folded) bonus = 120
-    else if (record.labelText.startsWith(folded)) bonus = 60
-    else if (record.labelText.includes(folded)) bonus = 30
+    else if (spaced.startsWith(` ${folded} `)) bonus = 60
+    else if (spaced.includes(` ${folded} `)) bonus = 30
+    else if (record.labelText.startsWith(folded)) bonus = 10
     const item = { record, score: total + bonus }
     if (scores.every(Boolean)) best.push(item)
     else partial.push(item)
@@ -275,12 +279,14 @@ export function searchComponents(index, query, { relatedLimit = 12 } = {}) {
   return { best: best.map((item) => item.record.entry), related, suggestion }
 }
 
-// Fold one character to one character, so positions in the folded text are
-// positions in the text shown.
-function foldChar(character) {
-  const lower = character.toLocaleLowerCase('tr')
-  const plain = (FOLD[lower] || lower).normalize('NFD').replace(/\p{M}/gu, '')
-  return plain.length === 1 ? plain : character
+// One shown character (a code point) folded: one letter for most, nothing
+// for a combining accent, itself for anything else (an emoji).
+function foldPiece(character) {
+  return [...character.toLocaleLowerCase('tr')]
+    .map((letter) => FOLD[letter] || letter)
+    .join('')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
 }
 
 /**
@@ -288,17 +294,29 @@ function foldChar(character) {
  * ("gorsel" marks "Görsel"), for highlighting a result's name.
  */
 export function highlightParts(text, query) {
-  const shown = String(text || '')
-  const folded = [...shown].map(foldChar).join('')
-  const marks = new Array(folded.length).fill(false)
+  const characters = [...String(text || '')]
+  // Each code unit of the folded text, mapped back to the character it came
+  // from: an emoji is two units of one character, an accent none.
+  let folded = ''
+  const from = []
+  const pieces = characters.map((character, index) => {
+    const piece = foldPiece(character)
+    for (let i = 0; i < piece.length; i++) from.push(index)
+    folded += piece
+    return piece
+  })
+  const marks = new Array(characters.length).fill(false)
   for (const word of words(query)) {
     if (word.length < 2) continue
     for (let at = folded.indexOf(word); at !== -1; at = folded.indexOf(word, at + 1)) {
-      for (let i = at; i < at + word.length; i++) marks[i] = true
+      for (let i = at; i < at + word.length; i++) marks[from[i]] = true
     }
   }
+  // A combining accent goes with the letter before it.
+  pieces.forEach((piece, index) => {
+    if (!piece && index > 0) marks[index] = marks[index - 1]
+  })
   const parts = []
-  const characters = [...shown]
   characters.forEach((character, index) => {
     const last = parts[parts.length - 1]
     if (last && last.match === marks[index]) last.text += character

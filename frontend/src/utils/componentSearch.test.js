@@ -46,6 +46,12 @@ describe('searching the block library', () => {
     expect(labels(search('fiyat tablosu').best)).toEqual(['Plan comparison table'])
   })
 
+  it('ranks a whole word above a name that only starts with its letters', () => {
+    const found = labels(search('form').best)
+    expect(found.indexOf('Contact form with details')).toBeLessThan(found.indexOf('Formula card'))
+    expect(found.indexOf('Contact form with details')).toBeGreaterThanOrEqual(0)
+  })
+
   it('ranks an exact name first', () => {
     expect(search('Çözümlü sınav sorusu').best[0].key).toBe('widget-study-question-paper')
     expect(search('Countdown').best[0].label).toBe('Countdown')
@@ -86,6 +92,12 @@ describe('marking the words a search found in a name', () => {
       { text: 'form', match: true },
       { text: 'u', match: false },
     ])
+  })
+
+  it('keeps the marks on the right letters after an emoji and over a combining accent', () => {
+    expect(highlightParts('🎵 Menü', 'menu')).toEqual([{ text: '🎵 ', match: false }, { text: 'Menü', match: true }])
+    expect(highlightParts('Go\u0308rsel', 'gorsel')).toEqual([{ text: 'Go\u0308rsel', match: true }])
+    expect(highlightParts('👩‍💻 İletişim', 'iletisim')).toEqual([{ text: '👩‍💻 ', match: false }, { text: 'İletişim', match: true }])
   })
 
   it('leaves a name unmarked when no word of two letters or more is in it', () => {
