@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumen Ledger — bookkeeping for small studios</title>
+<style>
+  :root { --ink: #1c2230; --muted: #5b6475; --brand: #2f6f5e; --paper: #fbfaf7; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 17px/1.6 system-ui, sans-serif; color: var(--ink); background: var(--paper); }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 18px 48px; border-bottom: 1px solid #e6e2d8; }
+  .logo { font-weight: 700; font-size: 20px; letter-spacing: -0.01em; }
+  nav a { color: var(--ink); text-decoration: none; margin-left: 28px; font-size: 15px; }
+  .menu { display: none; border: 1px solid #cfc9bb; background: none; padding: 6px 12px; border-radius: 6px; font: inherit; }
+  .hero { display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; padding: 72px 48px; align-items: center; }
+  .hero h1 { font-size: 52px; line-height: 1.08; margin: 0 0 18px; letter-spacing: -0.02em; }
+  .hero p { color: var(--muted); font-size: 19px; margin: 0 0 28px; }
+  .cta { display: inline-block; background: var(--brand); color: #fff; padding: 14px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; }
+  .ghost { margin-left: 14px; color: var(--brand); font-weight: 600; text-decoration: none; }
+  .card-art { height: 300px; border-radius: 18px; background: linear-gradient(135deg, #d9e8e2, #f3e6cf); padding: 28px; }
+  .card-art .row { display: flex; justify-content: space-between; background: #fff; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; font-size: 15px; }
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 24px 48px 64px; }
+  .feature { background: #fff; border: 1px solid #ebe6da; border-radius: 14px; padding: 24px; }
+  .feature h3 { margin: 0 0 8px; font-size: 19px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 16px; }
+  .pricing { padding: 48px; background: #f1eee6; }
+  .pricing h2, .faq h2 { font-size: 34px; margin: 0 0 24px; }
+  .plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .plan { background: #fff; border-radius: 14px; padding: 24px; border: 1px solid #e0dacb; }
+  .plan.best { border: 2px solid var(--brand); }
+  .price { font-size: 36px; font-weight: 700; }
+  .plan ul { padding-left: 20px; margin: 12px 0 0; color: var(--muted); }
+  .faq { padding: 56px 48px; max-width: 860px; }
+  details { border-bottom: 1px solid #e3ddcf; padding: 14px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  footer { padding: 32px 48px; color: var(--muted); font-size: 14px; border-top: 1px solid #e6e2d8; }
+  @media (max-width: 760px) {
+    header { padding: 14px 18px; }
+    nav { display: none; }
+    .menu { display: inline-block; }
+    .hero { grid-template-columns: 1fr; padding: 40px 18px; gap: 28px; }
+    .hero h1 { font-size: 36px; }
+    .features, .plans { grid-template-columns: 1fr; }
+    .features { padding: 8px 18px 40px; }
+    .pricing, .faq { padding: 36px 18px; }
+    footer { padding: 24px 18px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Lumen Ledger</div>
+  <nav><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">Questions</a></nav>
+  <button class="menu" type="button">Menu</button>
+</header>
+<section class="hero">
+  <div>
+    <h1>Books that close themselves every Friday.</h1>
+    <p>Lumen Ledger reads your invoices and bank feed, sorts every line, and hands your accountant a clean month without a single spreadsheet.</p>
+    <a class="cta" href="#pricing">Start a free month</a><a class="ghost" href="#features">See how it works</a>
+  </div>
+  <div class="card-art">
+    <div class="row"><span>Studio rent</span><b>−1,850.00</b></div>
+    <div class="row"><span>Client: Harbor &amp; Pine</span><b>+6,200.00</b></div>
+    <div class="row"><span>Software</span><b>−212.40</b></div>
+    <div class="row"><span>Balance this week</span><b>4,137.60</b></div>
+  </div>
+</section>
+<section class="features" id="features">
+  <div class="feature"><h3>Sorted on arrival</h3><p>Each transaction lands in the right category the moment your bank reports it.</p></div>
+  <div class="feature"><h3>Receipts by photo</h3><p>Snap a receipt and it is matched to its payment, even weeks later.</p></div>
+  <div class="feature"><h3>Ready for tax season</h3><p>Quarterly summaries your accountant can file without asking a question.</p></div>
+</section>
+<section class="pricing" id="pricing">
+  <h2>Simple pricing</h2>
+  <div class="plans">
+    <div class="plan"><h3>Solo</h3><div class="price">€9</div><ul><li>One bank account</li><li>Monthly summary</li></ul></div>
+    <div class="plan best"><h3>Studio</h3><div class="price">€24</div><ul><li>Five bank accounts</li><li>Receipt matching</li><li>Accountant access</li></ul></div>
+    <div class="plan"><h3>Agency</h3><div class="price">€59</div><ul><li>Unlimited accounts</li><li>Multiple currencies</li></ul></div>
+  </div>
+</section>
+<section class="faq" id="faq">
+  <h2>Questions</h2>
+  <details><summary>Can I keep my current accountant?</summary><p>Yes. Invite them with read access and they see the same books you do.</p></details>
+  <details><summary>Which banks are supported?</summary><p>Most European banks through open banking, and any bank through a CSV export.</p></details>
+  <details><summary>What happens after the free month?</summary><p>You choose a plan or your books stay readable, frozen, for a year.</p></details>
+</section>
+<footer>© 2026 Lumen Ledger. Made for studios of one to fifty.</footer>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Olasılık — kısa notlar</title>
+<style>
+  body { margin: 0; background: #f7f5ef; color: #26231d; font: 17px/1.65 Georgia, serif; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 36px 22px 70px; }
+  h1 { font-size: 38px; margin: 0 0 6px; }
+  .sub { font: 15px system-ui, sans-serif; color: #7a7263; }
+  h2 { font-size: 25px; margin: 34px 0 8px; border-bottom: 2px solid #e2dccd; padding-bottom: 4px; }
+  .box { background: #fff; border: 1px solid #e2dccd; border-radius: 10px; padding: 16px 20px; margin: 16px 0; }
+  .box h3 { margin: 0 0 6px; font: 600 16px system-ui, sans-serif; color: #6b4e16; }
+  .formula { font: italic 19px Georgia, serif; text-align: center; margin: 12px 0; }
+  ol li { margin-bottom: 6px; }
+  .steps .step { display: none; } .steps .step.on { display: block; }
+  .steps button { font: 600 14px system-ui; padding: 6px 12px; border-radius: 6px; border: 1px solid #c9bfa8; background: #fff; cursor: pointer; }
+  details { background: #fff; border: 1px solid #e2dccd; border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
+  summary { font: 600 15px system-ui, sans-serif; cursor: pointer; }
+  @media (max-width: 600px) { h1 { font-size: 29px; } .wrap { padding: 24px 16px 50px; } body { font-size: 16px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Olasılık — kısa notlar</h1>
+  <div class="sub">Vize öncesi tekrar için · 3 konu · 2 soru</div>
+  <h2>1. Koşullu olasılık</h2>
+  <p>Bir olayın, başka bir olayın gerçekleştiği bilindiğinde olasılığı. Örnek uzayı küçültür: artık yalnız <strong>B</strong> içindeki sonuçlara bakarız.</p>
+  <div class="box"><h3>Tanım</h3><p class="formula">P(A | B) = P(A ∩ B) / P(B)</p><p>Burada P(B) sıfırdan büyük olmalıdır.</p></div>
+  <h2>2. Bayes kuralı</h2>
+  <p>Koşulu tersine çevirir: sonuçtan sebebe gideriz. Testlerde en çok karıştırılan nokta, paydadaki toplam olasılıktır.</p>
+  <ol>
+    <li>Önce her sebebin kendi olasılığını yazın.</li>
+    <li>Her sebep altında gözlemin olasılığını çarpın.</li>
+    <li>Bu çarpımların toplamı paydadır.</li>
+  </ol>
+  <div class="box steps">
+    <h3>Adım adım örnek</h3>
+    <p class="step on">Bir hastalık nüfusun yüzde birinde görülüyor; test hastaların yüzde doksanında pozitif çıkıyor.</p>
+    <p class="step">Sağlıklı kişilerin yüzde beşinde de test yanlışlıkla pozitif çıkıyor.</p>
+    <p class="step">Pozitif çıkan birinin gerçekten hasta olma olasılığı yaklaşık yüzde on beştir.</p>
+    <button type="button" class="next">Sonraki adım</button>
+  </div>
+  <h2>3. Bağımsızlık</h2>
+  <p>İki olay bağımsızsa biri diğerinin olasılığını değiştirmez: P(A ∩ B) = P(A) · P(B). Ayrık olmakla karıştırmayın; ayrık iki olay, ikisi de mümkünse, bağımsız olamaz.</p>
+  <details><summary>Soru 1: Zar iki kez atılıyor; toplamın 7 olma olasılığı nedir?</summary><p>36 eşit olasılıklı sonuçtan 6 tanesi 7 verir: 6/36 = 1/6.</p></details>
+  <details><summary>Soru 2: Ayrık iki olay neden bağımsız olamaz?</summary><p>Biri gerçekleşince diğerinin olasılığı sıfıra düşer; bu, olasılığı değiştirmek demektir.</p></details>
+</div>
+<script>
+  var steps = document.querySelectorAll('.steps .step'); var at = 0
+  document.querySelector('.steps .next').addEventListener('click', function () {
+    if (at < steps.length - 1) { at += 1; steps[at].classList.add('on') }
+  })
+</script>
+</body>
+</html>

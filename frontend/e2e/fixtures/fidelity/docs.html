@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tidepool CLI — Getting started</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.6 system-ui, sans-serif; color: #1f2933; display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
+  aside { background: #f5f7fa; border-right: 1px solid #e4e7eb; padding: 24px 18px; }
+  aside b { display: block; font-size: 13px; text-transform: uppercase; color: #616e7c; margin: 18px 0 6px; letter-spacing: 0.05em; }
+  aside a { display: block; color: #323f4b; text-decoration: none; padding: 4px 8px; border-radius: 6px; font-size: 15px; }
+  aside a.on { background: #e1e8f0; font-weight: 600; }
+  main { padding: 36px 56px; max-width: 900px; }
+  h1 { font-size: 36px; margin: 0 0 8px; }
+  .lead { color: #52606d; font-size: 18px; }
+  h2 { font-size: 24px; margin: 36px 0 12px; }
+  pre { background: #1f2933; color: #e4e7eb; padding: 14px 18px; border-radius: 8px; font: 14px/1.5 ui-monospace, monospace; overflow-x: auto; }
+  code { font: 14px ui-monospace, monospace; background: #eef2f6; padding: 1px 5px; border-radius: 4px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid #d9e2ec; }
+  .tabs button { border: 0; background: none; padding: 8px 14px; font: 600 14px system-ui; color: #616e7c; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tabs button.on { color: #1f2933; border-bottom-color: #3e7bfa; }
+  .panel { display: none; } .panel.on { display: block; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e4e7eb; }
+  th { background: #f5f7fa; }
+  .callout { border-left: 4px solid #f7c948; background: #fffbea; padding: 12px 16px; border-radius: 4px; }
+  @media (max-width: 720px) { body { grid-template-columns: 1fr; } aside { display: none; } main { padding: 24px 18px; } h1 { font-size: 28px; } }
+</style>
+</head>
+<body>
+<aside>
+  <b>Start</b>
+  <a class="on" href="#install">Getting started</a><a href="#config">Configuration</a><a href="#commands">Commands</a>
+  <b>Guides</b>
+  <a href="#sync">Syncing a folder</a><a href="#ignore">Ignoring files</a><a href="#ci">Running in CI</a>
+</aside>
+<main>
+  <h1>Getting started</h1>
+  <p class="lead">Tidepool keeps a folder in step with a storage bucket, sending only what changed.</p>
+  <h2 id="install">Install</h2>
+  <div class="tabs" role="tablist">
+    <button class="on" role="tab" data-for="mac">macOS</button><button role="tab" data-for="linux">Linux</button><button role="tab" data-for="win">Windows</button>
+  </div>
+  <div class="panel on" id="mac"><pre>brew install tidepool</pre></div>
+  <div class="panel" id="linux"><pre>curl -fsSL https://example.com/install.sh | sh</pre></div>
+  <div class="panel" id="win"><pre>winget install Tidepool.CLI</pre></div>
+  <h2 id="config">Configuration</h2>
+  <p>Run <code>tidepool init</code> in the folder you want to sync. It writes a <code>tidepool.toml</code> file with these settings:</p>
+  <table>
+    <tr><th>Setting</th><th>Default</th><th>What it does</th></tr>
+    <tr><td><code>bucket</code></td><td>none</td><td>Where files are sent</td></tr>
+    <tr><td><code>interval</code></td><td>30s</td><td>How often the folder is checked</td></tr>
+    <tr><td><code>delete</code></td><td>false</td><td>Remove remote files deleted locally</td></tr>
+  </table>
+  <p class="callout"><strong>Careful:</strong> turning on <code>delete</code> removes files from the bucket for good.</p>
+  <h2 id="commands">Commands</h2>
+  <ul>
+    <li><code>tidepool sync</code> sends what changed once and exits.</li>
+    <li><code>tidepool watch</code> keeps running and syncs on every change.</li>
+    <li><code>tidepool status</code> lists files waiting to be sent.</li>
+  </ul>
+</main>
+<script>
+  document.querySelectorAll('.tabs button').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.tabs button').forEach(function (t) { t.classList.toggle('on', t === tab) })
+      document.querySelectorAll('.panel').forEach(function (p) { p.classList.toggle('on', p.id === tab.dataset.for) })
+    })
+  })
+</script>
+</body>
+</html>

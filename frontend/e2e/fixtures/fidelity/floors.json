@@ -1,0 +1,68 @@
+{
+  "article": {
+    "desktop": {
+      "found": 0.97,
+      "near": 0.89
+    },
+    "phone": {
+      "found": 0.97,
+      "near": 0.86
+    },
+    "blocks": 19
+  },
+  "dashboard": {
+    "desktop": {
+      "found": 0.97,
+      "near": 0.97
+    },
+    "phone": {
+      "found": 0.97,
+      "near": 0.1
+    },
+    "blocks": 69
+  },
+  "docs": {
+    "desktop": {
+      "found": 0.97,
+      "near": 0.52
+    },
+    "phone": {
+      "found": 0.97,
+      "near": 0
+    },
+    "blocks": 61
+  },
+  "landing": {
+    "desktop": {
+      "found": 0.97,
+      "near": 0.75
+    },
+    "phone": {
+      "found": 0.97,
+      "near": 0.26
+    },
+    "blocks": 68
+  },
+  "portfolio": {
+    "desktop": {
+      "found": 0.87,
+      "near": 0.87
+    },
+    "phone": {
+      "found": 0.87,
+      "near": 0.87
+    },
+    "blocks": 20
+  },
+  "study-notes": {
+    "desktop": {
+      "found": 0.97,
+      "near": 0.72
+    },
+    "phone": {
+      "found": 0.97,
+      "near": 0.32
+    },
+    "blocks": 33
+  }
+}

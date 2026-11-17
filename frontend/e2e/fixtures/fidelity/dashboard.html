@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greenhouse monitor</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #eef2ef; color: #18241d; }
+  .top { background: #18241d; color: #e8f0ea; padding: 14px 28px; display: flex; justify-content: space-between; align-items: center; }
+  .top b { font-size: 17px; }
+  .top span { font-size: 13px; opacity: 0.8; }
+  main { padding: 24px 28px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .stat { background: #fff; border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  .stat small { color: #5d6b62; text-transform: uppercase; font-size: 12px; letter-spacing: 0.05em; }
+  .stat div { font-size: 28px; font-weight: 700; margin-top: 4px; }
+  .stat .up { color: #2f7d4f; font-size: 13px; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 16px; }
+  .panel { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  .panel h2 { font-size: 16px; margin: 0 0 12px; }
+  canvas { width: 100%; height: 220px; display: block; }
+  input { width: 100%; padding: 8px 10px; border: 1px solid #c8d3cb; border-radius: 8px; font: inherit; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 7px 4px; border-bottom: 1px solid #edf1ee; text-align: left; }
+  th { font-size: 12px; color: #5d6b62; text-transform: uppercase; }
+  .ok { color: #2f7d4f; font-weight: 600; } .warn { color: #b45309; font-weight: 600; }
+  @media (max-width: 760px) { .stats { grid-template-columns: 1fr 1fr; } .grid { grid-template-columns: 1fr; } main { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="top"><b>Greenhouse monitor</b><span>Updated 2 minutes ago</span></div>
+<main>
+  <div class="stats">
+    <div class="stat"><small>Temperature</small><div>23.4°</div><span class="up">+0.6 since noon</span></div>
+    <div class="stat"><small>Humidity</small><div>68%</div><span class="up">steady</span></div>
+    <div class="stat"><small>Soil moisture</small><div>41%</div><span class="up">watering at 18:00</span></div>
+    <div class="stat"><small>Light</small><div>12.1k lx</div><span class="up">partly cloudy</span></div>
+  </div>
+  <div class="grid">
+    <div class="panel"><h2>Temperature today</h2><canvas id="chart" width="640" height="220"></canvas></div>
+    <div class="panel">
+      <h2>Beds</h2>
+      <input id="filter" placeholder="Filter beds">
+      <table id="beds">
+        <tr><th>Bed</th><th>Crop</th><th>State</th></tr>
+        <tr><td>A1</td><td>Tomatoes</td><td class="ok">Good</td></tr>
+        <tr><td>A2</td><td>Peppers</td><td class="ok">Good</td></tr>
+        <tr><td>B1</td><td>Basil</td><td class="warn">Dry</td></tr>
+        <tr><td>B2</td><td>Lettuce</td><td class="ok">Good</td></tr>
+        <tr><td>C1</td><td>Cucumbers</td><td class="warn">Warm</td></tr>
+      </table>
+    </div>
+  </div>
+</main>
+<script>
+  var c = document.getElementById('chart'); var g = c.getContext('2d')
+  var pts = [17, 17.5, 18.2, 19.8, 21.4, 22.9, 23.8, 24.1, 23.4, 22.2, 20.6, 19.1]
+  g.strokeStyle = '#2f7d4f'; g.lineWidth = 3; g.beginPath()
+  pts.forEach(function (v, i) { var x = 20 + i * 54, y = 200 - (v - 15) * 18; if (i) g.lineTo(x, y); else g.moveTo(x, y) })
+  g.stroke()
+  document.getElementById('filter').addEventListener('input', function (e) {
+    var q = e.target.value.toLowerCase()
+    document.querySelectorAll('#beds tr').forEach(function (row, i) { if (i) row.style.display = row.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none' })
+  })
+</script>
+</body>
+</html>
