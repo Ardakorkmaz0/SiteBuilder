@@ -39,11 +39,18 @@ test.skip(({ browserName }) => browserName !== 'chromium', 'the bench runs in Ch
 // Every word a reader can see, with its box on the page, and every picture.
 // Words are compared in lower case: a page that shows "uppercase" by CSS is
 // read with its words as written, and the converted one may carry them
-// already in capitals. A picture is compared by its address decoded: the
-// same data: address can be written with its spaces escaped or not.
+// already in capitals. A picture written into the page (a data: address)
+// is compared by what it holds, base64-encoded or not.
 function readDrawn() {
   const address = (src) => {
-    try { return decodeURIComponent(src).replace(/\s+/g, '') } catch { return src.replace(/\s+/g, '') }
+    const data = /^data:([^;,]*)((?:;[^;,]*)*),([\s\S]*)$/i.exec(src)
+    if (!data) return src
+    try {
+      const bytes = /;base64/i.test(data[2]) ? atob(data[3]) : unescape(encodeURIComponent(decodeURIComponent(data[3])))
+      return `data:${data[1].toLowerCase()},${bytes.replace(/\s+/g, '')}`
+    } catch {
+      return src
+    }
   }
   const words = []
   const images = []
@@ -137,6 +144,7 @@ for (const entry of pages) {
     for (const width of Object.keys(WIDTHS)) {
       expect.soft(scores[width].found, `${entry.name} at ${width}: share of words found`).toBeGreaterThanOrEqual(floor[width].found)
       expect.soft(scores[width].near, `${entry.name} at ${width}: share of words in place`).toBeGreaterThanOrEqual(floor[width].near)
+      expect.soft(scores[width].imagesNear, `${entry.name} at ${width}: share of pictures in place`).toBeGreaterThanOrEqual(floor[width].images)
     }
     expect.soft(converted.blocks, `${entry.name}: blocks`).toBeLessThanOrEqual(floor.blocks)
   })

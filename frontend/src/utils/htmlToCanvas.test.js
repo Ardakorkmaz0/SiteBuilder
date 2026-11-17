@@ -2,6 +2,7 @@
 // written by hand, the way htmlPageMeasure.js reports them from a browser.
 import { describe, expect, it } from 'vitest'
 import { alphaOf, canvasFromMeasured, canvasPageFromMeasured, hexOf } from './htmlToCanvas.js'
+import { sanitizeImageSrc } from './sanitize.js'
 
 const CLEAR = 'rgba(0, 0, 0, 0)'
 const BASE = {
@@ -946,5 +947,44 @@ describe('a page read at a phone\'s width too', () => {
     expect(result.mobileWidth).toBeUndefined()
     expect(result.components[0].mobileLayout).toBeUndefined()
     expect(result.components[0].children[0].mobileLayout).toBeUndefined()
+  })
+})
+
+// AI-written pages often write an SVG straight into the address:
+// "data:image/svg+xml;utf8,<svg …>". The published page (sanitizeImageSrc)
+// and the server take a data: picture only base64-encoded, so such a
+// picture used to vanish from the published page.
+describe('a picture written into the page as a data: address', () => {
+  const RECT = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='#c86b3c'/></svg>"
+  const RECT_64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCA0IDQnPjxyZWN0IHdpZHRoPSc0JyBoZWlnaHQ9JzQnIGZpbGw9JyNjODZiM2MnLz48L3N2Zz4='
+  const picture = (src) => node('img', [40, 40, 200, 120], { kind: 'image', src, alt: 'A square' })
+  const blocksOf = (kids) => {
+    const all = (list) => list.flatMap((c) => [c, ...all(c.children || [])])
+    return all(convert(page([node('section', [0, 0, 1200, 400], { kids })])).components)
+  }
+
+  it('is carried base64-encoded, so the published page keeps it', () => {
+    const [escaped] = blocksOf([picture(`data:image/svg+xml;utf8,${encodeURIComponent(RECT)}`)]).filter((c) => c.type === 'image')
+    expect(escaped.props.src).toBe(RECT_64)
+    expect(sanitizeImageSrc(escaped.props.src)).toBe(RECT_64)
+
+    const [plain] = blocksOf([picture(`data:image/svg+xml,${RECT.replace('#', '%23')}`)]).filter((c) => c.type === 'image')
+    expect(plain.props.src).toBe(RECT_64)
+  })
+
+  it('keeps letters beyond ASCII and leaves an address that is already base64 alone', () => {
+    const [letters] = blocksOf([picture(`data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"><text>ş</text></svg>')}`)]).filter((c) => c.type === 'image')
+    expect(letters.props.src).toBe('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjx0ZXh0PsWfPC90ZXh0Pjwvc3ZnPg==')
+
+    const [kept] = blocksOf([picture(RECT_64)]).filter((c) => c.type === 'image')
+    expect(kept.props.src).toBe(RECT_64)
+  })
+
+  it('is carried base64-encoded behind a box and inside a line of text too', () => {
+    const behind = blocksOf([node('div', [40, 40, 300, 200], { kids: [text('p', [60, 60, 200, 24], 'Over the picture')] }, { backgroundImage: `url("data:image/svg+xml;utf8,${encodeURIComponent(RECT)}")` })])
+    expect(behind.filter((c) => c.type === 'image').map((c) => c.props.src)).toEqual([RECT_64])
+
+    const inline = blocksOf([text('p', [40, 40, 400, 24], 'A square here', {}, { runs: [{ t: 'A square ' }, { img: `data:image/svg+xml;utf8,${encodeURIComponent(RECT)}`, w: 16, h: 16, va: 0, alt: '' }, { t: ' here' }] })])
+    expect(inline.find((c) => c.type === 'text').props.rich[1].img).toBe(RECT_64)
   })
 })

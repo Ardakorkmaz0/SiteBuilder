@@ -49,7 +49,23 @@ export function hexOf(color, fallback = '#ffffff') {
 }
 
 const gradientOf = (image) => (/gradient\(/i.test(image || '') && !/url\(/i.test(image || '') ? image : '')
-const pictureOf = (image) => (String(image || '').match(/url\((['"]?)(.*?)\1\)/i) || [])[2] || ''
+// A picture written into the page itself as a data: address, in the form
+// the published page keeps: sanitizeImageSrc (and the server) take such a
+// picture only base64-encoded, and pages, AI-written ones above all, often
+// write an SVG as "data:image/svg+xml;utf8,<svg …>". Any other address is
+// returned as it is.
+function base64Picture(src) {
+  if (typeof src !== 'string') return src
+  const match = /^data:(image\/[a-z0-9.+-]+)((?:;[^;,]*)*),([\s\S]*)$/i.exec(src.trim())
+  if (!match || /;base64/i.test(match[2])) return src
+  let text = match[3]
+  try { text = decodeURIComponent(text) } catch { /* not escaped: as written */ }
+  let binary = ''
+  for (const byte of new TextEncoder().encode(text)) binary += String.fromCharCode(byte)
+  return `data:${match[1].toLowerCase()};base64,${btoa(binary)}`
+}
+
+const pictureOf = (image) => base64Picture((String(image || '').match(/url\((['"]?)(.*?)\1\)/i) || [])[2] || '')
 
 const SIDES = ['Top', 'Right', 'Bottom', 'Left']
 const sideOf = (s, side) => ({
@@ -402,7 +418,7 @@ function leaf(n, origin, ctx, href) {
     if (!n.src) return []
     const radius = radiusOf(n.s)
     const fit = n.tag === 'svg' ? 'contain' : n.s.objectFit || 'fill'
-    return [block(ctx, 'image', { src: n.src, alt: n.alt || '', ...link }, { objectFit: fit, ...(radius ? { borderRadius: radius } : {}) }, place(n.rect, origin))]
+    return [block(ctx, 'image', { src: base64Picture(n.src), alt: n.alt || '', ...link }, { objectFit: fit, ...(radius ? { borderRadius: radius } : {}) }, place(n.rect, origin))]
   }
   if (n.kind === 'line') {
     const thick = Math.max(1, Math.min(Math.round(n.rect.h), Math.round(px(n.s.borderTopWidth)) || 1))
@@ -459,7 +475,9 @@ function leaf(n, origin, ctx, href) {
   // A cell of a table has a line on some of its sides only.
   under.push(...edgeLines(n, ctx, origin))
   // Formatting inside the text: runs beside the plain text (richText.js).
-  const rich = Array.isArray(n.runs) && n.runs.length ? { rich: n.runs } : {}
+  const rich = Array.isArray(n.runs) && n.runs.length
+    ? { rich: n.runs.map((run) => (typeof run?.img === 'string' ? { ...run, img: base64Picture(run.img) } : run)) }
+    : {}
   if (HEADINGS[n.tag]) {
     return [...under, block(ctx, 'heading', { text: n.text, level: HEADINGS[n.tag], ...rich, ...(target ? { href: target } : {}) }, styles, layout)]
   }
