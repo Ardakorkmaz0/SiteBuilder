@@ -66,6 +66,36 @@ describe('EditorTour', () => {
     expect(screen.getByText('1/2')).toBeInTheDocument()
   })
 
+  // Its steps arrive from a timer, so React puts the card on the page in one
+  // task and runs its passive effects in a later one. An arrow pressed in
+  // between, with the card already showing, did nothing (and made the test
+  // above fail now and then in CI).
+  it('takes an arrow key from the moment its card is on the page', async () => {
+    renderTour()
+    const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT
+    globalThis.IS_REACT_ACT_ENVIRONMENT = false
+    try {
+      await new Promise((resolve) => {
+        const check = () => {
+          if (!document.body.textContent.includes('1/2')) return false
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+          return true
+        }
+        if (check()) return resolve()
+        const observer = new MutationObserver(() => {
+          if (!check()) return
+          observer.disconnect()
+          resolve()
+        })
+        observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+      })
+    } finally {
+      globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment
+    }
+
+    expect(await screen.findByText('2/2')).toBeInTheDocument()
+  })
+
   it.each([
     ['the ×', () => fireEvent.click(screen.getByRole('button', { name: 'Close' }))],
     ['Skip', () => fireEvent.click(screen.getByRole('button', { name: 'Skip' }))],

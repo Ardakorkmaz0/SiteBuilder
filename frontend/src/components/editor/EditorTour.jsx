@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { placeCard, usableSteps } from '../../utils/tourPlacement.js'
 import { EDITOR_TOUR_STEPS, markTourSeen } from '../../utils/editorTour.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
@@ -75,7 +75,10 @@ export default function EditorTour({ open, steps = EDITOR_TOUR_STEPS, onClose })
     }
   }, [open, step])
 
-  useEffect(() => {
+  // In the commit that puts the card on the page, not in a passive effect
+  // after it: the steps arrive from a timer, and an arrow pressed in between
+  // did nothing (as Esc, in useEscapeToClose).
+  useLayoutEffect(() => {
     if (!open || !step) return undefined
     const onKey = (event) => {
       if (event.key === 'ArrowRight') move(1)
