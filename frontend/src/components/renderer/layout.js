@@ -76,7 +76,16 @@ export function pinnedLayoutStyle(component, baseStyle = {}, railInset = null) {
     pinned.top = numericProp(props.pinOffsetY, 0)
     pinned.bottom = 0
     pinned.height = 'auto'
-    if (fullHeight) pinned.overflowY = 'auto'
+    if (fullHeight) {
+      pinned.overflowY = 'auto'
+      // It scrolls without a scrollbar that takes room, as in Edit
+      // (FreeCanvasItem). Where scrollbars take room (Brave, Firefox on
+      // Linux) the bar narrowed the box, the box shrank its drawing to fit,
+      // the shorter drawing no longer needed the bar, and the menu flipped
+      // between two sizes on every frame, its links unclickable.
+      pinned.overflowX = 'hidden'
+      pinned.scrollbarWidth = 'none'
+    }
   }
 
   // A fixed full-width HORIZONTAL navbar is Bootstrap's fixed-top: glued to
