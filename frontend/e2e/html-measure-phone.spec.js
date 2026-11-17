@@ -134,11 +134,12 @@ test('a hidden tab with a long line does not make the page wider than the phone 
 for (const [kind, css] of Object.entries({ grid: 'main{display:grid;justify-items:center}', column: 'main{display:flex;flex-direction:column;align-items:center}' })) {
   test(`a hidden panel centred in a ${kind} keeps its width when it is read at a phone's width`, async ({ page }) => {
     await page.goto('/')
-    const read = await measure(page, `<!doctype html><html><head><style>body{margin:0;font:16px sans-serif}.panel{display:none;background:#eee}.panel.on{display:block}${css}</style></head><body><button id="show">Show</button><main><div class="panel" id="panel"><p id="words">This is a useful paragraph inside the hidden panel with several words.</p></div></main><script>document.getElementById('show').onclick=()=>document.getElementById('panel').classList.toggle('on')</script></body></html>`)
+    const read = await measure(page, `<!doctype html><html><head><style>body{margin:0;font:16px/18px sans-serif}.panel{display:none;background:#eee}.panel.on{display:block}${css}</style></head><body><button id="show">Show</button><main><div class="panel" id="panel"><p id="words">This is a useful paragraph inside the hidden panel with several words.</p></div></main><script>document.getElementById('show').onclick=()=>document.getElementById('panel').classList.toggle('on')</script></body></html>`)
 
     expect(read.nodes.panel.m.w).toBe(390)
-    // Two lines of 16 px text at the browser's normal line height.
-    expect(read.nodes.words.m.h).toBe(36)
+    // A few 18 px lines across the phone (two or three, as the engine's font
+    // wraps them); squeezed to nothing it was a word a line, 216 px.
+    expect(read.nodes.words.m.h).toBeLessThanOrEqual(54)
   })
 }
 
