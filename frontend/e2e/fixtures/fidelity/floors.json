@@ -41,7 +41,7 @@
   "landing": {
     "desktop": {
       "found": 0.97,
-      "near": 0.75,
+      "near": 0.8,
       "images": 1
     },
     "phone": {
@@ -49,7 +49,7 @@
       "near": 0.26,
       "images": 1
     },
-    "blocks": 68
+    "blocks": 71
   },
   "portfolio": {
     "desktop": {
@@ -67,7 +67,7 @@
   "study-notes": {
     "desktop": {
       "found": 0.97,
-      "near": 0.72,
+      "near": 0.81,
       "images": 1
     },
     "phone": {
@@ -75,6 +75,6 @@
       "near": 0.32,
       "images": 1
     },
-    "blocks": 33
+    "blocks": 36
   }
 }

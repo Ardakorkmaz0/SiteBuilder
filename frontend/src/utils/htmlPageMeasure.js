@@ -500,9 +500,44 @@ function readPage(token, frameWindow) {
     return `data:image/svg+xml;base64,${btoa(binary)}`
   }
 
+  // The <details> the page has closed as it opens (reveal opens them to read).
+  const closedAtLoad = new WeakSet()
+  // Where the first word of an element starts on the line.
+  const wordsStartX = (el) => {
+    const walker = doc.createTreeWalker(el, 4)
+    for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+      const at = text.data.search(/\S/)
+      if (at < 0) continue
+      const range = doc.createRange()
+      range.setStart(text, at)
+      range.setEnd(text, at + 1)
+      const box = range.getClientRects()[0]
+      if (box) return box.left + win.scrollX
+    }
+    return null
+  }
   // A list item's marker (bullet, number or CSS counter) when the item holds
   // rich formatting or children and so cannot be part of a plain `list` block.
+  // A <summary>'s disclosure triangle too: it sits inside the box, before the
+  // words (`inside` is how far it pushes them).
   const itemMarkerOf = (el, node, cs, firstY) => {
+    if (el.tagName === 'SUMMARY') {
+      if (cs.display !== 'list-item' || !/^disclosure-/.test(cs.listStyleType)) return null
+      const left = node.rect.x + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.paddingLeft) || 0)
+      const start = wordsStartX(el)
+      if (start === null || start - left < 4) return null
+      const fs = parseFloat(cs.fontSize) || 16
+      const lh = Math.min(node.rect.h || 24, parseFloat(cs.lineHeight) || fs * 1.4)
+      const details = el.parentElement?.tagName === 'DETAILS' ? el.parentElement : null
+      return {
+        tag: 'span',
+        kind: 'text',
+        text: details && !closedAtLoad.has(details) && details.open ? '▼' : '▶',
+        rect: { x: left, y: firstY, w: start - left, h: lh },
+        s: { ...node.s, backgroundColor: 'rgba(0, 0, 0, 0)', backgroundImage: 'none', boxShadow: 'none', paddingTop: '0px', paddingRight: '0px', paddingBottom: '0px', paddingLeft: '0px', fontSize: `${Math.round(fs * 0.7 * 100) / 100}px`, textAlign: 'left' },
+        inside: start - left,
+      }
+    }
     if (el.tagName !== 'LI') return null
     const cleanStyle = (base) => ({
       ...base,
@@ -565,16 +600,20 @@ function readPage(token, frameWindow) {
   }
 
   const withItemMarker = (el, node, cs, measured) => {
-    if (!measured || el.tagName !== 'LI') return measured
+    if (!measured || (el.tagName !== 'LI' && el.tagName !== 'SUMMARY')) return measured
     const firstY = measured.ink?.y ?? measured.kids?.[0]?.ink?.y ?? measured.kids?.[0]?.rect?.y ?? node.rect.y
     const marker = itemMarkerOf(el, node, cs, firstY)
     if (!marker) return measured
+    const inside = marker.inside || 0
+    delete marker.inside
     if (measured.kind === 'text') {
       const inner = { ...measured }
       delete inner.id
       delete inner.keys
       delete inner.room
       delete inner.actions
+      // The words start after a marker drawn inside the box.
+      if (inside) inner.s = { ...inner.s, paddingLeft: `${(parseFloat(inner.s.paddingLeft) || 0) + inside}px` }
       return {
         ...node,
         s: {
@@ -926,7 +965,9 @@ function readPage(token, frameWindow) {
       }
     }
     for (const el of doc.body.querySelectorAll('details:not([open])')) {
-      if (!holdsState(el)) el.open = true
+      if (holdsState(el)) continue
+      closedAtLoad.add(el)
+      el.open = true
     }
     for (const el of doc.body.querySelectorAll('[hidden]')) {
       if (holdsState(el)) continue
