@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useDraggable } from '@dnd-kit/core'
 import { DRAG_MIME } from '../../utils/htmlPlacement.js'
@@ -322,10 +322,14 @@ function PaletteFlyout({ item, anchor, onPick, onArm, onEnter, onLeave, onClose,
     addedTimer.current = window.setTimeout(() => setAdded(null), 900)
   }
   const addRef = useRef(add)
-  useEffect(() => { addRef.current = add })
+  // Both kept in the commit that puts the flyout on the page, not in a
+  // passive effect after it: the flyout opens from the hover timer, so its
+  // passive effects run in a later task, and a number pressed in between,
+  // with the variants already on screen, added nothing.
+  useLayoutEffect(() => { addRef.current = add })
   useEffect(() => () => window.clearTimeout(addedTimer.current), [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onKey = (event) => {
       if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return
       const target = event.target

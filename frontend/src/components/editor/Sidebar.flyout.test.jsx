@@ -59,6 +59,35 @@ describe('the quick-add flyout of a palette row', () => {
     expect(within(flyout()).getByText('Added')).toBeInTheDocument()
   })
 
+  // The flyout opens from the hover timer: React puts it on the page in one
+  // task and runs its passive effects in a later one. A number pressed in
+  // between, with the four variants already on screen, added nothing (and
+  // made EditorPage.quickAdd.test.jsx fail now and then in CI).
+  it('takes a number key from the moment its variants are on the page', async () => {
+    vi.useRealTimers()
+    const onArm = vi.fn()
+    renderSidebar({ onArmPlacement: onArm })
+    const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT
+    globalThis.IS_REACT_ACT_ENVIRONMENT = false
+    try {
+      await new Promise((resolve) => {
+        const observer = new MutationObserver(() => {
+          if (!flyout()) return
+          observer.disconnect()
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true, cancelable: true }))
+          resolve()
+        })
+        observer.observe(document.body, { childList: true, subtree: true })
+        hover(navbarRow())
+      })
+    } finally {
+      globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment
+    }
+
+    expect(onArm).toHaveBeenCalledTimes(1)
+    expect(onArm.mock.calls[0][0]).toMatchObject({ type: 'navbar' })
+  })
+
   it('leaves the number keys alone while a field is being typed in', () => {
     const onArm = vi.fn()
     renderSidebar({ onArmPlacement: onArm })
