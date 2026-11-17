@@ -417,6 +417,9 @@ function containerPhoneCss(components) {
           const l = ch.mobileLayout
           const tall = `${growsInParent(ch) ? 'min-height' : 'height'}:${Math.round(l.h || 80)}px !important`
           css += `  .cc-${esc(ch.id)} { left:${Math.round(l.x || 0)}px !important; top:${Math.round(l.y || 0)}px !important; width:${Math.round(l.w || 200)}px !important; ${tall}; }\n`
+          // An embed's frame is written at its desktop height; it takes the
+          // phone box's, as a top-level one does.
+          if (ch.type === 'html') css += `  .cc-${esc(ch.id)} > iframe { --pwb-embed-height:${Math.round(l.h || 80)}px; }\n`
         }
       }
       walk(c.children)
@@ -424,6 +427,18 @@ function containerPhoneCss(components) {
   }
   walk(components)
   return css
+}
+
+// A page laid out in flow draws every container from its desktop design,
+// scaled (containerChildKey): its containers' phone layouts are not written.
+function withoutFlowPhoneLayouts(page) {
+  if (!page?.flowMode) return page
+  const strip = (list) => (list || []).map((c) => {
+    if (!Array.isArray(c?.children)) return c
+    const props = c.type === 'container' && c.props?.phoneLayout ? { ...c.props, phoneLayout: false } : c.props
+    return { ...c, props, children: strip(c.children) }
+  })
+  return { ...page, components: strip(page.components) }
 }
 
 function nestedWithVisibility(components) {
@@ -1016,7 +1031,7 @@ export function schemaToSingleHtml(schema, title = 'My Site', options = {}) {
   // page's theme colours are written as variables and the head says which
   // palette is on before anything paints.
   const mode = options.colorMode || null
-  const page = withColorModePage((schema?.pages || [])[0] || {}, mode)
+  const page = withoutFlowPhoneLayouts(withColorModePage((schema?.pages || [])[0] || {}, mode))
   const html = page.flowMode
     ? schemaToFlowHtml(page, title, schema, options)
     : schemaToScaledHtml(page, title, schema, options)
@@ -1153,7 +1168,7 @@ export function schemaToFiles(input, { documents = {} } = {}) {
   // A site with a light/dark switch: every page, and the stylesheet they
   // share, carry both palettes, exactly as the published site does.
   const modes = (input?.pages || []).map((page) => colorModeFor(input, page))
-  const schema = { ...input, pages: (input?.pages || []).map((page, index) => withColorModePage(page, modes[index])) }
+  const schema = { ...input, pages: (input?.pages || []).map((page, index) => withoutFlowPhoneLayouts(withColorModePage(page, modes[index]))) }
   const pages = schema.pages
   const files = []
   const fileNames = pageFileNameList(pages)
