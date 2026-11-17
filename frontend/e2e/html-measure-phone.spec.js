@@ -126,3 +126,39 @@ test('a hidden tab with a long line does not make the page wider than the phone 
   expect(p2.m.hidden).toBeUndefined()
   expect(p2.m.w).toBeLessThanOrEqual(read.phone.width)
 })
+
+// A hidden panel its parent centres (a grid's justify-items, a column's
+// align-items) is as wide as what it holds: held to the width it is given
+// while it was read at a phone's width, it came out 0 px wide, its words
+// one under another.
+for (const [kind, css] of Object.entries({ grid: 'main{display:grid;justify-items:center}', column: 'main{display:flex;flex-direction:column;align-items:center}' })) {
+  test(`a hidden panel centred in a ${kind} keeps its width when it is read at a phone's width`, async ({ page }) => {
+    await page.goto('/')
+    const read = await measure(page, `<!doctype html><html><head><style>body{margin:0;font:16px sans-serif}.panel{display:none;background:#eee}.panel.on{display:block}${css}</style></head><body><button id="show">Show</button><main><div class="panel" id="panel"><p id="words">This is a useful paragraph inside the hidden panel with several words.</p></div></main><script>document.getElementById('show').onclick=()=>document.getElementById('panel').classList.toggle('on')</script></body></html>`)
+
+    expect(read.nodes.panel.m.w).toBe(390)
+    // Two lines of 16 px text at the browser's normal line height.
+    expect(read.nodes.words.m.h).toBe(36)
+  })
+}
+
+// A <summary>'s disclosure triangle is carried as a block of its own: ▶ for
+// a <details> the page has closed as it opens, ▼ for one it has open, though
+// the reader opens them all to read them. The page names no character set:
+// its letters, and the triangles, were read as Windows-1252.
+test('a summary\'s triangle points the way the page shows it as it opens, on a page that names no character set', async ({ page }) => {
+  await page.goto('/')
+  const words = await page.evaluate(async () => {
+    const { measureHtmlPage } = await import('/src/utils/htmlPageMeasure.js')
+    const read = await measureHtmlPage('<!doctype html><html><body style="font:16px sans-serif"><details id="shut"><summary>Kapalı soru</summary><p>Gizli cevap</p></details><details id="wide" open><summary>Açık soru</summary><p>Görünen cevap</p></details></body></html>', { width: 1180, timeout: 60000 })
+    const out = []
+    const walk = (node) => {
+      if (node.kind === 'text') out.push(node.text)
+      for (const kid of node.kids || []) walk(kid)
+    }
+    walk(read.root)
+    return out
+  })
+
+  expect(words).toEqual(['▶', 'Kapalı soru', 'Gizli cevap', '▼', 'Açık soru', 'Görünen cevap'])
+})

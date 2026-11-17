@@ -1551,8 +1551,15 @@ function readPage(token, frameWindow) {
         // grid cell it fills, a column): one sized by what it holds (in a
         // row, floating, placed) would shrink to nothing.
         if (!/^(block|list-item|flow-root)$/.test(cs.display)) continue
-        if (/flex/.test(around.display) && !/column/.test(around.flexDirection)) continue
-        if (/grid/.test(around.display) && !/^(normal|stretch|auto)$/.test(cs.justifySelf)) continue
+        // Its own alignment, or else what its parent gives every child: only
+        // a stretched one takes the width; a centred one is as wide as what
+        // it holds.
+        const own = (self, items) => (/^(auto|normal)$/.test(self) ? items : self)
+        if (/flex/.test(around.display)) {
+          if (!/column/.test(around.flexDirection)) continue
+          if (!/^(normal|stretch)$/.test(own(cs.alignSelf, around.alignItems))) continue
+        }
+        if (/grid/.test(around.display) && !/^(normal|stretch|legacy)$/.test(own(cs.justifySelf, around.justifyItems))) continue
         if (cs.float !== 'none' || cs.position === 'absolute' || cs.position === 'fixed') continue
         el.style.setProperty('contain', 'inline-size', 'important')
       }
@@ -1713,7 +1720,10 @@ function readWithScripts(html, { width, height, timeout, onProgress }) {
       // Given an address of its own, not written in as srcdoc: a sandboxed
       // srcdoc frame goes blank when a "#chapter" link in it is followed,
       // and the reader follows those to bring each chapter into view.
-      address = URL.createObjectURL(new Blob([withReader(html, token)], { type: 'text/html' }))
+      // The blob holds the page as UTF-8: said so, a page that names no
+      // character set of its own is not read as Windows-1252 (its Turkish
+      // letters, and the reader's own ▶ and •, turned into mojibake).
+      address = URL.createObjectURL(new Blob([withReader(html, token)], { type: 'text/html;charset=utf-8' }))
       frame.src = address
       document.body.appendChild(frame)
     } catch {
