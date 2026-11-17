@@ -150,7 +150,8 @@ describe('editorStore regressions', () => {
     // still 300 px down): the text is stacked at the top, 16 px in, and the
     // container ends 16 px below it.
     expect(mobile.cont_1.w).toBe(358)
-    expect(mobile.cont_1.h).toBeLessThan(120)
+    // 16 above + one 32 px line of 'Low' + 16 below.
+    expect(mobile.cont_1.h).toBe(64)
   })
 
   it('does not record phantom undo history entries on no-op actions', () => {

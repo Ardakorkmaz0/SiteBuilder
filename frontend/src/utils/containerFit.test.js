@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { containerChildKey, containerDesignWidth, fitContainerCanvas, scaledPhoneLayout } from './containerFit.js'
+import { absoluteChildrenHeight } from '../components/renderer/layout.js'
 
 const container = (extra = {}) => ({
   type: 'container', layout: { w: 500 }, props: {},
@@ -101,5 +102,19 @@ describe('a free container with phone layouts', () => {
 
   it('places a block put in it where the scaled desktop drawing showed it', () => {
     expect(scaledPhoneLayout(card(), { layout: { x: 100, y: 50, w: 150, h: 40 } })).toEqual({ x: 60, y: 30, w: 90, h: 24 })
+  })
+})
+
+describe('how tall a container\'s blocks reach', () => {
+  const kids = [
+    { layout: { x: 0, y: 0, w: 100, h: 300 }, mobileLayout: { x: 0, y: 10, w: 100, h: 50 } },
+    { layout: { x: 0, y: 0, w: 100, h: 40 }, mobileLayout: { x: 0, y: 400, w: 100, h: 50 }, hiddenMobile: true },
+  ]
+
+  it('reads their phone layout, without what the phone hides, when they stand there', () => {
+    // 10 + 50 + 16 below.
+    expect(absoluteChildrenHeight(kids, 20, 'mobileLayout')).toBe(76)
+    // 300 + 16 below.
+    expect(absoluteChildrenHeight(kids, 20)).toBe(316)
   })
 })

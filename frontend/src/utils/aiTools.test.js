@@ -840,3 +840,21 @@ describe('alignComponent where there is nothing to align in', () => {
     expect(find('kid').layout.x).toBe(0)
   })
 })
+
+// The assistant is told where the block ended up in the space it is drawn
+// in: on the phone, a container's phone layout when it has one.
+describe('alignComponent inside a container laid out for the phone', () => {
+  it('reports the block\'s phone coordinates', () => {
+    const state = () => useEditorStore.getState()
+    state().loadSchema({ pages: [{ id: 'home', name: 'Home', mobileWidth: 390, mobileManual: true, components: [{
+      id: 'card', type: 'container', props: { phoneLayout: true }, styles: {},
+      layout: { x: 0, y: 0, w: 300, h: 220 }, mobileLayout: { x: 16, y: 16, w: 300, h: 240 },
+      children: [{ id: 'child', type: 'text', props: { text: 'Child' }, styles: {}, layout: { x: 18, y: 20, w: 260, h: 40 }, mobileLayout: { x: 10, y: 10, w: 100, h: 80 } }],
+    }] }] })
+    state().setViewport('mobile')
+
+    // 300 wide on the phone; the block, 100 wide: its left edge at 200.
+    expect(executeTool('alignComponent', { id: 'child', mode: 'right' })).toEqual({ ok: true, x: 200, y: 10 })
+    expect(state().schema.pages[0].components[0].children[0].mobileLayout).toEqual({ x: 200, y: 10, w: 100, h: 80 })
+  })
+})

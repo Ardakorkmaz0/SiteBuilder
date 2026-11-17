@@ -95,3 +95,48 @@ describe('a block in a container on the phone', () => {
     expect(added.mobileLayout).toEqual({ x: 60, y: 30, w: 60, h: 24 })
   })
 })
+
+// Found in ChatGPT's review of 2a9de1b..4378572 (docs, 2026-11-17).
+describe('a container laid out for the phone, in the editor\'s other paths', () => {
+  const legacy = (id, layout, extra = {}) => ({ id, type: 'text', props: { text: id }, styles: {}, layout, mobileLayout: { x: 0, y: 0, w: 200, h: 80 }, ...extra })
+  function loadLegacy({ flowMode = false, hidden = false } = {}) {
+    state().loadSchema({ pages: [{
+      id: 'home', name: 'Home', canvasWidth: 1000, mobileWidth: 390, mobileManual: true, flowMode,
+      components: [{
+        id: 'card', type: 'container', props: {}, styles: {},
+        layout: { x: 0, y: 0, w: 300, h: 220 }, mobileLayout: { x: 16, y: 16, w: 180, h: 240 },
+        children: [
+          legacy('visible', { x: 18, y: 20, w: 260, h: 40 }),
+          ...(hidden ? [legacy('hidden', { x: 100, y: 100, w: 100, h: 40 }, { hiddenMobile: true })] : []),
+        ],
+      }, legacy('outside', { x: 500, y: 500, w: 100, h: 40 }, { mobileLayout: { x: 16, y: 400, w: 100, h: 40 } })],
+    }] })
+    state().setViewport('mobile')
+  }
+
+  it('aligns a sole block against the container\'s phone width', () => {
+    loadLegacy()
+    state().alignComponent('visible', 'right')
+    // 180 wide on the phone; the block, 156 wide after 180 / 300 of 260.
+    expect(block('visible').mobileLayout).toEqual({ x: 24, y: 12, w: 156, h: 24 })
+    expect(block('visible').layout).toEqual({ x: 18, y: 20, w: 260, h: 40 })
+  })
+
+  it('places a block added on the phone at the point it was dropped, not that point scaled again', () => {
+    loadLegacy()
+    state().addComponent('text', 20, 30, 'card', null, { w: 100, h: 40 })
+    expect(card().children.at(-1).mobileLayout).toEqual({ x: 20, y: 30, w: 100, h: 40 })
+  })
+
+  it('drops a block into the shared drawing a flow page draws', () => {
+    loadLegacy({ flowMode: true })
+    expect(state().moveComponentInto('outside', 'card', { x: 12, y: 100 })).toBe(true)
+    expect(block('outside').layout).toMatchObject({ x: 12, y: 100 })
+  })
+
+  it('gives a block hidden on the phone its scaled place too, for when it is shown again', () => {
+    loadLegacy({ hidden: true })
+    state().setVisibility('hidden', { hiddenMobile: false })
+    expect(block('hidden').mobileLayout).toEqual({ x: 60, y: 60, w: 60, h: 24 })
+  })
+})

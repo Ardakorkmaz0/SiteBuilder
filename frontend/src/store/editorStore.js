@@ -461,11 +461,6 @@ function addChildToTree(components, parentId, child, { placed = false } = {}) {
             : { ...l, x: 12, y: bottom ? bottom + 12 : 12 },
         }
       }
-      // A block added to a container with phone layouts gets the phone place
-      // its desktop one has in the container's scaled drawing.
-      if (!placed && containerChildKey(c, 'mobile') === 'mobileLayout') {
-        tagged = { ...tagged, mobileLayout: scaledPhoneLayout(c, tagged) }
-      }
       return { ...c, children: [...(c.children || []), tagged] }
     }
     if (hasKids(c)) return { ...c, children: addChildToTree(c.children, parentId, child, { placed }) }
@@ -626,6 +621,13 @@ function computeAlignParentBox(page, viewport, id, components) {
   }
   const parent = findParentInTree(components, id)
   if (!parent) return null
+  // The space the block is drawn in: a container's phone box when it lays
+  // its blocks out for the phone (containerChildKey).
+  if (parent.type === 'container') {
+    const key = containerChildKey(parent, viewport, page.flowMode)
+    const own = (key === 'mobileLayout' ? parent.mobileLayout : null) || parent.layout
+    return { w: containerDesignWidth(parent, key) || 600, h: Math.round(own?.h || 0) || 400 }
+  }
   const parentLayout = viewport === 'mobile' && parent.type === 'region'
     ? parent.mobileLayout || parent.layout
     : parent.layout
@@ -1154,7 +1156,9 @@ function withContainerPhoneLayouts(components) {
   return (components || []).map((c) => {
     if (!Array.isArray(c?.children) || c.type === 'tabs') return c
     if (!isFreeContainer(c) || c.props?.phoneLayout === true) return { ...c, children: withContainerPhoneLayouts(c.children) }
-    const children = c.children.map((child) => (child.hiddenMobile ? child : { ...child, mobileLayout: scaledPhoneLayout(c, child) }))
+    // Hidden ones too: shown again on the phone, they stand where the scaled
+    // drawing would have shown them, not at the server's default place.
+    const children = c.children.map((child) => ({ ...child, mobileLayout: scaledPhoneLayout(c, child) }))
     return { ...c, props: { ...c.props, phoneLayout: true }, children: withContainerPhoneLayouts(children) }
   })
 }
@@ -1525,9 +1529,24 @@ function insertComponent(state, page, type, x, y, parentId, presetId, initialSiz
       hiddenMobile: false,
       ...kids,
     }
-    const nextComps = addChildToTree(page.components, parentId, child)
+    // A container laying its blocks out for the phone (containerChildKey):
+    // dropped on the phone, the point is in its phone space and the block
+    // goes under its desktop siblings; dropped on the desktop, it gets the
+    // phone place its desktop one has in the scaled drawing.
+    const phoneContainer = parentNode?.type === 'container' && containerChildKey(parentNode, 'mobile', page.flowMode) === 'mobileLayout'
+    if (phoneContainer && state.viewport === 'mobile') {
+      const phoneSpace = containerDesignWidth(parentNode, 'mobileLayout')
+      child.mobileLayout = clampLayout(
+        { x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), w: Math.min(size.w, phoneSpace), h: size.h },
+        { maxX: phoneSpace },
+      )
+      child.layout = clampLayout({ x: 0, y: desktopBottom, w: Math.min(size.w, parentW || size.w), h: size.h }, { maxX: parentW })
+    } else if (phoneContainer) {
+      child.mobileLayout = scaledPhoneLayout(parentNode, child)
+    }
+    const nextComps = addChildToTree(page.components, parentId, child, { placed: phoneContainer })
     const schema =
-      regionParent && state.viewport === 'mobile'
+      (regionParent || phoneContainer) && state.viewport === 'mobile'
         ? mapPage(state.schema, page.id, (p) => ({ ...p, components: inShownPart(p, nextComps), mobileManual: true }))
         : withComponents(state.schema, page.id, nextComps)
     return {
@@ -3384,7 +3403,7 @@ export const useEditorStore = create((set, get) => ({
               { maxX: mobileWidth },
             ),
           }
-        } else if (target.type === 'container' && containerChildKey(target, 'mobile') === 'mobileLayout') {
+        } else if (target.type === 'container' && containerChildKey(target, 'mobile', currentPage.flowMode) === 'mobileLayout') {
           // A container with phone layouts (containerChildKey) is drawn from
           // them on the phone: a point there is in its phone space, and a
           // block dropped on the desktop goes under the phone's last block.
