@@ -81,7 +81,9 @@ export function scoreFidelity(original, converted, { samples = 5 } = {}) {
   const theirImages = [...(converted?.images || [])]
   let imagesNear = 0
   for (const image of images) {
-    const index = theirImages.findIndex((other) => other.src === image.src && distance(image, other) <= FAR)
+    // The same picture, where it was and as big as it was.
+    const sized = (other) => Math.abs(other.w - image.w) <= Math.max(2, image.w * 0.1) && Math.abs(other.h - image.h) <= Math.max(2, image.h * 0.1)
+    const index = theirImages.findIndex((other) => other.src === image.src && distance(image, other) <= FAR && sized(other))
     if (index >= 0) {
       imagesNear += 1
       theirImages.splice(index, 1)

@@ -44,6 +44,13 @@ describe('scoreFidelity', () => {
     expect(scoreFidelity(page, drawn)).toMatchObject({ found: 1, near: 0, close: 1 })
   })
 
+  it('does not count a picture drawn at another size as in place', () => {
+    const page = { words: [], images: [{ src: 'a.png', x: 0, y: 0, w: 300, h: 200 }] }
+    const drawn = { words: [], images: [{ src: 'a.png', x: 0, y: 0, w: 1, h: 1 }] }
+
+    expect(scoreFidelity(page, drawn).imagesNear).toBe(0)
+  })
+
   it('checks each picture by its source and place', () => {
     const page = { words: [], images: [{ src: 'a.png', x: 0, y: 0, w: 100, h: 100 }, { src: 'b.png', x: 0, y: 200, w: 100, h: 100 }] }
     const drawn = { words: [], images: [{ src: 'a.png', x: 2, y: 2, w: 100, h: 100 }, { src: 'b.png', x: 0, y: 400, w: 100, h: 100 }] }

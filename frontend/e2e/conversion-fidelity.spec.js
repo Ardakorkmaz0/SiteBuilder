@@ -42,6 +42,38 @@ test.skip(({ browserName }) => browserName !== 'chromium', 'the bench runs in Ch
 // already in capitals. A picture written into the page (a data: address)
 // is compared by what it holds, base64-encoded or not.
 function readDrawn() {
+  // What the boxes around an element cut what it holds to: those that clip
+  // their overflow, and a clip-path inset. Cached per element.
+  const cache = new Map()
+  const length = (value, size) => (/%$/.test(value) ? (parseFloat(value) / 100) * size : parseFloat(value) || 0)
+  const ownCut = (el) => {
+    const look = getComputedStyle(el)
+    const box = el.getBoundingClientRect()
+    let cut = null
+    if (look.overflowX !== 'visible' || look.overflowY !== 'visible') cut = { l: box.left, t: box.top, r: box.right, b: box.bottom }
+    const inset = /^inset\(([^)]*)\)/.exec(look.clipPath || '')
+    if (inset) {
+      const v = inset[1].split(/\s+round\s+/)[0].trim().split(/\s+/)
+      const [t, r = t, b = t, l = r] = v
+      const c = { l: box.left + length(l, box.width), t: box.top + length(t, box.height), r: box.right - length(r, box.width), b: box.bottom - length(b, box.height) }
+      cut = cut ? { l: Math.max(cut.l, c.l), t: Math.max(cut.t, c.t), r: Math.min(cut.r, c.r), b: Math.min(cut.b, c.b) } : c
+    }
+    return cut
+  }
+  const cutsOf = (el) => {
+    if (!el || el === document.documentElement) return []
+    if (cache.has(el)) return cache.get(el)
+    const own = ownCut(el)
+    const cuts = own ? [own, ...cutsOf(el.parentElement)] : cutsOf(el.parentElement)
+    cache.set(el, cuts)
+    return cuts
+  }
+  // More than half of it left once every cut around it is applied.
+  const mostlyShown = (box, cuts) => {
+    let l = box.left; let t = box.top; let r = box.right; let b = box.bottom
+    for (const c of cuts) { l = Math.max(l, c.l); t = Math.max(t, c.t); r = Math.min(r, c.r); b = Math.min(b, c.b) }
+    return r > l && b > t && (r - l) * (b - t) > 0.5 * box.width * box.height
+  }
   const address = (src) => {
     const data = /^data:([^;,]*)((?:;[^;,]*)*),([\s\S]*)$/i.exec(src)
     if (!data) return src
@@ -61,6 +93,7 @@ function readDrawn() {
     if (!el || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|TEXTAREA|OPTION)$/.test(el.tagName)) continue
     // Not drawn: hidden, see-through, or inside a closed <details>.
     if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) continue
+    const cuts = cutsOf(el)
     run += 1
     const text = node.textContent
     const pattern = /\S+/g
@@ -69,13 +102,13 @@ function readDrawn() {
       range.setStart(node, match.index)
       range.setEnd(node, match.index + match[0].length)
       const box = range.getBoundingClientRect()
-      if (box.width < 1 || box.height < 1) continue
+      if (box.width < 1 || box.height < 1 || !mostlyShown(box, cuts)) continue
       words.push({ t: match[0].toLocaleLowerCase(), x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height, run })
     }
   }
   for (const img of document.images) {
     const box = img.getBoundingClientRect()
-    if (box.width >= 1 && box.height >= 1 && img.checkVisibility({ opacityProperty: true, visibilityProperty: true })) images.push({ src: address(img.currentSrc || img.src), x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height })
+    if (box.width >= 1 && box.height >= 1 && img.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && mostlyShown(box, cutsOf(img.parentElement))) images.push({ src: address(img.currentSrc || img.src), x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height })
   }
   return { words, images, height: document.documentElement.scrollHeight }
 }
