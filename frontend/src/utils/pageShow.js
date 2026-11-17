@@ -200,17 +200,34 @@ export function pageShowRuntime(reflow, act) {
   // A page laid out in flow moves what follows a hidden block by itself.
   var flowPage = page.hasAttribute('data-pwb-flow')
   var saved = new Map()
-  var STYLE = ['top', 'height', 'minHeight', 'display']
+  var STYLE = ['top', 'height', 'min-height', 'display']
   // The design height a box is fitted to (utils/containerFit.js) follows
-  // the box when it gets shorter, or the fitting would stretch it back.
+  // the box when it gets shorter, or the fitting would stretch it back. On
+  // a phone, a container with phone layouts is fitted to its -mobile one.
   var FIT = 'data-pwb-container-height'
+  var FITS = [FIT, FIT + '-mobile']
+  function fitOf(el) {
+    var phone = el.hasAttribute(FIT + '-mobile') && window.matchMedia && window.matchMedia('(max-width: 768px)').matches
+    return phone ? FIT + '-mobile' : FIT
+  }
+  // Written over what the stylesheet says, whatever it says: a container's
+  // blocks are placed on a phone by !important rules (schemaToFiles
+  // containerPhoneCss), which a plain inline value would not move.
+  function put(el, name, value) { el.style.setProperty(name, value, 'important') }
   function remember(el) {
-    if (!saved.has(el)) saved.set(el, { style: STYLE.map(function (name) { return el.style[name] }), fit: el.getAttribute(FIT) })
+    if (saved.has(el)) return
+    saved.set(el, {
+      style: STYLE.map(function (name) { return [el.style.getPropertyValue(name), el.style.getPropertyPriority(name)] }),
+      fit: FITS.map(function (name) { return el.getAttribute(name) }),
+    })
   }
   function restore() {
     saved.forEach(function (was, el) {
-      STYLE.forEach(function (name, i) { el.style[name] = was.style[i] })
-      if (was.fit !== null) el.setAttribute(FIT, was.fit)
+      STYLE.forEach(function (name, i) {
+        if (was.style[i][0]) el.style.setProperty(name, was.style[i][0], was.style[i][1])
+        else el.style.removeProperty(name)
+      })
+      FITS.forEach(function (name, i) { if (was.fit[i] !== null) el.setAttribute(name, was.fit[i]) })
     })
   }
   var LEVEL = '.page, [data-pwb-container-root], .region-inner'
@@ -241,7 +258,7 @@ export function pageShowRuntime(reflow, act) {
     for (var e = 0; e < every.length; e++) {
       if (state(every[e]) === 'shown') continue
       remember(every[e])
-      every[e].style.display = 'none'
+      put(every[e], 'display', 'none')
     }
     if (typeof window.__pwbApplyLayout === 'function') window.__pwbApplyLayout()
   }
@@ -350,10 +367,10 @@ export function pageShowRuntime(reflow, act) {
       var result = reflow(items)
       seen.kids.forEach(function (kid, n) {
         remember(kid.el)
-        if (items[n].hidden || items[n].gone) kid.el.style.display = 'none'
+        if (items[n].hidden || items[n].gone) put(kid.el, 'display', 'none')
         else if (level === page && flowPage) return
-        else if (items[n].stretch) { if (result.cut) kid.el.style.height = Math.max(0, kid.h - result.cut) + 'px' }
-        else if (Math.abs(result.ys[n] - kid.y) > 0.5) kid.el.style.top = result.ys[n] + 'px'
+        else if (items[n].stretch) { if (result.cut) put(kid.el, 'height', Math.max(0, kid.h - result.cut) + 'px') }
+        else if (Math.abs(result.ys[n] - kid.y) > 0.5) put(kid.el, 'top', result.ys[n] + 'px')
       })
       if (level === page) {
         if (flowPage) return
@@ -378,9 +395,9 @@ export function pageShowRuntime(reflow, act) {
       seen.chain.forEach(function (link, n) {
         var cut = n === 0 ? result.cut : result.cut * scale
         remember(link.el)
-        link.el.style.height = Math.max(0, link.h - cut) + 'px'
-        link.el.style.minHeight = '0px'
-        if (link.el.hasAttribute(FIT)) link.el.setAttribute(FIT, String(Math.max(0, seen.chain[0].h - result.cut)))
+        put(link.el, 'height', Math.max(0, link.h - cut) + 'px')
+        put(link.el, 'min-height', '0px')
+        if (link.el.hasAttribute(FIT)) link.el.setAttribute(fitOf(link.el), String(Math.max(0, seen.chain[0].h - result.cut)))
         if (n === seen.chain.length - 1) cuts.set(link.el, cut)
       })
     })
