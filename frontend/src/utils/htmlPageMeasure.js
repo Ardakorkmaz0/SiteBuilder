@@ -1403,12 +1403,14 @@ function readPage(token, frameWindow) {
     }
     return added
   }
-  async function readPhone(read) {
+  // `narrow` runs once the page is at the phone's width, before it is read.
+  async function readPhone(read, { narrow = () => {} } = {}) {
     const wide = win.innerWidth
     if (wide <= PHONE_WIDTH + 40 || !read.length) return null
     let result = null
     let added = []
     if ((await askWidth(PHONE_WIDTH)) && (await reachWidth(PHONE_WIDTH))) {
+      narrow()
       await settle(120)
       win.scrollTo(0, 0)
       for (const [node, target] of read) {
@@ -1491,7 +1493,30 @@ function readPage(token, frameWindow) {
     const bodyStyle = win.getComputedStyle(doc.body)
     const rootStyle = win.getComputedStyle(doc.documentElement)
     const root = measureNode(doc.body)
-    const phone = root ? await readPhone(seen).catch(() => null) : null
+    // The page is read at a phone's width with everything opened, as it is at
+    // the desktop's: the published page hides what a click shows from there
+    // (pageShow.js). Opened, a hidden tab's long line of code would make the
+    // page wider than the phone, which it never is as it opens, and all of it
+    // with it. What was opened to be read takes the width it is given there,
+    // whatever it holds. Taken back with the rest of what was opened.
+    const narrow = () => {
+      openedLog.push(...opened.takeRecords())
+      const opens = new Set(openedLog.filter((record) => record.type === 'attributes').map((record) => record.target))
+      for (const el of opens) {
+        if (el.nodeType !== 1 || !el.isConnected || el === doc.body || !el.parentElement) continue
+        const cs = win.getComputedStyle(el)
+        const around = win.getComputedStyle(el.parentElement)
+        // Only a block that takes the width of what holds it (in the flow, a
+        // grid cell it fills, a column): one sized by what it holds (in a
+        // row, floating, placed) would shrink to nothing.
+        if (!/^(block|list-item|flow-root)$/.test(cs.display)) continue
+        if (/flex/.test(around.display) && !/column/.test(around.flexDirection)) continue
+        if (/grid/.test(around.display) && !/^(normal|stretch|auto)$/.test(cs.justifySelf)) continue
+        if (cs.float !== 'none' || cs.position === 'absolute' || cs.position === 'fixed') continue
+        el.style.setProperty('contain', 'inline-size', 'important')
+      }
+    }
+    const phone = root ? await readPhone(seen, { narrow }).catch(() => null) : null
     openedLog.push(...opened.takeRecords())
     opened.disconnect()
     // The pictures, drawn with bounded concurrency. Where one cannot be

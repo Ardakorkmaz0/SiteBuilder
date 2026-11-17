@@ -96,3 +96,33 @@ test('each part shown one at a time is read at a phone width too, and the next i
   expect(Math.round(b2.rect.y)).toBe(Math.round(a2.rect.y))
   expect(b2.m.y).toBeGreaterThanOrEqual(a2.m.y + a2.m.h)
 })
+
+// A tab the page hides as it opens, holding a long line of code: opened to
+// be read, it made the page wider than the phone, and everything on it was
+// read at that width instead of the phone's.
+const HIDDEN_WIDE_TAB = `<!doctype html><html><head><style>
+body{margin:0;font:16px sans-serif} main{display:grid;grid-template-columns:1fr;padding:0 18px}
+.panel{display:none} .panel.on{display:block} pre{overflow-x:auto;background:#eee}
+</style></head><body><main>
+<p id="intro">This paragraph wraps on a phone, at the width the phone gives it and no wider.</p>
+<div><button id="one">One</button><button id="two">Two</button></div>
+<div class="panel on" id="p1"><pre>short</pre></div>
+<div class="panel" id="p2"><pre>curl --silent --show-error --location https://example.com/a/rather/long/path/to/an/install/script.sh | sh</pre></div>
+</main><script>
+document.querySelectorAll('button').forEach(function(b){b.addEventListener('click',function(){
+document.getElementById('p1').classList.toggle('on',b.id==='one');document.getElementById('p2').classList.toggle('on',b.id==='two')})})
+</script></body></html>`
+
+test('a hidden tab with a long line does not make the page wider than the phone when it is read', async ({ page }) => {
+  await page.goto('/')
+  const read = await measure(page, HIDDEN_WIDE_TAB)
+
+  expect(read.ran).toBe(true)
+  const { intro, p2 } = read.nodes
+  // As wide as the phone leaves it, between the page's 18 px margins.
+  expect(Math.round(intro.m.x)).toBe(18)
+  expect(intro.m.x + intro.m.w).toBeLessThanOrEqual(read.phone.width - 17)
+  // The tab is still read, there, for when it is opened.
+  expect(p2.m.hidden).toBeUndefined()
+  expect(p2.m.w).toBeLessThanOrEqual(read.phone.width)
+})
