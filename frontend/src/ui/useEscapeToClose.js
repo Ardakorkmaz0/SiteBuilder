@@ -16,7 +16,7 @@
 // that, focus fell to the top of the page and a keyboard user started over.
 // A dialog opened from a menu item outlives the item (the menu closes), so
 // the button that opened the menu takes its place.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 const stack = []
 
@@ -76,10 +76,14 @@ export function useEscapeToClose(open, onClose) {
     setOpeners(open ? openersNow() : null)
   }
   const closeRef = useRef(onClose)
-  useEffect(() => {
+  // Both kept in the commit that puts the dialog on the page, not in a
+  // passive effect after it. A dialog that opens from a timer (the editor
+  // tour) has its passive effects run in a later task, and an Esc pressed in
+  // between went to the layer under a card the user could already see.
+  useLayoutEffect(() => {
     closeRef.current = onClose
   })
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return undefined
     stack.push(closeRef)
     if (stack.length === 1) document.addEventListener('keydown', onKeyDown, true)

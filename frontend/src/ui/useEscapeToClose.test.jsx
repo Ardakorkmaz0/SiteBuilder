@@ -1,5 +1,6 @@
 // Esc closes the dialog on top, only that one, and nothing behind it.
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useEffect, useState } from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { useEscapeToClose } from './useEscapeToClose.js'
 import AiWizard from '../components/editor/AiWizard.jsx'
@@ -58,6 +59,47 @@ describe('useEscapeToClose', () => {
     fireEvent.keyDown(document, { key: 'Escape', isComposing: true })
 
     expect(onClose).not.toHaveBeenCalled()
+  })
+  // A dialog that opens from a timer (the editor tour, once its steps are
+  // read) is committed in one task and, after a slow render, has its passive
+  // effects run in a later one. An Esc pressed in between, with the card
+  // already on the page, went to the layer under it.
+  it('takes Esc from the moment its dialog is on the page, even when it opens from a timer', async () => {
+    const under = vi.fn()
+    const tour = vi.fn()
+    function SlowPanel() {
+      const until = performance.now() + 20
+      while (performance.now() < until) { /* a render long enough for React to yield after it */ }
+      return null
+    }
+    function LateDialog() {
+      const [open, setOpen] = useState(false)
+      useEffect(() => {
+        const timer = window.setTimeout(() => setOpen(true), 0)
+        return () => window.clearTimeout(timer)
+      }, [])
+      return <><Dialog open={open} onClose={tour} />{open && <SlowPanel />}</>
+    }
+    render(<><Dialog onClose={under} /><LateDialog /></>)
+
+    const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT
+    globalThis.IS_REACT_ACT_ENVIRONMENT = false
+    try {
+      await new Promise((resolve) => {
+        const observer = new MutationObserver(() => {
+          if (document.querySelectorAll('[role="dialog"]').length < 2) return
+          observer.disconnect()
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+          resolve()
+        })
+        observer.observe(document.body, { childList: true, subtree: true })
+      })
+    } finally {
+      globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment
+    }
+
+    expect(tour).toHaveBeenCalledTimes(1)
+    expect(under).not.toHaveBeenCalled()
   })
 })
 
