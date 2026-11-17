@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { containerDesignWidth, fitContainerCanvas } from './containerFit.js'
+import { containerChildKey, containerDesignWidth, fitContainerCanvas, scaledPhoneLayout } from './containerFit.js'
 
 const container = (extra = {}) => ({
   type: 'container', layout: { w: 500 }, props: {},
@@ -64,5 +64,42 @@ describe('whole-canvas fitting shared by View and export', () => {
     expect(fitContainerCanvas(box, root, Infinity, -1)).toBe(1)
     expect(root.style).toEqual({ width: '1px', height: '0px', transformOrigin: '0 0', transform: '' })
     expect(box.style.minHeight).toBe('0px')
+  })
+})
+
+// A container whose blocks have a phone layout of their own (one converted
+// from an uploaded page) draws them there on the phone instead of scaling
+// its desktop drawing: a 294 px card in a 171 px phone box drew its text at
+// 0.58 of its size.
+describe('a free container with phone layouts', () => {
+  const card = (props = { phoneLayout: true }) => ({
+    type: 'container', props,
+    layout: { x: 0, y: 0, w: 300, h: 120 },
+    mobileLayout: { x: 16, y: 16, w: 180, h: 200 },
+    children: [
+      { id: 'a', layout: { x: 18, y: 20, w: 260, h: 40 }, mobileLayout: { x: 10, y: 10, w: 160, h: 80 } },
+      { id: 'b', layout: { x: 18, y: 70, w: 120, h: 30 }, mobileLayout: { x: 10, y: 100, w: 120, h: 30 } },
+    ],
+  })
+
+  it('stands its blocks at their phone layout on a phone only, when it says so', () => {
+    expect(containerChildKey(card(), 'mobile')).toBe('mobileLayout')
+    expect(containerChildKey(card(), 'pc')).toBe('layout')
+    expect(containerChildKey(card(), 'mobile', true)).toBe('layout')
+    // Every block has a mobileLayout once saved: that alone says nothing.
+    expect(containerChildKey(card({}), 'mobile')).toBe('layout')
+    expect(containerChildKey(card({ phoneLayout: true, flow: 'column' }), 'mobile')).toBe('layout')
+  })
+
+  it('is as wide as its phone box there, or as its blocks reach', () => {
+    expect(containerDesignWidth(card(), 'mobileLayout')).toBe(180)
+    expect(containerDesignWidth(card(), 'layout')).toBe(300)
+    const wide = card()
+    wide.children[1].mobileLayout = { x: 100, y: 100, w: 120, h: 30 }
+    expect(containerDesignWidth(wide, 'mobileLayout')).toBe(220)
+  })
+
+  it('places a block put in it where the scaled desktop drawing showed it', () => {
+    expect(scaledPhoneLayout(card(), { layout: { x: 100, y: 50, w: 150, h: 40 } })).toEqual({ x: 60, y: 30, w: 90, h: 24 })
   })
 })

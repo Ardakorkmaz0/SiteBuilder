@@ -934,6 +934,9 @@ describe('a page read at a phone\'s width too', () => {
     expect(bar.mobileLayout).toEqual({ x: 16, y: 8, w: 358, h: 40 })
     expect(contents.mobileLayout).toEqual({ x: 8, y: 4, w: 120, h: 32 })
     expect(blocks.find((c) => c.props?.text === 'On both').hidden).toBeUndefined()
+    // Its blocks stand at their phone layout on a phone, not at the desktop
+    // drawing scaled down.
+    expect(bar.props.phoneLayout).toBe(true)
     // The bar's paint is hidden on the desktop as well.
     expect(blocks.filter((c) => c.styles?.backgroundColor === 'rgb(238, 238, 238)').map((c) => c.hidden)).toEqual([true])
     expect(result.components[0].hidden).toBeUndefined()
@@ -941,8 +944,14 @@ describe('a page read at a phone\'s width too', () => {
 
   it('leaves the phone layout to be worked out when the page was not read at a phone\'s width', () => {
     const result = convert(page([
-      node('section', [0, 0, 1200, 300], { kids: [text('p', [40, 40, 500, 24], 'Only a desktop reading')] }),
+      node('section', [0, 0, 1200, 300], { kids: [
+        text('p', [40, 40, 500, 24], 'Only a desktop reading'),
+        node('div', [40, 100, 300, 120], { kids: [text('p', [60, 120, 200, 24], 'In a card')] }, { backgroundColor: 'rgb(238, 238, 238)' }),
+      ] }),
     ]))
+    const all = (list) => list.flatMap((c) => [c, ...all(c.children || [])])
+    // A card without a phone reading is drawn scaled on the phone, as before.
+    expect(all(result.components).find((c) => c.type === 'container').props.phoneLayout).toBeUndefined()
 
     expect(result.mobileWidth).toBeUndefined()
     expect(result.components[0].mobileLayout).toBeUndefined()

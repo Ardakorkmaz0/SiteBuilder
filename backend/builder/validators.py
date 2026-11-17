@@ -461,7 +461,7 @@ def sanitize_props(ctype, props):
         flow = props.get('flow')
         align = props.get('align')
         justify = props.get('justify')
-        return {
+        out = {
             'flow': flow if flow in ('free', 'column', 'row', 'grid') else 'free',
             'align': align if align in ('start', 'center', 'end', 'stretch') else 'stretch',
             'justify': justify
@@ -471,6 +471,13 @@ def sanitize_props(ctype, props):
             'cols': _num(props.get('cols'), 3, 1, 12),
             'wrap': bool(props.get('wrap')),
         }
+        # A free container whose blocks stand at their own phone layout on a
+        # phone instead of its desktop drawing scaled down (containerChildKey
+        # in frontend/src/utils/containerFit.js). Written only when on, so
+        # every other container is stored as before.
+        if props.get('phoneLayout') is True:
+            out['phoneLayout'] = True
+        return out
     if ctype == 'html':
         code = _str(props.get('code'))[:MAX_HTML_EMBED]
         # Only literal `</script` is escaped — the embed runs inside its own

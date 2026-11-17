@@ -20,7 +20,7 @@
     },
     "phone": {
       "found": 0.97,
-      "near": 0.1,
+      "near": 0.97,
       "images": 1
     },
     "blocks": 69
@@ -46,7 +46,7 @@
     },
     "phone": {
       "found": 0.97,
-      "near": 0.26,
+      "near": 0.7,
       "images": 1
     },
     "blocks": 71
@@ -72,7 +72,7 @@
     },
     "phone": {
       "found": 0.97,
-      "near": 0.32,
+      "near": 0.53,
       "images": 1
     },
     "blocks": 36

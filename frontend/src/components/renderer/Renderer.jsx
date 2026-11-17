@@ -29,7 +29,7 @@ import { elementIdFor } from '../../utils/anchors.js'
 import { fitsBox, nativeFit } from '../../utils/boxFit.js'
 import FitBox from './FitBox.jsx'
 import ContainerCanvas from './ContainerCanvas.jsx'
-import { containerDesignWidth } from '../../utils/containerFit.js'
+import { containerChildKey, containerDesignWidth } from '../../utils/containerFit.js'
 import { bleedContentWidth, ownContentWidth, stretchesToViewport } from '../../utils/bleedLayout.js'
 
 function RegionRender({ component, style, viewport, editorPreview, canvasDesignWidth }) {
@@ -286,7 +286,10 @@ export function RenderComponent({
         </div>
       )
     }
-    const minHeight = absoluteChildrenHeight(kids, Math.round(component.layout?.h || 160))
+    // On the phone, its blocks' own phone layout when they all have one.
+    const key = containerChildKey(component, viewport, flowMode)
+    const ownLayout = (key === 'mobileLayout' ? component.mobileLayout : null) || component.layout
+    const minHeight = absoluteChildrenHeight(kids, Math.round(ownLayout?.h || 160), key)
     const containerStyle = {
       ...style,
       overflow: sanitizeStyles(stylesFor(component, viewport)).overflow || 'visible',
@@ -296,14 +299,14 @@ export function RenderComponent({
     if (!kids.length) return <div style={{ ...containerStyle, minHeight }} />
     return (
       <ContainerCanvas
-        width={containerDesignWidth(component)}
+        width={containerDesignWidth(component, key)}
         height={minHeight}
         initialWidth={viewport === 'mobile' ? component.mobileLayout?.w || component.layout?.w : component.layout?.w}
         style={{ ...containerStyle, height: sanitizeStyles(stylesFor(component, viewport)).height || 'auto' }}
       >
         {kids.map((c) => {
           if (isHidden(c, viewport)) return null
-          const l = c.layout || {}
+          const l = c[key] || c.layout || {}
           return (
             <div
               key={c.id}

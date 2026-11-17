@@ -317,6 +317,25 @@ class TestValidateAndCleanSchema:
         assert 'tweakAlign' not in props2
         assert 'tweakZoom' not in props2
 
+    def test_container_phone_layout_flag_is_kept_only_when_on(self):
+        """A container whose blocks stand at their own phone layout keeps saying so;
+        every other container is stored as before, without the key."""
+        def container(props):
+            return validate_and_clean_schema({
+                'pages': [{
+                    'id': 'home', 'name': 'Home',
+                    'components': [{
+                        'id': 'c1', 'type': 'container', 'props': props, 'styles': {},
+                        'layout': {'x': 0, 'y': 0, 'w': 600, 'h': 300}, 'children': [],
+                    }],
+                }],
+            })['pages'][0]['components'][0]['props']
+
+        assert container({'phoneLayout': True})['phoneLayout'] is True
+        assert 'phoneLayout' not in container({})
+        assert 'phoneLayout' not in container({'phoneLayout': False})
+        assert 'phoneLayout' not in container({'phoneLayout': 'yes'})
+
     def test_container_auto_layout_round_trips(self):
         """Auto-layout flow props survive a save; junk is normalized."""
         clean = validate_and_clean_schema({

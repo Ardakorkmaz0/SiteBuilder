@@ -312,6 +312,11 @@ function phoneLayouts(components, ctx, origin) {
           h: Math.max(MIN_H, Math.ceil(box.h)),
         }
       }
+      // Its blocks stand where the page put them on a phone, not at the
+      // desktop drawing scaled down (containerChildKey in containerFit.js).
+      if (c.type === 'container' && box && Array.isArray(c.children) && c.children.length) {
+        c.props = { ...c.props, phoneLayout: true }
+      }
       if (Array.isArray(c.children)) assign(c.children, box || outer)
       delete c._phone
       delete c._styleFrom

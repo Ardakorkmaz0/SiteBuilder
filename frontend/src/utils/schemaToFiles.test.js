@@ -820,3 +820,37 @@ describe('nested accordion & tabs export regressions', () => {
     expect(panel2).not.toContain('color:#4b5563')
   })
 })
+
+// A container with phone layouts (props.phoneLayout) stands its blocks at
+// them on a phone, unscaled; any other one keeps its scaled desktop drawing.
+describe('schemaToSingleHtml container with phone layouts', () => {
+  const build = (props) => schemaToSingleHtml({
+    theme: {},
+    pages: [{
+      id: 'p1', name: 'Home', mode: 'empty', mobileWidth: 390,
+      components: [{
+        id: 'card', type: 'container', props, styles: {},
+        layout: { x: 0, y: 0, w: 300, h: 120 }, mobileLayout: { x: 16, y: 16, w: 180, h: 200 },
+        children: [
+          { id: 'title', type: 'text', props: { text: 'Humidity' }, styles: {}, layout: { x: 18, y: 20, w: 260, h: 40 }, mobileLayout: { x: 10, y: 10, w: 160, h: 80 } },
+          { id: 'gone', type: 'text', props: { text: 'Desktop only' }, styles: {}, layout: { x: 18, y: 70, w: 120, h: 30 }, mobileLayout: { x: 0, y: 0, w: 200, h: 80 }, hiddenMobile: true },
+        ],
+      }],
+    }],
+  }, 'Site')
+
+  it('writes each block\'s phone place under the phone media query, and the phone design size for the fit script', () => {
+    const html = build({ phoneLayout: true })
+    const phone = html.slice(html.indexOf('@media (max-width: 768px)'))
+    expect(phone).toContain('.cc-title { left:10px !important; top:10px !important; width:160px !important; height:80px !important; }')
+    expect(phone).not.toContain('.cc-gone {')
+    expect(html).toContain('data-pwb-container-width-mobile="180" data-pwb-container-height-mobile="200"')
+    expect(html).toMatch(/<div id="title" class="cc-title" style="position:absolute;left:18px;top:20px;width:260px/)
+  })
+
+  it('leaves a container without them as it was', () => {
+    const html = build({})
+    expect(html).not.toContain('.cc-title')
+    expect(html).not.toContain('data-pwb-container-width-mobile="')
+  })
+})

@@ -47,7 +47,7 @@ import {
 } from '../components/renderer/layout.js'
 import { regionContentWidth, resolveRegionDock } from './regionLayout.js'
 import { autoLayoutChildCss, autoLayoutContainerCss } from './autoLayout.js'
-import { containerDesignWidth } from './containerFit.js'
+import { containerChildKey, containerDesignWidth } from './containerFit.js'
 import { fixedRailInset } from './railInset.js'
 import {
   navLinkLabel,
@@ -399,6 +399,33 @@ function nestedClass(ch) {
 }
 
 // Every nested child on a page that carries a visibility switch.
+// Grows with what it shows (accordion, select, tabs, embed, container): its
+// wrapper sets a least height, not a height.
+function growsInParent(ch) {
+  return ['accordion', 'select', 'tabs', 'html', 'container'].includes(ch.type) && !nativeFit(ch)
+}
+
+// The phone places of the blocks of every container that draws them at their
+// own phone layout (nestedAbsoluteChildHtml's cc- hook), at any depth.
+function containerPhoneCss(components) {
+  let css = ''
+  const walk = (list) => {
+    for (const c of list || []) {
+      if (c.type === 'container' && containerChildKey(c, 'mobile') === 'mobileLayout') {
+        for (const ch of c.children || []) {
+          if (ch.hiddenMobile || !ch.mobileLayout) continue
+          const l = ch.mobileLayout
+          const tall = `${growsInParent(ch) ? 'min-height' : 'height'}:${Math.round(l.h || 80)}px !important`
+          css += `  .cc-${esc(ch.id)} { left:${Math.round(l.x || 0)}px !important; top:${Math.round(l.y || 0)}px !important; width:${Math.round(l.w || 200)}px !important; ${tall}; }\n`
+        }
+      }
+      walk(c.children)
+    }
+  }
+  walk(components)
+  return css
+}
+
 function nestedWithVisibility(components) {
   const out = []
   const walk = (arr) => {
@@ -432,20 +459,22 @@ function inlineNodesOf(components) {
 
 // `classedChildren` says a stylesheet already carries this region's per-child
 // geometry (see regionChildCss), so the inline copy is dropped and the mobile
-function nestedAbsoluteChildHtml(ch) {
+// `phone`: the container draws its blocks at their own phone layout there,
+// by the rule containerPhoneCss writes for this hook.
+function nestedAbsoluteChildHtml(ch, phone = false) {
   const l = ch.layout || {}
   // Interactive types (accordion/select/tabs) and nested containers need
   // to grow when used — forcing height:100% would clip the open state or
   // pinch nested content. Static types still fill the wrapper exactly.
   // A block that fits its box keeps that box, like on the canvas.
-  const grows = ['accordion', 'select', 'tabs', 'html', 'container'].includes(ch.type) && !nativeFit(ch)
+  const grows = growsInParent(ch)
   const filled = grows
     ? { ...ch, styles: { ...(ch.styles || {}), width: '100%' } }
     : { ...ch, styles: { ...(ch.styles || {}), width: '100%', height: '100%' } }
   const wrapH = grows ? '' : `;height:${Math.round(l.h || 80)}px`
   const wrapMinH = grows ? `;min-height:${Math.round(l.h || 80)}px` : ''
   // nestedClass: the hook its "hide on PC / on mobile" rule names.
-  return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}"${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
+  return `<div id="${esc(elementIdFor(ch))}" class="${`${nestedClass(ch)}${phone ? ` cc-${esc(ch.id)}` : ''}`.trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}"${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
 }
 
 // media query can reposition the children. Only top-level regions get those
@@ -479,11 +508,18 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
       return `<div${hook} style="${autoCss};${styleStr}">${inner}</div>`
     }
     const h = absoluteChildrenHeight(kids, Math.round(c.layout?.h || 160))
-    const inner = kids.map(nestedAbsoluteChildHtml).join('')
+    // On the phone its blocks stand at their own phone layout, when they all
+    // have one (containerChildKey); the fit script takes the phone's design
+    // size from the -mobile attributes there.
+    const phone = containerChildKey(c, 'mobile') === 'mobileLayout'
+    const inner = kids.map((ch) => nestedAbsoluteChildHtml(ch, phone)).join('')
     if (!kids.length) return `<div${hook} style="display:block;position:relative;min-height:${h}px;${styleStr}"></div>`
     const designW = containerDesignWidth(c)
     const scale = Math.min(1, Math.max(1, Number(c.layout?.w) || designW) / designW)
-    return `<div${hook} data-pwb-container-width="${designW}" data-pwb-container-height="${h}" style="display:block;position:relative;min-height:${h * scale}px;${styleStr}"><div data-pwb-container-root style="position:absolute;left:0;top:0;width:${designW}px;height:${h}px;transform-origin:0 0${scale === 1 ? '' : `;transform:scale(${scale})`}">${inner}</div></div>`
+    const phoneAttrs = phone
+      ? ` data-pwb-container-width-mobile="${containerDesignWidth(c, 'mobileLayout')}" data-pwb-container-height-mobile="${absoluteChildrenHeight(kids, Math.round((c.mobileLayout || c.layout)?.h || 160), 'mobileLayout')}"`
+      : ''
+    return `<div${hook} data-pwb-container-width="${designW}" data-pwb-container-height="${h}"${phoneAttrs} style="display:block;position:relative;min-height:${h * scale}px;${styleStr}"><div data-pwb-container-root style="position:absolute;left:0;top:0;width:${designW}px;height:${h}px;transform-origin:0 0${scale === 1 ? '' : `;transform:scale(${scale})`}">${inner}</div></div>`
   }
   if (c.type === 'tabs') {
     const tabs = (Array.isArray(p.tabs) ? p.tabs : []).filter((t) => t && t.id)
@@ -938,6 +974,7 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
     }
   }
   for (const page of pages) {
+    if (!page.flowMode) css += containerPhoneCss(page.components || [])
     for (const ch of nestedWithVisibility(page.components || [])) {
       if (ch.hiddenMobile) css += `  .n-${esc(ch.id)} { display:none; }
 `

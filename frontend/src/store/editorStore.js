@@ -19,7 +19,7 @@ import { regionContentWidth, regionDisplayPatchToDesign } from '../utils/regionL
 import { anchorOf, anchorProblem, elementIdFor, retargetLinks, slugifyAnchor } from '../utils/anchors.js'
 import { splitPageHtml } from '../utils/projectSnapshot.js'
 import { normalizeLanguageTag } from '../utils/languages.js'
-import { containerDesignWidth } from '../utils/containerFit.js'
+import { containerChildKey, containerDesignWidth, scaledPhoneLayout } from '../utils/containerFit.js'
 import { isAutoLayout } from '../utils/autoLayout.js'
 import { absoluteChildrenHeight } from '../components/renderer/layout.js'
 import { mergeFontFaces } from '../utils/fontFaces.js'
@@ -461,6 +461,11 @@ function addChildToTree(components, parentId, child, { placed = false } = {}) {
             ? l
             : { ...l, x: 12, y: bottom ? bottom + 12 : 12 },
         }
+      }
+      // A block added to a container with phone layouts gets the phone place
+      // its desktop one has in the container's scaled drawing.
+      if (!placed && containerChildKey(c, 'mobile') === 'mobileLayout') {
+        tagged = { ...tagged, mobileLayout: scaledPhoneLayout(c, tagged) }
       }
       return { ...c, children: [...(c.children || []), tagged] }
     }
@@ -1207,15 +1212,17 @@ function layoutBoundsFor(page, id, key, parentOverride = null) {
   }
   const parent = parentOverride || findParentInTree(page.components, id)
   if (!parent) return {}
-  const maxX = parentDesignWidth(parent, key === 'mobileLayout' && parent.type === 'region'
-    ? page.mobileWidth || MOBILE_CANVAS_WIDTH
-    : undefined)
+  const maxX = parent.type === 'container'
+    ? containerDesignWidth(parent, key)
+    : parentDesignWidth(parent, key === 'mobileLayout' && parent.type === 'region'
+      ? page.mobileWidth || MOBILE_CANVAS_WIDTH
+      : undefined)
   const parentLayout = key === 'mobileLayout' ? parent.mobileLayout || parent.layout : parent.layout
   // A copied container may already have a larger child design than its box.
   // Its fitted canvas can grow with a move; clamping to yesterday's extent
   // would make a left nudge impossible to reverse. It still stays inside what
   // the server stores: x can reach 5000, and a box in here is at most 2000 wide.
-  const fittedContainer = parent.type === 'container' && maxX > Math.round(parent.layout?.w || 600)
+  const fittedContainer = parent.type === 'container' && maxX > Math.round(parentLayout?.w || 600)
   return {
     maxX,
     maxY: Math.round(parentLayout?.h || 0) || undefined,
@@ -1223,13 +1230,15 @@ function layoutBoundsFor(page, id, key, parentOverride = null) {
   }
 }
 
-// Free containers and tabs share one child design at both breakpoints.
-// Regions keep independent phone child positions, just like page roots do.
+// Tabs share one child design at both breakpoints. Regions keep independent
+// phone child positions, just like page roots do, and so does a free
+// container once its blocks have a phone layout (containerChildKey).
 function componentLayoutKey(page, id, viewport) {
   if (isTopLevel(page.components, id)) {
     return !page.flowMode && viewport === 'mobile' ? 'mobileLayout' : 'layout'
   }
   const parent = findParentInTree(page.components, id)
+  if (parent?.type === 'container') return containerChildKey(parent, viewport, page.flowMode)
   return viewport === 'mobile' && parent?.type === 'region' ? 'mobileLayout' : 'layout'
 }
 
@@ -1248,8 +1257,9 @@ function offsetNestedCopy(component, page) {
   }
   return {
     layout: offset('layout'),
-    // Only a section keeps a phone place of its own for its blocks.
-    ...(parent?.type === 'region' && component.mobileLayout
+    // A section keeps a phone place of its own for its blocks, and so does a
+    // container whose blocks have one.
+    ...((parent?.type === 'region' || parent?.type === 'container') && component.mobileLayout
       ? { mobileLayout: offset('mobileLayout') }
       : {}),
   }
@@ -3334,6 +3344,26 @@ export const useEditorStore = create((set, get) => ({
               { maxX: mobileWidth },
             ),
           }
+        } else if (target.type === 'container' && containerChildKey(target, 'mobile') === 'mobileLayout') {
+          // A container with phone layouts (containerChildKey) is drawn from
+          // them on the phone: a point there is in its phone space, and a
+          // block dropped on the desktop goes under the phone's last block.
+          const phoneSpace = containerDesignWidth(target, 'mobileLayout')
+          const w = Math.min(phoneW, phoneSpace)
+          moved = onMobile
+            ? {
+              ...rest,
+              mobileLayout: clampLayout({ x: px, y: py, w, h: phoneH }, { maxX: phoneSpace }),
+              layout: clampLayout(
+                { x: 0, y: bottomOf(siblings, 'layout'), w: Math.min(pcSize.w, parentW), h: pcSize.h },
+                { maxX: parentW },
+              ),
+            }
+            : {
+              ...rest,
+              layout: clampLayout({ x: px, y: py, w: Math.min(pcSize.w, parentW), h: pcSize.h }, { maxX: parentW }),
+              mobileLayout: clampLayout({ x: 0, y: bottomOf(siblings, 'mobileLayout'), w, h: phoneH }, { maxX: phoneSpace }),
+            }
         } else {
           // A container or tab panel is drawn from its desktop design on both
           // breakpoints (scaled down to fit), so the point is in that space.

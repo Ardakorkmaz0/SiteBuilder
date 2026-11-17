@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { useEditorStore } from '../../store/editorStore.js'
+import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
 import { BanIcon } from '../icons.jsx'
 import {
   absoluteChildrenHeight,
@@ -20,7 +20,7 @@ import {
   responsiveRegionChildLayout,
 } from '../../utils/regionLayout.js'
 import { autoLayoutChildStyle, autoLayoutContainerStyle } from '../../utils/autoLayout.js'
-import { containerDesignWidth } from '../../utils/containerFit.js'
+import { containerChildKey, containerDesignWidth } from '../../utils/containerFit.js'
 import { usePointerDrag } from '../../ui/usePointerDrag.js'
 import { createReparentTracker } from '../../utils/reparentDrag.js'
 import { embedAspectLock } from '../../utils/htmlSnippetSizing.js'
@@ -476,10 +476,15 @@ export function ContainerEditor({
 }) {
   const { t } = useLanguage()
   const viewport = useEditorStore((s) => s.viewport)
+  const flowMode = useEditorStore((s) => !!selectCurrentPage(s)?.flowMode)
   const kids = Array.isArray(component.children) ? component.children : []
-  const designW = containerDesignWidth(component)
-  const designH = absoluteChildrenHeight(kids, Math.round(component.layout?.h || 160))
-  const boundsH = Math.max(1, Math.round(component.layout?.h || designH))
+  // On the phone, its blocks' own phone layout when they all have one
+  // (containerChildKey): drawn and moved there, unscaled.
+  const key = containerChildKey(component, viewport, flowMode)
+  const ownLayout = (key === 'mobileLayout' ? component.mobileLayout : null) || component.layout
+  const designW = containerDesignWidth(component, key)
+  const designH = absoluteChildrenHeight(kids, Math.round(ownLayout?.h || 160), key)
+  const boundsH = Math.max(1, Math.round(ownLayout?.h || designH))
   const { setNodeRef, isOver } = useDroppable({ id: component.id })
   const userStyles = sanitizeStyles(stylesFor(component, viewport))
   const { ref, scale, scaledHeight } = useFitToWidth(designW, designH)
@@ -568,6 +573,7 @@ export function ContainerEditor({
               key={c.id}
               component={c}
               bounds={{ w: designW, h: boundsH }}
+              layoutOverride={key === 'mobileLayout' ? c.mobileLayout : null}
               interactionScale={canvasScale * scale}
               brushMode={brushMode}
               brushColor={brushColor}

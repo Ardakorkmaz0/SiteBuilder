@@ -674,7 +674,12 @@ function boxFitScript() {
     function fitOne(box) {
       if (box.hasAttribute('data-pwb-container-width')) {
         var canvas = box.querySelector(':scope > [data-pwb-container-root]');
-        if (canvas) fitContainerCanvas(box, canvas, box.getAttribute('data-pwb-container-width'), box.getAttribute('data-pwb-container-height'));
+        // On the phone, a container whose blocks have their own phone layout
+        // is drawn at that design size (schemaToFiles containerPhoneCss, whose
+        // rules sit under MOBILE_BREAKPOINT's media query: 768px).
+        var phone = box.hasAttribute('data-pwb-container-width-mobile') && window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+        var suffix = phone ? '-mobile' : '';
+        if (canvas) fitContainerCanvas(box, canvas, box.getAttribute('data-pwb-container-width' + suffix), box.getAttribute('data-pwb-container-height' + suffix));
         return;
       }
       var root = box.querySelector(':scope > [data-pwb-fit-root]');

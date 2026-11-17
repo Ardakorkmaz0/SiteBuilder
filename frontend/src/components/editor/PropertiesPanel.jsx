@@ -17,6 +17,7 @@ import {
 } from '../../utils/snippets.js'
 import { htmlBaseSizeFromComponent } from '../../utils/htmlSnippetSizing.js'
 import { LANGUAGES } from '../../utils/languages.js'
+import { containerChildKey } from '../../utils/containerFit.js'
 import {
   LabeledText,
   LabeledTextarea,
@@ -349,9 +350,11 @@ function componentLayout(component, layoutKey) {
 }
 
 function entryLayoutKey(entry, isMobile, isFlow) {
-  // Containers and tabs share their child design across breakpoints. A region
-  // child has its own phone coordinates, including on a flow page.
+  // Tabs share their child design across breakpoints. A region child has its
+  // own phone coordinates, including on a flow page; a free container's once
+  // its blocks have a phone layout (containerChildKey).
   if (!isMobile) return 'layout'
+  if (entry?.parent?.type === 'container') return containerChildKey(entry.parent, 'mobile', isFlow)
   if (entry?.parent) return entry.parent.type === 'region' ? 'mobileLayout' : 'layout'
   return isFlow ? 'layout' : 'mobileLayout'
 }

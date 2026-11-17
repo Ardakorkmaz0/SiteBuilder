@@ -145,10 +145,12 @@ export function canvasHeight(components, viewport = 'pc') {
   return Math.max(viewport === 'mobile' ? 400 : 600, bottom + 40)
 }
 
-export function absoluteChildrenHeight(components, minHeight = 120) {
+// `key`: the layout the blocks stand at (containerChildKey in containerFit.js).
+export function absoluteChildrenHeight(components, minHeight = 120, key = 'layout') {
   const list = Array.isArray(components) ? components : []
   const bottom = list.reduce((max, c) => {
-    const l = c.layout || {}
+    if (key === 'mobileLayout' && c.hiddenMobile) return max
+    const l = (key === 'mobileLayout' ? c.mobileLayout : null) || c.layout || {}
     return Math.max(max, (l.y || 0) + (l.h || 0))
   }, 0)
   return Math.max(minHeight, bottom + 16)

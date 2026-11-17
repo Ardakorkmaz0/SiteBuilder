@@ -49,6 +49,7 @@ import { checkLinks, checkPropsPatch, checkStylePatch, checkTabs, checkThemePatc
 import { ALLOWED_STYLE_KEYS } from './sanitize.js'
 import { DEFAULT_THEME } from './theme.js'
 import { isAutoLayout } from './autoLayout.js'
+import { containerChildKey } from './containerFit.js'
 
 // ---------------------------------------------------------------------------
 // Re-exports: stable public surface for AiBar / AiChatPanel / PropertiesPanel
@@ -792,7 +793,9 @@ function alignBlock(id, mode) {
   store.alignComponent(id, mode)
   const state = useEditorStore.getState()
   const moved = findDeep(state.schema, id)
-  const key = state.viewport === 'mobile' && (topLevel || parent?.type === 'region') ? 'mobileLayout' : 'layout'
+  const key = parent?.type === 'container'
+    ? containerChildKey(parent, state.viewport, here.flowMode)
+    : state.viewport === 'mobile' && (topLevel || parent?.type === 'region') ? 'mobileLayout' : 'layout'
   const placed = moved?.[key] || moved?.layout || {}
   return { ok: true, x: Math.round(placed.x || 0), y: Math.round(placed.y || 0) }
 }
