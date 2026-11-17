@@ -76,8 +76,10 @@ describe('usePhoneEmbedHeights', () => {
 
     expect(measureEmbedHeight).toHaveBeenCalledTimes(2)
     const page = selectCurrentPage(useEditorStore.getState())
+    // A container's blocks are stacked for the phone at its own phone width
+    // (358 on a 390 phone), inside its 16 px margins: 326.
     expect(page.components[0].children[0].props._phoneH).toEqual({
-      w: 320,
+      w: 326,
       h: 420,
       key: embedPhoneKey(htmlInContainer),
     })

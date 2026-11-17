@@ -29,7 +29,22 @@ function load(type = 'container', mobileManual = true) {
 }
 
 describe('keyboard movement inside a container or tabs on the phone', () => {
-  for (const type of ['container', 'tabs']) {
+  // A container's block moves in its own phone layout: here the place its
+  // scaled drawing gave it (320 / 700 of the desktop one) on a page laid
+  // out by hand before containers had phone layouts.
+  it('nudges a container\'s block in its phone layout, leaving the desktop as it was', () => {
+    load('container')
+    expect(child().mobileLayout).toEqual({ x: 46, y: 18, w: 55, h: 27 })
+    state().selectComponent('child')
+    state().nudgeSelection(10, 5)
+
+    expect(child().mobileLayout).toEqual({ x: 56, y: 23, w: 55, h: 27 })
+    expect(child().layout).toEqual({ x: 100, y: 40, w: 120, h: 60 })
+    state().undo()
+    expect(child().mobileLayout).toEqual({ x: 46, y: 18, w: 55, h: 27 })
+  })
+
+  for (const type of ['tabs']) {
     it(`nudges the same shared ${type} coordinates that the pointer editor displays`, () => {
       load(type)
       state().selectComponent('child')
@@ -45,7 +60,7 @@ describe('keyboard movement inside a container or tabs on the phone', () => {
   }
 
   it('does not disable automatic mobile layout when only a shared child is edited', () => {
-    load('container', false)
+    load('tabs', false)
     state().setLayoutMany({ child: { x: 110, y: 45 } })
 
     expect(child().layout).toEqual({ x: 110, y: 45, w: 120, h: 60 })
@@ -53,7 +68,7 @@ describe('keyboard movement inside a container or tabs on the phone', () => {
   })
 
   it('keeps top-level phone movement independent while a shared child moves in the same action', () => {
-    load()
+    load('tabs')
     state().selectMany(['child', 'outside'])
     state().nudgeSelection(10, 5)
 

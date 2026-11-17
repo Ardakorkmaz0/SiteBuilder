@@ -21,7 +21,6 @@ import { splitPageHtml } from '../utils/projectSnapshot.js'
 import { normalizeLanguageTag } from '../utils/languages.js'
 import { containerChildKey, containerDesignWidth, scaledPhoneLayout } from '../utils/containerFit.js'
 import { isAutoLayout } from '../utils/autoLayout.js'
-import { absoluteChildrenHeight } from '../components/renderer/layout.js'
 import { mergeFontFaces } from '../utils/fontFaces.js'
 import { pageParts } from '../utils/pageShow.js'
 
@@ -843,11 +842,9 @@ function estMobileHeight(c, boxW) {
         const phone = c.props?._phoneH
         return phone && phone.w === boxW ? Math.max(designed, Math.round(phone.h) || 0) : designed
       }
-      const designW = Math.max(1, containerDesignWidth(c))
-      const scale = Math.min(1, boxW / designW)
-      const kids = Array.isArray(c.children) ? c.children : []
-      const freeHeight = Math.max(40, absoluteChildrenHeight(kids, designed))
-      return Math.max(40, Math.round(freeHeight * scale))
+      // Its blocks are stacked for the phone at the width it gets there
+      // (applyAutoMobileLayouts): as tall as they come out.
+      return containerPhoneHeight(laidOutForPhone(c, boxW))
     }
     case 'tabs': {
       // Its height is its content's, measured on the phone canvas
@@ -1115,10 +1112,51 @@ function applyAutoMobileLayouts(components, mobileWidth = MOBILE_CANVAS_WIDTH, p
     }
   })
   const auto = autoMobileLayout(prepared, mobileWidth)
-  return prepared.map((component) => ({
-    ...component,
-    mobileLayout: auto[component.id] || component.mobileLayout,
-  }))
+  return prepared.map((component) => {
+    const mobileLayout = auto[component.id] || component.mobileLayout
+    // A free container stacks its own blocks for the width it got, as the
+    // page does, and stands them there on the phone (containerChildKey).
+    if (isFreeContainer(component) && mobileLayout) return { ...laidOutForPhone(component, mobileLayout.w), mobileLayout }
+    return { ...component, mobileLayout }
+  })
+}
+
+const isFreeContainer = (c) => c?.type === 'container' && Array.isArray(c.children) && c.children.length > 0 && !isAutoLayout(c.props)
+
+// A free container whose blocks are stacked for the phone at width `w`,
+// with phone layouts on.
+function laidOutForPhone(c, w) {
+  if (!isFreeContainer(c)) return c
+  return {
+    ...c,
+    props: { ...c.props, phoneLayout: true },
+    children: applyAutoMobileLayouts(c.children, Math.max(MOBILE_PAD * 2 + 8, Math.round(w || 0))),
+  }
+}
+
+function containerPhoneHeight(c) {
+  const designed = Math.max(40, Math.round(c.layout?.h || 80))
+  if (!isFreeContainer(c)) return designed
+  const bottom = c.children.reduce((max, child) => {
+    if (child.hiddenMobile || child.props?.scrollBehavior === 'fixed') return max
+    const l = child.mobileLayout || child.layout || {}
+    return Math.max(max, (l.y || 0) + (l.h || 0))
+  }, 0)
+  return Math.max(40, Math.round(bottom + MOBILE_PAD))
+}
+
+// A page whose phone layout was laid out by hand, from before containers
+// had phone layouts of their own: each free container's blocks get the phone
+// place its scaled drawing gave them (scaledPhoneLayout), so the page looks
+// as it did, and the container has phone layouts from then on. Not inside a
+// tab panel, which still draws its desktop design on both breakpoints.
+function withContainerPhoneLayouts(components) {
+  return (components || []).map((c) => {
+    if (!Array.isArray(c?.children) || c.type === 'tabs') return c
+    if (!isFreeContainer(c) || c.props?.phoneLayout === true) return { ...c, children: withContainerPhoneLayouts(c.children) }
+    const children = c.children.map((child) => (child.hiddenMobile ? child : { ...child, mobileLayout: scaledPhoneLayout(c, child) }))
+    return { ...c, props: { ...c.props, phoneLayout: true }, children: withContainerPhoneLayouts(children) }
+  })
 }
 
 // Every component needs both a desktop layout and a mobile layout. Designs made
@@ -1308,6 +1346,8 @@ function normalizePage(page) {
   // existing sites pick up reading-order fixes without a manual re-arrange.
   if (!mobileManual) {
     components = applyAutoMobileLayouts(components, mobileWidth, partKeys(page))
+  } else if (!flowMode) {
+    components = withContainerPhoneLayouts(components)
   }
   // Per-page editor mode. Old/loaded data has no `mode`: a page that carries an
   // HTML document is 'html', everything else is the component canvas ('empty').

@@ -128,7 +128,7 @@ describe('editorStore regressions', () => {
     expect(moved.children[0].props.shownBy).toBeUndefined()
   })
 
-  it('scales free container mobileLayout height proportionally to content width in autoMobileLayout', () => {
+  it('stacks a free container\'s blocks for its phone width in autoMobileLayout, as tall as they come out', () => {
     const page = {
       components: [{
         id: 'cont_1',
@@ -146,9 +146,11 @@ describe('editorStore regressions', () => {
       }],
     }
     const mobile = autoMobileLayout(page.components)
-    // Content width is 358px -> scale = 358 / 716 = 0.5 -> absoluteChildrenHeight (416) * 0.5 = 208.
+    // Not its desktop drawing scaled (416 * 358 / 716 = 208, the low text
+    // still 300 px down): the text is stacked at the top, 16 px in, and the
+    // container ends 16 px below it.
     expect(mobile.cont_1.w).toBe(358)
-    expect(mobile.cont_1.h).toBe(208)
+    expect(mobile.cont_1.h).toBeLessThan(120)
   })
 
   it('does not record phantom undo history entries on no-op actions', () => {

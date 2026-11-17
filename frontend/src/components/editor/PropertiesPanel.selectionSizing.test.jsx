@@ -55,7 +55,8 @@ describe('sizing a selection containing a parent and its child', () => {
 
       const result = state().schema.pages[0].components[0]
       expect(viewport === 'mobile' ? result.mobileLayout.w : result.layout.w).toBe(100)
-      expect(result.children[0].layout.w).toBe(100)
+      // On the phone the container's block is sized in its own phone layout.
+      expect(result.children[0][viewport === 'mobile' ? 'mobileLayout' : 'layout'].w).toBe(100)
     })
   }
 })

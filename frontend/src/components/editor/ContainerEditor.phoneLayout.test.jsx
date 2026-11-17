@@ -1,6 +1,5 @@
 // In the phone view the editor lets the owner select and move a container's
-// blocks where they are drawn: at their phone layout when the container has
-// phone layouts (props.phoneLayout), else in the shared desktop drawing.
+// blocks where they are drawn: at their phone layout.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
@@ -37,7 +36,9 @@ describe('a container\'s blocks in the editor\'s phone view', () => {
     expect(editable({ phoneLayout: true })).toEqual({ left: '10px', top: '10px', width: '160px', height: '80px' })
   })
 
-  it('stand in the shared desktop drawing in any other container', () => {
-    expect(editable({})).toEqual({ left: '18px', top: '20px', width: '260px', height: '40px' })
+  // A page laid out by hand before containers had phone layouts: the place
+  // its scaled drawing gave each block (180 / 300 of the desktop one).
+  it('stand where the scaled drawing showed them on a page laid out by hand before', () => {
+    expect(editable({})).toEqual({ left: '11px', top: '12px', width: '156px', height: '24px' })
   })
 })

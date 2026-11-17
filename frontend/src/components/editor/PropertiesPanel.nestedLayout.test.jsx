@@ -36,7 +36,22 @@ beforeEach(() => {
 })
 
 describe('Properties panel coordinates on a phone', () => {
-  for (const type of ['container', 'tabs']) {
+  // A container's block has a phone layout of its own: on a page laid out by
+  // hand before containers had them, the place its scaled drawing gave it
+  // (320 / 700 of the desktop one: 46, 18, 55 by 27).
+  it('shows and scales a container child in its own phone layout', () => {
+    renderPanel([parent('container')])
+
+    expect.soft(screen.getByRole('spinbutton', { name: 'Width', exact: true })).toHaveValue(55)
+    expect.soft(screen.getByRole('spinbutton', { name: 'Height', exact: true })).toHaveValue(27)
+    fireEvent.click(screen.getByRole('button', { name: '10% larger', exact: true }))
+
+    const child = currentPage().components[0].children[0]
+    expect(child.mobileLayout).toEqual({ x: 46, y: 18, w: 61, h: 30 })
+    expect(child.layout).toEqual({ x: 100, y: 40, w: 120, h: 60 })
+  })
+
+  for (const type of ['tabs']) {
     it(`shows and scales the shared ${type} child instead of its stale phone geometry`, () => {
       renderPanel([parent(type)])
 
@@ -81,7 +96,7 @@ describe('Properties panel coordinates on a phone', () => {
   }
 
   it('reads each selected parent coordinate space before scaling a mixed selection', () => {
-    renderPanel([parent('container', box('shared')), parent('region', box('phone'))], { selected: ['shared', 'phone'] })
+    renderPanel([parent('tabs', box('shared')), parent('region', box('phone'))], { selected: ['shared', 'phone'] })
     expect.soft(screen.getByRole('spinbutton', { name: 'Width', exact: true })).toHaveValue(null)
     fireEvent.click(screen.getByRole('button', { name: '10% larger', exact: true }))
 

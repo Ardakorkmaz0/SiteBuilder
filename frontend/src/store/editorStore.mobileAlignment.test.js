@@ -31,7 +31,35 @@ function load(type, { flowMode = false, mobileManual = true } = {}) {
 }
 
 describe('mobile alignment coordinate spaces', () => {
-  for (const type of ['container', 'tabs']) {
+  // A container's blocks have phone layouts of their own: those of a page
+  // laid out by hand before containers had them are the places its scaled
+  // drawing gave them (here 320 / 800 of the desktop ones), and the phone
+  // aligns them there.
+  it('aligns a container\'s blocks in their phone layout, with Undo and Redo', () => {
+    load('container')
+    expect(mobileX()).toEqual([40, 120, 240])
+    state().selectMany(['a', 'b', 'c'])
+    state().alignSelection('left')
+    expect(mobileX()).toEqual([40, 40, 40])
+    expect(desktopX()).toEqual([100, 300, 600])
+    state().undo()
+    expect(mobileX()).toEqual([40, 120, 240])
+    state().redo()
+    expect(mobileX()).toEqual([40, 40, 40])
+  })
+
+  it('distributes a container\'s blocks in their phone layout, with Undo and Redo', () => {
+    load('container')
+    expect(mobileY()).toEqual([16, 64, 128])
+    state().selectMany(['a', 'b', 'c'])
+    state().distributeSelection('y')
+    expect(mobileY()).toEqual([16, 68, 128])
+    expect(desktopY()).toEqual([40, 160, 320])
+    state().undo()
+    expect(mobileY()).toEqual([16, 64, 128])
+  })
+
+  for (const type of ['tabs']) {
     it(`aligns the displayed shared ${type} coordinates, with Undo and Redo`, () => {
       load(type)
       state().selectMany(['a', 'b', 'c'])
@@ -59,7 +87,7 @@ describe('mobile alignment coordinate spaces', () => {
 
   for (const action of ['align', 'distribute']) {
     it(`keeps automatic mobile layout enabled after a shared-child ${action}`, () => {
-      load('container', { mobileManual: false })
+      load('tabs', { mobileManual: false })
       state().selectMany(['a', 'b', 'c'])
       if (action === 'align') state().alignSelection('left')
       else state().distributeSelection('y')

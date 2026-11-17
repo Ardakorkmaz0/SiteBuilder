@@ -25,24 +25,45 @@ function load(type = 'container', viewport = 'pc') {
 }
 
 describe('batch sizing a selected parent and descendant', () => {
-  for (const viewport of ['pc', 'mobile']) {
-    it(`applies explicit descendant sizes without applying positional nudges twice on ${viewport}`, () => {
-      load('container', viewport)
-      state().selectMany(['child', 'parent'])
-      state().nudgeSelection(10, 5)
-      expect(child().layout).toEqual({ x: 100, y: 40, w: 120, h: 60 })
-      expect(parent()[viewport === 'mobile' ? 'mobileLayout' : 'layout'].x).toBe(viewport === 'mobile' ? 20 : 50)
+  // The container's block has the phone place its scaled drawing gave it
+  // (300 / 700 of the desktop one): the page was laid out by hand before
+  // containers had phone layouts.
+  const PHONE = { x: 43, y: 17, w: 51, h: 26 }
 
-      state().setLayoutMany({ parent: { w: 100 }, child: { w: 100 } })
-      expect(parent()[viewport === 'mobile' ? 'mobileLayout' : 'layout'].w).toBe(100)
-      expect(child().layout).toEqual({ x: 100, y: 40, w: 100, h: 60 })
-      expect(child().mobileLayout).toEqual({ x: 16, y: 16, w: 200, h: 50 })
-      state().undo()
-      expect(child().layout.w).toBe(120)
-      state().redo()
-      expect(child().layout.w).toBe(100)
-    })
-  }
+  it('applies explicit descendant sizes without applying positional nudges twice on pc', () => {
+    load('container', 'pc')
+    state().selectMany(['child', 'parent'])
+    state().nudgeSelection(10, 5)
+    expect(child().layout).toEqual({ x: 100, y: 40, w: 120, h: 60 })
+    expect(parent().layout.x).toBe(50)
+
+    state().setLayoutMany({ parent: { w: 100 }, child: { w: 100 } })
+    expect(parent().layout.w).toBe(100)
+    expect(child().layout).toEqual({ x: 100, y: 40, w: 100, h: 60 })
+    expect(child().mobileLayout).toEqual(PHONE)
+    state().undo()
+    expect(child().layout.w).toBe(120)
+    state().redo()
+    expect(child().layout.w).toBe(100)
+  })
+
+  it('applies explicit descendant sizes without applying positional nudges twice on mobile', () => {
+    load('container', 'mobile')
+    state().selectMany(['child', 'parent'])
+    state().nudgeSelection(10, 5)
+    expect(child().mobileLayout).toEqual(PHONE)
+    expect(parent().mobileLayout.x).toBe(20)
+
+    state().setLayoutMany({ parent: { w: 100 }, child: { w: 100 } })
+    expect(parent().mobileLayout.w).toBe(100)
+    // As wide as the narrowed container: it fits only from its left edge.
+    expect(child().mobileLayout).toEqual({ ...PHONE, x: 0, w: 100 })
+    expect(child().layout).toEqual({ x: 100, y: 40, w: 120, h: 60 })
+    state().undo()
+    expect(child().mobileLayout.w).toBe(51)
+    state().redo()
+    expect(child().mobileLayout.w).toBe(100)
+  })
 
   it('constrains descendant sizes against the updated tabs parent, not its old width', () => {
     load('tabs')
