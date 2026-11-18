@@ -168,12 +168,12 @@ async function sampleFrames(page, decoder, surface) {
   }
   // Only seek playback that this input actually started. Seeking a paused or
   // pre-existing effect could make a disconnected trigger look functional.
-  const playback = await Promise.all(page.frames().map(frame => frame.evaluateHandle(earlier => document.getAnimations()
-    .filter(animation => animation.playState === 'running' && !earlier.includes(animation))
-    .map(animation => {
-      animation.pause()
-      return { animation, rate: animation.playbackRate }
-    }), previous.get(frame) || [])))
+  const playback = await Promise.all(page.frames().map(frame => frame.evaluateHandle(async earlier => {
+    const started = document.getAnimations().filter(animation => animation.playState === 'running' && !earlier.includes(animation))
+    for (const animation of started) animation.pause()
+    await Promise.all(started.map(animation => animation.ready))
+    return started.map(animation => ({ animation, rate: animation.playbackRate }))
+  }, previous.get(frame) || [])))
   const frames = []
   for (const ms of [0, 500, 1000]) {
     if (ms) await page.clock.runFor(500)
