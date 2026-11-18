@@ -1,0 +1,9 @@
+# Conversion behaviour checks
+
+Run `npx playwright test conversion-fidelity conversion-behaviour behaviour-pointer --project=chromium --no-deps` from the frontend directory. The publication spec also uses a local test account and the real Django API. In CI the browser projects and their setup run normally.
+
+The six fidelity pages each have an interaction in `fidelityJourneys.js`. Field Station tests six controls; Light Bench compares an 8×8 painted region at 0, 500 and 1000 ms for each of three effects. The original must meet the hand-written expectations. Only then is the converted page compared. Known gaps record specific observations. If the output improves, remove the corresponding gap and use the original expectation; do not lower a fidelity floor or mark the entire test as an expected failure.
+
+The private inventory is opt-in. Outside CI, set `FIDELITY_EXTRA` to one or more **lesson directories** (separated by the platform path delimiter) and run `node e2e/fidelityInventory.js` from the frontend directory. Redirect its JSON output to a private location outside Git. The static bench uses the same inventory when that variable is set.
+
+Rule version 1 walks subdirectories in sorted order without following directory entries that are symbolic links. It includes lowercase `.html` files strictly larger than 20,480 bytes, fingerprints their raw bytes with SHA-256 and runs each distinct document once. The manifest retains paths for duplicates. Feature counts are per distinct document: style blocks and style attributes for CSS, inline scripts and event attributes for JavaScript, and parsed tags for elements. These are source signals, not proof that an interaction works. No scripts are executed by the inventory. The optional external-page geometry scores are reports only; the committed behavioural contracts apply to the authored fixtures.

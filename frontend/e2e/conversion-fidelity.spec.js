@@ -13,20 +13,20 @@
 // but not checked: for pages that cannot be in the repository.
 import fs from 'node:fs'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { test, expect } from '@playwright/test'
 import { scoreFidelity } from '../src/utils/fidelityScore.js'
+import { convertFidelityPage } from './convertFidelityPage.js'
+import { extraFidelityPages } from './fidelityInventory.js'
+import { assertFidelityJourney } from './fidelityJourneys.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const corpus = path.join(here, 'fixtures', 'fidelity')
 const floors = JSON.parse(fs.readFileSync(path.join(corpus, 'floors.json'), 'utf8'))
 const pages = fs.readdirSync(corpus).filter((name) => name.endsWith('.html')).sort()
   .map((name) => ({ name: name.replace(/\.html$/, ''), file: path.join(corpus, name), checked: true }))
-if (process.env.FIDELITY_EXTRA) {
-  for (const name of fs.readdirSync(process.env.FIDELITY_EXTRA).filter((n) => n.endsWith('.html')).sort()) {
-    pages.push({ name: `extra/${name.replace(/\.html$/, '')}`, file: path.join(process.env.FIDELITY_EXTRA, name), checked: false })
-  }
-}
+pages.push(...extraFidelityPages(process.env.FIDELITY_EXTRA))
 
 const WIDTHS = { desktop: { width: 1280, height: 900 }, phone: { width: 390, height: 844 } }
 
@@ -74,18 +74,9 @@ function readDrawn() {
     for (const c of cuts) { l = Math.max(l, c.l); t = Math.max(t, c.t); r = Math.min(r, c.r); b = Math.min(b, c.b) }
     return r > l && b > t && (r - l) * (b - t) > 0.5 * box.width * box.height
   }
-  const address = (src) => {
-    const data = /^data:([^;,]*)((?:;[^;,]*)*),([\s\S]*)$/i.exec(src)
-    if (!data) return src
-    try {
-      const bytes = /;base64/i.test(data[2]) ? atob(data[3]) : unescape(encodeURIComponent(decodeURIComponent(data[3])))
-      return `data:${data[1].toLowerCase()},${bytes.replace(/\s+/g, '')}`
-    } catch {
-      return src
-    }
-  }
   const words = []
   const images = []
+  const samples = []
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
   let run = 0
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -103,61 +94,128 @@ function readDrawn() {
       range.setEnd(node, match.index + match[0].length)
       const box = range.getBoundingClientRect()
       if (box.width < 1 || box.height < 1 || !mostlyShown(box, cuts)) continue
-      words.push({ t: match[0].toLocaleLowerCase(), x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height, run })
+      samples.push({ el, into: words, item: { t: match[0].toLocaleLowerCase(), x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height, run } })
     }
   }
   for (const img of document.images) {
     const box = img.getBoundingClientRect()
-    if (box.width >= 1 && box.height >= 1 && img.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && mostlyShown(box, cutsOf(img.parentElement))) images.push({ src: address(img.currentSrc || img.src), x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height })
+    if (box.width >= 1 && box.height >= 1 && img.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && mostlyShown(box, cutsOf(img.parentElement))) {
+      samples.push({ el: img, into: images, item: { src: img.currentSrc || img.src, x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height } })
+    }
+  }
+  const left = scrollX
+  const top = scrollY
+  const probe = document.createElement('style')
+  probe.textContent = '* { pointer-events: auto !important; }'
+  document.head.append(probe)
+  const paints = new Map()
+  const opaque = (el) => {
+    if (paints.has(el)) return paints.get(el)
+    const look = getComputedStyle(el)
+    let answer = /^rgb\(/.test(look.backgroundColor)
+    for (let parent = el; answer && parent; parent = parent.parentElement) {
+      answer = getComputedStyle(parent).opacity === '1'
+    }
+    paints.set(el, answer)
+    return answer
+  }
+  try {
+    for (const { el, into, item } of samples) {
+      const center = item.y + item.h / 2
+      if (center < scrollY || center >= scrollY + innerHeight) scrollTo({ top: Math.max(0, center - innerHeight / 2), behavior: 'instant' })
+      const y = center - scrollY
+      const xs = [0.25, 0.5, 0.75].map(ratio => item.x + item.w * ratio - scrollX).filter(x => x >= 0 && x < innerWidth)
+      const covered = xs.filter(x => {
+        for (const hit of document.elementsFromPoint(x, y)) {
+          if (hit === el || hit.contains(el)) return false
+          if (opaque(hit)) return true
+        }
+        return false
+      }).length
+      if (!xs.length || covered <= xs.length / 2) into.push(item)
+    }
+  } finally {
+    probe.remove()
+    scrollTo({ left, top, behavior: 'instant' })
   }
   return { words, images, height: document.documentElement.scrollHeight }
 }
 
-async function drawnAt(browser, html, size) {
+async function drawnAt(browser, html, size, serve) {
   const context = await browser.newContext({ viewport: size, storageState: { cookies: [], origins: [] } })
   const page = await context.newPage()
-  await page.setContent(html, { waitUntil: 'load' })
-  await page.evaluate(() => document.fonts.ready)
-  await page.waitForTimeout(150)
-  const drawn = await page.evaluate(readDrawn)
-  await context.close()
-  return drawn
+  try {
+    if (serve) await serve(page)
+    const identities = new Map()
+    const hash = bytes => createHash('sha256').update(bytes).digest('hex')
+    page.on('response', response => {
+      if (response.request().resourceType() === 'image' && response.ok()) {
+        identities.set(response.url(), response.body().then(hash).catch(() => response.url()))
+      }
+    })
+    await page.setContent(html, { waitUntil: 'load' })
+    await page.evaluate(() => document.fonts.ready)
+    await page.waitForTimeout(150)
+    const drawn = await page.evaluate(readDrawn)
+    for (const image of drawn.images) {
+      if (!identities.has(image.src) && /^data:image\//i.test(image.src)) {
+        identities.set(image.src, fetch(image.src).then(response => response.arrayBuffer()).then(bytes => hash(Buffer.from(bytes))).catch(() => image.src))
+      }
+      image.src = (await identities.get(image.src)) ?? image.src
+    }
+    return drawn
+  } finally {
+    await context.close()
+  }
 }
+
+test('static measurement distinguishes a painted cover from a transparent layer', async ({ browser }) => {
+  const size = { width: 600, height: 300 }
+  const card = '<p>One formula</p><img style="display:block;margin-top:500px" alt="Diagram" width="30" height="30" src="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22/%3E">'
+  const cover = colour => `<div style="position:fixed;inset:0;z-index:2;pointer-events:none;background:${colour}"></div>`
+  const source = await drawnAt(browser, card, size)
+  expect([source.words.length, source.images.length]).toEqual([2, 1])
+  for (const colour of ['transparent', 'white', 'navy']) {
+    const result = scoreFidelity(source, await drawnAt(browser, card + cover(colour), size))
+    const expected = colour === 'transparent' ? 1 : 0
+    expect([result.found, result.imagesNear], colour).toEqual([expected, expected])
+  }
+})
+
+test('static measurement counts every surplus copy of a visible formula', async ({ browser }) => {
+  const size = { width: 600, height: 300 }
+  const formula = '<p style="font:20px monospace">E=mc²</p>'
+  const source = await drawnAt(browser, formula, size)
+  const tripled = await drawnAt(browser, formula.repeat(3), size)
+  const score = scoreFidelity(source, tripled)
+  expect(score).toMatchObject({ found: 1, duplicateWords: 2, extraText: ['e=mc²'] })
+  expect(score.duplicateArea).toBeGreaterThan(1000)
+})
+
+test('static measurement matches an embedded image to the same bytes in a site file', async ({ browser }) => {
+  const size = { width: 600, height: 300 }
+  const bytes = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="20" height="20" fill="blue"/></svg>'
+  const file = 'https://fidelity.invalid/diagram.svg'
+  const image = src => `<img width="20" height="20" alt="Diagram" src="${src}">`
+  const source = await drawnAt(browser, image('data:image/svg+xml;base64,' + Buffer.from(bytes).toString('base64')), size)
+  expect(source.images).toHaveLength(1)
+  for (const [colour, expected] of [['blue', 1], ['lime', 0]]) {
+    let requests = 0
+    const result = await drawnAt(browser, image(file), size, page => page.route(file, route => {
+      requests += 1
+      return route.fulfill({ contentType: 'image/svg+xml', body: bytes.replace('blue', colour) })
+    }))
+    expect(requests).toBe(1)
+    expect(scoreFidelity(source, result).imagesNear, colour).toBe(expected)
+  }
+})
 
 for (const entry of pages) {
   test(`fidelity: ${entry.name}`, async ({ page, browser }, testInfo) => {
     test.setTimeout(240_000)
     const source = fs.readFileSync(entry.file, 'utf8')
-    await page.goto('/')
     const started = Date.now()
-    const converted = await page.evaluate(async (html) => {
-      const { measureHtmlPage } = await import('/src/utils/htmlPageMeasure.js')
-      const { canvasPageFromMeasured } = await import('/src/utils/htmlToCanvas.js')
-      const { useEditorStore } = await import('/src/store/editorStore.js')
-      const { publishedPagesFor } = await import('/src/utils/publishedPages.js')
-      const measured = await measureHtmlPage(html, { width: 1280, timeout: 180000 })
-      const result = canvasPageFromMeasured(measured)
-      const store = useEditorStore.getState()
-      store.loadSchema({ theme: {}, pages: [{ id: 'page_home', name: 'Home', mode: 'html', components: [] }] })
-      store.convertPageToCanvas('page_home', {
-        ...result,
-        htmlBackup: html,
-        seoTitle: result.title,
-        seoDescription: result.description,
-        language: result.language,
-      })
-      const schema = useEditorStore.getState().schema
-      const count = (list) => list.reduce((sum, c) => sum + 1 + count(c.children || []), 0)
-      const kinds = {}
-      const tally = (list) => list.forEach((c) => { kinds[c.type] = (kinds[c.type] || 0) + 1; tally(c.children || []) })
-      tally(schema.pages[0].components)
-      return {
-        html: publishedPagesFor(schema, {}, 'Bench', '')[0]?.html || '',
-        blocks: count(schema.pages[0].components),
-        kinds,
-        ranScripts: measured.ranScripts,
-      }
-    }, source)
+    const converted = await convertFidelityPage(page, source)
     const seconds = Math.round((Date.now() - started) / 100) / 10
     expect(converted.html).toContain('<body')
 
@@ -175,10 +233,12 @@ for (const entry of pages) {
     const floor = floors[entry.name]
     expect(floor, `fixtures/fidelity/floors.json has no floor for ${entry.name}`).toBeTruthy()
     for (const width of Object.keys(WIDTHS)) {
+      expect.soft(scores[width], `${entry.name} at ${width}: duplicated text and its box area`).toMatchObject({ duplicateWords: 0, duplicateArea: 0 })
       expect.soft(scores[width].found, `${entry.name} at ${width}: share of words found`).toBeGreaterThanOrEqual(floor[width].found)
       expect.soft(scores[width].near, `${entry.name} at ${width}: share of words in place`).toBeGreaterThanOrEqual(floor[width].near)
       expect.soft(scores[width].imagesNear, `${entry.name} at ${width}: share of pictures in place`).toBeGreaterThanOrEqual(floor[width].images)
     }
     expect.soft(converted.blocks, `${entry.name}: blocks`).toBeLessThanOrEqual(floor.blocks)
+    await assertFidelityJourney(browser, entry.name, source, converted.html)
   })
 }

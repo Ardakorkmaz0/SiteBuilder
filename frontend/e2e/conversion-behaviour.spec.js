@@ -1,0 +1,220 @@
+import fs from 'node:fs/promises'
+import { test, expect } from '@playwright/test'
+import { pointerAt } from './behaviourActions.js'
+import { convertFidelityPage } from './convertFidelityPage.js'
+
+test.use({ storageState: { cookies: [], origins: [] } })
+test.skip(({ browserName }) => browserName !== 'chromium', 'the conversion and paint reference runs use Chromium')
+
+async function withDocument(browser, html, read) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 })
+  try {
+    const url = 'http://behaviour.invalid/lesson'
+    await context.route('**/*', route => route.request().url() === url
+      ? route.fulfill({ contentType: 'text/html; charset=utf-8', body: html })
+      : route.abort())
+    const page = await context.newPage()
+    await page.clock.install({ time: new Date('2025-01-01T00:00:00Z') })
+    await page.clock.pauseAt(new Date('2025-01-01T00:01:00Z'))
+    await page.goto(url)
+    await page.evaluate(() => document.fonts.ready)
+    return await read(page)
+  } finally {
+    await context.close()
+  }
+}
+
+const words = (page, text) => page.getByText(text, { exact: true })
+const count = (page, text) => words(page, text).filter({ visible: true }).count()
+const press = (page, text) => pointerAt(page, words(page, text))
+const typeIn = async (page, name, value) => {
+  const target = page.getByRole('textbox', { name, exact: true })
+  const hit = await pointerAt(page, target)
+  if (hit === 'clicked') await page.keyboard.type(value)
+  return hit
+}
+const routeLooks = async (page) => {
+  const ridge = words(page, 'Ridge watch')
+  return {
+    active: await ridge.count() === 1 && await ridge.evaluate(el => getComputedStyle(el).color === 'rgb(0, 100, 80)'),
+    ridge: await count(page, 'Ridge watch selected'),
+    brook: await count(page, 'Brook watch selected'),
+  }
+}
+const atBrook = { active: false, ridge: 0, brook: 1 }
+const atRidge = { active: true, ridge: 1, brook: 0 }
+
+const observations = [
+  {
+    name: 'active menu', expected: [atBrook, 'clicked', atRidge, 'clicked', atBrook],
+    run: async page => [await routeLooks(page), await press(page, 'Ridge watch'), await routeLooks(page),
+      await press(page, 'Brook watch'), await routeLooks(page)],
+  },
+  {
+    name: 'arrow navigation', expected: [atBrook, atRidge, atBrook],
+    async run(page) {
+      const initial = await routeLooks(page)
+      await page.keyboard.press('ArrowRight')
+      const right = await routeLooks(page)
+      await page.keyboard.press('ArrowLeft')
+      return [initial, right, await routeLooks(page)]
+    },
+  },
+  {
+    name: 'specimen filter', expected: [1, 1, 'clicked', 0, 1],
+    run: async page => [await count(page, 'Silver birch'), await count(page, 'Copper fern'),
+      await typeIn(page, 'Find a specimen', 'copper'), await count(page, 'Silver birch'), await count(page, 'Copper fern')],
+  },
+  {
+    name: 'radio quiz', expected: [1, 'clicked', 'clicked', 1, 0],
+    run: async page => [await count(page, 'No bearing checked'),
+      await pointerAt(page, page.getByRole('radio', { name: 'Eastern slope', exact: true })),
+      await press(page, 'Check bearing'), await count(page, 'Bearing confirmed'), await count(page, 'No bearing checked')],
+  },
+  {
+    name: 'persistent visits', expected: [1, 'clicked', 1, 1, 0],
+    async run(page) {
+      const first = await count(page, 'Visits logged: 0')
+      const hit = await press(page, 'Record visit')
+      const once = await count(page, 'Visits logged: 1')
+      await page.reload()
+      return [first, hit, once, await count(page, 'Visits logged: 1'), await count(page, 'Visits logged: 0')]
+    },
+  },
+  {
+    name: 'rope calculator', expected: [1, 'clicked', 1, 0],
+    run: async page => [await count(page, 'Double length: 0 m'), await typeIn(page, 'Rope length', '7'),
+      await count(page, 'Double length: 14 m'), await count(page, 'Double length: 0 m')],
+  },
+]
+
+const knownObservations = {
+  'active menu': [atBrook, 'clicked', atBrook, 'clicked', atBrook],
+  'arrow navigation': [atBrook, atBrook, atBrook],
+  'specimen filter': [1, 1, 'missing', 1, 1],
+  'radio quiz': [1, 'missing', 'clicked', 0, 1],
+  'persistent visits': [1, 'clicked', 0, 0, 1],
+  'rope calculator': [1, 'missing', 0, 1],
+}
+
+// Conversion is the expensive part. Reuse its immutable text, never a visitor's document.
+const corpus = new Map()
+async function fixture(page, name) {
+  if (!corpus.has(name)) {
+    const source = await fs.readFile(new URL('./fixtures/behaviour/' + name + '.html', import.meta.url), 'utf8')
+    const converted = await convertFidelityPage(page, source)
+    expect(converted.blocks).toBeGreaterThan(0)
+    corpus.set(name, { source, html: converted.html })
+  }
+  return corpus.get(name)
+}
+
+test.describe('field station behaviour', () => {
+  for (const scenario of observations) {
+    test(scenario.name, async ({ browser, page }, info) => {
+      const { source, html } = await fixture(page, 'field-station')
+      const reference = await withDocument(browser, source, scenario.run)
+      expect(reference, 'original must satisfy the authored outcomes').toEqual(scenario.expected)
+      const observation = await withDocument(browser, html, scenario.run)
+      await info.attach(scenario.name, { body: JSON.stringify({ reference, observation }), contentType: 'application/json' })
+      if (Object.hasOwn(knownObservations, scenario.name)) {
+        expect(observation, 'conversion improved: remove the known gap').not.toEqual(scenario.expected)
+        expect(observation, 'conversion changed: investigate this exact observation').toEqual(knownObservations[scenario.name])
+      } else {
+        expect(observation).toEqual(scenario.expected)
+      }
+    })
+  }
+})
+
+// Capture a small, authored patch of each painted surface, away from the text.
+const surfaces = [
+  { name: 'hover transition', top: 83, colors: [[32, 32, 32], [128, 128, 128], [224, 224, 224]] },
+  { name: 'step keyframes', top: 163, colors: [[255, 255, 255], [143, 175, 207], [31, 95, 159]] },
+  { name: 'canvas pulse', top: 243, colors: [[32, 48, 96], [128, 48, 96], [224, 48, 96]] },
+]
+
+async function pixels(decoder, png) {
+  return decoder.evaluate(async (data) => {
+    const image = new Image()
+    image.src = 'data:image/png;base64,' + data
+    await image.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = image.width
+    canvas.height = image.height
+    const pen = canvas.getContext('2d')
+    pen.drawImage(image, 0, 0)
+    return [...pen.getImageData(0, 0, image.width, image.height).data].filter((_, index) => index % 4 !== 3)
+  }, png.toString('base64'))
+}
+
+async function sampleFrames(page, decoder, surface) {
+  const previous = await page.evaluateHandle(() => document.getAnimations())
+  const hover = surface.name === 'hover transition'
+  let hit
+  if (surface.name === 'canvas pulse') {
+    await page.keyboard.press('p')
+    hit = 'key p'
+  } else {
+    const target = words(page, hover ? 'Lamp surface' : 'Start pulse')
+    hit = await pointerAt(page, target, hover ? 'hover' : 'click')
+  }
+  // Only seek playback that this input actually started. Seeking a paused or
+  // pre-existing effect could make a disconnected trigger look functional.
+  const playback = await page.evaluateHandle(earlier => document.getAnimations()
+    .filter(animation => animation.playState === 'running' && !earlier.includes(animation))
+    .map(animation => {
+      animation.pause()
+      return { animation, rate: animation.playbackRate }
+    }), previous)
+  const frames = []
+  for (const ms of [0, 500, 1000]) {
+    if (ms) await page.clock.runFor(500)
+    // Playwright owns the JS/rAF clock; CSS animations have a separate timeline.
+    await playback.evaluate((entries, time) => {
+      for (const { animation, rate } of entries) animation.currentTime = time * rate
+    }, ms)
+    const png = await page.screenshot({ clip: { x: 192, y: surface.top, width: 8, height: 8 }, animations: 'allow' })
+    frames.push(await pixels(decoder, png))
+  }
+  return { hit, frames }
+}
+
+const delta = (left, right) => Math.max(...left.map((value, index) => Math.abs(value - right[index])))
+const knownPaint = {
+  'hover transition': { hit: 'hovered', phases: [true, false, false] },
+  'step keyframes': { hit: 'clicked', phases: [false, false, true] },
+  'canvas pulse': { hit: 'key p', phases: [true, false, false] },
+}
+
+test.describe('light bench: calibrated paint', () => {
+  for (const surface of surfaces) {
+    test(surface.name, async ({ browser, page }, info) => {
+      const { source, html } = await fixture(page, 'light-bench')
+      const sample = doc => withDocument(browser, doc, p => sampleFrames(p, page, surface))
+      const ref = await sample(source)
+      const repeat = await sample(source)
+      const action = { 'hover transition': 'hovered', 'step keyframes': 'clicked', 'canvas pulse': 'key p' }[surface.name]
+      expect([ref.hit, repeat.hit]).toEqual([action, action])
+      const drift = ref.frames.map((frame, index) => delta(frame, repeat.frames[index]))
+      expect(Math.max(...drift), 'unstable reference; do not loosen the threshold').toBeLessThanOrEqual(2)
+      const tolerance = 2 + Math.max(...drift)
+      for (const [index, frame] of ref.frames.entries()) {
+        const expected = frame.map((_, i) => surface.colors[index][i % 3])
+        expect(delta(frame, expected), 'authored RGB at phase ' + index).toBeLessThanOrEqual(4)
+      }
+      const result = await sample(html)
+      const errors = ref.frames.map((frame, index) => delta(frame, result.frames[index]))
+      const phases = errors.map(error => error <= tolerance)
+      const actual = { hit: result.hit, phases }
+      const expected = { hit: action, phases: [true, true, true] }
+      await info.attach(surface.name, { body: JSON.stringify({ drift, tolerance, errors, actual }), contentType: 'application/json' })
+      if (Object.hasOwn(knownPaint, surface.name)) {
+        expect(actual, 'paint improved: remove the known gap').not.toEqual(expected)
+        expect(actual).toEqual(knownPaint[surface.name])
+      } else {
+        expect(actual).toEqual(expected)
+      }
+    })
+  }
+})

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Field station logbook</title>
+<style>
+  body { font: 16px/1.4 Arial, sans-serif; max-width: 640px; margin: 20px; }
+  button, input { font: inherit; }
+  button.selected { color: rgb(0, 100, 80); }
+  nav button:not(.selected) { color: rgb(32, 32, 32); }
+  section { margin: 12px 0; }
+</style>
+<h1>Field station logbook</h1>
+<nav aria-label="Route"><button class="selected">Brook watch</button> <button>Ridge watch</button></nav>
+<p id="route">Brook watch selected</p>
+<section>
+  <label>Find a specimen <input type="text" placeholder="Find a specimen"></label>
+  <ul><li>Silver birch</li><li>Copper fern</li></ul>
+</section>
+<section>
+  <fieldset><legend>Which slope faces the dawn?</legend>
+    <label><input type="radio" name="slope" value="west">Western slope</label>
+    <label><input type="radio" name="slope" value="east">Eastern slope</label>
+  </fieldset>
+  <button id="check">Check bearing</button>
+  <p id="feedback" aria-live="polite">No bearing checked</p>
+</section>
+<section><button id="log">Record visit</button> <output id="visits"></output></section>
+<section><label>Rope length <input type="text" placeholder="Rope length"></label>
+  <p id="length">Double length: 0 m</p>
+</section>
+<script>
+  const stops = [...document.querySelectorAll('nav button')]
+  function choose(stop) {
+    for (const button of stops) button.classList.toggle('selected', button === stop)
+    document.querySelector('#route').textContent = stop.textContent + ' selected'
+  }
+  for (const stop of stops) stop.addEventListener('click', () => choose(stop))
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowRight') choose(stops[1])
+    if (event.key === 'ArrowLeft') choose(stops[0])
+  })
+  document.querySelector('[placeholder="Find a specimen"]').oninput = (event) => {
+    for (const item of document.querySelectorAll('li')) item.hidden = !item.textContent.toLowerCase().includes(event.target.value.toLowerCase())
+  }
+  document.querySelector('#check').onclick = () => {
+    document.querySelector('#feedback').textContent = document.querySelector('[value="east"]').checked ? 'Bearing confirmed' : 'Try another bearing'
+  }
+  let visits = 0
+  try { visits = Number(localStorage.getItem('field-visits')) || 0 } catch { /* storage unavailable */ }
+  function displayVisits() { document.querySelector('#visits').textContent = 'Visits logged: ' + visits }
+  displayVisits()
+  document.querySelector('#log').onclick = () => {
+    visits++
+    try { localStorage.setItem('field-visits', String(visits)) } catch { /* session only */ }
+    displayVisits()
+  }
+  document.querySelector('[placeholder="Rope length"]').oninput = (event) => {
+    document.querySelector('#length').textContent = 'Double length: ' + (Number(event.target.value) * 2) + ' m'
+  }
+</script>
+</html>

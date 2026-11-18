@@ -37,6 +37,13 @@ describe('scoreFidelity', () => {
     expect(scoreFidelity(page, drawn)).toMatchObject({ found: 0.5, near: 0.5, missing: ['Lost'] })
   })
 
+  it('reports extra occurrences and their own drawn area even when no original word is missing', () => {
+    const page = { words: [word('formula', 20, 10), word('formula', 40, 10)] }
+    const drawn = { words: [...page.words, word('formula', 0, 50, 1, 12), word('formula', 0, 80, 2, 25)] }
+    expect(scoreFidelity(page, drawn)).toMatchObject({ found: 1, near: 1, duplicateWords: 2, duplicateArea: 740 })
+    expect(scoreFidelity(page, page)).toMatchObject({ duplicateWords: 0, duplicateArea: 0 })
+  })
+
   it('does not count a word drawn in another size as in place', () => {
     const page = { words: [word('Title', 0, 0, 0, 100)] }
     const drawn = { words: [word('Title', 0, 0, 0, 60)] }

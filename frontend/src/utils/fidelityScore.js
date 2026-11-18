@@ -76,6 +76,9 @@ export function scoreFidelity(original, converted, { samples = 5 } = {}) {
   const near = moved.filter((m) => m.by <= NEAR && sizeKept(m)).length
   const close = moved.filter((m) => m.by <= FAR).length
   const by = moved.map((m) => m.by).sort((a, b) => a - b)
+  const unmatched = to.filter((_, index) => !taken.to.has(index))
+  const vocabulary = new Set(from.map(word => word.t))
+  const duplicates = unmatched.filter(word => vocabulary.has(word.t))
 
   const images = original?.images || []
   const theirImages = [...(converted?.images || [])]
@@ -100,6 +103,9 @@ export function scoreFidelity(original, converted, { samples = 5 } = {}) {
     p95: percentile(by, 0.95),
     images: images.length,
     imagesNear: images.length ? round(imagesNear / images.length) : 1,
+    duplicateWords: duplicates.length,
+    duplicateArea: Math.round(duplicates.reduce((sum, word) => sum + word.w * word.h, 0)),
+    extraText: [...new Set(unmatched.map(word => word.t))].slice(0, samples),
     missing: from.filter((_, i) => !taken.from.has(i)).slice(0, samples).map((w) => w.t),
     worst: moved.sort((a, b) => b.by - a.by).slice(0, samples).filter((m) => m.by > FAR)
       .map((m) => ({ t: m.word.t, from: [Math.round(m.word.x), Math.round(m.word.y)], to: [Math.round(m.at.x), Math.round(m.at.y)] })),

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Light bench</title>
+<style>
+  body { background: white; color: black; font: 16px Arial, sans-serif; margin: 0; }
+  h1 { margin: 8px; }
+  .plate { position: absolute; left: 32px; width: 180px; height: 48px; border: 0; box-sizing: border-box; }
+  #hover { top: 80px; background-color: rgb(32,32,32); color: white; transition: background-color 1s linear; }
+  #hover:hover { background-color: rgb(224,224,224); }
+  #step { top: 160px; background: rgb(31,95,159); opacity: 0; }
+  #step.lit { animation: brighten 1s linear both; }
+  @keyframes brighten { from { opacity: 0; } to { opacity: 1; } }
+  canvas { top: 240px; }
+  #start { position: absolute; left: 32px; top: 320px; }
+</style>
+<h1>Light bench</h1>
+<button id="hover" class="plate">Lamp surface</button>
+<div id="step" class="plate">Blue band</div>
+<canvas class="plate" width="180" height="48" aria-label="Sensor surface"></canvas>
+<button id="start">Start pulse</button>
+<script>
+  const pen = document.querySelector('canvas').getContext('2d')
+  function paint(value) { pen.fillStyle = 'rgb(' + value + ',48,96)'; pen.fillRect(0,0,180,48) }
+  paint(32)
+  document.querySelector('#start').onclick = () => {
+    document.querySelector('#step').classList.add('lit')
+  }
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'p') return
+    const start = performance.now()
+    function draw(now) {
+      const progress = Math.min(1, Math.round((now - start) / 100) / 10)
+      paint(Math.round(32 + 192 * progress))
+      if (progress < 1) requestAnimationFrame(draw)
+    }
+    requestAnimationFrame(draw)
+  })
+</script>
+</html>
