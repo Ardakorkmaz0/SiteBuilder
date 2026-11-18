@@ -1,29 +1,30 @@
 import { expect } from '@playwright/test'
-import { pointerAt } from './behaviourActions.js'
+import { pointerAt, visitorMatches } from './behaviourActions.js'
 
-const text = (page, value) => page.getByText(value, { exact: true })
-const visible = (page, value) => text(page, value).filter({ visible: true }).count()
+const text = (page, value) => visitorMatches(page, frame => frame.getByText(value, { exact: true }))
+const visible = async (page, value) => (await visitorMatches(page, frame => frame.getByText(value, { exact: true }).filter({ visible: true }))).length
 async function click(page, target) {
   const hit = await pointerAt(page, target)
   if (hit === 'clicked') await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
   return hit
 }
-const clickText = (page, value) => click(page, text(page, value))
-async function enter(page, field, value) {
-  const hit = await pointerAt(page, field)
+const clickText = async (page, value) => click(page, await text(page, value))
+async function enter(page, find, value) {
+  const fields = await visitorMatches(page, find)
+  const hit = await pointerAt(page, fields)
   if (hit !== 'clicked') return { hit, value: null }
   await page.keyboard.type(value)
-  return { hit, value: await field.inputValue() }
+  return { hit, value: await fields[0].inputValue() }
 }
 
 const journeys = {
   article: {
     expected: { hit: 'clicked', reachedSurvey: true },
     async run(page) {
-      const link = page.getByRole('link', { name: 'survey of regular passengers', exact: true })
+      const link = await visitorMatches(page, frame => frame.getByRole('link', { name: 'survey of regular passengers', exact: true }))
       const hit = await click(page, link)
-      const heading = text(page, 'What the numbers say')
-      const rect = await heading.boundingBox()
+      const headings = await text(page, 'What the numbers say')
+      const rect = headings.length === 1 && await headings[0].boundingBox()
       return { hit, reachedSurvey: Boolean(rect && rect.y >= 0 && rect.y + rect.height <= page.viewportSize().height && new URL(page.url()).hash === '#survey') }
     },
   },
@@ -31,7 +32,7 @@ const journeys = {
     knownGap: { tomatoes: 1 },
     expected: { input: { hit: 'clicked', value: 'basil' }, basil: 1, tomatoes: 0 },
     async run(page) {
-      const input = await enter(page, page.getByPlaceholder('Filter beds', { exact: true }), 'basil')
+      const input = await enter(page, frame => frame.getByPlaceholder('Filter beds', { exact: true }), 'basil')
       return { input, basil: await visible(page, 'Basil'), tomatoes: await visible(page, 'Tomatoes') }
     },
   },
@@ -47,7 +48,7 @@ const journeys = {
   landing: {
     expected: { before: 0, open: 'clicked', shown: 1, close: 'clicked', after: 0 },
     async run(page) {
-      const question = page.getByText('Can I keep my current accountant?', { exact: false })
+      const question = await visitorMatches(page, frame => frame.getByText('Can I keep my current accountant?', { exact: false }))
       const answer = 'Yes. Invite them with read access and they see the same books you do.'
       const before = await visible(page, answer)
       const open = await click(page, question)
@@ -57,9 +58,8 @@ const journeys = {
     },
   },
   portfolio: {
-    knownGap: { hit: 'missing', value: null },
     expected: { hit: 'clicked', value: 'June' },
-    run: (page) => enter(page, page.getByRole('textbox', { name: 'Your name', exact: true }), 'June'),
+    run: (page) => enter(page, frame => frame.getByRole('textbox', { name: 'Your name', exact: true }), 'June'),
   },
   'study-notes': {
     expected: { before: 0, first: 'clicked', secondStep: 1, thirdBefore: 0, next: 'clicked', thirdStep: 1 },

@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import { test, expect } from '@playwright/test'
-import { pointerAt } from './behaviourActions.js'
+import { pointerAt, visitorMatches } from './behaviourActions.js'
 import { convertFidelityPage } from './convertFidelityPage.js'
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -24,19 +24,21 @@ async function withDocument(browser, html, read) {
   }
 }
 
-const words = (page, text) => page.getByText(text, { exact: true })
-const count = (page, text) => words(page, text).filter({ visible: true }).count()
-const press = (page, text) => pointerAt(page, words(page, text))
+const words = text => frame => frame.getByText(text, { exact: true }).filter({ visible: true })
+const count = async (page, text) => (await visitorMatches(page, words(text))).length
+async function aim(page, query, action = 'click') {
+  return pointerAt(page, await visitorMatches(page, query), action)
+}
+const press = (page, text) => aim(page, words(text))
 const typeIn = async (page, name, value) => {
-  const target = page.getByRole('textbox', { name, exact: true })
-  const hit = await pointerAt(page, target)
+  const hit = await aim(page, frame => frame.getByRole('textbox', { name, exact: true }))
   if (hit === 'clicked') await page.keyboard.type(value)
   return hit
 }
 const routeLooks = async (page) => {
-  const ridge = words(page, 'Ridge watch')
+  const ridge = await visitorMatches(page, words('Ridge watch'))
   return {
-    active: await ridge.count() === 1 && await ridge.evaluate(el => getComputedStyle(el).color === 'rgb(0, 100, 80)'),
+    active: ridge.length === 1 && await ridge[0].evaluate(el => getComputedStyle(el).color === 'rgb(0, 100, 80)'),
     ridge: await count(page, 'Ridge watch selected'),
     brook: await count(page, 'Brook watch selected'),
   }
@@ -51,13 +53,14 @@ const observations = [
       await press(page, 'Brook watch'), await routeLooks(page)],
   },
   {
-    name: 'arrow navigation', expected: [atBrook, atRidge, atBrook],
+    name: 'arrow navigation', expected: ['clicked', atBrook, atRidge, atBrook],
     async run(page) {
+      const hit = await press(page, 'Brook watch')
       const initial = await routeLooks(page)
       await page.keyboard.press('ArrowRight')
       const right = await routeLooks(page)
       await page.keyboard.press('ArrowLeft')
-      return [initial, right, await routeLooks(page)]
+      return [hit, initial, right, await routeLooks(page)]
     },
   },
   {
@@ -68,7 +71,7 @@ const observations = [
   {
     name: 'radio quiz', expected: [1, 'clicked', 'clicked', 1, 0],
     run: async page => [await count(page, 'No bearing checked'),
-      await pointerAt(page, page.getByRole('radio', { name: 'Eastern slope', exact: true })),
+      await aim(page, frame => frame.getByRole('radio', { name: 'Eastern slope', exact: true })),
       await press(page, 'Check bearing'), await count(page, 'Bearing confirmed'), await count(page, 'No bearing checked')],
   },
   {
@@ -90,7 +93,7 @@ const observations = [
 
 const knownObservations = {
   'active menu': [atBrook, 'clicked', atBrook, 'clicked', atBrook],
-  'arrow navigation': [atBrook, atBrook, atBrook],
+  'arrow navigation': ['clicked', atBrook, atBrook, atBrook],
   'specimen filter': [1, 1, 'missing', 1, 1],
   'radio quiz': [1, 'missing', 'clicked', 0, 1],
   'persistent visits': [1, 'clicked', 0, 0, 1],
@@ -99,9 +102,10 @@ const knownObservations = {
 
 // Conversion is the expensive part. Reuse its immutable text, never a visitor's document.
 const corpus = new Map()
+const readFixture = name => fs.readFile(new URL('./fixtures/behaviour/' + name + '.html', import.meta.url), 'utf8')
 async function fixture(page, name) {
   if (!corpus.has(name)) {
-    const source = await fs.readFile(new URL('./fixtures/behaviour/' + name + '.html', import.meta.url), 'utf8')
+    const source = await readFixture(name)
     const converted = await convertFidelityPage(page, source)
     expect(converted.blocks).toBeGreaterThan(0)
     corpus.set(name, { source, html: converted.html })
@@ -149,31 +153,34 @@ async function pixels(decoder, png) {
 }
 
 async function sampleFrames(page, decoder, surface) {
-  const previous = await page.evaluateHandle(() => document.getAnimations())
+  const previous = new Map(await Promise.all(page.frames().map(async frame =>
+    [frame, await frame.evaluateHandle(() => document.getAnimations())])))
   const hover = surface.name === 'hover transition'
   let hit
   if (surface.name === 'canvas pulse') {
-    await page.keyboard.press('p')
-    hit = 'key p'
+    hit = await press(page, 'Light bench')
+    if (hit === 'clicked') {
+      await page.keyboard.press('p')
+      hit = 'key p'
+    }
   } else {
-    const target = words(page, hover ? 'Lamp surface' : 'Start pulse')
-    hit = await pointerAt(page, target, hover ? 'hover' : 'click')
+    hit = await aim(page, words(hover ? 'Lamp surface' : 'Start pulse'), hover ? 'hover' : 'click')
   }
   // Only seek playback that this input actually started. Seeking a paused or
   // pre-existing effect could make a disconnected trigger look functional.
-  const playback = await page.evaluateHandle(earlier => document.getAnimations()
+  const playback = await Promise.all(page.frames().map(frame => frame.evaluateHandle(earlier => document.getAnimations()
     .filter(animation => animation.playState === 'running' && !earlier.includes(animation))
     .map(animation => {
       animation.pause()
       return { animation, rate: animation.playbackRate }
-    }), previous)
+    }), previous.get(frame) || [])))
   const frames = []
   for (const ms of [0, 500, 1000]) {
     if (ms) await page.clock.runFor(500)
     // Playwright owns the JS/rAF clock; CSS animations have a separate timeline.
-    await playback.evaluate((entries, time) => {
+    await Promise.all(playback.map(handle => handle.evaluate((entries, time) => {
       for (const { animation, rate } of entries) animation.currentTime = time * rate
-    }, ms)
+    }, ms)))
     const png = await page.screenshot({ clip: { x: 192, y: surface.top, width: 8, height: 8 }, animations: 'allow' })
     frames.push(await pixels(decoder, png))
   }
@@ -186,6 +193,21 @@ const knownPaint = {
   'step keyframes': { hit: 'clicked', phases: [false, false, true] },
   'canvas pulse': { hit: 'key p', phases: [true, false, false] },
 }
+
+test('the visitor can operate and see a working module inside a sandboxed frame', async ({ browser, page }) => {
+  const frame = source => '<iframe sandbox="allow-scripts" style="position:fixed;inset:0;width:100%;height:100%;border:0" srcdoc="' +
+    source.replaceAll('&', '&amp;').replaceAll('"', '&quot;') + '"></iframe>'
+  const workshop = frame(await readFixture('field-station'))
+  for (const scenario of observations.filter(s => ['arrow navigation', 'rope calculator'].includes(s.name))) {
+    expect(await withDocument(browser, workshop, scenario.run), scenario.name).toEqual(scenario.expected)
+  }
+  const step = surfaces.find(s => s.name === 'step keyframes')
+  const sample = await withDocument(browser, frame(await readFixture('light-bench')), p => sampleFrames(p, page, step))
+  expect(sample.hit).toBe('clicked')
+  for (const [phase, pixels] of sample.frames.entries()) {
+    expect(delta(pixels, pixels.map((_, i) => step.colors[phase][i % 3]))).toBeLessThanOrEqual(4)
+  }
+})
 
 test.describe('light bench: calibrated paint', () => {
   for (const surface of surfaces) {
