@@ -65,8 +65,8 @@ export function fitContainerCanvas(box, root, designWidth, designHeight) {
   for (var s = 0; s < scrollers.length; s++) {
     var el = scrollers[s]
     if (!el || el.nodeType !== 1 || !el.style || el.style.scrollbarGutter === 'stable') continue
-    var overflowY = ''
-    try { overflowY = window.getComputedStyle(el).overflowY } catch (e) { overflowY = '' }
+    var overflowY
+    try { overflowY = window.getComputedStyle(el).overflowY } catch { overflowY = '' }
     if (overflowY === 'auto' || overflowY === 'scroll') el.style.scrollbarGutter = 'stable'
   }
   var width = Number(designWidth)
