@@ -1020,11 +1020,21 @@ function readPage(token, frameWindow) {
   // into view is how that step is shown, and the step is read with it.
   const drawsElements = (record) => [...record.addedNodes, ...record.removedNodes].some((node) => node.nodeType === 1)
   const undo = (records) => {
+    const inButton = (record) => record.target.closest && record.target.closest('button, summary, [role="button"]')
+    // Where a script's drawing is kept, the marks it left there (a
+    // typesetter's data-ok) are kept with it: taken back, the next reading
+    // made the script typeset its own drawing again, and a formula came
+    // out three times over.
+    const drawnIn = new Set(records.filter((record) => record.type === 'childList' && drawsElements(record) && !inButton(record)).map((record) => record.target))
     for (let i = records.length - 1; i >= 0; i--) {
       const record = records[i]
       // A button's own words go back whatever they are made of.
-      const inButton = record.target.closest && record.target.closest('button, summary, [role="button"]')
-      if (record.type === 'childList' && drawsElements(record) && !inButton) continue
+      if (record.type === 'childList' && drawsElements(record) && !inButton(record)) continue
+      // The rest of the same drawing stays too: KaTeX clears the source in
+      // one change and adds the drawing in another; the source put back
+      // stood beside the drawing as plain text.
+      if (record.type === 'childList' && drawnIn.has(record.target)) continue
+      if (record.type === 'attributes' && /^data-/.test(record.attributeName) && drawnIn.has(record.target)) continue
       // A chart a script drew is sized by the style it gave its <canvas>:
       // taken back, the drawing would stand at the size of its pixels. Its
       // other attributes ([hidden]) go back as any other's.
