@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test'
 import { pointerAt, visitorMatches } from './behaviourActions.js'
+import { openLesson } from './lessonDocument.js'
 
 const text = (page, value) => visitorMatches(page, frame => frame.getByText(value, { exact: true }))
 const visible = async (page, value) => (await visitorMatches(page, frame => frame.getByText(value, { exact: true }).filter({ visible: true }))).length
@@ -79,10 +80,7 @@ const journeys = {
 async function exercise(browser, html, run) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, storageState: { cookies: [], origins: [] } })
   try {
-    const address = 'https://lesson.invalid/'
-    await page.route(address, (route) => route.fulfill({ contentType: 'text/html', body: html, headers: { 'Content-Security-Policy': 'sandbox allow-scripts' } }))
-    await page.goto(address)
-    await page.evaluate(() => document.fonts.ready)
+    await openLesson(page, html)
     return await run(page)
   } finally { await page.close() }
 }

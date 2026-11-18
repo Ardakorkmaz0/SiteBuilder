@@ -2,22 +2,18 @@ import fs from 'node:fs/promises'
 import { test, expect } from '@playwright/test'
 import { pointerAt, visitorMatches } from './behaviourActions.js'
 import { convertFidelityPage } from './convertFidelityPage.js'
+import { openLesson } from './lessonDocument.js'
 
 test.use({ storageState: { cookies: [], origins: [] } })
 test.skip(({ browserName }) => browserName !== 'chromium', 'the conversion and paint reference runs use Chromium')
 
-async function withDocument(browser, html, read) {
+async function withDocument(browser, html, read, publication) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 })
   try {
-    const url = 'http://behaviour.invalid/lesson'
-    await context.route('**/*', route => route.request().url() === url
-      ? route.fulfill({ contentType: 'text/html; charset=utf-8', body: html })
-      : route.abort())
     const page = await context.newPage()
     await page.clock.install({ time: new Date('2025-01-01T00:00:00Z') })
     await page.clock.pauseAt(new Date('2025-01-01T00:01:00Z'))
-    await page.goto(url)
-    await page.evaluate(() => document.fonts.ready)
+    await openLesson(page, html, publication)
     return await read(page)
   } finally {
     await context.close()
@@ -45,6 +41,14 @@ const routeLooks = async (page) => {
 }
 const atBrook = { active: false, ridge: 0, brook: 1 }
 const atRidge = { active: true, ridge: 1, brook: 0 }
+
+async function recordVisitAndReload(page) {
+  const first = await count(page, 'Visits logged: 0')
+  const hit = await press(page, 'Record visit')
+  const once = await count(page, 'Visits logged: 1')
+  await page.reload()
+  return [first, hit, once, await count(page, 'Visits logged: 1'), await count(page, 'Visits logged: 0')]
+}
 
 const observations = [
   {
@@ -75,14 +79,10 @@ const observations = [
       await press(page, 'Check bearing'), await count(page, 'Bearing confirmed'), await count(page, 'No bearing checked')],
   },
   {
-    name: 'persistent visits', expected: [1, 'clicked', 1, 1, 0],
-    async run(page) {
-      const first = await count(page, 'Visits logged: 0')
-      const hit = await press(page, 'Record visit')
-      const once = await count(page, 'Visits logged: 1')
-      await page.reload()
-      return [first, hit, once, await count(page, 'Visits logged: 1'), await count(page, 'Visits logged: 0')]
-    },
+    name: 'visits until reload on the platform', expected: [1, 'clicked', 1, 0, 1], run: recordVisitAndReload,
+  },
+  {
+    name: 'visits after reload on a custom domain', publication: 'custom-domain', expected: [1, 'clicked', 1, 1, 0], run: recordVisitAndReload,
   },
   {
     name: 'rope calculator', expected: [1, 'clicked', 1, 0],
@@ -96,7 +96,8 @@ const knownObservations = {
   'arrow navigation': ['clicked', atBrook, atBrook, atBrook],
   'specimen filter': [1, 1, 'missing', 1, 1],
   'radio quiz': [1, 'missing', 'clicked', 0, 1],
-  'persistent visits': [1, 'clicked', 0, 0, 1],
+  'visits until reload on the platform': [1, 'clicked', 0, 0, 1],
+  'visits after reload on a custom domain': [1, 'clicked', 0, 0, 1],
   'rope calculator': [1, 'missing', 0, 1],
 }
 
@@ -117,9 +118,9 @@ test.describe('field station behaviour', () => {
   for (const scenario of observations) {
     test(scenario.name, async ({ browser, page }, info) => {
       const { source, html } = await fixture(page, 'field-station')
-      const reference = await withDocument(browser, source, scenario.run)
+      const reference = await withDocument(browser, source, scenario.run, scenario.publication)
       expect(reference, 'original must satisfy the authored outcomes').toEqual(scenario.expected)
-      const observation = await withDocument(browser, html, scenario.run)
+      const observation = await withDocument(browser, html, scenario.run, scenario.publication)
       await info.attach(scenario.name, { body: JSON.stringify({ reference, observation }), contentType: 'application/json' })
       if (Object.hasOwn(knownObservations, scenario.name)) {
         expect(observation, 'conversion improved: remove the known gap').not.toEqual(scenario.expected)

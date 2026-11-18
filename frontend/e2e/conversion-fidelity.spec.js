@@ -94,13 +94,13 @@ function readDrawn() {
       range.setEnd(node, match.index + match[0].length)
       const box = range.getBoundingClientRect()
       if (box.width < 1 || box.height < 1 || !mostlyShown(box, cuts)) continue
-      samples.push({ el, into: words, item: { t: match[0].toLocaleLowerCase(), x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height, run } })
+      samples.push({ el, target: range, into: words, item: { t: match[0].toLocaleLowerCase(), x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height, run } })
     }
   }
   for (const img of document.images) {
     const box = img.getBoundingClientRect()
     if (box.width >= 1 && box.height >= 1 && img.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && mostlyShown(box, cutsOf(img.parentElement))) {
-      samples.push({ el: img, into: images, item: { src: img.currentSrc || img.src, x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height } })
+      samples.push({ el: img, target: img, into: images, item: { src: img.currentSrc || img.src, x: box.left + scrollX, y: box.top + scrollY, w: box.width, h: box.height } })
     }
   }
   const left = scrollX
@@ -120,11 +120,12 @@ function readDrawn() {
     return answer
   }
   try {
-    for (const { el, into, item } of samples) {
+    for (const { el, target, into, item } of samples) {
       const center = item.y + item.h / 2
-      if (center < scrollY || center >= scrollY + innerHeight) scrollTo({ top: Math.max(0, center - innerHeight / 2), behavior: 'instant' })
-      const y = center - scrollY
-      const xs = [0.25, 0.5, 0.75].map(ratio => item.x + item.w * ratio - scrollX).filter(x => x >= 0 && x < innerWidth)
+      scrollTo({ top: Math.max(0, center - innerHeight / 2), behavior: 'instant' })
+      const rect = target.getBoundingClientRect()
+      const y = rect.top + rect.height / 2
+      const xs = [0.25, 0.5, 0.75].map(ratio => rect.left + rect.width * ratio).filter(x => x >= 0 && x < innerWidth)
       const covered = xs.filter(x => {
         for (const hit of document.elementsFromPoint(x, y)) {
           if (hit === el || hit.contains(el)) return false
@@ -179,6 +180,17 @@ test('static measurement distinguishes a painted cover from a transparent layer'
     const result = scoreFidelity(source, await drawnAt(browser, card + cover(colour), size))
     const expected = colour === 'transparent' ? 1 : 0
     expect([result.found, result.imagesNear], colour).toEqual([expected, expected])
+  }
+})
+
+test('static measurement finds the same words behind a fixed header in either DOM order', async ({ browser }) => {
+  const size = { width: 600, height: 300 }
+  const header = '<header style="position:fixed;inset:0 0 auto;height:80px;background:white;z-index:2">Menu</header>'
+  const badge = '<b style="position:fixed;right:20px;bottom:8px">Status</b><div style="position:fixed;right:0;top:130px;width:100px;height:40px;background:white"></div>'
+  const word = (name, y) => `<p style="position:absolute;top:${y}px;left:20px;margin:0">${name}</p>`
+  for (const pair of [[word('alpha', 1500), word('beta', 1420)], [word('beta', 1420), word('alpha', 1500)]]) {
+    const result = await drawnAt(browser, header + '<main style="height:3000px"></main>' + pair.join('') + badge, size)
+    expect(result.words.map(({ t }) => t).sort()).toEqual(['alpha', 'beta', 'menu', 'status'])
   }
 })
 

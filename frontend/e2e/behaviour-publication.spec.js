@@ -1,5 +1,6 @@
 import { test, expect, api, openEditor, save, publish, BACKEND } from './support.js'
 import { pointerAt } from './behaviourActions.js'
+import { platformSandbox } from './lessonDocument.js'
 
 const source = `<!doctype html><html lang="en"><title>Field journal</title>
 <body><h1>Field journal</h1>
@@ -60,6 +61,7 @@ test('sample inspection survives conversion, saving, reopening and anonymous pub
       .map(directive => directive.trim().split(/\s+/)).find(words => words[0] === 'sandbox')
     expect(sandbox).toContain('allow-scripts')
     expect(sandbox).not.toContain('allow-same-origin')
+    expect(sandbox.toSorted()).toEqual(platformSandbox.split(' ').sort())
     await inspectSample(published)
   } finally {
     try {

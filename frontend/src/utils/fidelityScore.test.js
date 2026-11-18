@@ -39,8 +39,8 @@ describe('scoreFidelity', () => {
 
   it('reports extra occurrences and their own drawn area even when no original word is missing', () => {
     const page = { words: [word('formula', 20, 10), word('formula', 40, 10)] }
-    const drawn = { words: [...page.words, word('formula', 0, 50, 1, 12), word('formula', 0, 80, 2, 25)] }
-    expect(scoreFidelity(page, drawn)).toMatchObject({ found: 1, near: 1, duplicateWords: 2, duplicateArea: 740 })
+    const drawn = { words: [...page.words, word('formula', 0, 50, 1, 12), word('formula', 0, 80, 2, 25), word('marker', 0, 110)] }
+    expect(scoreFidelity(page, drawn)).toMatchObject({ found: 1, near: 1, duplicateWords: 2, duplicateArea: 740, extraText: ['formula', 'marker'] })
     expect(scoreFidelity(page, page)).toMatchObject({ duplicateWords: 0, duplicateArea: 0 })
   })
 
