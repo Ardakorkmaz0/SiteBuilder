@@ -168,7 +168,9 @@ describe('a side menu as tall as the screen', () => {
   // Its scroll box showed a scrollbar that took room in Brave: the menu then
   // measured narrower and shrank its blocks, the shorter blocks no longer
   // needed the scrollbar, and the menu flipped between two sizes every frame.
-  it('scrolls without a scrollbar that takes room from its blocks', () => {
+  // The bar's room is kept whether it shows or not: no flipping between two
+  // sizes, and a bar to see and drag (ChatGPT's review, 2026-11-18).
+  it('keeps its scrollbar\'s room whether the bar shows or not', () => {
     s().loadSchema({
       theme: {},
       pages: [{
@@ -183,6 +185,7 @@ describe('a side menu as tall as the screen', () => {
     const { handle } = renderItem('menu')
     const scroller = handle.querySelector('.overflow-y-auto')
 
-    expect(scroller.getAttribute('style')).toContain('scrollbar-width: none')
+    expect(scroller.getAttribute('style')).toContain('scrollbar-gutter: stable')
+    expect(scroller.getAttribute('style')).not.toContain('scrollbar-width: none')
   })
 })

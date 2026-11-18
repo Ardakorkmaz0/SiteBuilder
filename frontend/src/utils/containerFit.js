@@ -56,6 +56,19 @@ export function containerDesignWidth(component, key = 'layout') {
 // Shared with the exported runtime. Keep this self-contained: its source is
 // shipped to published documents without this module's imports or helpers.
 export function fitContainerCanvas(box, root, designWidth, designHeight) {
+  // A box that scrolls inside itself (or whose wrapper does) keeps its
+  // scrollbar's room whether the bar shows or not. Where scrollbars take
+  // room, a bar that came and went changed the width this fits to, the
+  // fitted height decided whether the bar was needed, and the box flipped
+  // between two sizes on every frame.
+  var scrollers = [box, box && box.parentElement]
+  for (var s = 0; s < scrollers.length; s++) {
+    var el = scrollers[s]
+    if (!el || el.nodeType !== 1 || !el.style || el.style.scrollbarGutter === 'stable') continue
+    var overflowY = ''
+    try { overflowY = window.getComputedStyle(el).overflowY } catch (e) { overflowY = '' }
+    if (overflowY === 'auto' || overflowY === 'scroll') el.style.scrollbarGutter = 'stable'
+  }
   var width = Number(designWidth)
   var height = Number(designHeight)
   if (!Number.isFinite(width) || width <= 0) width = 1

@@ -78,13 +78,14 @@ export function pinnedLayoutStyle(component, baseStyle = {}, railInset = null) {
     pinned.height = 'auto'
     if (fullHeight) {
       pinned.overflowY = 'auto'
-      // It scrolls without a scrollbar that takes room, as in Edit
-      // (FreeCanvasItem). Where scrollbars take room (Brave, Firefox on
-      // Linux) the bar narrowed the box, the box shrank its drawing to fit,
-      // the shorter drawing no longer needed the bar, and the menu flipped
-      // between two sizes on every frame, its links unclickable.
-      pinned.overflowX = 'hidden'
-      pinned.scrollbarWidth = 'none'
+      // The bar's room is kept whether it shows or not. Where scrollbars
+      // take room (Brave, Firefox on Linux) a bar that came and went
+      // narrowed the box, the box shrank its drawing to fit, the shorter
+      // drawing no longer needed the bar, and the menu flipped between two
+      // sizes on every frame, its links unclickable. A thin bar stays to be
+      // seen and dragged; what stands past the side can be scrolled to.
+      pinned.scrollbarGutter = 'stable'
+      pinned.scrollbarWidth = 'thin'
     }
   }
 
