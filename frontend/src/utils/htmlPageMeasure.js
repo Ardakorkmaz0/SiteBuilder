@@ -379,10 +379,14 @@ function readPage(token, frameWindow) {
   }
 
   // Where the line of text `el` sits in has its baseline.
+  // The baseline of the line `el` stands on, from an empty mark put right
+  // after it: put before it, the mark stayed at the end of the line before
+  // when `el` starts a wrapped line, and a formula there was set a whole
+  // line too low.
   const baselineAt = (el) => {
     const probe = doc.createElement('span')
     probe.setAttribute('style', 'display:inline-block;width:0;height:0;padding:0;margin:0;border:0')
-    el.parentNode.insertBefore(probe, el)
+    el.parentNode.insertBefore(probe, el.nextSibling)
     const y = probe.getBoundingClientRect().bottom
     probe.remove()
     return y

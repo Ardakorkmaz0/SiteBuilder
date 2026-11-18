@@ -44,3 +44,26 @@ test('a formula the page typesets once is read once in every part', async ({ pag
   // put back beside the drawing ("a+ba+b").
   expect(read.two[0].join(' ')).toBe('a+b')
 })
+
+// A piece drawn as a picture in a line of text (a formula) that starts a
+// wrapped line: its line's baseline was looked for just before it, where
+// the line before ends, and the picture was set a whole line too low.
+test('a picture that starts a wrapped line sits on that line\'s baseline', async ({ page }) => {
+  await page.goto('/')
+  const runs = await page.evaluate(async () => {
+    const { measureHtmlPage } = await import('/src/utils/htmlPageMeasure.js')
+    const result = await measureHtmlPage('<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;font:16px/24px sans-serif"><p id="cell" style="width:220px">Words that fill the first line, <span style="display:inline-block;width:90px;height:20px;background:#246">x</span> then more words</p></body></html>', { width: 1180, timeout: 60000 })
+    let found = null
+    const walk = (node) => {
+      if (node.id === 'cell') found = node
+      for (const kid of node.kids || []) walk(kid)
+    }
+    walk(result.root)
+    return (found?.runs || []).filter((run) => run.img !== undefined).map((run) => ({ va: run.va, h: run.h }))
+  })
+
+  expect(runs).toHaveLength(1)
+  // On its own line: an inline block's bottom sits the letter's descent
+  // (a few px) below that line's baseline. Set a line too low, it was 28.
+  expect(Math.abs(runs[0].va)).toBeLessThanOrEqual(12)
+})
