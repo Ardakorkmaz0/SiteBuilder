@@ -317,18 +317,20 @@ export default function PreviewPage() {
   useEffect(() => {
     if (!site) return
     const pages = site?.schema?.pages || []
-    let settled = false
     const pick = () => {
+      const rawHash = String(window.location.hash || '').replace(/^#/, '')
       const h = previewPageId(window.location.hash)
-      if (pages.some((p) => p.id === h)) {
+      if (h && pages.some((p) => p.id === h)) {
         setActiveId(h)
-        settled = true
-      } else if (!settled) {
-        setActiveId(pages[0]?.id || null)
-        settled = true
+        return
       }
-      // else: unknown hash (#top / #section) → leave the page as-is, let the
-      // browser scroll to the matching element.
+      if (!rawHash) {
+        setActiveId(pages[0]?.id || null)
+        return
+      }
+      // Unknown or malformed non-empty hash (#top / #section / #%E0%A4%A):
+      // keep the current page if it still exists, or fall back to the first page.
+      setActiveId((prev) => (prev && pages.some((p) => p.id === prev) ? prev : pages[0]?.id || null))
     }
     pick()
     window.addEventListener('hashchange', pick)
@@ -441,7 +443,8 @@ export default function PreviewPage() {
       customJs: staticMode ? '' : site?.schema?.customJs,
       pages: [current],
     }
-    return schemaToSingleHtml(pageSchema, site?.title || current.name || 'My Site', { colorMode })
+    const rendered = schemaToSingleHtml(pageSchema, site?.title || current.name || 'My Site', { colorMode })
+    return staticMode ? withoutExecutableScripts(rendered) : rendered
   }, [
     useIframe,
     staticMode,

@@ -1,7 +1,7 @@
 // The editor on a phone is a preview: a light/dark switch on the page has to
 // switch there too, as it does on the published site.
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import UiThemeProvider from '../../ui/UiThemeProvider.jsx'
@@ -91,5 +91,42 @@ describe('the editor on a phone', () => {
     )
     const html = screen.getByTestId('mobile-editor-preview').querySelector('iframe').getAttribute('srcdoc')
     expect(html).toContain(face)
+  })
+
+  it('switches pages on pwb-navigate messages from the preview iframe and exits focused mode on Escape', () => {
+    const onSelectPage = vi.fn()
+    render(
+      <MemoryRouter>
+        <LanguageProvider>
+          <UiThemeProvider>
+            <MobileEditorPreview
+              title="Site"
+              slug="site"
+              published={false}
+              pages={[
+                { id: 'home', name: 'Home', components: [text] },
+                { id: 'about', name: 'About', components: [text] },
+              ]}
+              currentPageId="home"
+              pageHtmlMap={{}}
+              theme={{}}
+              colorModeSetting={{}}
+              customCss=""
+              customJs=""
+              onSelectPage={onSelectPage}
+              onBack={vi.fn()}
+            />
+          </UiThemeProvider>
+        </LanguageProvider>
+      </MemoryRouter>,
+    )
+    const frame = screen.getByTestId('mobile-editor-preview').querySelector('iframe')
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'pwb-navigate', hash: '#about' }, source: frame.contentWindow }))
+    expect(onSelectPage).toHaveBeenCalledWith('about')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Focus preview' }))
+    expect(screen.getByRole('button', { name: 'Exit focused preview' })).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('button', { name: 'Exit focused preview' })).not.toBeInTheDocument()
   })
 })

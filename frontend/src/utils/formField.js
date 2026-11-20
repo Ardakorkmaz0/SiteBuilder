@@ -157,6 +157,7 @@ export function controlsFor(componentType, inputType) {
 const has = (value) => value !== undefined && value !== null && value !== ''
 
 function numberOr(value, fallback) {
+  if (!has(value)) return fallback
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
 }

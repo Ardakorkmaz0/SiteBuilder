@@ -446,7 +446,7 @@ export default function CodeProjectPage() {
             className="brand-mark"
             style={{ width: '1.6rem', height: '1.6rem', fontSize: '0.8rem' }}
           >S</Link>
-          <button type="button" onClick={guardedGoBack} title={t('Go back')} className="px-1 text-sm font-medium text-[var(--studio-text-muted)] hover:text-[#111827]">&larr;</button>
+          <button type="button" onClick={guardedGoBack} title={t('Go back')} aria-label={t('Go back')} className="px-1 text-sm font-medium text-[var(--studio-text-muted)] hover:text-[#111827]">&larr;</button>
         </div>
         <span className="flex shrink-0 items-center gap-1.5 truncate text-sm font-semibold text-[#111827]"><FolderOpenIcon size={15} className="text-[var(--studio-text-muted)]" /> {rootName}</span>
         <span className="shrink-0 rounded-full bg-[var(--studio-control)] px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-[var(--studio-text-muted)]">
@@ -658,6 +658,10 @@ export default function CodeProjectPage() {
           <Sidebar
             onPickComponent={isHtml ? (type, html, options) => setPending({ session: projectSessionId, path: activePath, type, html, atEnd: !!options?.atEnd }) : undefined}
             onCollapse={() => setLeftOpen(false)}
+            htmlMotion={isHtml ? {
+              info: htmlSelection,
+              onApply: (patch) => workspaceRef.current?.applyMotionToSelected?.(patch),
+            } : null}
             filesPanel={<ProjectFilesPanel key={projectSessionId} onOpen={openFile} />}
           />
         ) : (

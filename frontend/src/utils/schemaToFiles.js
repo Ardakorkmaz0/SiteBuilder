@@ -113,9 +113,10 @@ function wrapperStyle(c, viewport, canvasWidth, flowMode, layoutKey = 'layout', 
     margin: 0,
     ...(flowMode ? flowItemStyle(c, viewport, canvasWidth) : absoluteWrapperStyle(c, layoutKey)),
   }
+  const fixed = isFixedComponent(c)
   if (!flowMode && stretchesToViewport(c, c?.[layoutKey] || c?.layout, canvasWidth)) {
     base = { ...base, left: 0, width: '100%' }
-  } else if (!flowMode) {
+  } else if (!flowMode && !fixed) {
     base = { ...base, left: `calc(var(--design-offset, 0px) + ${Math.round(Number(base.left) || 0)}px)` }
   }
   // Sticky on an ABSOLUTE page: native position:sticky needs a flow position,
@@ -140,6 +141,15 @@ function esc(s) {
     /[&<>"]/g,
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]),
   )
+}
+
+// Keep generated CSS class identifiers safe against selector/style breakout.
+function cssIdent(s) {
+  return String(s ?? '').replace(/[^a-zA-Z0-9_-]/g, '_')
+}
+
+function safeCssComment(s) {
+  return String(s ?? '').replace(/\*\//g, '* /').replace(/<\/style/gi, '<\\/style')
 }
 
 // Preserve deliberate line breaks from textareas without allowing user HTML.
@@ -488,8 +498,10 @@ function nestedAbsoluteChildHtml(ch, phone = false) {
     : { ...ch, styles: { ...(ch.styles || {}), width: '100%', height: '100%' } }
   const wrapH = grows ? '' : `;height:${Math.round(l.h || 80)}px`
   const wrapMinH = grows ? `;min-height:${Math.round(l.h || 80)}px` : ''
+  const motionVars = styleObjectBlock(motionCssVars(ch.props))
+  const motionStyle = motionVars ? `;${motionVars}` : ''
   // nestedClass: the hook its "hide on PC / on mobile" rule names.
-  return `<div id="${esc(elementIdFor(ch))}" class="${`${nestedClass(ch)}${phone ? ` cc-${esc(ch.id)}` : ''}`.trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}"${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
+  return `<div id="${esc(elementIdFor(ch))}" class="${`${nestedClass(ch)}${phone ? ` cc-${esc(ch.id)}` : ''}${motionClassSuffix(ch.props)}`.trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}${motionStyle}"${motionRevealAttr(ch.props)}${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
 }
 
 // media query can reposition the children. Only top-level regions get those
@@ -503,8 +515,11 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
     const designW = regionContentWidth(c)
     const inner = kids.map((ch) => {
       const filled = { ...ch, styles: { ...(ch.styles || {}), width: '100%', height: '100%' } }
-      const geometry = classedChildren ? '' : ` style="${regionChildInlineStyle(ch, designW)}"`
-      return `<div id="${esc(elementIdFor(ch))}" class="region-child region-${esc(c.id)}-${esc(ch.id)}${nestedClass(ch)}"${geometry}${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
+      const motionVars = styleObjectBlock(motionCssVars(ch.props))
+      const baseStyle = classedChildren ? '' : regionChildInlineStyle(ch, designW)
+      const combinedStyle = [baseStyle, motionVars].filter(Boolean).join(';')
+      const geometry = combinedStyle ? ` style="${combinedStyle}"` : ''
+      return `<div id="${esc(elementIdFor(ch))}" class="region-child region-${esc(c.id)}-${esc(ch.id)}${nestedClass(ch)}${motionClassSuffix(ch.props)}"${geometry}${motionRevealAttr(ch.props)}${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
     }).join('')
     return `<section${hook} style="position:relative;width:100%;height:100%;overflow:hidden;${styleStr}"><div class="region-inner" style="position:relative;width:100%;max-width:${designW}px;height:100%;margin:0 auto;overflow:hidden">${inner}</div></section>`
   }
@@ -515,12 +530,16 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
     if (autoCss) {
       const inner = kids
         .map((ch) => {
-          const filled = { ...ch, styles: { ...(ch.styles || {}), width: '100%' } }
-          const childCss = autoLayoutChildCss(ch, c.props)
-          return `<div id="${esc(elementIdFor(ch))}" class="${nestedClass(ch).trim()}" style="${childCss}"${showAttrs(ch.props)}>${linkWrap(filled, inlineNode(filled))}</div>`
+          const grows = growsInParent(ch)
+          const filled = grows
+            ? { ...ch, styles: { ...(ch.styles || {}), width: '100%' } }
+            : { ...ch, styles: { ...(ch.styles || {}), width: '100%', height: '100%' } }
+          const motionVars = styleObjectBlock(motionCssVars(ch.props))
+          const childCss = [autoLayoutChildCss(ch, c.props), motionVars].filter(Boolean).join(';')
+          return `<div id="${esc(elementIdFor(ch))}" class="${`${nestedClass(ch)}${motionClassSuffix(ch.props)}`.trim()}" style="${childCss}"${motionRevealAttr(ch.props)}${showAttrs(ch.props)}>${linkWrap(filled, inlineNode(filled))}</div>`
         })
         .join('')
-      return `<div${hook} style="${autoCss};${styleStr}">${inner}</div>`
+      return `<div${hook} style="${styleStr};${autoCss}">${inner}</div>`
     }
     const h = absoluteChildrenHeight(kids, Math.round(c.layout?.h || 160))
     // On the phone its blocks stand at their own phone layout, when they all
@@ -554,7 +573,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
       .map((t) => {
         const panelKids = kids.filter((ch) => (ch.tabId || ch.props?.tabId || safeTabs[0].id) === t.id)
         const panelH = absoluteChildrenHeight(panelKids, 120)
-        const inner = panelKids.map(nestedAbsoluteChildHtml).join('')
+        const inner = panelKids.map((ch) => nestedAbsoluteChildHtml(ch)).join('')
         const hidden = t.id === activeId ? '' : ' hidden'
         if (!panelKids.length) return `<div role="tabpanel" data-builder-panel="${esc(t.id)}"${hidden} style="display:block;position:relative;min-height:${panelH}px"></div>`
         return `<div role="tabpanel" data-builder-panel="${esc(t.id)}" data-pwb-container-width="${designW}" data-pwb-container-height="${panelH}"${hidden} style="display:block;position:relative;min-height:${panelH}px"><div data-pwb-container-root style="position:absolute;left:0;top:0;width:${designW}px;height:${panelH}px;transform-origin:0 0">${inner}</div></div>`
@@ -691,9 +710,11 @@ function openTag(c, extraAttrs = '', inner = false) {
   // source, so the published bar animates exactly as the editor's Motion panel
   // promised. A fitted block's inner node (see fitShell) leaves both, and the
   // id, to the box around it.
-  const cls = inner ? `ci-${c.id}` : `c-${c.id}${motionClassSuffix(c.props)}`
+  const safeId = cssIdent(c.id)
+  const cls = inner ? `ci-${safeId}` : `c-${safeId}${motionClassSuffix(c.props)}`
   // id lets in-page links (#anchor, else #componentId) scroll to this component.
-  const idAttr = inner ? extraAttrs : ` id="${esc(elementIdFor(c))}"${motionRevealAttr(c.props)}${extraAttrs}`
+  const sharedAttrs = inner ? extraAttrs : `${motionRevealAttr(c.props)}${extraAttrs}`
+  const idAttr = inner ? extraAttrs : ` id="${esc(elementIdFor(c))}"${sharedAttrs}`
   if (tag === 'a') {
     const href = sanitizeUrl((c.props || {}).href)
     const ext = /^https?:\/\//i.test(href)
@@ -706,7 +727,7 @@ function openTag(c, extraAttrs = '', inner = false) {
     const src = sanitizeImageSrc(p.src)
     if (!p._otherSrc) return `<img${idAttr} class="${cls}" src="${esc(src)}" alt="${esc(p.alt)}" />`
     return `<img${idAttr} class="${cls} pwb-on-${esc(p._baseMode)}" src="${esc(src)}" alt="${esc(p.alt)}" />`
-      + `<img class="${cls} pwb-on-${esc(p._otherMode)}" src="${esc(sanitizeImageSrc(p._otherSrc))}" alt="${esc(p.alt)}" loading="lazy" />`
+      + `<img${sharedAttrs} class="${cls} pwb-on-${esc(p._otherMode)}" src="${esc(sanitizeImageSrc(p._otherSrc))}" alt="${esc(p.alt)}" loading="lazy" />`
   }
   if (c.type === 'icon') {
     return `<${tag}${idAttr} class="${cls}"${iconA11yAttrs(c.props || {})}>`
@@ -747,11 +768,11 @@ function pageHtml(
   const body = pageBody(page, { font: theme?.fontFamily })
   const source = `${body}${customJsBlock(customJs)}${colorMode ? PALETTE_ON_PAGE : ''}`
   const runtimeHead = externalRuntime
-    ? '<script src="runtime.js"></script>'
+    ? ''
     : (runtimeNeeds(source).motion ? motionHeadTags() : '')
   const customStyleLink = externalRuntime ? '\n    <link rel="stylesheet" href="custom.css" />' : ''
   const runtimeBody = externalRuntime
-    ? '<script src="custom.js"></script>'
+    ? '<script src="runtime.js"></script>\n    <script src="custom.js"></script>'
     : `${builderInteractiveTags(source)}\n    ${customJsBlock(customJs)}`
   return `<!DOCTYPE html>
 <html lang="${pageLanguage(page)}"${pageDirAttr(page)}>
@@ -765,7 +786,7 @@ function pageHtml(
     ${runtimeHead}${colorMode ? `\n    ${colorModeHeadTags(colorMode)}` : ''}
   </head>
   <body>
-    <div class="page p-${page.id}"${pageShowAttrs(page)}>
+    <div class="page p-${cssIdent(page.id)}"${pageShowAttrs(page)}>
 ${body}
     </div>
     ${runtimeBody}
@@ -819,9 +840,11 @@ function pageBodyHtml(page, fixed) {
 }
 
 function pageMinHeight(comps, key, fallback) {
+  const mobile = key === 'mobileLayout'
   const bottom = (comps || []).reduce((max, c) => {
     if (isFixedComponent(c)) return max
-    const l = (key === 'mobileLayout' ? c.mobileLayout : c.layout) || {}
+    if (mobile ? c.hiddenMobile : c.hidden) return max
+    const l = (mobile ? c.mobileLayout || c.layout : c.layout) || {}
     return Math.max(max, (l.y || 0) + (l.h || 0))
   }, 0)
   return Math.max(fallback, bottom + 40)
@@ -855,53 +878,55 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
   for (const page of pages) {
     const comps = page.components || []
     const w = page.canvasWidth || 1000
+    const pid = cssIdent(page.id)
     // A fixed side rail insets any fixed full-width top bar, so the bar's brand
     // never disappears under the rail (and lands identically at every width).
     const railInset = page.flowMode ? null : fixedRailInset(comps)
-    css += `\n/* ===== ${page.name} (desktop) ===== */\n`
+    css += `\n/* ===== ${safeCssComment(page.name)} (desktop) ===== */\n`
     if (page.flowMode) {
-      css += `.p-${page.id} { width: 100%; min-height: ${flowCanvasHeight(comps, 'pc', w)}px; background: ${cssValue(page.background || '#ffffff')}; display:flex; flex-direction:row; flex-wrap:wrap; align-items:stretch; align-content:flex-start; justify-content:flex-start; gap:${flowGap('pc')}px; padding:0 ${flowSidePad('pc')}px; box-sizing:border-box; }\n`
+      css += `.p-${pid} { width: 100%; min-height: ${flowCanvasHeight(comps, 'pc', w)}px; background: ${cssValue(page.background || '#ffffff')}; display:flex; flex-direction:row; flex-wrap:wrap; align-items:stretch; align-content:flex-start; justify-content:flex-start; gap:${flowGap('pc')}px; padding:0 ${flowSidePad('pc')}px; box-sizing:border-box; }\n`
     } else {
-      css += `.p-${page.id} { --design-offset:max(0px, calc((100% - ${w}px) / 2)); width: ${w}px; min-height: ${pageMinHeight(comps, 'layout', 600)}px; background: ${cssValue(page.background || '#ffffff')}; }\n`
+      css += `.p-${pid} { --design-offset:max(0px, calc((100% - ${w}px) / 2)); width: ${w}px; min-height: ${pageMinHeight(comps, 'layout', 600)}px; background: ${cssValue(page.background || '#ffffff')}; }\n`
     }
     for (const c of comps) {
+      const cid = cssIdent(c.id)
       const hide = c.hidden ? ' display:none;' : ''
       const placed = navbarPlacementCss(c)
       // inlineNode types paint their own look on the inner node; repeating it on
       // the wrapper would apply padding and borders twice.
       const fitted = !INLINE_NODE_TYPES.has(c.type) && !!pageFit(c, page)
       const own = INLINE_NODE_TYPES.has(c.type) || fitted ? '' : `${baseRules(c.type)} ${styleBlock(c.styles)}`
-      if (fitted) css += `.ci-${c.id} { ${baseRules(c.type)} ${styleBlock(c.styles)} width:100%; height:100%; box-sizing:border-box; }\n`
+      if (fitted) css += `.ci-${cid} { ${baseRules(c.type)} ${styleBlock(c.styles)} width:100%; height:100%; box-sizing:border-box; }\n`
       // Reveal speed/delay ride the component's own rule as CSS variables the
       // motion stylesheet reads.
       const motionVars = styleObjectBlock(motionCssVars(c.props))
       const motion = motionVars ? ` ${motionVars}` : ''
       if (page.flowMode) {
         const fixed = FLOW_FIXED_HEIGHT_TYPES.has(c.type)
-        css += `.c-${c.id} { ${styleObjectBlock(wrapperStyle(c, 'pc', w, true))} overflow:${fixed ? 'hidden' : 'visible'}; ${own}${motion}${hide} }\n`
+        css += `.c-${cid} { ${styleObjectBlock(wrapperStyle(c, 'pc', w, true))} overflow:${fixed ? 'hidden' : 'visible'}; ${own}${motion}${hide} }\n`
         if (FLOW_FULL_WIDTH_TYPES.has(c.type) && !isVerticalNavbar(c)) {
-          css += `.c-${c.id} > .nav-inner, .c-${c.id} > .section-inner { max-width:${ownContentWidth(c) || Math.round(c.layout?.w || w)}px; }\n`
+          css += `.c-${cid} > .nav-inner, .c-${cid} > .section-inner { max-width:${ownContentWidth(c) || Math.round(c.layout?.w || w)}px; }\n`
         }
         if (placed) {
-          if (placed.row) css += `.c-${c.id} > .nav-inner { ${placed.row} }\n`
-          if (placed.brand) css += `.c-${c.id} > .nav-inner > .brand { ${placed.brand} }\n`
-          if (placed.links) css += `.c-${c.id} > .nav-inner > .links { ${placed.links} }\n`
+          if (placed.row) css += `.c-${cid} > .nav-inner { ${placed.row} }\n`
+          if (placed.brand) css += `.c-${cid} > .nav-inner > .brand { ${placed.brand} }\n`
+          if (placed.links) css += `.c-${cid} > .nav-inner > .links { ${placed.links} }\n`
         }
       } else {
-        css += `.c-${c.id} { ${styleObjectBlock(wrapperStyle(c, 'pc', w, false, 'layout', railInset))} ${own}${motion}${hide} }\n`
+        css += `.c-${cid} { ${styleObjectBlock(wrapperStyle(c, 'pc', w, false, 'layout', railInset))} ${own}${motion}${hide} }\n`
         // A bar or band that reaches the screen edges keeps its content on the
         // design column (utils/bleedLayout.js); a boxed bar keeps its own width.
         const bleeds = stretchesToViewport(c, c.layout, w)
         if (c.type === 'navbar' && !isVerticalNavbar(c)) {
           const row = bleeds ? bleedContentWidth(c, c.styles, w) : ownContentWidth(c) || Math.round(c.layout?.w || w)
-          css += `.c-${c.id} > .nav-inner { max-width:${row}px; }\n`
+          css += `.c-${cid} > .nav-inner { max-width:${row}px; }\n`
         } else if (c.type === 'section' && bleeds) {
-          css += `.c-${c.id} > .section-inner { max-width:${bleedContentWidth(c, c.styles, w)}px; }\n`
+          css += `.c-${cid} > .section-inner { max-width:${bleedContentWidth(c, c.styles, w)}px; }\n`
         }
         if (placed) {
-          if (placed.row) css += `.c-${c.id} > .nav-inner { ${placed.row} }\n`
-          if (placed.brand) css += `.c-${c.id} > .nav-inner > .brand { ${placed.brand} }\n`
-          if (placed.links) css += `.c-${c.id} > .nav-inner > .links { ${placed.links} }\n`
+          if (placed.row) css += `.c-${cid} > .nav-inner { ${placed.row} }\n`
+          if (placed.brand) css += `.c-${cid} > .nav-inner > .brand { ${placed.brand} }\n`
+          if (placed.links) css += `.c-${cid} > .nav-inner > .links { ${placed.links} }\n`
         }
       }
       // Desktop geometry for a section's free-placed children, so the mobile
@@ -935,12 +960,14 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
   for (const page of pages) {
     const comps = page.components || []
     const mw = page.mobileWidth || 390
+    const pid = cssIdent(page.id)
     if (page.flowMode) {
-      css += `  .p-${page.id} { width: 100%; min-height: ${flowCanvasHeight(comps, 'mobile', mw)}px; background: ${cssValue(page.backgroundMobile || page.background || '#ffffff')}; gap:${flowGap('mobile')}px; padding:0 ${flowSidePad('mobile')}px; }\n`
+      css += `  .p-${pid} { width: 100%; min-height: ${flowCanvasHeight(comps, 'mobile', mw)}px; background: ${cssValue(page.backgroundMobile || page.background || '#ffffff')}; gap:${flowGap('mobile')}px; padding:0 ${flowSidePad('mobile')}px; }\n`
     } else {
-      css += `  .p-${page.id} { --design-offset:max(0px, calc((100% - ${mw}px) / 2)); width: ${mw}px; min-height: ${pageMinHeight(comps, 'mobileLayout', 400)}px; background: ${cssValue(page.backgroundMobile || page.background || '#ffffff')}; }\n`
+      css += `  .p-${pid} { --design-offset:max(0px, calc((100% - ${mw}px) / 2)); width: ${mw}px; min-height: ${pageMinHeight(comps, 'mobileLayout', 400)}px; background: ${cssValue(page.backgroundMobile || page.background || '#ffffff')}; }\n`
     }
     for (const c of comps) {
+      const cid = cssIdent(c.id)
       const fitted = !INLINE_NODE_TYPES.has(c.type) && !!pageFit(c, page)
       const hide = c.hiddenMobile
         ? ' display:none;'
@@ -953,19 +980,19 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
       // look lives on the inner node, not on this wrapper (see inlinePhoneRule).
       const mobileStyles =
         c.stylesMobile && !INLINE_NODE_TYPES.has(c.type) && !fitted ? ` ${styleBlock(c.stylesMobile)}` : ''
-      if (fitted && c.stylesMobile) css += `  .ci-${c.id} { ${styleBlock(c.stylesMobile)} }\n`
-      css += phonePartRule(c, fitted ? `.ci-${c.id}` : `.c-${c.id}`)
+      if (fitted && c.stylesMobile) css += `  .ci-${cid} { ${styleBlock(c.stylesMobile)} }\n`
+      css += phonePartRule(c, fitted ? `.ci-${cid}` : `.c-${cid}`)
       if (page.flowMode) {
         const fixed = FLOW_FIXED_HEIGHT_TYPES.has(c.type)
-        css += `  .c-${c.id} { ${styleObjectBlock(wrapperStyle(c, 'mobile', mw, true))} overflow:${fixed ? 'hidden' : 'visible'};${mobileStyles}${hide} }\n`
+        css += `  .c-${cid} { ${styleObjectBlock(wrapperStyle(c, 'mobile', mw, true))} overflow:${fixed ? 'hidden' : 'visible'};${mobileStyles}${hide} }\n`
       } else {
-        css += `  .c-${c.id} { ${styleObjectBlock(wrapperStyle(c, 'mobile', mw, false, 'mobileLayout'))}${mobileStyles}${hide} }\n`
+        css += `  .c-${cid} { ${styleObjectBlock(wrapperStyle(c, 'mobile', mw, false, 'mobileLayout'))}${mobileStyles}${hide} }\n`
         // The phone design is centred on a wider phone or tablet the same way:
         // a stretched bar or band keeps its content on the phone column.
         if ((c.type === 'navbar' && !isVerticalNavbar(c)) || c.type === 'section') {
           if (stretchesToViewport(c, c.mobileLayout || c.layout, mw)) {
             const inner = c.type === 'navbar' ? 'nav-inner' : 'section-inner'
-            css += `  .c-${c.id} > .${inner} { max-width:${bleedContentWidth(c, stylesFor(c, 'mobile'), mw)}px; }\n`
+            css += `  .c-${cid} > .${inner} { max-width:${bleedContentWidth(c, stylesFor(c, 'mobile'), mw)}px; }\n`
           }
         }
         // An embed's iframe is written with the desktop height baked in (flow
@@ -974,16 +1001,16 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
         // match, or the embed keeps its PC height inside a taller mobile frame.
         if (c.type === 'html') {
           const mh = Math.max(40, Math.round((c.mobileLayout || c.layout || {}).h || 240))
-          css += `  .c-${c.id} > iframe { --pwb-embed-height:${mh}px; }\n`
+          css += `  .c-${cid} > iframe { --pwb-embed-height:${mh}px; }\n`
         }
       }
       if (c.type === 'region') {
         for (const child of c.children || []) {
           const layout = child.mobileLayout || child.layout || {}
           const rawX = Math.max(0, Math.round(layout.x || 0))
-          const childX = Math.min(rawX, Math.max(0, mw - 8))
-          const childWidth = Math.min(Math.max(8, Math.round(layout.w || 200)), Math.max(8, mw - childX))
-          css += `  .region-${esc(c.id)}-${esc(child.id)} { left:${childX}px;right:auto;top:${Math.max(0, Math.round(layout.y || 0))}px;width:${childWidth}px;height:${Math.max(4, Math.round(layout.h || 80))}px;max-width:100%;transform:none;${child.hiddenMobile ? 'display:none;' : ''} }\n`
+          const childWidth = Math.min(Math.max(8, Math.round(layout.w || 200)), mw)
+          const childX = Math.max(0, Math.min(rawX, mw - childWidth))
+          css += `  .region-${cid}-${cssIdent(child.id)} { left:${childX}px;right:auto;top:${Math.max(0, Math.round(layout.y || 0))}px;width:${childWidth}px;height:${Math.max(4, Math.round(layout.h || 80))}px;max-width:100%;transform:none;${child.hiddenMobile ? 'display:none;' : ''} }\n`
         }
       }
     }
@@ -991,23 +1018,24 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
   for (const page of pages) {
     if (!page.flowMode) css += containerPhoneCss(page.components || [])
     for (const ch of nestedWithVisibility(page.components || [])) {
-      if (ch.hiddenMobile) css += `  .n-${esc(ch.id)} { display:none; }
+      if (ch.hiddenMobile) css += `  .n-${cssIdent(ch.id)} { display:none; }
 `
     }
     for (const c of inlineNodesOf(page.components)) {
       const rule = inlinePhoneRule(c)
-      if (rule) css += `  .ci-${esc(c.id)} { ${rule} }\n`
-      css += phonePartRule(c, `.ci-${esc(c.id)}`)
+      if (rule) css += `  .ci-${cssIdent(c.id)} { ${rule} }\n`
+      css += phonePartRule(c, `.ci-${cssIdent(c.id)}`)
     }
   }
-  css += `  .nav-inner:not(.nav-vertical):not(.nav-mobile-stack) { position:relative; flex-direction:row; align-items:center; justify-content:space-between; gap:10px; flex-wrap:nowrap; }\n`
-  css += `  .nav-inner:not(.nav-vertical):not(.nav-mobile-stack) .mobile-nav-toggle { display:inline-flex; }\n`
-  css += `  .nav-inner:not(.nav-vertical):not(.nav-mobile-stack) .links { display:none; position:absolute; z-index:100; top:calc(100% + 8px); left:0; right:0; width:100%; flex-direction:column; align-items:stretch; gap:6px; padding:10px; border:1px solid currentColor; border-radius:10px; background:var(--builder-nav-menu-bg,#1d1d1f); box-shadow:0 12px 28px rgba(0,0,0,.2); }\n`
-  css += `  .nav-inner:not(.nav-vertical):not(.nav-mobile-stack)[data-mobile-open="true"] .links { display:flex; }\n`
-  css += `  .nav-inner:not(.nav-vertical):not(.nav-mobile-stack) .links a { display:block; width:100%; padding:10px 12px; border-radius:8px; }\n`
-  css += `  .nav-mobile-stack { flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:10px; }\n`
-  css += `  .nav-mobile-stack > .brand { position:static; left:auto; transform:none; order:0; margin-left:0; align-self:var(--builder-mobile-brand-align,flex-start); }\n`
-  css += `  .nav-mobile-stack .links { position:static; left:auto; transform:none; order:1; margin-left:0; width:100%; flex-direction:row; align-items:center; justify-content:var(--builder-mobile-links-align,flex-end); gap:16px; row-gap:6px; }\n`
+  css += `  :is(.page, .export-fixed) .nav-inner:not(.nav-vertical):not(.nav-mobile-stack) { position:relative; flex-direction:row; align-items:center; justify-content:space-between; gap:10px; flex-wrap:nowrap; }\n`
+  css += `  :is(.page, .export-fixed) .nav-inner:not(.nav-vertical):not(.nav-mobile-stack) > .brand { position:static; left:auto; transform:none; order:0; margin-left:0; }\n`
+  css += `  :is(.page, .export-fixed) .nav-inner:not(.nav-vertical):not(.nav-mobile-stack) .mobile-nav-toggle { display:inline-flex; }\n`
+  css += `  :is(.page, .export-fixed) .nav-inner:not(.nav-vertical):not(.nav-mobile-stack) .links { display:none; position:absolute; z-index:100; top:calc(100% + 8px); left:0; right:0; transform:none; order:0; margin-left:0; width:100%; flex-direction:column; align-items:stretch; gap:6px; padding:10px; border:1px solid currentColor; border-radius:10px; background:var(--builder-nav-menu-bg,#1d1d1f); box-shadow:0 12px 28px rgba(0,0,0,.2); }\n`
+  css += `  :is(.page, .export-fixed) .nav-inner:not(.nav-vertical):not(.nav-mobile-stack)[data-mobile-open="true"] .links { display:flex; }\n`
+  css += `  :is(.page, .export-fixed) .nav-inner:not(.nav-vertical):not(.nav-mobile-stack) .links a { display:block; width:100%; padding:10px 12px; border-radius:8px; }\n`
+  css += `  :is(.page, .export-fixed) .nav-inner.nav-mobile-stack { flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:10px; }\n`
+  css += `  :is(.page, .export-fixed) .nav-inner.nav-mobile-stack > .brand { position:static; left:auto; transform:none; order:0; margin-left:0; align-self:var(--builder-mobile-brand-align,flex-start); }\n`
+  css += `  :is(.page, .export-fixed) .nav-inner.nav-mobile-stack .links { position:static; left:auto; transform:none; order:1; margin-left:0; width:100%; flex-direction:row; align-items:center; justify-content:var(--builder-mobile-links-align,flex-end); gap:16px; row-gap:6px; }\n`
   css += `}\n`
   if (options.includeCustomCss !== false) css += customCssBlock(schema?.customCss)
   return css
@@ -1035,7 +1063,9 @@ export function schemaToSingleHtml(schema, title = 'My Site', options = {}) {
   const html = page.flowMode
     ? schemaToFlowHtml(page, title, schema, options)
     : schemaToScaledHtml(page, title, schema, options)
-  return mode ? html.replace('</head>', `${colorModeHeadTags(mode)}\n  </head>`) : html
+  return mode && !page.flowMode
+    ? html.replace('</head>', () => `${colorModeHeadTags(mode)}\n  </head>`)
+    : html
 }
 
 function schemaToFlowHtml(page, title, schema, { colorMode = null } = {}) {
@@ -1050,7 +1080,7 @@ function schemaToFlowHtml(page, title, schema, { colorMode = null } = {}) {
   const html = pageHtml(page, title, 'styles.css', schema?.customJs, pageTheme(schema, page), { colorMode, fontFaces: schema?.fontFaces })
   return html.replace(
     '<link rel="stylesheet" href="styles.css" />',
-    `<style>\n${withoutUnusedRules(css, `${html}${schema?.customCss || ''}`)}${customCssBlock(schema?.customCss)}\n    </style>`,
+    () => `<style>\n${withoutUnusedRules(css, `${html}${schema?.customCss || ''}`)}${customCssBlock(schema?.customCss)}\n    </style>`,
   )
 }
 
@@ -1090,6 +1120,7 @@ function schemaToScaledHtml(page, title = 'My Site', schema = {}, options = {}) 
   const fixedBody = pageBody(page, { fixed: 'only', font })
   const mainBody = pageBody(page, { fixed: 'exclude', font })
   const source = `${mainBody}${fixedBody}${customJsBlock(schema?.customJs)}${options.colorMode ? PALETTE_ON_PAGE : ''}`
+  const pid = cssIdent(page.id)
 
   return `<!DOCTYPE html>
 <html lang="${pageLanguage(page)}"${pageDirAttr(page)}>
@@ -1101,7 +1132,7 @@ function schemaToScaledHtml(page, title = 'My Site', schema = {}, options = {}) 
     ${googleFontLinkTag(pageTheme(schema, page), page?.fonts)}${fontFaceStyleTag(schema, page)}
     ${runtimeNeeds(source).motion ? motionHeadTags() : ''}
     <style>
-${withoutUnusedRules(css, `<div class="page p-${page.id}"></div>${source}${schema?.customCss || ''}`)}
+${withoutUnusedRules(css, `<div class="page p-${pid}"></div>${source}${schema?.customCss || ''}`)}
       html, body { width: 100%; min-height: 100%; overflow-x: hidden; }
       body { background: ${desktopBg}; }
       .export-viewport { width: 100%; min-height: 100vh; overflow: hidden; background: ${desktopBg}; }
@@ -1115,7 +1146,7 @@ ${overlayScrollbarCss(options)}${customCssBlock(schema?.customCss)}
   <body>
     <div class="export-viewport">
       <div class="export-stage">
-        <div class="page p-${page.id}"${pageShowAttrs(page)}>
+        <div class="page p-${pid}"${pageShowAttrs(page)}>
 ${mainBody}
         </div>
       </div>

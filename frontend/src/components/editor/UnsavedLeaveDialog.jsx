@@ -8,8 +8,11 @@ import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 // Esc did nothing. Esc is Stay: the one answer that loses nothing.
 export default function UnsavedLeaveDialog({ open, saving, onSave, onDiscard, onStay }) {
   const { t } = useLanguage()
-  // Not while a save is on its way out: Stay is disabled then as well.
-  useEscapeToClose(open && !saving, onStay)
+  // Stay on the Escape stack while open (even during a save) so canvas
+  // shortcuts stay blocked behind the modal; Esc is a no-op while saving.
+  useEscapeToClose(open, () => {
+    if (!saving) onStay?.()
+  })
   const ref = useInitialDialogFocus(open)
   if (!open) return null
   return (

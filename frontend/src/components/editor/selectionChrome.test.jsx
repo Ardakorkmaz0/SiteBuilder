@@ -9,7 +9,7 @@ import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import { useEditorStore } from '../../store/editorStore.js'
 import FreeCanvasItem from './FreeCanvasItem.jsx'
 import FlowCanvasItem from './FlowCanvasItem.jsx'
-import { chromeMetrics, frameOutsets, hoverRingStyle, resizeHandles } from './selectionChrome.js'
+import { chromeMetrics, frameOutsets, hoverRingStyle, resizeHandles, resizedBox } from './selectionChrome.js'
 
 beforeEach(() => {
   globalThis.ResizeObserver = class {
@@ -108,5 +108,23 @@ describe('every renderer draws the same physical frame', () => {
     // jsdom has no layout, so the container's own fit-down is 1: the child is
     // painted at the canvas scale.
     expect(Number(kid.querySelector('[data-selection-frame]').dataset.frameWidth) * 2).toBeCloseTo(2)
+  })
+})
+
+describe('resizedBox', () => {
+  it('clamps west and north drags at 0 without shifting the opposite anchored edge', () => {
+    const west = resizedBox({ x: 40, y: 50, w: 100, h: 60 }, 'w', -100, 0, 20)
+    expect(west).toEqual({ x: 0, y: 50, w: 140, h: 60 })
+
+    const north = resizedBox({ x: 40, y: 50, w: 100, h: 60 }, 'n', 0, -100, 20)
+    expect(north).toEqual({ x: 40, y: 0, w: 100, h: 110 })
+  })
+
+  it('caps east and south drags at container maxX and maxY bounds', () => {
+    const east = resizedBox({ x: 100, y: 20, w: 100, h: 60 }, 'e', 500, 0, 20, null, { maxX: 300 })
+    expect(east).toEqual({ x: 100, y: 20, w: 200, h: 60 })
+
+    const south = resizedBox({ x: 100, y: 20, w: 100, h: 60 }, 's', 0, 500, 20, null, { maxY: 150 })
+    expect(south).toEqual({ x: 100, y: 20, w: 100, h: 130 })
   })
 })

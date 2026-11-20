@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { schemaToFiles, schemaToSingleHtml } from './schemaToFiles.js'
 import { schemaToResponsiveHtml } from './responsiveHtml.js'
+import { colorModeFor } from './colorMode.js'
 
 describe('schemaToFiles custom code', () => {
   it('keeps page markup, shared styles, runtime and custom code in separate files', () => {
@@ -852,5 +853,75 @@ describe('schemaToSingleHtml container with phone layouts', () => {
     const html = build({})
     expect(html).not.toContain('.cc-title')
     expect(html).not.toContain('data-pwb-container-width-mobile="')
+  })
+})
+
+describe('schemaToFiles & schemaToSingleHtml hardening regressions', () => {
+  it('injects colorMode head tags only once on flow pages and preserves $\' in customCss', () => {
+    const schema = {
+      theme: { primaryColor: '#4f46e5', backgroundColor: '#ffffff', textColor: '#111111' },
+      customCss: '.note::after { content: "cost $\'10"; }',
+      pages: [{
+        id: 'p1',
+        name: 'Home',
+        flowMode: true,
+        components: [
+          { id: 't1', type: 'themeToggle', props: { style: 'icon' }, styles: {}, layout: { x: 0, y: 0, w: 48, h: 40 } },
+        ],
+      }],
+    }
+    const colorMode = colorModeFor(schema, schema.pages[0], {}, { always: true })
+    const html = schemaToSingleHtml(schema, 'Flow Color', { colorMode })
+    expect(html.split('<style data-pwb-color-mode').length - 1).toBe(1)
+    expect(html.split('<script data-pwb-color-mode').length - 1).toBe(1)
+    expect(html).toContain('content: "cost $\'10"')
+  })
+
+  it('preserves mobile region child width when desktop x is near the right edge', () => {
+    const html = schemaToSingleHtml({
+      theme: {},
+      pages: [{
+        id: 'p1',
+        name: 'Home',
+        canvasWidth: 1000,
+        mobileWidth: 390,
+        components: [{
+          id: 'reg1',
+          type: 'region',
+          props: {},
+          styles: {},
+          layout: { x: 0, y: 0, w: 1000, h: 300 },
+          children: [{
+            id: 'card',
+            type: 'card',
+            props: { title: 'Right card' },
+            styles: {},
+            layout: { x: 750, y: 20, w: 200, h: 120 },
+          }],
+        }],
+      }],
+    }, 'Region Mobile')
+    const phone = html.slice(html.indexOf('@media (max-width: 768px)'))
+    expect(phone).toContain('.region-reg1-card { left:190px;right:auto;top:20px;width:200px;height:120px;')
+  })
+
+  it('places external runtime.js in body after page markup instead of head', () => {
+    const files = schemaToFiles({
+      theme: {},
+      pages: [{
+        id: 'p1',
+        name: 'Home',
+        components: [{
+          id: 'h1',
+          type: 'heading',
+          props: { text: 'Animated', animIn: 'fade-up' },
+          styles: {},
+          layout: { x: 0, y: 0, w: 300, h: 60 },
+        }],
+      }],
+    }, 'External Runtime')
+    const indexHtml = files.find((f) => f.name === 'index.html').content
+    expect(indexHtml.indexOf('<script src="runtime.js"></script>')).toBeGreaterThan(indexHtml.indexOf('</head>'))
+    expect(indexHtml.indexOf('<script src="runtime.js"></script>')).toBeGreaterThan(indexHtml.indexOf('Animated'))
   })
 })

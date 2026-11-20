@@ -245,4 +245,78 @@ describe('editorStore regressions', () => {
     })
     expect(s().schema.pages[0].language).toBe('tr')
   })
+
+  it('marks pages[0] as html mode in loadSchema when legacySiteHtml populates an unset mode', () => {
+    const htmlMap = s().loadSchema(
+      { pages: [{ id: 'p1', name: 'Home', components: [] }] },
+      { legacySiteHtml: '<!DOCTYPE html><html><body><h1>Legacy</h1></body></html>' },
+    )
+    expect(htmlMap.p1).toContain('Legacy')
+    expect(s().schema.pages[0].mode).toBe('html')
+  })
+
+  it('stacks duplicated regions below existing content at x:0 and ignores regions in nudgeSelection', () => {
+    freshSchema([{
+      id: 'p1',
+      name: 'Home',
+      canvasWidth: 1000,
+      mobileWidth: 390,
+      mobileManual: true,
+      components: [{
+        id: 'reg_1',
+        type: 'region',
+        props: {},
+        styles: {},
+        layout: { x: 0, y: 0, w: 1000, h: 300 },
+        mobileLayout: { x: 0, y: 0, w: 390, h: 320 },
+        children: [],
+      }],
+    }])
+    s().duplicateComponent('reg_1')
+    const comps = selectCurrentPage(s()).components
+    expect(comps).toHaveLength(2)
+    expect(comps[1].layout).toEqual({ x: 0, y: 300, w: 1000, h: 300 })
+    expect(comps[1].mobileLayout).toEqual({ x: 0, y: 320, w: 390, h: 320 })
+
+    s().selectComponent('reg_1')
+    s().nudgeSelection(20, 40)
+    expect(selectCurrentPage(s()).components[0].layout).toEqual({ x: 0, y: 0, w: 1000, h: 300 })
+  })
+
+  it('writes mobile paintComponent style overrides to stylesMobile without mutating desktop styles', () => {
+    freshSchema([{
+      id: 'p1',
+      name: 'Home',
+      components: [{
+        id: 'btn_1',
+        type: 'button',
+        props: { text: 'Go' },
+        styles: { backgroundColor: '#111111', color: '#ffffff' },
+        layout: { x: 20, y: 20, w: 140, h: 44 },
+      }],
+    }])
+    s().setViewport('mobile')
+    s().paintComponent('btn_1', '#22c55e', 'fill')
+    const btn = selectCurrentPage(s()).components[0]
+    expect(btn.styles.backgroundColor).toBe('#111111')
+    expect(btn.stylesMobile.backgroundColor).toBe('#22c55e')
+  })
+
+  it('applies preset props in addition to preset styles in applyComponentPreset', () => {
+    freshSchema([{
+      id: 'p1',
+      name: 'Home',
+      components: [{
+        id: 'nav_1',
+        type: 'navbar',
+        props: { brand: 'Old', navLayout: 'centered', links: [] },
+        styles: {},
+        layout: { x: 0, y: 0, w: 1000, h: 64 },
+      }],
+    }])
+    s().applyComponentPreset('nav_1', 'bootstrap')
+    const nav = selectCurrentPage(s()).components[0]
+    expect(nav.props.navLayout).toBe('horizontal')
+    expect(nav.props.links.length).toBeGreaterThan(0)
+  })
 })

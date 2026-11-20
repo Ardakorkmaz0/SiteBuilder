@@ -58,7 +58,6 @@ const paintAttributes = (text) => paint(text, ATTRIBUTE, ['attr', 'string'])
 const TAG = /<!--(?:-?>|[\s\S]*?(?:--!?>|$))|<!doctype[^>]*>?|(<\/?)([a-zA-Z][\w:-]*)((?:[^>"']|"[^"]*"|'[^']*')*)(>?)/gi
 
 function paintHtml(code) {
-  const lower = code.toLowerCase()
   let out = ''
   let at = 0
   TAG.lastIndex = 0
@@ -73,8 +72,8 @@ function paintHtml(code) {
     const name = match[2].toLowerCase()
     // What a script or a style holds is another language, up to its closing tag.
     if (match[1] === '<' && (name === 'script' || name === 'style')) {
-      const end = lower.indexOf(`</${name}`, at)
-      const stop = end === -1 ? code.length : end
+      const endOffset = code.slice(at).search(new RegExp(`</${name}`, 'i'))
+      const stop = endOffset === -1 ? code.length : at + endOffset
       out += (name === 'style' ? paintCss : paintJs)(code.slice(at, stop))
       at = stop
       TAG.lastIndex = stop

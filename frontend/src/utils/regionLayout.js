@@ -75,6 +75,14 @@ export function regionDisplayPatchToDesign(child, patch, displayLayout, designWi
   const available = Math.max(MIN_SIZE, number(actualWidth, designWidth))
   const nextW = Math.max(MIN_SIZE, number(patch.w, displayLayout?.w || child?.layout?.w || 200))
   const displayX = number(patch.x, displayLayout?.x)
+  if (dock === 'stretch') {
+    const designW = Math.max(MIN_SIZE, Math.round(nextW + (designWidth - available)))
+    return {
+      ...patch,
+      x: Math.max(0, Math.round(displayX)),
+      ...(patch.w === undefined ? {} : { w: designW }),
+    }
+  }
   let designX = displayX
   if (dock === 'right') {
     const rightMargin = Math.max(0, available - displayX - nextW)

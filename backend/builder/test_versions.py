@@ -262,6 +262,7 @@ class TestCheckpoints:
     def test_overwrite_replaces_slot_contents(self, client, alice):
         site_id = self._create_site(client, alice[1])
         cp = client.post(f'/api/sites/{site_id}/versions/checkpoint/', {'label': 'slot'}, format='json').data
+        SiteVersion.objects.filter(pk=cp['id']).update(summary={'pages': [{'id': 'stale', 'name': 'Stale'}]})
         # Change the site, then save the new state over the slot.
         client.put(f'/api/sites/{site_id}/', {
             'title': 'Demo', 'html': '', 'published': False,
@@ -272,6 +273,7 @@ class TestCheckpoints:
         row = SiteVersion.objects.get(pk=cp['id'])
         assert row.schema['pages'][0]['id'] == 'v2'
         assert row.pinned is True
+        assert row.summary is None
 
     def test_delete_checkpoint(self, client, alice):
         site_id = self._create_site(client, alice[1])

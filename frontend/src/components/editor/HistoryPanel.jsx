@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   listVersions,
   restoreVersion,
@@ -46,6 +46,7 @@ export default function HistoryPanel({
   const [rows, setRows] = useState(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
   const [filter, setFilter] = useState('all')
   const [onlyPage, setOnlyPage] = useState(false)
   const scopePage = onlyPage && pageId ? pageId : null
@@ -59,17 +60,22 @@ export default function HistoryPanel({
     if (!open || !siteId) return undefined
     let cancelled = false
     listVersions(siteId)
-      .then((data) => { if (!cancelled) setRows(Array.isArray(data) ? data : []) })
+      .then((data) => {
+        if (cancelled) return
+        setErr('')
+        setRows(Array.isArray(data) ? data : [])
+      })
       .catch((e) => {
         if (cancelled) return
-        setErr(e?.response?.data?.detail || t('Could not load history.'))
+        setErr(apiError(e, t('Could not load history.')))
         setRows([])
       })
     return () => { cancelled = true }
   }, [open, siteId, t, liveAt])
 
   const run = async (fn) => {
-    if (busy) return
+    if (busyRef.current) return
+    busyRef.current = true
     setBusy(true)
     setErr('')
     try {
@@ -77,6 +83,7 @@ export default function HistoryPanel({
     } catch (e) {
       setErr(apiError(e, t('Something went wrong.')))
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
@@ -148,8 +155,11 @@ export default function HistoryPanel({
   const what = (v) => <ChangeWords change={versionChange(v, scopePage)} t={t} />
 
   // Every send adds a row and only the oldest are pruned, so the newest row is
-  // what visitors see, for as long as the site is published.
-  const nowLiveId = onSendLive ? liveSaves[0]?.id : undefined
+  // what visitors see, for as long as the site is published. Always read from
+  // the unfiltered list so narrowing to one page never marks an older live
+  // version as currently live.
+  const allLiveSaves = scopePage ? groupSiteVersions(rows).liveSaves : liveSaves
+  const nowLiveId = onSendLive ? allLiveSaves[0]?.id : undefined
 
   const timelineRow = (v) => (
     <li key={v.id} className="flex items-center gap-2 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 transition hover:border-[var(--studio-border-strong)]">

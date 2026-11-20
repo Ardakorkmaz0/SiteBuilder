@@ -117,6 +117,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
   async function generate() {
     const run = ++generationRef.current
     setPhase('generating')
+    setRefining(false)
     setError('')
     setStatusLine(GENERATING_LINES[0])
     try {
@@ -169,6 +170,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
 
   function close() {
     generationRef.current += 1 // abandon any in-flight generation
+    setRefining(false)
     setPhase('form')
     onClose?.()
   }
@@ -496,7 +498,8 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
               <button
                 type="button"
                 onClick={() => setPhase('form')}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--studio-text-muted)] hover:bg-[#f3f4f6]"
+                disabled={refining}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--studio-text-muted)] hover:bg-[#f3f4f6] disabled:opacity-50"
               >
                 {t('← Edit answers')}
               </button>

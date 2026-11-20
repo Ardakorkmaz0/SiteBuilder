@@ -32,6 +32,12 @@ describe('closingTagIndex', () => {
     const html = '<html><body><p>x</p></BODY\n></html>'
     expect(closingTagIndex(html, 'body')).toBe(html.indexOf('</BODY'))
   })
+
+  it('keeps exact closing tag offsets when Turkish İ precedes script or style blocks', () => {
+    const html = '<html><body><h1>İİİİİİİİİİİİİİİ</h1><script>const x = 1</scr' + 'ipt></body></html>'
+    const at = closingTagIndex(html, 'body')
+    expect(html.slice(at)).toBe('</body></html>')
+  })
 })
 
 describe('insertBeforeClosingTag', () => {

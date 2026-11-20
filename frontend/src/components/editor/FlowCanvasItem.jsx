@@ -94,6 +94,8 @@ export default function FlowCanvasItem({
   const select = useEditorStore((s) => s.selectComponent)
   const setLayout = useEditorStore((s) => s.setLayout)
   const paintComponent = useEditorStore((s) => s.paintComponent)
+  const linkMode = useEditorStore((s) => s.linkMode)
+  const pickLinkNode = useEditorStore((s) => s.pickLinkNode)
 
   const isSelected = selectedId === component.id
   const hidden = isHidden(component, viewport)
@@ -134,7 +136,7 @@ export default function FlowCanvasItem({
       // The item's untransformed flow position, in canvas coordinates (1:1).
       const baseX = (r.left - cRect.left) / scale - prev.x
       const baseY = (r.top - cRect.top) / scale - prev.y
-      const viewTop = (sRect.top - cRect.top) / scale
+      const viewTop = Math.max(0, (sRect.top - cRect.top) / scale)
       const viewBottom = viewTop + sRect.height / scale
       let targetY = pinY === 'bottom' ? viewBottom - itemH - pinOffsetY : viewTop + pinOffsetY
       targetY = Math.min(Math.max(targetY, pinY === 'bottom' ? 0 : Math.min(0, pinOffsetY)), Math.max(0, canvasH - itemH))
@@ -159,6 +161,7 @@ export default function FlowCanvasItem({
   }, [pinMode, pinY, pinX, pinOffsetY, pinOffsetX, viewport, canvasScale])
 
   function startResize(e, dir) {
+    if (e.button !== 0) return
     e.stopPropagation()
     e.preventDefault()
     select(component.id)
@@ -172,7 +175,7 @@ export default function FlowCanvasItem({
     function onMove(ev) {
       const dx = (ev.clientX - sx) / canvasScale
       const dy = (ev.clientY - sy) / canvasScale
-      const box = resizedBox({ x: 0, y: 0, ...orig }, dir, dx, dy, MIN, aspect)
+      const box = resizedBox({ x: 0, y: 0, ...orig }, dir, dx, dy, MIN, aspect, { maxX: canvasWidth })
       const patch = {}
       if (dir.includes('e') || aspect) patch.w = box.w
       if (dir.includes('s') || aspect) patch.h = box.h
@@ -194,7 +197,13 @@ export default function FlowCanvasItem({
       <div
         data-cid={component.id}
         onPointerDown={(e) => {
+          if (e.button !== 0) return
           e.stopPropagation()
+          if (linkMode) {
+            e.preventDefault()
+            pickLinkNode(component.id)
+            return
+          }
           if (brushMode) {
             paintComponent(component.id, brushColor, brushTarget)
             onBrushUse(brushColor)
@@ -202,7 +211,7 @@ export default function FlowCanvasItem({
             select(component.id)
           }
         }}
-        style={{ flex: '0 0 100%', width: '100%', cursor: brushMode ? BRUSH_CURSOR : 'pointer', zIndex: isSelected ? 20 : 1 }}
+        style={{ flex: '0 0 100%', width: '100%', cursor: linkMode ? 'crosshair' : brushMode ? BRUSH_CURSOR : 'pointer', zIndex: isSelected ? 20 : 1 }}
       >
         <div
           className={`flex items-center gap-2 rounded-lg border border-dashed px-2 py-1 text-[11px] ${
@@ -230,15 +239,21 @@ export default function FlowCanvasItem({
     bottom: -chrome.outset,
     left: horizontalFrameOutset,
   }
-  const handles = isSelected && !brushMode ? flowResizeHandles({ full, viewport }, chrome) : []
-  const edgeHitZones = isSelected && !brushMode ? flowResizeEdgeHitZones({ full, viewport }, chrome) : []
+  const handles = isSelected && !brushMode && !linkMode ? flowResizeHandles({ full, viewport }, chrome) : []
+  const edgeHitZones = isSelected && !brushMode && !linkMode ? flowResizeEdgeHitZones({ full, viewport }, chrome) : []
 
   return (
     <div
       ref={pinRef}
       data-cid={component.id}
       onPointerDown={(e) => {
+        if (e.button !== 0) return
         e.stopPropagation()
+        if (linkMode) {
+          e.preventDefault()
+          pickLinkNode(component.id)
+          return
+        }
         if (brushMode) {
           paintComponent(component.id, brushColor, brushTarget)
           onBrushUse(brushColor)
@@ -253,7 +268,7 @@ export default function FlowCanvasItem({
         ...(pinMode === 'sticky'
           ? { position: 'sticky', [pinY === 'bottom' ? 'bottom' : 'top']: pinOffsetY }
           : {}),
-        cursor: brushMode ? BRUSH_CURSOR : 'pointer',
+        cursor: linkMode ? 'crosshair' : brushMode ? BRUSH_CURSOR : 'pointer',
         zIndex: isSelected ? 20 : pinMode ? 10 : 1,
         ...hoverRingStyle(chrome, frameOutsets),
       }}
@@ -603,6 +618,8 @@ function FlowChildItem({
   const viewport = useEditorStore((s) => s.viewport)
   const select = useEditorStore((s) => s.selectComponent)
   const paintComponent = useEditorStore((s) => s.paintComponent)
+  const linkMode = useEditorStore((s) => s.linkMode)
+  const pickLinkNode = useEditorStore((s) => s.pickLinkNode)
   if (isHidden(component, viewport)) return null
   const isSelected = selectedId === component.id
   const childStyle = autoLayoutChildStyle(component, container.props) || {}
@@ -616,6 +633,11 @@ function FlowChildItem({
       onPointerDown={(e) => {
         if (e.button !== 0) return
         e.stopPropagation()
+        if (linkMode) {
+          e.preventDefault()
+          pickLinkNode(component.id)
+          return
+        }
         if (brushMode) {
           paintComponent(component.id, brushColor, brushTarget)
           onBrushUse(brushColor)
@@ -627,7 +649,7 @@ function FlowChildItem({
         ...childStyle,
         position: 'relative',
         boxSizing: 'border-box',
-        cursor: brushMode ? BRUSH_CURSOR : 'pointer',
+        cursor: linkMode ? 'crosshair' : brushMode ? BRUSH_CURSOR : 'pointer',
         zIndex: isSelected ? 20 : undefined,
         ...hoverRingStyle(chrome, outsets),
       }}
@@ -660,6 +682,8 @@ function TabsCanvasItem({
   const select = useEditorStore((s) => s.selectComponent)
   const setLayout = useEditorStore((s) => s.setLayout)
   const paintComponent = useEditorStore((s) => s.paintComponent)
+  const linkMode = useEditorStore((s) => s.linkMode)
+  const pickLinkNode = useEditorStore((s) => s.pickLinkNode)
   const isSelected = selectedId === component.id
   const hidden = isHidden(component, viewport)
   const l = layoutOverride || component.layout || {}
@@ -679,8 +703,8 @@ function TabsCanvasItem({
   // scale times any fit-down of the mini-canvas it lives in.
   const chrome = chromeMetrics(interactionScale)
   const frameOutsets = frameOutsetsFor(chromeRect, chrome)
-  const handles = brushMode ? [] : resizeHandles(chromeRect, chrome)
-  const edgeHitZones = brushMode ? [] : resizeEdgeHitZones(chromeRect, chrome)
+  const handles = brushMode || linkMode ? [] : resizeHandles(chromeRect, chrome)
+  const edgeHitZones = brushMode || linkMode ? [] : resizeEdgeHitZones(chromeRect, chrome)
   const applyLayout = (patch) => setLayout(
     component.id,
     layoutMapper ? layoutMapper(patch, { x, y, w, h }) : patch,
@@ -689,6 +713,11 @@ function TabsCanvasItem({
   function startMove(e) {
     if (e.button !== 0) return
     e.stopPropagation()
+    if (linkMode) {
+      e.preventDefault()
+      pickLinkNode(component.id)
+      return
+    }
     if (brushMode) {
       e.preventDefault()
       paintComponent(component.id, brushColor, brushTarget)
@@ -736,6 +765,7 @@ function TabsCanvasItem({
   }
 
   function startResize(e, dir) {
+    if (e.button !== 0) return
     e.stopPropagation()
     e.preventDefault()
     select(component.id)
@@ -743,10 +773,11 @@ function TabsCanvasItem({
     const sy = e.clientY
     const orig = { x, y, w, h }
     const aspect = embedAspectLock(component)
+    const resizeBounds = bounds ? { maxX: bounds.w, maxY: bounds.h } : null
     function onMove(ev) {
       const dx = (ev.clientX - sx) / interactionScale
       const dy = (ev.clientY - sy) / interactionScale
-      applyLayout(resizedBox(orig, dir, dx, dy, MIN, aspect))
+      applyLayout(resizedBox(orig, dir, dx, dy, MIN, aspect, resizeBounds))
     }
     // One undo step per gesture; ends on pointerup, cancel or loss of focus.
     useEditorStore.getState().beginHistoryGesture()
@@ -770,7 +801,7 @@ function TabsCanvasItem({
         top: y,
         width: w,
         height: h,
-        cursor: brushMode ? BRUSH_CURSOR : 'move',
+        cursor: linkMode ? 'crosshair' : brushMode ? BRUSH_CURSOR : 'move',
         zIndex: isSelected ? 20 : 1,
         opacity: hidden ? 0.35 : 1,
         ...hoverRingStyle(chrome, frameOutsets),

@@ -472,6 +472,7 @@ function SiteEditor() {
   const [metaDirty, setMetaDirty] = useState(false)
   const metaRevisionRef = useRef(0)
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [error, setError] = useState('')
   const [activeType, setActiveType] = useState(null)
   // On unless this site was switched off. A new key on purpose: the old one
@@ -882,14 +883,6 @@ function SiteEditor() {
     if (link.href !== themeFontHref) link.href = themeFontHref
   }, [themeFontHref])
 
-  // Keep the global Ctrl+Z listener pointed at the right history (html
-  // snapshot stacks vs canvas store) without re-binding it every render.
-  // In a layout effect: Ctrl+Z right after a change must reach the handlers of
-  // the screen it was pressed on, not the ones from the render before.
-  useLayoutEffect(() => {
-    htmlHistoryRef.current = { undoStep, redoStep }
-  })
-
   const leaveGuard = useLeaveGuard({ dirty, htmlDirty, metaDirty, workspaceDirty })
 
   // Auto-save only at natural BOUNDARIES — not on every edit (that churned the
@@ -917,6 +910,20 @@ function SiteEditor() {
     },
   })
   const offerRecovery = sessionRecovery.offer
+
+  // Keep the global Ctrl+Z and canvas shortcut listener pointed at the right
+  // history, page mode, and modal state without re-binding it every render.
+  // In a layout effect: shortcuts right after a change must reach the handlers
+  // of the screen they were pressed on, not the ones from the render before.
+  useLayoutEffect(() => {
+    htmlHistoryRef.current = {
+      undoStep,
+      redoStep,
+      currentPageIsHtml,
+      modalOpen: loading || loadFailed || conflict.open || leaveGuard.promptOpen || !!sessionRecovery.draft || viewLive,
+    }
+  })
+
   const saveLifecycleRef = useRef(null)
   // A save never touches the undo/redo history (markSaved only clears
   // `dirty`), so Undo still works after one, and the server keeps every save
@@ -936,7 +943,7 @@ function SiteEditor() {
   saveLifecycleRef.current = {
     save, performSave, liveHtmlMap, dirty, htmlDirty, metaDirty, workspaceDirty, published,
     flushWorkspaceDrafts, historyDraftSnapshot, applyHistoryRestore, captureDetachedDraft,
-    loading: loading || !!sessionRecovery.draft || conflict.open, autoSaveEnabled, previewing,
+    loading: loading || loadFailed || !!sessionRecovery.draft || conflict.open, autoSaveEnabled, previewing,
   }
   useEditorAutoSave({
     lifecycleRef: saveLifecycleRef,
@@ -944,7 +951,7 @@ function SiteEditor() {
     sessionEndedRef: sessionRecovery.endedRef,
     sessionMessageRef: sessionRecovery.messageRef,
     autoSaveEnabled,
-    blocked: loading || !!sessionRecovery.draft || conflict.open,
+    blocked: loading || loadFailed || !!sessionRecovery.draft || conflict.open,
     previewing,
     dirty,
     htmlDirty,
@@ -984,11 +991,17 @@ function SiteEditor() {
 
   useEffect(() => {
     let active = true
-    const loadingTimer = setTimeout(() => active && setLoading(true), 0)
+    loadedSiteRef.current = false
+    const loadingTimer = setTimeout(() => {
+      if (!active) return
+      setLoadFailed(false)
+      setLoading(true)
+    }, 0)
     getSite(id)
       .then((data) => {
         if (!active) return
         loadedSiteRef.current = true
+        setLoadFailed(false)
         conflict.baseRevisionRef.current = Number.isInteger(data.revision) ? data.revision : null
         setTitle(data.title)
         setSlug(data.slug)
@@ -1039,7 +1052,11 @@ function SiteEditor() {
           setWizardOpen(true)
         }
       })
-      .catch((e) => active && setError(apiError(e)))
+      .catch((e) => {
+        if (!active) return
+        setLoadFailed(true)
+        setError(apiError(e))
+      })
       .finally(() => {
         clearTimeout(loadingTimer)
         if (active) setLoading(false)
@@ -1087,12 +1104,14 @@ function SiteEditor() {
       if (scope === 'field') return
 
       if (mod && e.key.toLowerCase() === 'z') {
+        if (htmlHistoryRef.current.modalOpen) return
         e.preventDefault()
         const h = htmlHistoryRef.current
         ;(e.shiftKey ? h.redoStep : h.undoStep)?.()
         return
       }
       if (mod && e.key.toLowerCase() === 'y') {
+        if (htmlHistoryRef.current.modalOpen) return
         e.preventDefault()
         htmlHistoryRef.current.redoStep?.()
         return
@@ -1110,7 +1129,7 @@ function SiteEditor() {
       if (e.defaultPrevented) return
 
       // Everything below is the component-canvas arrange layer — not HTML pages.
-      if (htmlHistoryRef.current.currentPageIsHtml) return
+      if (htmlHistoryRef.current.currentPageIsHtml || htmlHistoryRef.current.modalOpen) return
       if (!canvasArrangeKeysLive(e, { canvasMode, fullscreen, layerOpen: escapeLayerOpen() })) return
       const state = useEditorStore.getState()
 
@@ -1456,9 +1475,22 @@ function SiteEditor() {
   // Switching a canvas page to HTML updates both page.mode and pageHtmlMap;
   // keeping both snapshots bound to the single store history entry means one
   // Undo cleanly restores the canvas page (and clears pageHtmlMap for it).
+  function clearComponentDraftForPage(pageId, pages) {
+    const drafts = componentSourceDraftsRef.current
+    if (!Object.keys(drafts).length) return
+    const idx = pages.findIndex((p) => p.id === pageId)
+    if (idx < 0) return
+    const name = pageFileName(pages[idx], idx === 0, pages)
+    if (!Object.prototype.hasOwnProperty.call(drafts, name)) return
+    const next = { ...drafts }
+    delete next[name]
+    setComponentSourceDrafts(next)
+  }
+
   function applyHtmlPage(pageId, htmlText, { reseedWorkspace = false } = {}) {
     const state = useEditorStore.getState()
     const targetPage = state.schema.pages.find((p) => p.id === pageId)
+    clearComponentDraftForPage(pageId, state.schema.pages)
     if (targetPage && targetPage.mode !== 'html') {
       const mapBefore = pageId === currentPageId ? liveHtmlMap() : liveHtmlMap({ commit: true })
       const nextMap = { ...mapBefore, [pageId]: htmlText }
@@ -1606,7 +1638,8 @@ function SiteEditor() {
   }
 
   function editBrowserPage(pageId) {
-    if (currentPageIsHtml) {
+    const targetIsHtml = (storePages.find((p) => p.id === pageId)?.mode || 'empty') === 'html'
+    if (targetIsHtml) {
       try { localStorage.setItem(`pwb_htmlmode_${id}`, 'edit') } catch { /* ignore */ }
       if (pageId === currentPageId) workspaceRef.current?.showEdit?.()
       else switchToPage(pageId)
@@ -1771,6 +1804,7 @@ function SiteEditor() {
   // the site down again the moment the publish finished (and put a site that
   // was just unpublished back up).
   async function performSave(wantPublished, { auto = false, versionSource, force = false, goLive = false } = {}) {
+      if (!loadedSiteRef.current) return null
       const nextPublished = typeof wantPublished === 'boolean' ? wantPublished : publishedRef.current
       setAutoSaveState('saving')
       // While an AI proposal is drawn on the canvas, the design is the one it
@@ -1865,6 +1899,7 @@ function SiteEditor() {
       if (publishedRef.current && !data.published) {
         setLivePast([])
         setLiveFuture([])
+        setViewLive(false)
       }
       publishedRef.current = !!data.published
       setPublished(data.published)
@@ -1920,9 +1955,17 @@ function SiteEditor() {
     // rollback — push the schema + html back into the editor
     // store + local state so the canvas reflects it immediately
     // (no manual reload needed).
+    const beforeStore = useEditorStore.getState()
+    const prevPageId = beforeStore.currentPageId
+    const prevViewport = beforeStore.viewport
     {
       // The per-page html map comes back exactly like the initial load.
       setPageHtmlMap(fresh?.schema ? loadSchema(fresh.schema, { legacySiteHtml: fresh.html }) : {})
+      const afterStore = useEditorStore.getState()
+      afterStore.setViewport(prevViewport)
+      if (prevPageId && afterStore.schema.pages.some((p) => p.id === prevPageId)) {
+        afterStore.selectPage(prevPageId)
+      }
       setHtmlPast([])
       setHtmlFuture([])
       // The draft's own steps end here, and so do the live site's: with nothing
@@ -1933,6 +1976,11 @@ function SiteEditor() {
       setHtmlDirty(false)
       setWorkspaceDirty(false)
       setComponentSourceDrafts({})
+      setHtmlSelection(null)
+      setSpotlightElement(null)
+      sessionRecovery.clearRestored()
+      setAutoSaveState('idle')
+      setAutoSaveRefused(false)
       // Remount the HTML workspace so a source textarea or editable
       // iframe cannot retain the pre-restore document and auto-save it
       // back over the version the user just loaded.
@@ -1966,6 +2014,8 @@ function SiteEditor() {
     try {
       const fresh = await loadIntoDraft(() => liveToDraft(id))
       if (fresh) setViewLive(false)
+    } catch (e) {
+      setError(apiError(e))
     } finally {
       setLiveBusy(false)
     }
@@ -1979,12 +2029,18 @@ function SiteEditor() {
       return await editorSave.run(async () => {
         const content = await getVersionContent(id, versionId)
         const map = {}
-        ;(content?.schema?.pages || []).forEach((page, index) => {
-          if (page?.mode !== 'html') return
+        const versionPages = (content?.schema?.pages || []).map((page, index) => {
           const own = typeof page.html === 'string' ? page.html : ''
+          const legacyHome = !page?.mode && index === 0 && !own.trim() && String(content?.html || '').trim()
+            ? content.html
+            : ''
+          const isHtml = page?.mode === 'html' || (!page?.mode && (!!own.trim() || !!legacyHome))
+          if (!isHtml) return page
           map[page.id] = own.trim() ? own : index === 0 ? content.html || '' : ''
+          return page.mode === 'html' ? page : { ...page, mode: 'html' }
         })
-        const pages = publishedPagesFor(content.schema, map, title, slug)
+        const versionSchema = { ...(content?.schema || {}), pages: versionPages }
+        const pages = publishedPagesFor(versionSchema, map, title, slug)
         const data = await sendVersionLive(id, versionId, pages, conflict.baseRevisionRef.current)
         if (Number.isInteger(data.revision)) conflict.baseRevisionRef.current = data.revision
         publishedRef.current = !!data.published
@@ -2028,8 +2084,8 @@ function SiteEditor() {
     try {
       return await editorSave.run(async () => {
         if (leftEditorRef.current) return null
+        flushSync(() => saveLifecycleRef.current.flushWorkspaceDrafts())
         const lifecycle = saveLifecycleRef.current
-        flushSync(() => lifecycle.flushWorkspaceDrafts())
         if (lifecycle.historyDraftSnapshot().unsaved) await lifecycle.performSave()
         if (leftEditorRef.current) return null
         const data = await change()
@@ -2503,6 +2559,10 @@ function SiteEditor() {
         rememberHtmlForSchema(schemaBefore, htmlBefore)
         rememberHtmlForSchema(useEditorStore.getState().schema, importedHtml)
         setPageHtmlMap(importedHtml)
+        setComponentSourceDrafts({})
+        setHtmlSelection(null)
+        setSpotlightElement(null)
+        if (localFile) unlinkLocalFile()
         setHtmlPast([])
         setHtmlFuture([])
         markHtmlDirty()
@@ -2543,6 +2603,19 @@ function SiteEditor() {
     return (
       <div className="flex min-h-screen items-center justify-center text-gray-400">
         {t('Loading editor...')}
+      </div>
+    )
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="studio-shell flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--studio-shell)] p-6 text-center text-[var(--studio-text)]">
+        <p role="alert" className="max-w-md text-sm text-[var(--studio-danger)]">
+          {error || t('Something went wrong.')}
+        </p>
+        <button type="button" onClick={goBack} className="ms-btn ms-btn-secondary">
+          {t('Go back')}
+        </button>
       </div>
     )
   }
@@ -2731,9 +2804,16 @@ function SiteEditor() {
         : { label: t('Saved'), tone: 'var(--studio-success)' }
   const effectiveAiPanelLayout = isNarrow ? 'compact' : aiPanelLayout
   const aiWorkspaceOpen = aiOn && aiOpen && effectiveAiPanelLayout === 'workspace'
-  const applyAiDocument = (html) => {
-    const placed = workspaceRef.current?.applyAiHtml?.(html) ?? html
-    commitHtml(placed)
+  const applyAiDocument = (html, targetPageId = currentPageId) => {
+    const pageId = storePages.some((p) => p.id === targetPageId) ? targetPageId : currentPageId
+    const targetPage = storePages.find((p) => p.id === pageId)
+    if (targetPage && targetPage.mode !== 'html') {
+      applyHtmlPage(pageId, html, { reseedWorkspace: true })
+      if (pageId !== currentPageId) useEditorStore.getState().selectPage(pageId)
+      return
+    }
+    const placed = pageId === currentPageId ? (workspaceRef.current?.applyAiHtml?.(html) ?? html) : html
+    applyHtmlPage(pageId, placed)
   }
 
   return (

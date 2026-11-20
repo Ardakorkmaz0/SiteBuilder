@@ -836,11 +836,14 @@ class SiteViewSet(viewsets.ModelViewSet):
         except SiteVersion.DoesNotExist:
             return error_response('version_not_found', 'Version not found for this site.', status.HTTP_404_NOT_FOUND)
         # Save the current state INTO this slot, and bump it to the top.
+        # Clear cached summary so the next history read recomputes it against
+        # the overwritten snapshot rather than showing the old slot's diff.
         version.schema = site.schema
         version.html = site.html
         version.pinned = True
+        version.summary = None
         version.created_at = timezone.now()
-        version.save(update_fields=['schema', 'html', 'pinned', 'created_at'])
+        version.save(update_fields=['schema', 'html', 'pinned', 'summary', 'created_at'])
         return Response(SiteVersionSerializer(version, context={'request': request}).data)
 
     @action(detail=True, methods=['patch'], url_path=r'versions/(?P<version_id>[0-9]+)/pin')
@@ -1991,11 +1994,11 @@ class AdminSiteModerateView(APIView):
         action = request.data.get('action')
         if action not in ('unpublish', 'reinstate', 'delete'):
             return error_response('invalid_site_action', "action must be 'unpublish', 'reinstate' or 'delete'.")
-        try:
-            site = Site.objects.get(pk=site_id)
-        except Site.DoesNotExist:
-            return error_response('site_not_found', 'Site not found.', status.HTTP_404_NOT_FOUND)
         if action == 'delete':
+            try:
+                site = Site.objects.select_related('owner').get(pk=site_id)
+            except Site.DoesNotExist:
+                return error_response('site_not_found', 'Site not found.', status.HTTP_404_NOT_FOUND)
             _log_admin(request, site, 'site.delete', f'Owner @{site.owner.username}')
             site.delete()
             return Response({'detail': 'Site deleted.', 'deleted': True})
@@ -2004,19 +2007,29 @@ class AdminSiteModerateView(APIView):
             # while blocked. Lifting the block hands back a draft, rather
             # than publishing that saved state on the moderator's behalf.
             with transaction.atomic():
+                try:
+                    site = Site.objects.select_for_update().get(pk=site_id)
+                except Site.DoesNotExist:
+                    return error_response('site_not_found', 'Site not found.', status.HTTP_404_NOT_FOUND)
                 if site.moderation_blocked:
                     site.published = False
                     forget_live_version(site)
                 site.moderation_blocked = False
                 site.moderated_at = None
-                site.save(update_fields=['published', 'moderation_blocked', 'moderated_at'])
+                site.revision += 1
+                site.save(update_fields=['published', 'moderation_blocked', 'moderated_at', 'revision'])
             _log_admin(request, site, 'site.reinstate')
             return Response({'detail': 'Site reinstated.', 'published': site.published, 'moderation_blocked': False})
         with transaction.atomic():
+            try:
+                site = Site.objects.select_for_update().get(pk=site_id)
+            except Site.DoesNotExist:
+                return error_response('site_not_found', 'Site not found.', status.HTTP_404_NOT_FOUND)
             site.published = False
             site.moderation_blocked = True
             site.moderated_at = timezone.now()
-            site.save(update_fields=['published', 'moderation_blocked', 'moderated_at'])
+            site.revision += 1
+            site.save(update_fields=['published', 'moderation_blocked', 'moderated_at', 'revision'])
             forget_live_version(site)
         # Resolve any open reports on a taken-down site.
         Report.objects.filter(site=site, status='open').update(status='resolved', resolved_at=timezone.now())
@@ -2445,6 +2458,25 @@ def _without_copies(components, component_id):
     return kept, removed
 
 
+def _strip_schema_copies(schema, component_id):
+    if not isinstance(schema, dict):
+        return schema, 0
+    pages = schema.get('pages') if isinstance(schema.get('pages'), list) else []
+    removed_here = 0
+    for page in pages:
+        if not isinstance(page, dict):
+            continue
+        components = page.get('components')
+        if isinstance(components, list):
+            page['components'], removed = _without_copies(components, component_id)
+            removed_here += removed
+        # On an HTML page the copy is part of the document.
+        if isinstance(page.get('html'), str):
+            page['html'], removed = strip_marked(page['html'], component_id)
+            removed_here += removed
+    return schema, removed_here
+
+
 def _purge_shared_copies(component_id):
     """Delete every block that was taken from this component, wherever it went.
 
@@ -2459,43 +2491,47 @@ def _purge_shared_copies(component_id):
     """
     marked = 0
     sites_touched = 0
-    for site in Site.objects.only('id', 'schema', 'html', 'revision').iterator():
-        schema = site.schema if isinstance(site.schema, dict) else {}
-        pages = schema.get('pages') if isinstance(schema.get('pages'), list) else []
-        removed_here = 0
-        for page in pages:
-            if not isinstance(page, dict):
+    site_ids = list(Site.objects.values_list('id', flat=True))
+    for site_id in site_ids:
+        with transaction.atomic():
+            site = Site.objects.select_for_update().only(
+                'id', 'schema', 'html', 'live_schema', 'live_html', 'revision',
+            ).filter(pk=site_id).first()
+            if site is None:
                 continue
-            components = page.get('components')
-            if isinstance(components, list):
-                page['components'], removed = _without_copies(components, component_id)
-                removed_here += removed
-            # On an HTML page the copy is part of the document.
-            if isinstance(page.get('html'), str):
-                page['html'], removed = strip_marked(page['html'], component_id)
-                removed_here += removed
-        site_html, html_removed = strip_marked(site.html, component_id)
-        # What visitors receive is the published copy of each page: a copy
-        # deleted only from the draft stayed live until the owner republished.
-        live_removed = 0
-        for published in PublishedPage.objects.filter(site_id=site.pk).only('id', 'html'):
-            cleaned, removed = strip_marked(published.html, component_id)
-            if removed:
-                published.html = cleaned
-                published.save(update_fields=['html', 'updated_at'])
-                live_removed += removed
-        if removed_here or live_removed or site_html != site.html:
-            # Straight back, without re-running the save gate: this only ever
-            # deletes content, so there is nothing new to validate and nothing
-            # else on the page should shift because of a takedown.
-            site.schema = schema
-            site.html = site_html
-            site.revision += 1
-            site.save(update_fields=['schema', 'html', 'revision', 'updated_at'])
-            # Draft schema, legacy HTML and published documents can hold the
-            # same copies; count the fullest representation once.
-            marked += max(removed_here, live_removed, html_removed)
-            sites_touched += 1
+            schema, removed_here = _strip_schema_copies(site.schema if isinstance(site.schema, dict) else {}, component_id)
+            live_schema, live_schema_removed = _strip_schema_copies(site.live_schema, component_id)
+            site_html, html_removed = strip_marked(site.html, component_id)
+            live_html, live_html_removed = strip_marked(site.live_html, component_id)
+            # What visitors receive is the published copy of each page: a copy
+            # deleted only from the draft stayed live until the owner republished.
+            live_removed = 0
+            for published in PublishedPage.objects.select_for_update().filter(site_id=site.pk).only('id', 'html'):
+                cleaned, removed = strip_marked(published.html, component_id)
+                if removed:
+                    published.html = cleaned
+                    published.save(update_fields=['html', 'updated_at'])
+                    live_removed += removed
+            if (
+                removed_here
+                or live_schema_removed
+                or live_removed
+                or site_html != site.html
+                or live_html != site.live_html
+            ):
+                # Straight back, without re-running the save gate: this only ever
+                # deletes content, so there is nothing new to validate and nothing
+                # else on the page should shift because of a takedown.
+                site.schema = schema
+                site.html = site_html
+                site.live_schema = live_schema
+                site.live_html = live_html
+                site.revision += 1
+                site.save(update_fields=['schema', 'html', 'live_schema', 'live_html', 'revision', 'updated_at'])
+                # Draft schema, live snapshot, legacy HTML and published documents
+                # can hold the same copies; count the fullest representation once.
+                marked += max(removed_here, live_schema_removed, live_removed, html_removed, live_html_removed)
+                sites_touched += 1
     return sites_touched, marked
 
 

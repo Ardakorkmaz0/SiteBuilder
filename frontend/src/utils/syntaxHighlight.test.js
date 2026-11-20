@@ -64,6 +64,14 @@ describe('what gets a colour', () => {
     expect(kinds(highlightCode('<script>"<b>"</script>')).map(([kind]) => kind)).toEqual(['tag', 'string', 'tag'])
   })
 
+  it('does not shift closing tag indices when Turkish İ appears before style or script', () => {
+    const src = '<p>İİİİİİİİİİ</p><style>.a{color:#fff}</style><main>Son</main>'
+    const tokens = kinds(highlightCode(src, 'html'))
+    expect(read(highlightCode(src, 'html')).textContent).toBe(src)
+    expect(tokens.filter(([kind, text]) => kind === 'tag' && text === 'style')).toHaveLength(2)
+    expect(tokens).toContainEqual(['tag', 'main'])
+  })
+
   it('in css: selectors, at-rules, properties, values, comments', () => {
     expect(kinds(highlightCode('/* c */@media print{a{margin:1px}}', 'css'))).toEqual([
       ['comment', '/* c */'], ['keyword', '@media print'], ['tag', 'a'], ['property', 'margin'], ['number', '1px'],

@@ -341,12 +341,14 @@ export default function AiSettings({ showHeading = true }) {
     // The local-status row refetches via the effect above; clearing here
     // makes it show "checking…" instead of a stale snapshot.
     setLocalStatus(null)
+    window.dispatchEvent(new Event('storage'))
   }
   // Persist the key as the user types; flash "Saved ✓" briefly.
   function changeApiKey(next) {
     setValue(next)
     setApiKey(next || '', provider)
     setSavedFlash(!!next)
+    window.dispatchEvent(new Event('storage'))
   }
   useEffect(() => {
     if (!savedFlash) return undefined
@@ -355,9 +357,13 @@ export default function AiSettings({ showHeading = true }) {
   }, [savedFlash])
   useEffect(() => {
     setModel(model, provider)
+    window.dispatchEvent(new Event('storage'))
   }, [model, provider])
   useEffect(() => {
-    if (providerInfo?.configurableEndpoint) setEndpoint(endpoint, provider)
+    if (providerInfo?.configurableEndpoint) {
+      setEndpoint(endpoint, provider)
+      window.dispatchEvent(new Event('storage'))
+    }
   }, [endpoint, provider, providerInfo?.configurableEndpoint])
   const modelLabel = models.find((m) => m.id === model)?.label.replace(' (recommended)', '') || model
   // Switched off on the server since this panel opened: reset UI state for the
@@ -372,6 +378,7 @@ export default function AiSettings({ showHeading = true }) {
   }
   useEffect(() => {
     setProvider(provider)
+    window.dispatchEvent(new Event('storage'))
   }, [provider])
   if (!offered.length) {
     return (

@@ -186,4 +186,31 @@ describe('loading a save with work not saved yet', () => {
     await waitFor(() => expect(onRestored).toHaveBeenCalled())
     expect(onSave).not.toHaveBeenCalled()
   })
+
+  it('does not mislabel an older publish as Now live when filtering by current page', async () => {
+    listVersions.mockResolvedValue([
+      {
+        id: 2,
+        source: 'publish',
+        pinned: false,
+        label: 'Sent live: About',
+        created_at: '2026-07-16T10:00:00Z',
+        summary: { pages: [{ id: 'about', name: 'About' }] },
+      },
+      {
+        id: 1,
+        source: 'publish',
+        pinned: false,
+        label: 'Sent live: Home',
+        created_at: '2026-07-15T10:00:00Z',
+        summary: { pages: [{ id: 'home', name: 'Home' }] },
+      },
+    ])
+    renderPanel({ pageId: 'home', pageName: 'Home', onSendLive: vi.fn() })
+    expect(await screen.findByText('Now live')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Only this page: Home/i }))
+    expect(screen.getByText('Sent live: Home')).toBeInTheDocument()
+    expect(screen.queryByText('Now live')).not.toBeInTheDocument()
+  })
 })

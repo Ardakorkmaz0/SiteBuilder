@@ -182,11 +182,12 @@ export default function SiteControlCenter({
     if (!window.confirm(t('Create a new review link? The previous link will stop working.'))) return
     return runAction(async () => {
       const data = await regenerateReviewLink(site.id)
-      onSitePatch({ ...site, review_token: data.review_token })
+      onSitePatch({ review_token: data.review_token })
     })
   }
 
   function editContent(entry, value) {
+    if (value === entry.value) return
     if (entry.source === 'html') {
       const page = schema.pages.find((item) => item.id === entry.pageId)
       const html = pageHtmlMap[entry.pageId] ?? page?.html ?? ''
@@ -290,7 +291,7 @@ export default function SiteControlCenter({
             <div className="space-y-3">
               <div className="rounded-2xl border border-[color-mix(in_srgb,var(--studio-info)_30%,var(--studio-border))] bg-[var(--studio-info-soft)] p-4 text-sm text-[var(--studio-info)]">{t('Edit text and image descriptions without opening the design canvas. Changes remain undoable and are saved with the site.')}</div>
               {!contentEntries.length ? <EmptyState>{t('No editable content found.')}</EmptyState> : contentEntries.map((entry) => (
-                <label key={entry.id} className="block rounded-2xl border border-[#e5e7eb] bg-white p-4"><span className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-[var(--studio-text-muted)]"><span>{entry.pageName}</span><span>{entry.labelKey ? t(entry.labelKey, entry.labelVars) : entry.label}</span></span>{entry.value.length > 90 ? <textarea className="ms-input min-h-24" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} /> : <input className="ms-input" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} />}</label>
+                <label key={entry.id} className="block rounded-2xl border border-[#e5e7eb] bg-white p-4"><span className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-[var(--studio-text-muted)]"><span>{entry.pageName}</span><span>{entry.labelKey ? t(entry.labelKey, entry.labelVars) : entry.label}</span></span>{entry.value.length > 90 ? <textarea key={`${entry.id}:${entry.value}`} className="ms-input min-h-24" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} /> : <input key={`${entry.id}:${entry.value}`} className="ms-input" defaultValue={entry.value} onBlur={(e) => editContent(entry, e.target.value)} />}</label>
               ))}
             </div>
           )}
@@ -313,7 +314,7 @@ export default function SiteControlCenter({
                   check at the end, so the status never left "waiting". */}
               <DomainPanel
                 siteId={site.id}
-                onStatus={(data) => onSitePatch({ ...site, custom_domain: data.domain, domain_status: data.status })}
+                onStatus={(data) => onSitePatch({ custom_domain: data.domain, domain_status: data.status })}
               />
             </div>
           )}

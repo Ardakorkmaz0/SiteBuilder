@@ -312,6 +312,45 @@ export function themedStyles(type, baseStyles = {}, theme = DEFAULT_THEME) {
         borderStyle: 'none',
         fontFamily: t.fontFamily,
       }
+    case 'region':
+    case 'container':
+      return {
+        ...styles,
+        ...(styles?.backgroundColor && styles.backgroundColor !== 'transparent' ? { backgroundColor: t.surfaceColor } : {}),
+        color: t.textColor,
+        ...(styles?.borderColor ? { borderColor: t.borderColor } : {}),
+        fontFamily: t.fontFamily,
+      }
+    case 'tabs':
+      return {
+        ...styles,
+        backgroundColor: t.surfaceColor,
+        color: t.textColor,
+        borderColor: t.borderColor,
+        fontFamily: t.fontFamily,
+      }
+    case 'list':
+      return {
+        ...styles,
+        color: t.textColor,
+        fontFamily: t.fontFamily,
+      }
+    case 'quote':
+      return {
+        ...styles,
+        color: t.textColor,
+        borderLeftColor: t.primaryColor,
+        ...(styles?.backgroundColor && styles.backgroundColor !== 'transparent' ? { backgroundColor: t.surfaceColor } : {}),
+        fontFamily: t.fontFamily,
+      }
+    case 'accordion':
+      return {
+        ...styles,
+        backgroundColor: t.surfaceColor,
+        color: t.textColor,
+        borderColor: t.borderColor,
+        fontFamily: t.fontFamily,
+      }
     default:
       return styles
   }

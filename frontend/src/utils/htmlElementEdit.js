@@ -263,6 +263,7 @@ export function resolveSelectableElement(el, bodyEl) {
   if (!node || !bodyEl) return null
   if (node === bodyEl || node === bodyEl.ownerDocument?.documentElement) return null
   if (!bodyEl.contains(node)) return null
+  if (node.closest?.('[data-pwb-chrome], [data-pwb-injected], [data-pwb-tt]')) return null
   return node
 }
 
@@ -451,7 +452,7 @@ export function linkListAnchors(el) {
 
 export function readElementLinks(el) {
   return linkListAnchors(el).map((a) => ({
-    text: (a.textContent || '').trim(),
+    text: String(a.textContent || '').replace(/^[\r\n\t]+|[\r\n\t]+$/g, ''),
     href: a.getAttribute('href') || '',
   }))
 }
@@ -464,7 +465,7 @@ export function setElementLinks(el, links) {
   const anchors = linkListAnchors(el)
   if (!anchors.length && !Array.isArray(links)) return
   const wanted = (Array.isArray(links) ? links : []).map((link) => ({
-    text: String(link?.text ?? '').trim(),
+    text: String(link?.text ?? ''),
     href: String(link?.href ?? ''),
   }))
 

@@ -842,6 +842,43 @@ class TestCopiesBeyondTheComponentList:
         assert f'data-pwb-shared-from="{drop.pk}"' not in live
         assert f'data-pwb-shared-from="{keep.pk}"' in live
 
+    def test_a_purge_also_strips_live_schema_and_live_html_snapshots(self, author, taker, moderator):
+        drop = SharedComponent.objects.create(author=author, **GOOD)
+        keep = SharedComponent.objects.create(author=author, **{**GOOD, 'title': 'Safe'})
+        site = Site.objects.create(
+            owner=taker,
+            title='Live Snap',
+            slug='live-snap-site',
+            published=True,
+            schema={'theme': {}, 'pages': [{'id': 'page_home', 'name': 'Home', 'components': []}]},
+            html='',
+            live_schema={
+                'theme': {},
+                'pages': [{
+                    'id': 'page_home',
+                    'name': 'Home',
+                    'components': [
+                        {'id': 'b1', 'type': 'html', 'props': {'code': '<p>bad</p>', '_sharedFrom': drop.pk}, 'styles': {}, 'layout': {'x': 0, 'y': 0, 'w': 100, 'h': 40}},
+                        {'id': 'b2', 'type': 'html', 'props': {'code': '<p>ok</p>', '_sharedFrom': keep.pk}, 'styles': {}, 'layout': {'x': 0, 'y': 50, 'w': 100, 'h': 40}},
+                    ],
+                }],
+            },
+            live_html=f'<html><body><div data-pwb-shared-from="{drop.pk}">bad</div><p>keep</p></body></html>',
+        )
+        rev0 = site.revision
+
+        res = client_for(moderator).post(
+            reverse('admin-component-moderate', args=[drop.pk]), {'action': 'purge'}, format='json',
+        )
+
+        assert res.status_code == 200
+        assert res.data['sites_touched'] == 1
+        site.refresh_from_db()
+        assert [c['id'] for c in site.live_schema['pages'][0]['components']] == ['b2']
+        assert f'data-pwb-shared-from="{drop.pk}"' not in site.live_html
+        assert '<p>keep</p>' in site.live_html
+        assert site.revision == rev0 + 1
+
 
 class TestAuthorDeleted:
     """The owner's decision (round 7): when an account is deleted, its blocks

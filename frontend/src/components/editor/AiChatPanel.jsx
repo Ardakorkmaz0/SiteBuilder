@@ -468,13 +468,15 @@ export default function AiChatPanel({
           setError(t('HTML mode is not wired into this editor session.'))
           return
         }
+        const targetPageId = useEditorStore.getState().currentPageId
+        const baseHtml = currentHtml || ''
         const lastDivider = messages.findLastIndex((m) => m.role === 'divider')
         const since = lastDivider >= 0 ? messages.slice(lastDivider + 1) : messages
         const history = [...since, userMsg]
           .filter((m) => m.role === 'user' || m.role === 'assistant')
           .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', text: m.text || '' }))
           .slice(0, -1)
-        const { html: generated } = await runAiHtmlPrompt(modelPrompt, { history, currentHtml, signal: run.signal })
+        const { html: generated } = await runAiHtmlPrompt(modelPrompt, { history, currentHtml: baseHtml, signal: run.signal })
         // Weak models sometimes return a bare fragment instead of the full
         // document. coerce: graft fragments onto the current page (the apply
         // step places them at the user's viewport) or wrap them standalone.
@@ -519,7 +521,7 @@ export default function AiChatPanel({
           : doc.grafted
             ? t('The model sent back just the new part, so I added it to your current page — it should be highlighted in the preview.')
             : t('Generated ~{size} KB of HTML and prepared a preview.', { size: Math.round(finalHtml.length / 1024) })
-        setPendingChange({ kind: 'html', html: finalHtml, summary })
+        setPendingChange({ kind: 'html', html: finalHtml, summary, pageId: targetPageId, baseHtml })
         return
       }
       // ----- Components mode (default tool-calling path) --------------------
@@ -695,7 +697,14 @@ export default function AiChatPanel({
 
   function acceptPendingChange() {
     if (!pendingChange) return
-    if (pendingChange.kind === 'html') onApplyHtml?.(pendingChange.html)
+    if (pendingChange.kind === 'html') {
+      const samePage = !pendingChange.pageId || useEditorStore.getState().currentPageId === pendingChange.pageId
+      if (samePage && pendingChange.baseHtml !== undefined && (currentHtml || '') !== pendingChange.baseHtml) {
+        setError(t('The page has changed since this proposal was prepared. Reject it and ask again, so the changes you made in the meantime are not lost.'))
+        return
+      }
+      onApplyHtml?.(pendingChange.html, pendingChange.pageId)
+    }
     if (pendingChange.kind === 'schema') {
       const store = useEditorStore.getState()
       // The proposal is the whole design as it was when the run began, with

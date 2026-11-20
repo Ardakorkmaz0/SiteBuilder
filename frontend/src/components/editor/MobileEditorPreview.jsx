@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { EditIcon, EyeIcon, GlobeIcon, LayersIcon } from '../icons.jsx'
 import LanguageSwitcher from '../LanguageSwitcher.jsx'
@@ -7,6 +7,7 @@ import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { HTML_ALLOW, PUBLIC_HTML_SANDBOX, withBuilderInteractiveHtml, withViewportMeta } from '../../utils/htmlRuntime.js'
 import { schemaToSingleHtml } from '../../utils/schemaToFiles.js'
 import { colorModeFor, withColorModeHtml } from '../../utils/colorMode.js'
+import { isPreviewMessageSource, previewPageId } from '../../utils/previewMessages.js'
 
 function htmlForPage(page, pages, pageHtmlMap) {
   const live = pageHtmlMap?.[page?.id]
@@ -33,20 +34,46 @@ export default function MobileEditorPreview({
 }) {
   const { t } = useLanguage()
   const [sheet, setSheet] = useState(null)
-  // A tablet with a keyboard reaches this layout too.
-  useEscapeToClose(!!sheet, () => setSheet(null))
   const [focused, setFocused] = useState(false)
+  // A tablet with a keyboard reaches this layout too.
+  useEscapeToClose(focused, () => setFocused(false))
+  useEscapeToClose(!!sheet, () => setSheet(null))
   const [copied, setCopied] = useState(false)
+  const [palette, setPalette] = useState({ chosen: null, forPage: null, pageId: null })
+  const frameRef = useRef(null)
   const currentPage = useMemo(
     () => pages.find((page) => page.id === currentPageId) || pages[0] || {},
     [currentPageId, pages],
   )
+  if (palette.pageId !== currentPage.id) {
+    setPalette((was) => ({ ...was, forPage: was.chosen, pageId: currentPage.id }))
+  }
   const currentHtml = htmlForPage(currentPage, pages, pageHtmlMap)
   const currentIsHtml = currentPage.mode === 'html' || !!currentHtml.trim()
 
+  useEffect(() => {
+    const onMessage = (event) => {
+      if (!isPreviewMessageSource(event, frameRef.current)) return
+      if (event.data?.type === 'pwb-color-mode') {
+        const chosen = event.data.mode
+        if (chosen === 'light' || chosen === 'dark' || chosen === 'system') {
+          setPalette((was) => ({ ...was, chosen }))
+        }
+        return
+      }
+      if (event.data?.type !== 'pwb-navigate') return
+      const id = previewPageId(event.data.hash)
+      const target = id ? pages.find((p) => p.id === id) : null
+      if (target && target.id !== currentPage.id) onSelectPage?.(target.id)
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [currentPage.id, onSelectPage, pages])
+
   const previewHtml = useMemo(() => {
     // A light/dark switch works here as it does on the published page.
-    const colorMode = colorModeFor({ theme, colorMode: colorModeSetting, pages }, currentPage, pageHtmlMap)
+    const baseMode = colorModeFor({ theme, colorMode: colorModeSetting, pages }, currentPage, pageHtmlMap)
+    const colorMode = baseMode && palette.forPage ? { ...baseMode, chosen: palette.forPage } : baseMode
     if (currentIsHtml) return withViewportMeta(withBuilderInteractiveHtml(withColorModeHtml(currentHtml, colorMode)))
     return withViewportMeta(schemaToSingleHtml({
       theme,
@@ -55,7 +82,7 @@ export default function MobileEditorPreview({
       fontFaces,
       pages: [currentPage],
     }, title || currentPage.name || 'My Site', { colorMode }))
-  }, [colorModeSetting, currentHtml, currentIsHtml, currentPage, customCss, customJs, fontFaces, pageHtmlMap, pages, theme, title])
+  }, [colorModeSetting, currentHtml, currentIsHtml, currentPage, customCss, customJs, fontFaces, pageHtmlMap, pages, palette.forPage, theme, title])
 
   async function copyEditorLink() {
     try {
@@ -69,6 +96,7 @@ export default function MobileEditorPreview({
 
   const frame = (
     <iframe
+      ref={frameRef}
       key={`${currentPage.id || 'page'}-${currentIsHtml ? 'html' : 'components'}`}
       title={t('Previewing {page}', { page: currentPage.name || title || t('Preview') })}
       srcDoc={previewHtml}

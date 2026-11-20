@@ -348,3 +348,20 @@ describe('a document that has some of the runtime already', () => {
     expect(out).toContain('data-builder-interactive>')
   })
 })
+
+describe('head matching and style breakout hardening', () => {
+  it('does not treat <header> as <head> when injecting viewport meta or generated styles', () => {
+    const fragment = '<header class="top"><h1>Brand</h1></header><main><p>Hi</p></main>'
+    const withVp = withViewportMeta(fragment)
+    expect(withVp).not.toMatch(/<header[^>]*>\s*<meta/i)
+    const withCss = withGeneratedStylesHtml(fragment, '.top { color: red; }')
+    expect(withCss).not.toMatch(/<header[^>]*>\s*<style/i)
+  })
+
+  it('strips nested </style breakout sequences iteratively from generated styles', () => {
+    const out = withGeneratedStylesHtml('<html><head></head><body></body></html>', '.x { content: "</sty</stylele><script>alert(1)</script>"; }')
+    const match = out.match(/<style[^>]*data-pwb-generated[^>]*>([\s\S]*?)<\/style>/i)
+    expect(match).not.toBeNull()
+    expect(match[1].toLowerCase()).not.toContain('</style')
+  })
+})

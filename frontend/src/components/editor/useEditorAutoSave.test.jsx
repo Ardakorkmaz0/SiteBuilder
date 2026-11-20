@@ -185,4 +185,13 @@ describe('saving at the edges', () => {
     hook.unmount()
     expect(save).not.toHaveBeenCalled()
   })
+
+  it('does not fire debounced, hidden, or unmount auto-saves while a session warning is active', () => {
+    const { save, hook, sessionMessageRef } = setup()
+    sessionMessageRef.current = 'Your session ended'
+    act(() => { vi.advanceTimersByTime(10000) })
+    act(() => { setVisibility('hidden') })
+    hook.unmount()
+    expect(save).not.toHaveBeenCalled()
+  })
 })

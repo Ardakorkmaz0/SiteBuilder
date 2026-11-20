@@ -126,24 +126,56 @@ export function chromeBadgeStyle(metrics, corner = 'top-left') {
   }
 }
 
-/** Resize an item box cleanly while honoring minimum bounds and optional aspect ratio lock. */
-export function resizedBox(orig, dir, dx, dy, min = 20, aspect = null) {
+/** Resize an item box cleanly while honoring minimum bounds, container bounds, and optional aspect ratio lock. */
+export function resizedBox(orig, dir, dx, dy, min = 20, aspect = null, bounds = null) {
+  const right = orig.x + orig.w
+  const bottom = orig.y + orig.h
+  const maxX = Number.isFinite(bounds?.maxX) ? bounds.maxX : null
+  const maxY = Number.isFinite(bounds?.maxY) ? bounds.maxY : null
   let { x: nx, y: ny, w: nw, h: nh } = orig
-  if (dir.includes('e')) nw = Math.max(min, orig.w + dx)
-  if (dir.includes('s')) nh = Math.max(min, orig.h + dy)
+  if (dir.includes('e')) {
+    nw = Math.max(min, orig.w + dx)
+    if (maxX !== null) nw = Math.min(nw, Math.max(min, maxX - orig.x))
+  }
+  if (dir.includes('s')) {
+    nh = Math.max(min, orig.h + dy)
+    if (maxY !== null) nh = Math.min(nh, Math.max(min, maxY - orig.y))
+  }
   if (dir.includes('w')) {
-    nw = Math.max(min, orig.w - dx)
-    nx = orig.x + (orig.w - nw)
+    nw = Math.min(Math.max(min, orig.w - dx), Math.max(min, right))
+    nx = Math.max(0, right - nw)
   }
   if (dir.includes('n')) {
-    nh = Math.max(min, orig.h - dy)
-    ny = orig.y + (orig.h - nh)
+    nh = Math.min(Math.max(min, orig.h - dy), Math.max(min, bottom))
+    ny = Math.max(0, bottom - nh)
   }
   if (aspect) {
     if (dir.includes('e') || dir.includes('w')) nh = Math.max(min, Math.round(nw / aspect))
     else nw = Math.max(min, Math.round(nh * aspect))
-    if (dir.includes('n')) ny = orig.y + orig.h - nh
-    if (dir.includes('w')) nx = orig.x + orig.w - nw
+    if (dir.includes('n')) ny = bottom - nh
+    if (dir.includes('w')) nx = right - nw
+    if (nx < 0) {
+      nx = 0
+      nw = Math.max(min, right)
+      nh = Math.max(min, Math.round(nw / aspect))
+      if (dir.includes('n')) ny = bottom - nh
+    }
+    if (ny < 0) {
+      ny = 0
+      nh = Math.max(min, bottom)
+      nw = Math.max(min, Math.round(nh * aspect))
+      if (dir.includes('w')) nx = right - nw
+    }
+    if (maxX !== null && nx + nw > maxX) {
+      nw = Math.max(min, maxX - nx)
+      nh = Math.max(min, Math.round(nw / aspect))
+      if (dir.includes('n')) ny = Math.max(0, bottom - nh)
+    }
+    if (maxY !== null && ny + nh > maxY) {
+      nh = Math.max(min, maxY - ny)
+      nw = Math.max(min, Math.round(nh * aspect))
+      if (dir.includes('w')) nx = Math.max(0, right - nw)
+    }
   }
   return { x: nx, y: ny, w: nw, h: nh }
 }

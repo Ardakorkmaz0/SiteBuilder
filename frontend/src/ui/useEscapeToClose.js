@@ -93,13 +93,28 @@ export function useEscapeToClose(open, onClose) {
       if (!stack.length) document.removeEventListener('keydown', onKeyDown, true)
     }
   }, [open])
+  const restoreRef = useRef(null)
+  useLayoutEffect(() => {
+    if (!open || !openers) return undefined
+    let done = false
+    const restore = () => {
+      if (done) return
+      done = true
+      if (!focusWasLost()) return
+      openers.find((element) => element.isConnected)?.focus({ preventScroll: true })
+    }
+    restoreRef.current = restore
+    return () => {
+      // useLayoutEffect cleanup runs right before React detaches the dialog DOM,
+      // so queueMicrotask fires immediately after removal — before
+      // MutationObserver-based focusRescue can steal focus away.
+      queueMicrotask(restore)
+    }
+  }, [open, openers])
   useEffect(() => {
     if (!open || !openers) return undefined
     return () => {
-      // Only when focus went down with the dialog: a close that moved focus
-      // on purpose (into a field, onto another page) is left alone.
-      if (!focusWasLost()) return
-      openers.find((element) => element.isConnected)?.focus({ preventScroll: true })
+      restoreRef.current?.()
     }
   }, [open, openers])
 }

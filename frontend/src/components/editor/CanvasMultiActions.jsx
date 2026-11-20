@@ -61,7 +61,7 @@ export default function CanvasMultiActions({ count, canvasScale = 1, style }) {
       }}
       style={{
         position: 'absolute',
-        zIndex: 52,
+        zIndex: 1100,
         display: 'flex',
         alignItems: 'center',
         gap: 2,

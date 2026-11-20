@@ -81,6 +81,22 @@ describe('themedStyles', () => {
     expect(themedStyles('badge', {}, theme)).toMatchObject({ backgroundColor: '#facc15', color: '#111111' })
     expect(themedStyles('icon', {}, theme).color).toBe('#facc15')
   })
+
+  it('themes region, container, tabs, list, quote, and accordion components', () => {
+    const theme = normalizeTheme({
+      surfaceColor: '#1e293b',
+      textColor: '#f8fafc',
+      borderColor: '#334155',
+      primaryColor: '#38bdf8',
+      fontFamily: 'Lora',
+    })
+    expect(themedStyles('region', { backgroundColor: '#ffffff' }, theme)).toMatchObject({ backgroundColor: '#1e293b', color: '#f8fafc', fontFamily: 'Lora' })
+    expect(themedStyles('container', { backgroundColor: '#ffffff', borderColor: '#dddddd' }, theme)).toMatchObject({ backgroundColor: '#1e293b', color: '#f8fafc', borderColor: '#334155' })
+    expect(themedStyles('tabs', {}, theme)).toMatchObject({ backgroundColor: '#1e293b', color: '#f8fafc', borderColor: '#334155' })
+    expect(themedStyles('list', {}, theme)).toMatchObject({ color: '#f8fafc', fontFamily: 'Lora' })
+    expect(themedStyles('quote', {}, theme)).toMatchObject({ color: '#f8fafc', borderLeftColor: '#38bdf8', fontFamily: 'Lora' })
+    expect(themedStyles('accordion', {}, theme)).toMatchObject({ backgroundColor: '#1e293b', color: '#f8fafc', borderColor: '#334155', fontFamily: 'Lora' })
+  })
 })
 
 describe('readableTextOn', () => {

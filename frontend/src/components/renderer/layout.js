@@ -27,6 +27,7 @@ function isVerticalNavbar(component) {
 }
 
 function numericProp(value, fallback = 0) {
+  if (value === undefined || value === null || value === '') return fallback
   const n = Number(value)
   return Number.isFinite(n) ? Math.round(n) : fallback
 }

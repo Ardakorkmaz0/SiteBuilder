@@ -72,6 +72,11 @@ describe('the published HTML', () => {
     expect([range.min, range.max, range.value]).toEqual(['10', '20', '20'])
   })
 
+  it('uses default range bounds when saved slider props are empty strings', () => {
+    const range = dom(html({ inputType: 'range', rangeMin: '', rangeMax: '', rangeStep: '', rangeValue: '' })).querySelector('input')
+    expect([range.min, range.max, range.step, range.value]).toEqual(['0', '100', '1', '50'])
+  })
+
   it('styles each part on its own', () => {
     const doc = dom(html({ label: 'Name', labelColor: '#ff0000', fieldColor: '#00ff00', helpText: 'Hint', helpColor: '#0000ff' }))
     expect(doc.querySelector('label').style.color).toBe('rgb(255, 0, 0)')

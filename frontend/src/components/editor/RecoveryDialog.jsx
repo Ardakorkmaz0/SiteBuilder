@@ -1,10 +1,12 @@
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 
 // A draft is kept when a session ends with unsaved changes, or when the last
 // save on leaving the editor was refused because another tab had saved since.
 export default function RecoveryDialog({ open, reason, onRestore, onDiscard }) {
   const { t } = useLanguage()
+  useEscapeToClose(open, () => {})
   const ref = useInitialDialogFocus(open)
   if (!open) return null
   return (

@@ -473,7 +473,9 @@ function chipifyTemplateTags(node) {
       child.replaceWith(frag)
     } else if (child.nodeType === 1) {
       const tag = child.tagName
-      if (tag !== 'SCRIPT' && tag !== 'STYLE') chipifyTemplateTags(child)
+      if (tag !== 'SCRIPT' && tag !== 'STYLE' && tag !== 'TITLE' && tag !== 'TEXTAREA' && tag !== 'NOSCRIPT' && tag !== 'OPTION') {
+        chipifyTemplateTags(child)
+      }
     }
   }
 }

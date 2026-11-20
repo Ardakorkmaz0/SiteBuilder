@@ -32,9 +32,10 @@ export function closingTagIndex(html, name) {
       continue
     }
     const tag = skip[1].toLowerCase()
-    const end = source.toLowerCase().indexOf(`</${tag}`, cursor + skip.index + skip[0].length)
-    if (end === -1) return -1
-    cursor = end + tag.length + 2
+    const bodyStart = cursor + skip.index + skip[0].length
+    const endOffset = source.slice(bodyStart).search(new RegExp(`</${tag}`, 'i'))
+    if (endOffset === -1) return -1
+    cursor = bodyStart + endOffset + tag.length + 2
   }
   return -1
 }

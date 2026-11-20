@@ -1172,7 +1172,10 @@ export function executeTool(rawName, args) {
         enumField('animHover', HOVER_TYPES) ||
         enumField('animSpeed', SPEED_TYPES)
       if (motionError) return { ok: false, error: motionError }
-      if (Number.isFinite(Number(a.animDelay))) {
+      const hasAnimDelay = typeof a.animDelay === 'number'
+        ? Number.isFinite(a.animDelay)
+        : typeof a.animDelay === 'string' && a.animDelay.trim() !== '' && Number.isFinite(Number(a.animDelay))
+      if (hasAnimDelay) {
         patch.animDelay = Math.min(3000, Math.max(0, Math.round(Number(a.animDelay))))
       }
       if (!Object.keys(patch).length) {
@@ -1225,7 +1228,10 @@ export function executeTool(rawName, args) {
         }
         patch[key] = v
       }
-      if (Number.isFinite(Number(a.linkGap))) patch.linkGap = Math.max(0, Math.round(Number(a.linkGap)))
+      const hasLinkGap = typeof a.linkGap === 'number'
+        ? Number.isFinite(a.linkGap)
+        : typeof a.linkGap === 'string' && a.linkGap.trim() !== '' && Number.isFinite(Number(a.linkGap))
+      if (hasLinkGap) patch.linkGap = Math.max(0, Math.round(Number(a.linkGap)))
       if (!Object.keys(patch).length) {
         return { ok: false, error: `Provide at least one of: ${[...Object.keys(enums), 'linkGap'].join(', ')}.` }
       }
@@ -1246,7 +1252,10 @@ export function executeTool(rawName, args) {
       // through the server's allowlist and a `background` key would be dropped
       // on the next save, leaving the colour to vanish on reload.
       if (background) store.updateStyles(newId, background.patch)
-      if (Number.isFinite(Number(a.height))) {
+      const hasHeight = typeof a.height === 'number'
+        ? Number.isFinite(a.height)
+        : typeof a.height === 'string' && a.height.trim() !== '' && Number.isFinite(Number(a.height))
+      if (hasHeight) {
         store.setLayout(newId, { h: Math.max(80, Math.round(Number(a.height))) })
       }
       return {
@@ -2426,11 +2435,43 @@ export function repairDroppedSections(oldHtml, newHtml) {
   const oldDoc = parse(oldHtml)
   const newDoc = parse(newHtml)
   const oldKids = [...oldDoc.body.children]
-  const newSet = new Set([...newDoc.body.children].map(norm))
-  const missing = oldKids.filter((k) => !newSet.has(norm(k)))
-  if (!missing.length) return { html: newHtml, repaired: false }
-  const oldSet = new Set(oldKids.map(norm))
-  const added = [...newDoc.body.children].filter((k) => !oldSet.has(norm(k)))
+  const newKids = [...newDoc.body.children]
+  const matchedNew = new Set()
+  const extended = new Map()
+  let dropped = false
+
+  const extendsOld = (oldEl, newEl) => {
+    if (newEl.tagName !== oldEl.tagName) return false
+    if (oldEl.id && newEl.id !== oldEl.id) return false
+    const oldSub = [...oldEl.children]
+    if (oldSub.length > 0) {
+      const newSubSet = new Set([...newEl.children].map(norm))
+      if (oldSub.every((ch) => newSubSet.has(norm(ch)))) return true
+    }
+    return norm(newEl).length >= norm(oldEl).length && contentPreservationRatio(oldEl.outerHTML, newEl.outerHTML) >= 0.85
+  }
+
+  for (const oldEl of oldKids) {
+    const oldNorm = norm(oldEl)
+    const exact = newKids.find((k) => !matchedNew.has(k) && norm(k) === oldNorm)
+    if (exact) {
+      matchedNew.add(exact)
+      continue
+    }
+    const ext = newKids.find((k) => !matchedNew.has(k) && extendsOld(oldEl, k))
+    if (ext) {
+      matchedNew.add(ext)
+      extended.set(oldEl, ext)
+      continue
+    }
+    dropped = true
+  }
+
+  if (!dropped) return { html: newHtml, repaired: false }
+  for (const [oldEl, newEl] of extended.entries()) {
+    oldEl.replaceWith(oldDoc.importNode(newEl, true))
+  }
+  const added = newKids.filter((k) => !matchedNew.has(k))
   for (const node of added) {
     oldDoc.body.appendChild(oldDoc.importNode(node, true))
   }

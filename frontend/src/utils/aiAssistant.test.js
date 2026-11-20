@@ -21,6 +21,7 @@ import {
   getEndpoint,
   setEndpoint,
   extractJsonObject,
+  repairDroppedSections,
 } from './aiAssistant.js'
 
 describe('extractJsonObject (single-component AI patch parsing)', () => {
@@ -152,5 +153,26 @@ describe('provider/key/model/endpoint persistence', () => {
   it('persists the local endpoint so a custom port survives reload', () => {
     setEndpoint('http://localhost:1234/v1', 'local')
     expect(getEndpoint('local')).toBe('http://localhost:1234/v1')
+  })
+})
+
+describe('repairDroppedSections', () => {
+  it('recognizes a new section added inside an existing <main> without duplicating <main>', () => {
+    const oldHtml = '<!DOCTYPE html><html><body><header>Nav</header><main><section>Hero</section></main><footer>Foot</footer></body></html>'
+    const newHtml = '<!DOCTYPE html><html><body><header>Nav</header><main><section>Hero</section><section>Pricing</section></main><footer>Foot</footer></body></html>'
+    const res = repairDroppedSections(oldHtml, newHtml)
+    expect(res.repaired).toBe(false)
+    expect(res.html.match(/<main>/g)).toHaveLength(1)
+  })
+
+  it('restores genuinely dropped top-level sections while keeping extended containers once', () => {
+    const oldHtml = '<!DOCTYPE html><html><body><header>Nav</header><main><section>Hero</section></main><footer>Foot</footer></body></html>'
+    const newHtml = '<!DOCTYPE html><html><body><main><section>Hero</section><section>Pricing</section></main></body></html>'
+    const res = repairDroppedSections(oldHtml, newHtml)
+    expect(res.repaired).toBe(true)
+    expect(res.html).toContain('<header>Nav</header>')
+    expect(res.html).toContain('<footer>Foot</footer>')
+    expect(res.html).toContain('<section>Pricing</section>')
+    expect(res.html.match(/<main>/g)).toHaveLength(1)
   })
 })

@@ -26,7 +26,7 @@ function fitStyle([w, h]) {
 
 function BigPreview({ html, wide, fit }) {
   return (
-    <div className="flex h-[104px] w-full items-center justify-center overflow-hidden rounded-lg bg-[#f8fafc]">
+    <div className="flex h-[104px] w-full items-center justify-center overflow-hidden rounded-lg bg-[#f8fafc] text-black">
       <div
         style={
           fit

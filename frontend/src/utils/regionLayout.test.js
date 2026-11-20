@@ -37,6 +37,13 @@ describe('responsive region docking', () => {
     expect(regionDisplayPatchToDesign(right, { x: 900 }, { x: 900, w: 200 }, 1000, 1200))
       .toEqual({ x: 700 })
   })
+
+  it('maps resized stretch-docked widths back to design width', () => {
+    const stretched = child('stretch', { x: 80, y: 10, w: 840, h: 50 })
+    // On a 1200px viewport, displayed width is 1040 (840 + 200). Resizing to 940 maps to 740 in 1000px design space.
+    expect(regionDisplayPatchToDesign(stretched, { w: 940 }, { x: 80, w: 1040 }, 1000, 1200))
+      .toEqual({ x: 80, w: 740 })
+  })
 })
 
 // The editor's px field writes its unit: "1100px" is 1100, not the default.

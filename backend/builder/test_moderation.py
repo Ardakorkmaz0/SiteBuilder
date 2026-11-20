@@ -215,6 +215,21 @@ class TestAdminModeration:
         response = client.post(f'/api/admin/sites/{site.id}/moderate/', {'action': 'reinstate'}, format='json')
         assert response.data['published'] is True
 
+    def test_moderation_unpublish_and_reinstate_bump_revision(self, client, admin, alice):
+        owner, _ = alice
+        site = Site.objects.create(owner=owner, title='Revision check', published=True)
+        rev0 = site.revision
+        _auth(client, admin[1])
+        resp = client.post(f'/api/admin/sites/{site.id}/moderate/', {'action': 'unpublish'}, format='json')
+        assert resp.status_code == 200
+        site.refresh_from_db()
+        assert site.revision == rev0 + 1
+
+        resp = client.post(f'/api/admin/sites/{site.id}/moderate/', {'action': 'reinstate'}, format='json')
+        assert resp.status_code == 200
+        site.refresh_from_db()
+        assert site.revision == rev0 + 2
+
     def test_reports_queue_lists_open(self, client, admin, alice, bob):
         a, _ = alice
         s1 = Site.objects.create(owner=a, title='S1', published=True)

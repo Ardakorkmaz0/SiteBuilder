@@ -755,7 +755,9 @@ const RUNTIME_SCRIPT = `
       scope.querySelectorAll('[contenteditable]').forEach(lockElement);
     }
     function findHashTarget(hash) {
-      var id = decodeURIComponent(String(hash || '').replace(/^#/, ''));
+      var raw = String(hash || '').replace(/^#/, '');
+      var id = raw;
+      try { id = decodeURIComponent(raw); } catch (e) {}
       if (!id) return null;
       return document.getElementById(id) || document.querySelector('[name="' + cssEscape(id) + '"]');
     }
@@ -1056,7 +1058,7 @@ export function withBuilderRuntimeHtml(html) {
     + (motion ? '' : MOTION_OBSERVER_TAG)
   const headed = insertBeforeClosingTag(out, 'head', head)
   if (headed) out = headed
-  else if (/<head[^>]*>/i.test(out)) out = out.replace(/<head[^>]*>/i, (m) => m + head)
+  else if (/<head(?:\s[^>]*)?>/i.test(out)) out = out.replace(/<head(?:\s[^>]*)?>/i, (m) => m + head)
   else out = head + out
   // End of body, where everything the scripts look for already exists.
   return insertBeforeClosingTag(out, 'body', body) ?? out + body
@@ -1070,8 +1072,8 @@ export function withViewportMeta(html) {
   const out = String(html || '')
   if (/<meta[^>]+name=["']?viewport/i.test(out)) return out
   const tag = '<meta name="viewport" content="width=device-width, initial-scale=1.0" />'
-  if (/<head[^>]*>/i.test(out)) return out.replace(/<head[^>]*>/i, (m) => m + tag)
-  if (/<html[^>]*>/i.test(out)) return out.replace(/<html[^>]*>/i, (m) => m + '<head>' + tag + '</head>')
+  if (/<head(?:\s[^>]*)?>/i.test(out)) return out.replace(/<head(?:\s[^>]*)?>/i, (m) => m + tag)
+  if (/<html(?:\s[^>]*)?>/i.test(out)) return out.replace(/<html(?:\s[^>]*)?>/i, (m) => m + '<head>' + tag + '</head>')
   return tag + out
 }
 
@@ -1083,8 +1085,8 @@ export function withEditorViewportMeta(html) {
   const out = String(html || '')
   if (/<meta[^>]+name=["']?viewport/i.test(out)) return out
   const tag = '<meta data-pwb-injected name="viewport" content="width=device-width, initial-scale=1.0" />'
-  if (/<head[^>]*>/i.test(out)) return out.replace(/<head[^>]*>/i, (m) => m + tag)
-  if (/<html[^>]*>/i.test(out)) return out.replace(/<html[^>]*>/i, (m) => m + '<head>' + tag + '</head>')
+  if (/<head(?:\s[^>]*)?>/i.test(out)) return out.replace(/<head(?:\s[^>]*)?>/i, (m) => m + tag)
+  if (/<html(?:\s[^>]*)?>/i.test(out)) return out.replace(/<html(?:\s[^>]*)?>/i, (m) => m + '<head>' + tag + '</head>')
   return tag + out
 }
 
@@ -1099,7 +1101,10 @@ export function withEditorViewportMeta(html) {
 // which serializeDocument strips, so nothing of this reaches the saved file.
 export function withGeneratedStylesHtml(html, css) {
   const out = String(html || '')
-  const text = String(css || '').replace(/<\/style/gi, '')
+  let text = String(css || '')
+  // Iterative strip prevents nested payloads like `</sty</stylele>` from
+  // reconstructing `</style>` and escaping the injected style tag.
+  while (/<\/style/i.test(text)) text = text.replace(/<\/style/gi, '')
   if (!text.trim()) return out
   const tag = `<style data-pwb-injected data-pwb-generated>${text}</style>`
   return insertBeforeClosingTag(out, 'head', tag)
@@ -1152,7 +1157,13 @@ function cssEscape(win, value) {
 }
 
 function findHashTarget(doc, hash) {
-  const id = decodeURIComponent(String(hash || '').replace(/^#/, ''))
+  const raw = String(hash || '').replace(/^#/, '')
+  let id
+  try {
+    id = decodeURIComponent(raw)
+  } catch {
+    id = raw
+  }
   if (!id) return null
   return doc.getElementById(id) || doc.querySelector(`[name="${cssEscape(doc.defaultView, id)}"]`)
 }

@@ -42,12 +42,13 @@ export function useEditorAutoSave({
       discardRef.current,
     )) return undefined
     const timer = window.setTimeout(() => {
+      if (sessionMessageRef.current) return
       const s = lifecycleRef.current
       if (shouldRunEditorAutoSave(s, discardRef.current)) s.save(undefined, { auto: true })
     }, EDITOR_AUTO_SAVE_DELAY_MS)
     return () => window.clearTimeout(timer)
   }, [
-    lifecycleRef, discardRef,
+    lifecycleRef, discardRef, sessionMessageRef,
     autoSaveEnabled, blocked, previewing, dirty, htmlDirty, metaDirty, workspaceDirty,
     schema, htmlMap, title, category, tagsText, published,
   ])
@@ -77,18 +78,18 @@ export function useEditorAutoSave({
   useEffect(() => {
     if (!autoSaveEnabled) return undefined
     const onVisibility = () => {
-      if (document.visibilityState !== 'hidden') return
+      if (document.visibilityState !== 'hidden' || sessionMessageRef.current) return
       const s = lifecycleRef.current
       if (shouldRunEditorAutoSave(s, discardRef.current)) s.save(undefined, { auto: true })
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
-  }, [lifecycleRef, discardRef, autoSaveEnabled])
+  }, [lifecycleRef, discardRef, sessionMessageRef, autoSaveEnabled])
 
   useEffect(() => () => {
     const s = lifecycleRef.current
-    if (!sessionEndedRef.current && shouldRunEditorAutoSave(s, discardRef.current)) {
+    if (!sessionEndedRef.current && !sessionMessageRef.current && shouldRunEditorAutoSave(s, discardRef.current)) {
       s.save(undefined, { auto: true })
     }
-  }, [lifecycleRef, discardRef, sessionEndedRef])
+  }, [lifecycleRef, discardRef, sessionEndedRef, sessionMessageRef])
 }

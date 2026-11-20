@@ -573,14 +573,14 @@ export default function Canvas({
             Sits above the group's bounding box; when the group hugs the top of
             the artboard it drops just inside instead, so it can never be pushed
             off-canvas out of reach (same rule as the single-item toolbar). */}
-        {multiBox && !marquee && (
+        {multiBox && !marquee && !brushMode && !linkMode && (
           <CanvasMultiActions
             count={selectedIds.length}
             canvasScale={canvasScale}
             style={
               multiBox.y >= 48
-                ? { left: multiBox.x, top: multiBox.y, transform: 'translateY(calc(-100% - 8px))' }
-                : { left: multiBox.x, top: multiBox.y + 8 }
+                ? { left: Math.max(0, Math.min(multiBox.x, Math.max(0, canvasW - 260))), top: multiBox.y, transform: 'translateY(calc(-100% - 8px))' }
+                : { left: Math.max(0, Math.min(multiBox.x, Math.max(0, canvasW - 260))), top: multiBox.y + 8 }
             }
           />
         )}

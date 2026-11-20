@@ -75,7 +75,11 @@ export function closestPlaceableBlock(el, bodyEl) {
   if (!el || !bodyEl) return bodyEl || null
   let node = el
   while (node && node !== bodyEl) {
-    if (node.nodeType === 1 && BLOCK_TAGS.has(node.tagName) && !node.hasAttribute('data-pwb-chrome')) {
+    if (
+      node.nodeType === 1
+      && BLOCK_TAGS.has(node.tagName)
+      && !node.closest?.('[data-pwb-chrome], [data-pwb-injected]')
+    ) {
       return node
     }
     node = node.parentElement
@@ -92,7 +96,7 @@ export function placeableBlocks(bodyEl) {
   const wrapper = pageWrapper(bodyEl)
   return [...bodyEl.querySelectorAll('*')].filter(
     (el) => BLOCK_TAGS.has(el.tagName)
-      && !el.hasAttribute('data-pwb-chrome')
+      && !el.closest?.('[data-pwb-chrome], [data-pwb-injected]')
       && el !== wrapper,
   )
 }

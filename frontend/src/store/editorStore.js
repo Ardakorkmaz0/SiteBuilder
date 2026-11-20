@@ -539,7 +539,27 @@ function cloneTrees(components, { keepAnchors = false } = {}) {
 // Copies need a visible offset on BOTH designs. A manually arranged phone
 // keeps its own boxes, and reload clamps boxes to the artboard: do the same
 // before showing a copy so it neither overlaps exactly nor jumps on reload.
-function offsetPageCopy(component, page) {
+function offsetPageCopy(component, page, existingComponents = page.components) {
+  if (component?.type === 'region') {
+    const comps = Array.isArray(existingComponents) ? existingComponents : []
+    const desktopBandY = comps.reduce(
+      (max, c) => Math.max(max, (c.layout?.y || 0) + (c.layout?.h || 0)),
+      0,
+    )
+    const mobileBandY = comps.reduce((max, c) => {
+      const l = c.mobileLayout || c.layout || {}
+      return Math.max(max, (l.y || 0) + (l.h || 0))
+    }, 0)
+    const pcW = page.canvasWidth || CANVAS_WIDTH
+    const mobileW = page.mobileWidth || MOBILE_CANVAS_WIDTH
+    const layout = { ...(component.layout || { x: 0, y: 0, w: pcW, h: 400 }), x: 0, y: desktopBandY, w: pcW }
+    return {
+      layout,
+      ...(component.mobileLayout ? {
+        mobileLayout: { ...component.mobileLayout, x: 0, y: mobileBandY, w: mobileW },
+      } : {}),
+    }
+  }
   const offset = (layout, maxX) => {
     const shifted = { ...layout, x: (layout.x || 0) + 24, y: (layout.y || 0) + 24 }
     return page.flowMode ? shifted : clampLayout(shifted, { maxX })
@@ -1801,7 +1821,11 @@ export const useEditorStore = create((set, get) => ({
   // out here instead of lingering in the schema as a copy nothing updates.
   // `legacySiteHtml` is site.html of sites that predate per-page HTML.
   loadSchema: (schema, { legacySiteHtml = '' } = {}) => {
+    const rawPages = Array.isArray(schema?.pages) ? schema.pages : []
     const { schema: normalized, htmlMap } = splitPageHtml(normalizeSchema(schema), legacySiteHtml)
+    if (rawPages[0]?.mode == null && htmlMap[normalized.pages[0].id]) {
+      normalized.pages[0] = { ...normalized.pages[0], mode: 'html' }
+    }
     gesture = null
     lastKey = null
     lastTime = 0
@@ -2215,10 +2239,13 @@ export const useEditorStore = create((set, get) => ({
       // (+24, +48, …). It used to paste from the same origin each time, and a
       // second Ctrl+V dropped its copy exactly on top of the first — two
       // components that looked like one.
-      const shifted = state.clipboard.map((c) => ({
-        ...c,
-        ...offsetPageCopy(c, page),
-      }))
+      const shifted = []
+      let placed = page.components
+      for (const c of state.clipboard) {
+        const next = { ...c, ...offsetPageCopy(c, page, placed) }
+        shifted.push(next)
+        placed = [...placed, next]
+      }
       // Cut + paste is a move: the block keeps its section name, and the links
       // that lead to it keep working. A copy of something still on the page
       // would duplicate the name, so it pastes without one.
@@ -2275,7 +2302,7 @@ export const useEditorStore = create((set, get) => ({
         const copy = copies[index]
         newIds.push(copy.id)
         if (isTopLevel(page.components, src.id)) {
-          Object.assign(copy, offsetPageCopy(src, page))
+          Object.assign(copy, offsetPageCopy(src, page, components))
           components = [...components, copy]
         } else {
           // A block inside a container is placed by that container's own
@@ -2319,7 +2346,8 @@ export const useEditorStore = create((set, get) => ({
     for (const id of ids) {
       const key = componentLayoutKey(page, id, get().viewport)
       const c = findInTree(page.components, id)
-      const l = c && (c[key] || c.layout)
+      if (!c || c.type === 'region') continue
+      const l = c[key] || c.layout
       if (l) {
         updates[id] = {
           x: Math.max(0, Math.round((l.x || 0) + dx)),
@@ -2748,11 +2776,21 @@ export const useEditorStore = create((set, get) => ({
       const page = selectCurrentPage(state)
       const target = findInTree(page.components, id)
       if (!target) return {}
+      const isMobile = state.viewport === 'mobile'
       const components = mapTree(page.components, id, (c) => {
         const patch = brushPatchForComponent(c, safeColor, safeTarget)
+        const nextProps = patch.props ? { ...c.props, ...patch.props } : c.props
+        if (isMobile) {
+          const hasStylePatch = patch.styles && Object.keys(patch.styles).length > 0
+          return {
+            ...c,
+            props: nextProps,
+            ...(hasStylePatch ? { stylesMobile: { ...(c.stylesMobile || {}), ...patch.styles } } : {}),
+          }
+        }
         return {
           ...c,
-          props: { ...c.props, ...patch.props },
+          props: nextProps,
           styles: { ...c.styles, ...patch.styles },
         }
       })
@@ -3096,9 +3134,16 @@ export const useEditorStore = create((set, get) => ({
         presetId,
         pageTheme(state.schema, page),
       )
-      if (!styles) return {}
+      const props = componentPresetProps(src?.type, presetId)
+      if (!styles && !props) return {}
       const components = mapTree(page.components, id, (c) =>
-        c.id === id ? { ...c, styles: { ...c.styles, ...styles } } : c,
+        c.id === id
+          ? {
+              ...c,
+              ...(styles ? { styles: { ...c.styles, ...styles } } : {}),
+              ...(props ? { props: { ...c.props, ...props } } : {}),
+            }
+          : c,
       )
       return { schema: withComponents(state.schema, page.id, components), dirty: true }
     })

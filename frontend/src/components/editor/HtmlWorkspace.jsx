@@ -1067,11 +1067,12 @@ function HtmlWorkspace({
   const prepareForFrameChange = useCallback(() => {
     if (mode !== 'edit') return readHtml()
     const currentHtml = readHtml()
-    setEditSeed(currentHtml)
+    if (assemble) assemble(currentHtml, { forEdit: true }).then(setEditSeed)
+    else setEditSeed(currentHtml)
     onCommit?.(currentHtml)
     clearSelection()
     return currentHtml
-  }, [clearSelection, mode, onCommit, readHtml])
+  }, [assemble, clearSelection, mode, onCommit, readHtml])
 
   // Plain statements, NOT logic inside a setMode updater: updater functions
   // run during render, so calling onCommit (a parent setState) from one
@@ -1710,7 +1711,8 @@ function HtmlWorkspace({
       const el = resolveSelectableElement(e.target, doc.body)
       if (!el || el === doc.body) return
       const patch = brushElementPatch(describeElement(el), brushColorRef.current, brushTargetRef.current)
-      applyElementPatch(el, patch)
+      if (isMobileDevice(deviceIdRef.current)) applyMobileElementPatch(el, patch)
+      else applyElementPatch(el, patch)
       onCommitRef.current?.(serializeDocument(doc))
       flashNode(doc, el)
       onBrushUseRef.current?.(brushColorRef.current)
@@ -1758,7 +1760,6 @@ function HtmlWorkspace({
       attachSelectionListeners(doc)
       attachTypingSteps(doc)
       attachShortcutForwarding(doc)
-      if (pendingRef.current) attachPlacementListeners(doc)
       // Resting the unrun reveals is the loadTick effect's job — bumping the
       // tick above is what triggers it, for both a fresh load and a toggle.
       // Edit iframes run no scripts, so the parent handles the post-AI

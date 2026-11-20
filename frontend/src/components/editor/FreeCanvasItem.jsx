@@ -198,7 +198,7 @@ export default function FreeCanvasItem({
       const scale = canvasScale > 0 ? canvasScale : 1
       const canvasH = cRect.height / scale
       const canvasWidthPx = cRect.width / scale
-      const viewTop = (sRect.top - cRect.top) / scale
+      const viewTop = Math.max(0, (sRect.top - cRect.top) / scale)
       const viewBottom = viewTop + sRect.height / scale
       let targetY = pinY === 'bottom' ? viewBottom - h - pinOffsetY : viewTop + pinOffsetY
       if (pinMode === 'sticky') {
@@ -379,6 +379,7 @@ export default function FreeCanvasItem({
   }
 
   function startResize(e, dir) {
+    if (e.button !== 0) return
     e.stopPropagation()
     e.preventDefault()
     select(component.id)
@@ -395,7 +396,7 @@ export default function FreeCanvasItem({
     function resizeTo(clientX, clientY) {
       const dx = (clientX - sx) / canvasScale
       const dy = (clientY - sy) / canvasScale + drag.scrolled()
-      setLayout(component.id, resizedBox(orig, dir, dx, dy, MIN, aspect))
+      setLayout(component.id, resizedBox(orig, dir, dx, dy, MIN, aspect, { maxX: canvasWidth }))
     }
     useEditorStore.getState().beginHistoryGesture()
     trackDrag(e, {

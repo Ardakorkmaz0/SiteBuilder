@@ -195,7 +195,7 @@ export function injectThemeFont(html, fontFamily, headingFontFamily = fontFamily
   const inject = link + style
   const headed = insertBeforeClosingTag(out, 'head', inject)
   if (headed) return headed
-  if (/<head[^>]*>/i.test(out)) return out.replace(/<head[^>]*>/i, (m) => m + inject)
+  if (/<head(?:\s[^>]*)?>/i.test(out)) return out.replace(/<head(?:\s[^>]*)?>/i, (m) => m + inject)
   return inject + out
 }
 

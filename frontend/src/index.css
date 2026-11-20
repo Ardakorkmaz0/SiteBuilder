@@ -2453,12 +2453,20 @@ button:not(:disabled),
   position: absolute;
   inset: 0;
   margin: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   scrollbar-gutter: stable;
+  scrollbar-color: transparent transparent;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   color: #e6edf3;
   pointer-events: none;
+}
+.code-field-behind::-webkit-scrollbar {
+  background: transparent;
+}
+.code-field-behind::-webkit-scrollbar-thumb {
+  background: transparent;
 }
 /* Its weight is for the dark theme's rule on every field, which would show its
    text over the colours. */
