@@ -21,7 +21,7 @@ const WIDGET_CATEGORY_NAMES = new Map(WIDGET_CATEGORIES.map((category) => [categ
 export function buildEntries() {
   const entries = []
   for (const block of HTML_BLOCKS) {
-    const [w, h] = blockSize(block.id)
+    const [w, h] = blockSize(block)
     entries.push({
       kind: 'section',
       key: `section-${block.id}`,

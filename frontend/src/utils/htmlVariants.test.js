@@ -45,4 +45,10 @@ describe('htmlVariants', () => {
       expect(variant.html).toContain('data-builder-panel')
     }
   })
+
+  it('re-exports component variants directly from htmlComponentVariants without drift', async () => {
+    const split = await import('./htmlComponentVariants.js')
+    expect(split.htmlVariantsFor('button')).toEqual(htmlVariantsFor('button'))
+    expect(split.htmlVariantsFor('tabs')).toEqual(htmlVariantsFor('tabs'))
+  })
 })

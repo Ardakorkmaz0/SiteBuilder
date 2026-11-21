@@ -503,7 +503,11 @@ const STATE_REPORTER_SCRIPT = `<script data-pwb-state-reporter>(function () {
   // instead of reading once.
   try {
     new MutationObserver(schedule).observe(document.documentElement, {
-      childList: true, subtree: true, attributes: true, characterData: true,
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class', 'hidden', 'open', 'data-mobile-open', 'data-pwb-show', 'data-pwb-part'],
+      characterData: true,
     })
   } catch (e) {}
 })()</scr` + `ipt>`

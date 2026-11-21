@@ -7,7 +7,7 @@ import {
   getProvider,
   pickBestLocalModel,
   setModel,
-} from '../../utils/aiAssistant.js'
+} from '../../utils/aiProviders.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useAiPolicy } from '../../utils/aiPolicy.js'
 

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useDraggable } from '@dnd-kit/core'
 import { DRAG_MIME } from '../../utils/htmlPlacement.js'
@@ -7,8 +7,10 @@ import { CodeIcon, FolderIcon, LayersIcon, PlusIcon, SaveIcon, SparklesIcon } fr
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { notePaletteUse, noteRecentBlock, quickPicks, readPaletteUsage } from '../../utils/paletteQuick.js'
-import BlockLibrary from './BlockLibrary.jsx'
+import { lazyChunk } from '../../utils/lazyChunk.js'
 import AnimationPanel from './AnimationPanel.jsx'
+
+const BlockLibrary = lazyChunk(() => import('./BlockLibrary.jsx'))
 import {
   ADDABLE_PALETTE_ITEMS,
   NATIVE_CANVAS_TYPES,
@@ -416,7 +418,7 @@ function PaletteFlyout({ item, anchor, onPick, onArm, onEnter, onLeave, onClose,
 // inserts the raw section HTML; the free canvas drops it as one `html` component.
 function BlockCard({ block, onPick, onArm, onInspect, theme }) {
   const { t } = useLanguage()
-  const [w, h] = blockSize(block.id)
+  const [w, h] = blockSize(block)
   const inspect = () => onInspect?.({
     type: 'Section',
     label: block.label,
@@ -889,14 +891,18 @@ export default function Sidebar({ onPickComponent, onArmPlacement, onCollapse, f
           onSeeAll={() => openLibrary(flyoutItem.type)}
         />
       )}
-      <BlockLibrary
-        key={libraryKey}
-        initialCategory={libraryCategory}
-        open={libraryOpen}
-        onClose={() => setLibraryOpen(false)}
-        onPickComponent={onPickComponent}
-        onArmPlacement={onArmPlacement}
-      />
+      {libraryOpen && (
+        <Suspense fallback={null}>
+          <BlockLibrary
+            key={libraryKey}
+            initialCategory={libraryCategory}
+            open={libraryOpen}
+            onClose={() => setLibraryOpen(false)}
+            onPickComponent={onPickComponent}
+            onArmPlacement={onArmPlacement}
+          />
+        </Suspense>
+      )}
     </aside>
   )
 }

@@ -301,3 +301,54 @@ class TestSitemap:
 
         assert '/draft/' not in body
         assert body.count('<url>') == 1
+
+
+class TestConditionalCaching:
+    def test_published_page_emits_etag_and_returns_304_when_unchanged(self, client, site):
+        publish(client, site)
+        visitor = APIClient()
+
+        first = visitor.get(f'/s/{site.slug}/')
+        assert first.status_code == 200
+        etag = first['ETag']
+        assert etag.startswith('W/"')
+
+        second = visitor.get(f'/s/{site.slug}/', HTTP_IF_NONE_MATCH=etag)
+        assert second.status_code == 304
+        assert second.content == b''
+        assert second['ETag'] == etag
+        assert 'sandbox allow-scripts' in second['Content-Security-Policy']
+        assert 'allow-same-origin' not in second['Content-Security-Policy']
+
+    def test_republishing_changes_etag_and_serves_fresh_html(self, client, site):
+        publish(client, site)
+        visitor = APIClient()
+        old_etag = visitor.get(f'/s/{site.slug}/')['ETag']
+
+        updated_home = HOME.replace('<h1>Ada</h1>', '<h1>Grace</h1>')
+        publish(client, site, payload=[{'path': '', 'title': 'Grace', 'html': updated_home}])
+
+        fresh = visitor.get(f'/s/{site.slug}/', HTTP_IF_NONE_MATCH=old_etag)
+        assert fresh.status_code == 200
+        assert '<h1>Grace</h1>' in fresh.content.decode()
+        assert fresh['ETag'] != old_etag
+
+    def test_palette_choice_still_sets_cookie_even_if_etag_matches(self, site):
+        PublishedPage.objects.create(
+            site=site, path='', title='Ada', html=TestRememberingAVisitorsPalette.TWO_PALETTES,
+        )
+        visitor = APIClient()
+        etag = visitor.get(f'/s/{site.slug}/')['ETag']
+
+        chosen = visitor.get(f'/s/{site.slug}/?pwb-theme=dark', HTTP_IF_NONE_MATCH=etag)
+        assert chosen.status_code == 200
+        assert chosen.cookies['pwb-theme'].value == 'dark'
+
+    def test_no_index_header_is_preserved_on_304(self, client, site):
+        publish(client, site, payload=[{'path': 'draft', 'title': 'Draft', 'html': ABOUT, 'noIndex': True}])
+        visitor = APIClient()
+        etag = visitor.get(f'/s/{site.slug}/draft/')['ETag']
+
+        cached = visitor.get(f'/s/{site.slug}/draft/', HTTP_IF_NONE_MATCH=etag)
+        assert cached.status_code == 304
+        assert cached['X-Robots-Tag'] == 'noindex'

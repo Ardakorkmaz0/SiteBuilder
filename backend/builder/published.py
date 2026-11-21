@@ -27,6 +27,7 @@ A visitor's light or dark choice is the one thing kept across visits, and the
 page has no part in it: the server writes it to a cookie the page cannot read
 and says what it holds when it sends the page (see _with_visitor_palette).
 """
+import hashlib
 from html import escape, unescape
 from html.parser import HTMLParser
 import re
@@ -53,12 +54,37 @@ PUBLISHED_CSP = (
 
 
 def _published_site(slug):
-    site = public_sites().filter(slug=slug).first()
+    site = public_sites().defer('html', 'live_html').filter(slug=slug).first()
     if site is None:
         # Unpublished, suspended owner or taken down: one answer for all of
         # them, so the URL says nothing about why.
         raise Http404('Site not found.')
     return site
+
+
+def _html_etag(html):
+    digest = hashlib.sha256((html or '').encode('utf-8')).hexdigest()[:16]
+    return f'W/"{digest}"'
+
+
+def _if_none_match(request, etag):
+    if request is None:
+        return False
+    header = request.META.get('HTTP_IF_NONE_MATCH')
+    if not header:
+        return False
+    target = etag[2:] if etag.startswith('W/') else etag
+    for raw in header.split(','):
+        token = raw.strip()
+        if not token:
+            continue
+        if token == '*':
+            return True
+        if token.startswith('W/'):
+            token = token[2:]
+        if token == target:
+            return True
+    return False
 
 
 def _frame_ancestors():
@@ -108,7 +134,12 @@ def serve_published_page(request, slug, path=''):
     html = _with_form_endpoint(html, published_form_path(site.slug))
     two_palettes = _PALETTE_SCRIPT in html
     html, remember = _with_visitor_palette(html, request) if two_palettes else (html, None)
-    response = _harden(HttpResponse(html, content_type='text/html; charset=utf-8'))
+    etag = _html_etag(html)
+    if not remember and _if_none_match(request, etag):
+        response = _harden(HttpResponse(status=304))
+    else:
+        response = _harden(HttpResponse(html, content_type='text/html; charset=utf-8'))
+    response['ETag'] = etag
     if page.no_index:
         response['X-Robots-Tag'] = 'noindex'
     if two_palettes:
@@ -211,7 +242,7 @@ def published_form(request, slug):
 def published_sitemap(request, slug):
     """Every page of this site that is allowed to be found."""
     site = _published_site(slug)
-    pages = site.published_pages.filter(no_index=False)
+    pages = site.published_pages.filter(no_index=False).only('path', 'updated_at')
 
     out = StringIO()
     xml = SimplerXMLGenerator(out, 'utf-8')
@@ -254,7 +285,7 @@ def site_for_host(host):
     name = normalize_host(host)
     if not name or is_platform_host(name):
         return None
-    return public_sites().filter(
+    return public_sites().defer('html', 'live_html').filter(
         custom_domain=name, domain_status='connected',
         domain_verified_at__isnull=False,
     ).first()
@@ -418,13 +449,16 @@ def serve_for_host(site, path, request=None):
         raise Http404('Page not found.')
     if request is not None:
         record_served_view(site, request, wanted)
-    response = _harden(
-        HttpResponse(
-            _DomainDocument(with_site_meta(page.html, site, _media_origin()), site).render(),
-            content_type='text/html; charset=utf-8',
-        ),
-        sandbox=False,
-    )
+    html = _DomainDocument(with_site_meta(page.html, site, _media_origin()), site).render()
+    etag = _html_etag(html)
+    if _if_none_match(request, etag):
+        response = _harden(HttpResponse(status=304), sandbox=False)
+    else:
+        response = _harden(
+            HttpResponse(html, content_type='text/html; charset=utf-8'),
+            sandbox=False,
+        )
+    response['ETag'] = etag
     if page.no_index:
         response['X-Robots-Tag'] = 'noindex'
     return response
@@ -468,7 +502,7 @@ def _domain_sitemap(site):
     xml = SimplerXMLGenerator(out, 'utf-8')
     xml.startDocument()
     xml.startElement('urlset', {'xmlns': 'http://www.sitemaps.org/schemas/sitemap/0.9'})
-    for page in site.published_pages.filter(no_index=False):
+    for page in site.published_pages.filter(no_index=False).only('path', 'updated_at'):
         xml.startElement('url', {})
         xml.addQuickElement('loc', f'{base}/{page.path}/' if page.path else f'{base}/')
         xml.addQuickElement('lastmod', page.updated_at.date().isoformat())

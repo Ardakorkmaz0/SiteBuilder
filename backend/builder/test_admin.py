@@ -237,3 +237,57 @@ class TestOwnerSiteStats:
             'seo_total': 1,
             'domain_ready': False,
         }
+
+
+@pytest.mark.django_db
+class TestQueryEfficiency:
+    def test_admin_users_stays_constant_queries_and_defers_site_content(self, client, admin):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        _, atok = admin
+        _auth(client, atok)
+
+        u1 = User.objects.create_user(username='q1', password='secret123')
+        Site.objects.create(owner=u1, title='S1', published=True, html='<html>big</html>', live_html='<html>live</html>')
+        with CaptureQueriesContext(connection) as first_run:
+            res1 = client.get('/api/admin/users/')
+        assert res1.status_code == 200
+
+        for idx in range(2, 6):
+            user = User.objects.create_user(username=f'q{idx}', password='secret123')
+            Site.objects.create(
+                owner=user, title=f'S{idx}', published=True,
+                html='<html>big</html>', live_html='<html>live</html>',
+            )
+        with CaptureQueriesContext(connection) as second_run:
+            res2 = client.get('/api/admin/users/')
+        assert res2.status_code == 200
+        assert len(second_run) == len(first_run)
+        sql = ' '.join(q['sql'] for q in second_run)
+        assert '"builder_site"."html"' not in sql
+        assert '"builder_site"."live_html"' not in sql
+        assert '"builder_site"."schema"' not in sql
+
+    def test_explore_defers_html_columns_even_with_share_image_fallback(self, client, alice):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        user, _ = alice
+        for idx in range(3):
+            Site.objects.create(
+                owner=user,
+                title=f'Explore {idx}',
+                published=True,
+                html='<html>draft-html</html>',
+                live_html='<html>live-html</html>',
+                live_schema={'pages': [{'id': 'home', 'seoImage': f'https://example.com/og-{idx}.png'}]},
+            )
+        with CaptureQueriesContext(connection) as queries:
+            res = client.get('/api/explore/')
+        assert res.status_code == 200
+        assert len(res.data['results']) == 3
+        assert res.data['results'][0]['share_image'].startswith('https://example.com/og-')
+        sql = ' '.join(q['sql'] for q in queries)
+        assert '"builder_site"."html"' not in sql
+        assert '"builder_site"."live_html"' not in sql

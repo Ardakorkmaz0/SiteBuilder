@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { useEditorStore, selectCurrentPage } from '../../store/editorStore.js'
 import { RenderComponent } from '../renderer/Renderer.jsx'
 import { ContainerEditor, RegionEditor, TabsEditor } from './FlowCanvasItem.jsx'
@@ -24,20 +24,19 @@ import {
 import { ResizeAffordances, SelectionFrame } from './ChromeAffordances.jsx'
 
 const MIN = 20
+const NOOP = () => {}
 // Native types sized by their own content rather than the palette's guess.
 const CONTENT_GROW_TYPES = new Set(['tabs'])
 
-export default function FreeCanvasItem({
+const FreeCanvasItem = memo(function FreeCanvasItem({
   component,
   canvasScale = 1,
   brushMode = false,
   brushColor = '#4f46e5',
   brushTarget = 'smart',
-  onBrushUse = () => {},
+  onBrushUse = NOOP,
 }) {
   const { t } = useLanguage()
-  const selectedId = useEditorStore((s) => s.selectedId)
-  const selectedIds = useEditorStore((s) => s.selectedIds)
   const viewport = useEditorStore((s) => s.viewport)
   const select = useEditorStore((s) => s.selectComponent)
   const toggleSelect = useEditorStore((s) => s.toggleSelect)
@@ -49,25 +48,27 @@ export default function FreeCanvasItem({
   const clearDragGuides = useEditorStore((s) => s.clearDragGuides)
   const paintComponent = useEditorStore((s) => s.paintComponent)
 
-  // Component-canvas link tool: when armed, a click picks this component as the
-  // link source or target instead of selecting/moving it.
+  // Narrow boolean selectors so dragging or selecting one block does not
+  // re-render every sibling block on the canvas.
   const linkMode = useEditorStore((s) => s.linkMode)
-  const linkSourceId = useEditorStore((s) => s.linkSourceId)
   const pickLinkNode = useEditorStore((s) => s.pickLinkNode)
-  const isLinkSource = linkMode && linkSourceId === component.id
-
-  const isSelected = selectedIds.includes(component.id)
+  const isLinkSource = useEditorStore((s) => s.linkMode && s.linkSourceId === component.id)
+  const isSelected = useEditorStore((s) => s.selectedIds.includes(component.id))
+  const isSoleSelected = useEditorStore((s) => s.selectedIds.length <= 1 && s.selectedId === component.id)
   // Resize handles + Delete only on a SOLE selection — a multi-selection just
   // gets the outline (handles on every item would be noise).
-  const isPrimarySingle = !brushMode && selectedIds.length <= 1 && selectedId === component.id
+  const isPrimarySingle = !brushMode && isSoleSelected
   // Edit the layout of the active breakpoint only.
   const layout =
     (viewport === 'mobile'
       ? component.mobileLayout || component.layout
       : component.layout) || {}
-  const page = useEditorStore(selectCurrentPage)
-  const trackDrag = usePointerDrag(page.id, viewport)
-  const canvasWidth = viewport === 'mobile' ? page.mobileWidth || 390 : page.canvasWidth || 1000
+  const pageId = useEditorStore((s) => selectCurrentPage(s).id)
+  const trackDrag = usePointerDrag(pageId, viewport)
+  const canvasWidth = useEditorStore((s) => {
+    const p = selectCurrentPage(s)
+    return s.viewport === 'mobile' ? p.mobileWidth || 390 : p.canvasWidth || 1000
+  })
   const viewportStretch = component.type === 'region' || (
     component.type === 'navbar' &&
     component.props?.navLayout !== 'vertical' &&
@@ -111,26 +112,28 @@ export default function FreeCanvasItem({
   // layout stacks its blocks full-width (the exported mobile CSS insets
   // nothing), so applying a desktop rail's width here would squeeze the bar
   // into a sliver and make Edit disagree with View on mobile.
-  const railInset =
+  const needsRailInset =
     viewport !== 'mobile' &&
     component.type === 'navbar' &&
     component.props?.navLayout !== 'vertical' &&
     component.props?.scrollBehavior === 'fixed' &&
     component.props?.widthMode !== 'boxed'
-      ? fixedRailInset(page.components)
-      : { left: 0, right: 0 }
-  const railInsetLeft = railInset.left
-  const railInsetRight = railInset.right
-  const x = viewportStretch ? railInset.left : layout.x
+  const railInsetKey = useEditorStore((s) => {
+    if (!needsRailInset) return '0:0'
+    const inset = fixedRailInset(selectCurrentPage(s).components)
+    return `${inset.left}:${inset.right}`
+  })
+  const [railInsetLeft, railInsetRight] = railInsetKey.split(':').map(Number)
+  const x = viewportStretch ? railInsetLeft : layout.x
   const y = layout.y
-  const w = viewportStretch ? Math.max(40, canvasWidth - railInset.left - railInset.right) : layout.w
+  const w = viewportStretch ? Math.max(40, canvasWidth - railInsetLeft - railInsetRight) : layout.w
   const h = isFullHeightRail && railHeight ? railHeight : layout.h
   const chromeRect = {
     x,
     y,
     w,
     h,
-    maxW: viewport === 'mobile' ? page.mobileWidth || 390 : page.canvasWidth || 1000,
+    maxW: canvasWidth,
   }
   const chrome = chromeMetrics(canvasScale)
   const frameOutsets = frameOutsetsFor(chromeRect, chrome)
@@ -542,4 +545,6 @@ export default function FreeCanvasItem({
       )}
     </div>
   )
-}
+})
+
+export default FreeCanvasItem

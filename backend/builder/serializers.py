@@ -216,7 +216,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
         return _absolute_image_url(prof.avatar if prof else None, self.context)
 
     def get_site_count(self, obj):
-        return obj.sites.count()
+        return len(obj.sites.all())
 
     def get_sites(self, obj):
         # favorited_by + reports are prefetched by the view, so counting in

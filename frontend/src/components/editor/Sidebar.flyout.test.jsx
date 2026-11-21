@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { DndContext } from '@dnd-kit/core'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import Sidebar from './Sidebar.jsx'
@@ -137,13 +137,18 @@ describe('the quick-add flyout of a palette row', () => {
     expect(flyout()).toBeNull()
   })
 
-  it('opens the library on the row\'s components from "See all"', () => {
+  it('opens the library on the row\'s components from "See all"', async () => {
     renderSidebar({ onArmPlacement: vi.fn() })
     hover(navbarRow())
     wait(200)
     fireEvent.click(within(flyout()).getByRole('button', { name: /^See all \(\d+\)$/ }))
     expect(flyout()).toBeNull()
-    const library = document.querySelector('[data-block-library]')
+    vi.useRealTimers()
+    const library = await waitFor(() => {
+      const node = document.querySelector('[data-block-library]')
+      expect(node).not.toBeNull()
+      return node
+    })
     expect(within(library).getByRole('button', { current: true })).toHaveTextContent(/^Navbar\d+$/)
   })
 

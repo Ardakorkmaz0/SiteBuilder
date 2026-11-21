@@ -233,11 +233,23 @@ function brushPatchForComponent(component, color, target = 'smart') {
 }
 
 function mapTree(components, id, fn) {
-  return components.map((c) => {
-    if (c.id === id) return fn(c)
-    if (hasKids(c)) return { ...c, children: mapTree(c.children, id, fn) }
+  let changed = false
+  const next = components.map((c) => {
+    if (c.id === id) {
+      const updated = fn(c)
+      if (updated !== c) changed = true
+      return updated
+    }
+    if (hasKids(c)) {
+      const nextChildren = mapTree(c.children, id, fn)
+      if (nextChildren !== c.children) {
+        changed = true
+        return { ...c, children: nextChildren }
+      }
+    }
     return c
   })
+  return changed ? next : components
 }
 
 function removeFromTree(components, id) {
@@ -1091,6 +1103,18 @@ const partKeys = (page) => pageParts(page).map((part) => part.key)
 // Apply auto-layout through responsive region trees as well as the page roots.
 // Regions are independent Wix-like content grids; their phone height must grow
 // to the newly stacked children or the region's overflow clips the last items.
+function sameLayoutBox(a, b) {
+  if (a === b) return true
+  if (!a || !b) return false
+  return (
+    a.x === b.x
+    && a.y === b.y
+    && a.w === b.w
+    && a.h === b.h
+    && Object.keys(a).length === Object.keys(b).length
+  )
+}
+
 function applyAutoMobileLayouts(components, mobileWidth = MOBILE_CANVAS_WIDTH, parts = []) {
   const list = Array.isArray(components) ? components : []
   // A page whose parts are shown one at a time (utils/pageShow.js) has them
@@ -1105,7 +1129,13 @@ function applyAutoMobileLayouts(components, mobileWidth = MOBILE_CANVAS_WIDTH, p
         if (partOf(c) === key || !laid.has(c.id)) laid.set(c.id, c)
       }
     }
-    return list.map((c) => laid.get(c.id) || c)
+    let changed = false
+    const out = list.map((c) => {
+      const next = laid.get(c.id) || c
+      if (next !== c) changed = true
+      return next
+    })
+    return changed ? out : list
   }
   // Arrange inner grids first. Their resulting heights are then available while
   // laying out the page roots, so a taller first region pushes the next region
@@ -1118,29 +1148,47 @@ function applyAutoMobileLayouts(components, mobileWidth = MOBILE_CANVAS_WIDTH, p
     const flowingChildren = children.filter((child) => (
       !child.hiddenMobile && child.props?.scrollBehavior !== 'fixed'
     ))
-    if (!flowingChildren.length) return { ...component, children }
+    if (!flowingChildren.length) {
+      return children === component.children ? component : { ...component, children }
+    }
 
     const bottom = flowingChildren.reduce((max, child) => {
       const layout = child.mobileLayout || child.layout || {}
       return Math.max(max, (layout.y || 0) + (layout.h || 0))
     }, 0)
+    const nextH = Math.max(120, Math.round(bottom + MOBILE_PAD))
+    if (children === component.children && component.mobileLayout?.h === nextH) return component
     return {
       ...component,
       children,
       mobileLayout: {
         ...component.mobileLayout,
-        h: Math.max(120, Math.round(bottom + MOBILE_PAD)),
+        h: nextH,
       },
     }
   })
   const auto = autoMobileLayout(prepared, mobileWidth)
-  return prepared.map((component) => {
+  let changed = false
+  const out = prepared.map((component, index) => {
     const mobileLayout = auto[component.id] || component.mobileLayout
     // A free container stacks its own blocks for the width it got, as the
     // page does, and stands them there on the phone (containerChildKey).
-    if (isFreeContainer(component) && mobileLayout) return { ...laidOutForPhone(component, mobileLayout.w), mobileLayout }
-    return { ...component, mobileLayout }
+    let next
+    if (isFreeContainer(component) && mobileLayout) {
+      const phoneReady = laidOutForPhone(component, mobileLayout.w)
+      next =
+        phoneReady === component && sameLayoutBox(component.mobileLayout, mobileLayout)
+          ? component
+          : { ...phoneReady, mobileLayout }
+    } else {
+      next = sameLayoutBox(component.mobileLayout, mobileLayout)
+        ? component
+        : { ...component, mobileLayout }
+    }
+    if (next !== list[index]) changed = true
+    return next
   })
+  return changed ? out : list
 }
 
 const isFreeContainer = (c) => c?.type === 'container' && Array.isArray(c.children) && c.children.length > 0 && !isAutoLayout(c.props)
@@ -1149,10 +1197,12 @@ const isFreeContainer = (c) => c?.type === 'container' && Array.isArray(c.childr
 // with phone layouts on.
 function laidOutForPhone(c, w) {
   if (!isFreeContainer(c)) return c
+  const children = applyAutoMobileLayouts(c.children, Math.max(MOBILE_PAD * 2 + 8, Math.round(w || 0)))
+  if (c.props?.phoneLayout === true && children === c.children) return c
   return {
     ...c,
-    props: { ...c.props, phoneLayout: true },
-    children: applyAutoMobileLayouts(c.children, Math.max(MOBILE_PAD * 2 + 8, Math.round(w || 0))),
+    props: c.props?.phoneLayout === true ? c.props : { ...c.props, phoneLayout: true },
+    children,
   }
 }
 

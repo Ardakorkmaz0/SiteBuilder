@@ -14,7 +14,6 @@ import {
 } from '@dnd-kit/core'
 import { getSite, liveToDraft, sendPageLive, sendVersionLive, setPageHidden, swapLiveChange, updateSite } from '../api/sites.js'
 import { getVersionContent, restoreVersion } from '../api/versions.js'
-import LiveVersionView from '../components/editor/LiveVersionView.jsx'
 import { useEditorStore, selectCurrentPage, nextHistoryStamp, shownPartOf } from '../store/editorStore.js'
 import { inViewSpot } from '../utils/paletteQuick.js'
 import { useAuthStore } from '../store/authStore.js'
@@ -29,11 +28,9 @@ import {
 } from '../components/registry.jsx'
 import { componentPresetProps } from '../utils/componentPresets.js'
 import AiBar from '../components/editor/AiBar.jsx'
-import AiChatPanel from '../components/editor/AiChatPanel.jsx'
 import { loadAiPolicy } from '../utils/aiPolicy.js'
 import { aiProviderReady, useAiAvailable } from '../utils/aiProviders.js'
 import Sidebar from '../components/editor/Sidebar.jsx'
-import ShortcutsHelp from '../components/editor/ShortcutsHelp.jsx'
 import {
   ArrowLeftIcon,
   ClockIcon,
@@ -57,7 +54,6 @@ import {
 } from '../components/icons.jsx'
 import Canvas from '../components/editor/Canvas.jsx'
 import CodeActivityOverlay from '../components/editor/CodeActivityOverlay.jsx'
-import EditorTour from '../components/editor/EditorTour.jsx'
 import { tourWasSeen } from '../utils/editorTour.js'
 import { applyHtmlPageSettings, readHtmlPageSettings } from '../utils/htmlPageSettings.js'
 import { publishedPagesFor } from '../utils/publishedPages.js'
@@ -84,9 +80,6 @@ import {
 } from '../utils/brush.js'
 import PropertiesPanel from '../components/editor/PropertiesPanel.jsx'
 import HtmlElementPanel from '../components/editor/HtmlElementPanel.jsx'
-import ElementSpotlight from '../components/editor/ElementSpotlight.jsx'
-import ComponentSpotlight from '../components/editor/ComponentSpotlight.jsx'
-import ShareComponentDialog from '../components/editor/ShareComponentDialog.jsx'
 import { toggleSpotlightTarget } from '../components/editor/spotlight.js'
 import PageFilesPanel from '../components/editor/PageFilesPanel.jsx'
 import { pageFileName } from '../utils/pageFiles.js'
@@ -135,28 +128,32 @@ import {
   supportsLocalFiles,
   writeHtmlToHandle,
 } from '../utils/localFile.js'
-import { localizeTemplateHtml } from '../utils/templateLocalization.js'
 import { useLanguage } from '../i18n/useLanguage.js'
 import { useDocumentTitle } from '../utils/useDocumentTitle.js'
 import { accountName } from '../utils/accountName.js'
 import { useUiTheme } from '../ui/useUiTheme.js'
 import { escapeLayerOpen, useEscapeToClose } from '../ui/useEscapeToClose.js'
-import MobileEditorPreview from '../components/editor/MobileEditorPreview.jsx'
-import SiteControlCenter from '../components/editor/SiteControlCenter.jsx'
 import { moveInRadioGroup } from '../ui/radioGroupKeys.js'
 
-// The three panels below all sit behind a toggle / file-mode switch and most
-// editor sessions never open them. Lazy-loading them keeps the initial
-// editor chunk smaller — the code streams in only after the user explicitly
-// opens that surface. Suspense fallback is a tiny spinner box, never the
-// whole screen, so the rest of the editor stays interactive while the panel
-// chunk arrives.
+import LiveVersionView from '../components/editor/LiveVersionView.jsx'
+import MobileEditorPreview from '../components/editor/MobileEditorPreview.jsx'
+
+// The panels and overlays below sit behind a toggle or modal and most editor
+// sessions never open them. Lazy-loading them keeps the initial editor chunk
+// smaller — code streams in only after the user opens that surface.
 const CodePanel = lazyChunk(() => import('../components/editor/CodePanel.jsx'))
 const HtmlWorkspace = lazyChunk(() => import('../components/editor/HtmlWorkspace.jsx'))
 const TemplatePicker = lazyChunk(() => import('../components/editor/TemplatePicker.jsx'))
 const HistoryPanel = lazyChunk(() => import('../components/editor/HistoryPanel.jsx'))
 const NotesPanel = lazyChunk(() => import('../components/editor/NotesPanel.jsx'))
 const AiWizard = lazyChunk(() => import('../components/editor/AiWizard.jsx'))
+const AiChatPanel = lazyChunk(() => import('../components/editor/AiChatPanel.jsx'))
+const SiteControlCenter = lazyChunk(() => import('../components/editor/SiteControlCenter.jsx'))
+const ShareComponentDialog = lazyChunk(() => import('../components/editor/ShareComponentDialog.jsx'))
+const ElementSpotlight = lazyChunk(() => import('../components/editor/ElementSpotlight.jsx'))
+const ComponentSpotlight = lazyChunk(() => import('../components/editor/ComponentSpotlight.jsx'))
+const ShortcutsHelp = lazyChunk(() => import('../components/editor/ShortcutsHelp.jsx'))
+const EditorTour = lazyChunk(() => import('../components/editor/EditorTour.jsx'))
 
 // The viewport the editor reopens on: simply the last one the user switched to.
 const LAST_VIEWPORT_KEY = 'pwb_default_editor_viewport'
@@ -768,12 +765,12 @@ function SiteEditor() {
   useEffect(() => {
     try { localStorage.setItem(BRUSH_RECENTS_KEY, JSON.stringify(recentBrushColors)) } catch { /* ignore */ }
   }, [recentBrushColors])
-  const rememberBrushColor = (color) => {
+  const rememberBrushColor = useCallback((color) => {
     const next = normalizeBrushColor(color)
     if (!next) return
     if (BRUSH_BASIC_COLORS.includes(next)) return
     setRecentBrushColors((prev) => [next, ...prev.filter((c) => c !== next)].slice(0, 8))
-  }
+  }, [])
   const chooseBrushColor = (color) => {
     const next = normalizeBrushColor(color)
     if (!next) return
@@ -2505,7 +2502,7 @@ function SiteEditor() {
   }
 
   // Load a ready-made responsive template as the ACTIVE page's HTML.
-  function pickTemplate(tpl, contentLanguage = 'en') {
+  async function pickTemplate(tpl, contentLanguage = 'en') {
     setTemplateOpen(false)
     if (
       pageHasWork() &&
@@ -2515,7 +2512,10 @@ function SiteEditor() {
     )
       return
     const built = tpl.build(title || 'My Site', useEditorStore.getState().schema.theme)
-    applyHtmlPage(currentPageId, localizeTemplateHtml(built, contentLanguage), { reseedWorkspace: true })
+    const localized = contentLanguage === 'en'
+      ? built
+      : (await import('../utils/templateLocalization.js')).localizeTemplateHtml(built, contentLanguage)
+    applyHtmlPage(currentPageId, localized, { reseedWorkspace: true })
   }
 
   // Unified importer for an HTML file, a project folder (HTML + CSS), or a
@@ -2599,6 +2599,60 @@ function SiteEditor() {
     }
   }
 
+  const currentPageIndex = Math.max(0, storePages.findIndex((p) => p.id === currentPageId))
+  const currentPage = storePages[currentPageIndex] || storePages[0]
+  // Motion (reveal + hover) lives in the export layer, so a page that uses it
+  // must render View through the export iframe — otherwise the plain React
+  // preview would show it static, disagreeing with the published page.
+  const componentViewNeedsIframe =
+    hasFixedComponent(currentPage?.components) || pageHasMotion(currentPage) || pageHasShow(currentPage)
+    || Boolean(customCss?.trim() || customJs?.trim())
+  // A site with a light/dark switch: View draws both palettes, as published.
+  const componentColorMode = useMemo(
+    () => (!loading && !loadFailed && !isMobileEditor && currentPage
+      ? viewColorMode({ theme, colorMode: colorModeSetting, pages: storePages }, currentPage, colorModePreview)
+      : null),
+    [loading, loadFailed, isMobileEditor, theme, colorModeSetting, storePages, currentPage, colorModePreview],
+  )
+  // Built only while it is on screen (View, or full screen). It is the whole
+  // page as an export, and this used to run on every render of the editor —
+  // every keystroke in Edit — for any page with motion or a pinned block.
+  const componentViewShown =
+    !loading && !loadFailed && !isMobileEditor && !currentPageIsHtml && (canvasMode === 'view' || fullscreen)
+  // The parts of a page shown a part at a time (utils/pageShow.js).
+  const currentParts = currentPage && !currentPageIsHtml ? pageParts(currentPage) : []
+  const componentViewHtml = useMemo(
+    () => (componentViewShown && componentViewNeedsIframe && currentPage
+      ? schemaToSingleHtml(
+          {
+            theme,
+            customCss,
+            customJs,
+            // The page's own fonts are written into the frame: it does not see
+            // the editor's.
+            fontFaces: siteFontFaces,
+            pages: [currentPage],
+          },
+          title || currentPage.name || 'My Site',
+          // Inside the phone mockup a desktop scrollbar would steal layout width
+          // from the design and look nothing like a phone.
+          { overlayScrollbars: viewport === 'mobile', colorMode: componentColorMode },
+        )
+      : ''),
+    [
+      componentViewShown,
+      componentViewNeedsIframe,
+      currentPage,
+      theme,
+      customCss,
+      customJs,
+      siteFontFaces,
+      title,
+      viewport,
+      componentColorMode,
+    ],
+  )
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-gray-400">
@@ -2620,8 +2674,6 @@ function SiteEditor() {
     )
   }
 
-  const currentPageIndex = Math.max(0, storePages.findIndex((p) => p.id === currentPageId))
-  const currentPage = storePages[currentPageIndex] || storePages[0]
   const leaveDialog = (
     <>
       <RecoveryDialog open={!!sessionRecovery.draft} reason={sessionRecovery.draft?.reason} onRestore={restoreRecovery} onDiscard={sessionRecovery.discard} />
@@ -2671,40 +2723,6 @@ function SiteEditor() {
     )
   }
 
-  // Motion (reveal + hover) lives in the export layer, so a page that uses it
-  // must render View through the export iframe — otherwise the plain React
-  // preview would show it static, disagreeing with the published page.
-  const componentViewNeedsIframe =
-    hasFixedComponent(currentPage?.components) || pageHasMotion(currentPage) || pageHasShow(currentPage)
-    || Boolean(customCss?.trim() || customJs?.trim())
-  // A site with a light/dark switch: View draws both palettes, as published.
-  const componentColorMode = currentPage
-    ? viewColorMode({ theme, colorMode: colorModeSetting, pages: storePages }, currentPage, colorModePreview)
-    : null
-  // Built only while it is on screen (View, or full screen). It is the whole
-  // page as an export, and this used to run on every render of the editor —
-  // every keystroke in Edit — for any page with motion or a pinned block.
-  const componentViewShown = !currentPageIsHtml && (canvasMode === 'view' || fullscreen)
-  // The parts of a page shown a part at a time (utils/pageShow.js).
-  const currentParts = currentPage && !currentPageIsHtml ? pageParts(currentPage) : []
-  const componentViewHtml =
-    componentViewShown && componentViewNeedsIframe && currentPage
-      ? schemaToSingleHtml(
-          {
-            theme,
-            customCss,
-            customJs,
-            // The page's own fonts are written into the frame: it does not see
-            // the editor's.
-            fontFaces: siteFontFaces,
-            pages: [currentPage],
-          },
-          title || currentPage.name || 'My Site',
-          // Inside the phone mockup a desktop scrollbar would steal layout width
-          // from the design and look nothing like a phone.
-          { overlayScrollbars: viewport === 'mobile', colorMode: componentColorMode },
-        )
-      : ''
   const sizePresets = viewport === 'mobile' ? MOBILE_CANVAS_PRESETS : PC_CANVAS_PRESETS
   const curW = viewport === 'mobile' ? mobileW : pcWidth
   const curFold = viewport === 'mobile' ? mobileFold : pcFold
@@ -3349,27 +3367,35 @@ function SiteEditor() {
               </RailSlot>}
               {/* Same handlers as the rail's panel: the spotlight is a bigger
                   window onto the element, not a second inspector. */}
-              <ElementSpotlight
-                open={!!spotlightElement && !!htmlSelection}
-                element={spotlightElement}
-                info={htmlSelection}
-                viewport={isMobileDevice(htmlDevice) ? 'mobile' : 'pc'}
-                pages={storePages}
-                onChange={(patch, opts) => workspaceRef.current?.updateSelectedElement?.(patch, opts)}
-                onSelectParent={() => workspaceRef.current?.selectParent?.()}
-                onDuplicate={() => workspaceRef.current?.duplicateSelected?.()}
-                onMoveUp={() => workspaceRef.current?.moveSelected?.('up')}
-                onMoveDown={() => workspaceRef.current?.moveSelected?.('down')}
-                onDelete={() => workspaceRef.current?.deleteSelected?.()}
-                onResetMobile={() => workspaceRef.current?.resetSelectedMobileStyles?.()}
-                onClose={() => setSpotlightElement(null)}
-              />
-              <ShareComponentDialog
-                open={!!shareElement}
-                element={shareElement}
-                sourceSiteId={id}
-                onClose={() => setShareElement(null)}
-              />
+              {!!spotlightElement && !!htmlSelection && (
+                <Suspense fallback={null}>
+                  <ElementSpotlight
+                    open
+                    element={spotlightElement}
+                    info={htmlSelection}
+                    viewport={isMobileDevice(htmlDevice) ? 'mobile' : 'pc'}
+                    pages={storePages}
+                    onChange={(patch, opts) => workspaceRef.current?.updateSelectedElement?.(patch, opts)}
+                    onSelectParent={() => workspaceRef.current?.selectParent?.()}
+                    onDuplicate={() => workspaceRef.current?.duplicateSelected?.()}
+                    onMoveUp={() => workspaceRef.current?.moveSelected?.('up')}
+                    onMoveDown={() => workspaceRef.current?.moveSelected?.('down')}
+                    onDelete={() => workspaceRef.current?.deleteSelected?.()}
+                    onResetMobile={() => workspaceRef.current?.resetSelectedMobileStyles?.()}
+                    onClose={() => setSpotlightElement(null)}
+                  />
+                </Suspense>
+              )}
+              {!!shareElement && (
+                <Suspense fallback={null}>
+                  <ShareComponentDialog
+                    open
+                    element={shareElement}
+                    sourceSiteId={id}
+                    onClose={() => setShareElement(null)}
+                  />
+                </Suspense>
+              )}
             </>
           ) : (
             <>
@@ -3705,11 +3731,15 @@ function SiteEditor() {
                 {/* Same overlay as HTML mode, drawing a component instead of a
                     DOM element — the properties panel inside it is the rail's
                     own, so an edit here is an edit there. */}
-                <ComponentSpotlight
-                  open={!!spotlightComponentId}
-                  componentId={spotlightComponentId}
-                  onClose={() => setSpotlightComponentId(null)}
-                />
+                {!!spotlightComponentId && (
+                  <Suspense fallback={null}>
+                    <ComponentSpotlight
+                      open
+                      componentId={spotlightComponentId}
+                      onClose={() => setSpotlightComponentId(null)}
+                    />
+                  </Suspense>
+                )}
                 {/* What that last edit did to the page's code, typed out over
                     the canvas. Off in Source mode, where the file is already
                     on screen. */}
@@ -3752,14 +3782,16 @@ function SiteEditor() {
           )}
 
           {aiWorkspaceOpen && (
-            <AiChatPanel
-              open
-              presentation="workspace"
-              onPresentationChange={setAiPanelLayout}
-              onClose={() => setAiOpen(false)}
-              currentHtml={siteHtml}
-              onApplyHtml={applyAiDocument}
-            />
+            <Suspense fallback={null}>
+              <AiChatPanel
+                open
+                presentation="workspace"
+                onPresentationChange={setAiPanelLayout}
+                onClose={() => setAiOpen(false)}
+                currentHtml={siteHtml}
+                onApplyHtml={applyAiDocument}
+              />
+            </Suspense>
           )}
 
           {dragOver && (
@@ -3784,14 +3816,16 @@ function SiteEditor() {
       </DndContext>
 
       {aiOn && aiOpen && effectiveAiPanelLayout === 'compact' && (
-        <AiChatPanel
-          open
-          presentation="compact"
-          onPresentationChange={setAiPanelLayout}
-          onClose={() => setAiOpen(false)}
-          currentHtml={siteHtml}
-          onApplyHtml={applyAiDocument}
-        />
+        <Suspense fallback={null}>
+          <AiChatPanel
+            open
+            presentation="compact"
+            onPresentationChange={setAiPanelLayout}
+            onClose={() => setAiOpen(false)}
+            currentHtml={siteHtml}
+            onApplyHtml={applyAiDocument}
+          />
+        </Suspense>
       )}
 
       {templateOpen && (
@@ -3806,27 +3840,31 @@ function SiteEditor() {
         </Suspense>
       )}
 
-      {controlCenterOpen && <SiteControlCenter
-        open={controlCenterOpen}
-        focusField={controlCenterFocus}
-        initialTab={controlCenterTab}
-        onClose={() => { setControlCenterOpen(false); setControlCenterFocus(''); setControlCenterTab('readiness') }}
-        site={{
-          id,
-          title,
-          slug,
-          published,
-          site_options: siteOptions,
-          review_token: reviewToken,
-          custom_domain: customDomain,
-          domain_status: domainStatus,
-        }}
-        schema={editorSchema}
-        pageHtmlMap={pageHtmlMap}
-        onSitePatch={applySitePatch}
-        onHtmlContentChange={importHtmlIntoPage}
-        onSchemaContentChange={applyManagedSchema}
-      />}
+      {controlCenterOpen && (
+        <Suspense fallback={null}>
+          <SiteControlCenter
+            open={controlCenterOpen}
+            focusField={controlCenterFocus}
+            initialTab={controlCenterTab}
+            onClose={() => { setControlCenterOpen(false); setControlCenterFocus(''); setControlCenterTab('readiness') }}
+            site={{
+              id,
+              title,
+              slug,
+              published,
+              site_options: siteOptions,
+              review_token: reviewToken,
+              custom_domain: customDomain,
+              domain_status: domainStatus,
+            }}
+            schema={editorSchema}
+            pageHtmlMap={pageHtmlMap}
+            onSitePatch={applySitePatch}
+            onHtmlContentChange={importHtmlIntoPage}
+            onSchemaContentChange={applyManagedSchema}
+          />
+        </Suspense>
+      )}
 
       {aiOn && wizardOpen && (
         <Suspense fallback={null}>
@@ -3846,8 +3884,16 @@ function SiteEditor() {
         </Suspense>
       )}
 
-      {shortcutsOpen && <ShortcutsHelp onClose={() => setShortcutsOpen(false)} />}
-      <EditorTour open={tourOpen} onClose={() => setTourOpen(false)} />
+      {shortcutsOpen && (
+        <Suspense fallback={null}>
+          <ShortcutsHelp onClose={() => setShortcutsOpen(false)} />
+        </Suspense>
+      )}
+      {tourOpen && (
+        <Suspense fallback={null}>
+          <EditorTour open={tourOpen} onClose={() => setTourOpen(false)} />
+        </Suspense>
+      )}
 
       {historyOpen && (
         <Suspense fallback={null}>

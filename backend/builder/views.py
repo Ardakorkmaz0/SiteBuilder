@@ -35,7 +35,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count, F, Q
+from django.db.models import Count, F, Prefetch, Q
 from django.db.models.functions import TruncDate
 
 from . import runtime_config
@@ -631,10 +631,13 @@ class SiteViewSet(viewsets.ModelViewSet):
         # Annotate favorite_count so the profile's site list can show per-site
         # stats (views are a stored field). Harmless for the detail/update
         # serializers that don't expose it.
-        return (
+        qs = (
             Site.objects.filter(owner=self.request.user)
             .annotate(favorite_count=Count('favorited_by'))
         )
+        if self.action == 'list':
+            qs = qs.defer('live_html')
+        return qs
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -1545,6 +1548,7 @@ class PublicProfileView(APIView):
         prof = ProfileSerializer(profile, context={'request': request}).data
         sites = (
             public_sites().filter(owner=user)
+            .defer('html', 'live_html')
             .select_related('owner', 'owner__profile')
             .annotate(favorite_count=Count('favorited_by'))
             .order_by('-hot_score', '-updated_at')
@@ -1586,6 +1590,7 @@ class ExploreView(ListAPIView):
         # (pinned_at IS NULL) would sort to the top on a descending order.
         qs = (
             public_sites()
+            .defer('html', 'live_html')
             .select_related('owner', 'owner__profile')
             .annotate(favorite_count=Count('favorited_by'))
             .order_by(F('pinned_at').desc(nulls_last=True), '-hot_score', '-updated_at')
@@ -1632,6 +1637,7 @@ class GlobalSearchView(APIView):
 
         sites = (
             public_sites()
+            .defer('html', 'live_html')
             .filter(
                 Q(title__icontains=query)
                 | Q(owner__username__icontains=query)
@@ -1703,6 +1709,7 @@ class FavoritesView(APIView):
             # down or lost its owner to a suspension stays in the table but
             # is not shown — it used to be listed with all of its content.
             for s in Site.objects.filter(id__in=fav_ids)
+            .defer('html', 'live_html')
             .filter(Q(pk__in=public_sites().values('pk')) | Q(owner=request.user))
             .select_related('owner', 'owner__profile')
             .annotate(favorite_count=Count('favorited_by'))
@@ -1868,7 +1875,11 @@ class AdminUsersView(ListAPIView):
         qs = (
             User.objects.all()
             .select_related('profile')
-            .prefetch_related('sites', 'sites__reports', 'sites__favorited_by')
+            .prefetch_related(
+                Prefetch('sites', queryset=Site.objects.defer('schema', 'html', 'live_schema', 'live_html')),
+                'sites__reports',
+                'sites__favorited_by',
+            )
             .order_by('-date_joined')
         )
         q = self.request.query_params.get('q', '').strip()
@@ -1894,6 +1905,7 @@ class AdminStatsView(APIView):
         agg = sites.aggregate(total_views=Sum('view_count'))
         top = (
             sites.filter(published=True)
+            .defer('schema', 'html', 'live_schema', 'live_html')
             .select_related('owner')
             .annotate(fav=Count('favorited_by'))
             .order_by('-view_count')[:5]
@@ -1924,7 +1936,10 @@ class AdminReportsView(ListAPIView):
     pagination_class = AdminPagination
 
     def get_queryset(self):
-        qs = Report.objects.select_related('site', 'site__owner', 'reporter')
+        qs = (
+            Report.objects.select_related('site', 'site__owner', 'reporter')
+            .defer('site__schema', 'site__html', 'site__live_schema', 'site__live_html')
+        )
         status_filter = self.request.GET.get('status', 'open')
         if status_filter != 'all':
             qs = qs.filter(status=status_filter)

@@ -66,7 +66,8 @@ def share_image(site, base=''):
     if image:
         return image
     # What a link preview shows is the live site, not the draft being edited.
-    live = site.live_content()[0]
+    # Read only the schema column so callers can defer the large html/live_html fields.
+    live = site.live_schema if site.live_schema is not None else site.schema
     schema = live if isinstance(live, dict) else {}
     pages = schema.get('pages') if isinstance(schema.get('pages'), list) else []
     home = pages[0] if pages and isinstance(pages[0], dict) else {}

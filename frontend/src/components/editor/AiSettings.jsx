@@ -29,8 +29,7 @@ import {
   setEndpoint,
   setModel,
   setProvider,
-  testAiConnection,
-} from '../../utils/aiAssistant.js'
+} from '../../utils/aiProviders.js'
 import { useAiPolicy } from '../../utils/aiPolicy.js'
 import { aiErrorText } from '../../utils/aiErrorText.js'
 import {
@@ -224,6 +223,8 @@ function ConnectionTest({ provider, model, apiKey }) {
     runRef.current = controller
     setState('testing')
     setAnsweredFor(asked)
+    const { testAiConnection } = await import('../../utils/aiAssistant.js')
+    if (controller.signal.aborted) return
     const result = await testAiConnection(provider, { signal: controller.signal })
     if (controller.signal.aborted) return
     setState(result)

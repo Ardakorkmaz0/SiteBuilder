@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
 import { BanIcon } from '../icons.jsx'
@@ -38,6 +38,7 @@ import {
 import { ResizeAffordances, SelectionFrame } from './ChromeAffordances.jsx'
 
 const MIN = 20
+const NOOP = () => {}
 const FIXED_HEIGHT_TYPES = new Set(['image', 'divider', 'spacer'])
 
 // Resize handles for flow mode. Width (E) controls how the block packs in its row;
@@ -76,7 +77,7 @@ function uniformOutsets(chrome) {
   return { top: o, right: o, bottom: o, left: o }
 }
 
-export default function FlowCanvasItem({
+const FlowCanvasItem = memo(function FlowCanvasItem({
   component,
   canvasWidth,
   canvasScale = 1,
@@ -84,10 +85,10 @@ export default function FlowCanvasItem({
   brushMode = false,
   brushColor = '#4f46e5',
   brushTarget = 'smart',
-  onBrushUse = () => {},
+  onBrushUse = NOOP,
 }) {
   const { t } = useLanguage()
-  const selectedId = useEditorStore((s) => s.selectedId)
+  const isSelected = useEditorStore((s) => s.selectedId === component.id)
   const viewport = useEditorStore((s) => s.viewport)
   const currentPageId = useEditorStore((s) => s.currentPageId)
   const trackDrag = usePointerDrag(currentPageId, viewport)
@@ -97,7 +98,6 @@ export default function FlowCanvasItem({
   const linkMode = useEditorStore((s) => s.linkMode)
   const pickLinkNode = useEditorStore((s) => s.pickLinkNode)
 
-  const isSelected = selectedId === component.id
   const hidden = isHidden(component, viewport)
   const fixedHeight = FIXED_HEIGHT_TYPES.has(component.type)
   const full = isFlowFullWidth(component)
@@ -342,7 +342,9 @@ export default function FlowCanvasItem({
       />
     </div>
   )
-}
+})
+
+export default FlowCanvasItem
 
 // Measure a ref's actual rendered width and return a {scale, height} pair that
 // fits a virtual `designW` x `designH` mini-canvas into it. When the rendered
@@ -605,23 +607,22 @@ export function ContainerEditor({
 // One child inside an auto-layout container: an in-flow cell that renders the
 // real component and selects on click. Sizing comes from autoLayoutChildStyle
 // so the editor matches the published flow exactly.
-function FlowChildItem({
+const FlowChildItem = memo(function FlowChildItem({
   component,
   container,
   canvasScale = 1,
   brushMode = false,
   brushColor = '#4f46e5',
   brushTarget = 'smart',
-  onBrushUse = () => {},
+  onBrushUse = NOOP,
 }) {
-  const selectedId = useEditorStore((s) => s.selectedId)
+  const isSelected = useEditorStore((s) => s.selectedId === component.id)
   const viewport = useEditorStore((s) => s.viewport)
   const select = useEditorStore((s) => s.selectComponent)
   const paintComponent = useEditorStore((s) => s.paintComponent)
   const linkMode = useEditorStore((s) => s.linkMode)
   const pickLinkNode = useEditorStore((s) => s.pickLinkNode)
   if (isHidden(component, viewport)) return null
-  const isSelected = selectedId === component.id
   const childStyle = autoLayoutChildStyle(component, container.props) || {}
   // A flowing cell is never clipped by its container, so the frame always sits
   // fully outside it — the same place the free-canvas frame sits.
@@ -661,7 +662,7 @@ function FlowChildItem({
       {isSelected && !brushMode && <SelectionFrame outsets={outsets} metrics={chrome} />}
     </div>
   )
-}
+})
 
 function TabsCanvasItem({
   component,
@@ -672,10 +673,10 @@ function TabsCanvasItem({
   brushMode = false,
   brushColor = '#4f46e5',
   brushTarget = 'smart',
-  onBrushUse = () => {},
+  onBrushUse = NOOP,
 }) {
   const { t } = useLanguage()
-  const selectedId = useEditorStore((s) => s.selectedId)
+  const isSelected = useEditorStore((s) => s.selectedId === component.id)
   const viewport = useEditorStore((s) => s.viewport)
   const currentPageId = useEditorStore((s) => s.currentPageId)
   const trackDrag = usePointerDrag(currentPageId, viewport)
@@ -684,7 +685,6 @@ function TabsCanvasItem({
   const paintComponent = useEditorStore((s) => s.paintComponent)
   const linkMode = useEditorStore((s) => s.linkMode)
   const pickLinkNode = useEditorStore((s) => s.pickLinkNode)
-  const isSelected = selectedId === component.id
   const hidden = isHidden(component, viewport)
   const l = layoutOverride || component.layout || {}
   const x = Math.round(l.x || 0)
