@@ -4,7 +4,7 @@
 // variety per type — especially buttons — so the palette feels like a real
 // component library, not one bland default.
 
-import { EXTRA_VARIANTS } from './componentVariants/index.js'
+import { EXTRA_VARIANTS } from './componentVariants/extraVariants.js'
 
 const B = (style, label = 'Button') =>
   `<a href="#" style="${style}">${label}</a>`
