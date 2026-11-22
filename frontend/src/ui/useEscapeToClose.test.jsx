@@ -172,6 +172,47 @@ describe('closing a dialog', () => {
 
     expect(document.activeElement).toBe(document.body)
   })
+
+  it('returns focus to the opener before focusRescue can move it elsewhere on close', async () => {
+    const { installFocusRescue } = await import('./focusRescue.js')
+    const stopRescue = installFocusRescue(document)
+    function AsyncCloseToolbar() {
+      const [open, setOpen] = useState(false)
+      return (
+        <div>
+          <button type="button">Home</button>
+          <button type="button" onClick={() => setOpen(true)}>Code</button>
+          {open && (
+            <div role="dialog">
+              <CloseLater onClose={() => setOpen(false)} />
+            </div>
+          )}
+        </div>
+      )
+    }
+    function CloseLater({ onClose }) {
+      useEscapeToClose(true, onClose)
+      useEffect(() => {
+        const timer = window.setTimeout(() => onClose(), 0)
+        return () => window.clearTimeout(timer)
+      }, [onClose])
+      return <button type="button" autoFocus>Copy</button>
+    }
+
+    const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT
+    try {
+      const { getByRole } = render(<AsyncCloseToolbar />)
+      const codeButton = getByRole('button', { name: 'Code' })
+      codeButton.focus()
+      globalThis.IS_REACT_ACT_ENVIRONMENT = false
+      fireEvent.click(codeButton)
+      await new Promise((resolve) => window.setTimeout(resolve, 30))
+      expect(document.activeElement).toBe(codeButton)
+    } finally {
+      globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment
+      stopRescue()
+    }
+  })
 })
 
 describe('the AI wizard', () => {

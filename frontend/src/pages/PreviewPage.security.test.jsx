@@ -125,6 +125,24 @@ describe('public preview URL hashes', () => {
     })
     await waitFor(() => expect(screen.getByTitle('Security preview').srcdoc).toContain('Home page'))
   })
+
+  it('returns to the home page when the hash is cleared after a subpage, while keeping the page on unknown section hashes', async () => {
+    window.history.replaceState(null, '', '/site/security-preview#contact')
+    await mount()
+    expect(screen.getByTitle('Security preview').srcdoc).toContain('Contact page')
+
+    act(() => {
+      window.history.replaceState(null, '', '/site/security-preview#unknown-section')
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    expect(screen.getByTitle('Security preview').srcdoc).toContain('Contact page')
+
+    act(() => {
+      window.history.replaceState(null, '', '/site/security-preview')
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    await waitFor(() => expect(screen.getByTitle('Security preview').srcdoc).toContain('Home page'))
+  })
 })
 
 describe('private review message authorization', () => {

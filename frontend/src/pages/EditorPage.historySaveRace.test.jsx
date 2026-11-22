@@ -289,4 +289,54 @@ describe('history loads share the editor save queue', () => {
     expect(api.restoreVersion).toHaveBeenCalledTimes(1)
     expect(api.updateSite).not.toHaveBeenCalled()
   }, 30000)
+
+  it('preserves the active page and mobile viewport when restoring a version that still contains that page', async () => {
+    server = {
+      ...site('Current C', 4, 1),
+      html: '',
+      schema: {
+        theme: {},
+        pages: [
+          { id: 'page_home', name: 'Home', components: [{ id: 'h1', type: 'heading', props: { text: 'Current Home' }, styles: {}, layout: { x: 20, y: 20, w: 300, h: 60 } }] },
+          { id: 'page_about', name: 'About', components: [{ id: 'a1', type: 'heading', props: { text: 'Current About' }, styles: {}, layout: { x: 20, y: 20, w: 300, h: 60 } }] },
+        ],
+      },
+    }
+    api.restoreVersion.mockImplementationOnce(async () => ({
+      ...site('Checkpoint A', 5, 1),
+      html: '',
+      schema: {
+        theme: {},
+        pages: [
+          { id: 'page_home', name: 'Home', components: [{ id: 'h1', type: 'heading', props: { text: 'Restored Home' }, styles: {}, layout: { x: 20, y: 20, w: 300, h: 60 } }] },
+          { id: 'page_about', name: 'About', components: [{ id: 'a1', type: 'heading', props: { text: 'Restored About' }, styles: {}, layout: { x: 20, y: 20, w: 300, h: 60 } }] },
+        ],
+      },
+    }))
+
+    render(
+      <UiThemeProvider><LanguageProvider><MemoryRouter initialEntries={['/editor/1']}>
+        <Routes><Route path="/editor/:id" element={<EditorPage />} /></Routes>
+      </MemoryRouter></LanguageProvider></UiThemeProvider>,
+    )
+    await waitFor(() => expect(titleInput()).toHaveValue('Current C'), SLOW)
+
+    act(() => {
+      useEditorStore.getState().selectPage('page_about')
+      useEditorStore.getState().setViewport('mobile')
+    })
+    expect(useEditorStore.getState().currentPageId).toBe('page_about')
+    expect(useEditorStore.getState().viewport).toBe('mobile')
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'History', exact: true }))
+    await screen.findByRole('complementary', { name: 'Saves & history', exact: true }, SLOW)
+    await waitFor(() => expect(loadButton()).toBeEnabled(), SLOW)
+
+    fireEvent.click(loadButton())
+    await waitFor(() => expect(titleInput()).toHaveValue('Checkpoint A'), SLOW)
+
+    expect(useEditorStore.getState().currentPageId).toBe('page_about')
+    expect(useEditorStore.getState().viewport).toBe('mobile')
+  }, 30000)
 })
