@@ -346,7 +346,7 @@ function inlinePhoneRule(c) {
 // other design stays as it was. A nested block of the other types has it already
 // (see openTag).
 function inlinePhoneHook(c) {
-  return inlinePhoneRule(c) ? ` class="ci-${esc(c.id)}"` : ''
+  return inlinePhoneRule(c) ? ` class="ci-${cssIdent(c.id)}"` : ''
 }
 
 // A navbar's phone menu and a section's button take their colours from the block,
@@ -405,7 +405,7 @@ function visibleChildren(c) {
 // Only added when the child actually has a visibility switch set, so the
 // markup of every existing design is byte-identical.
 function nestedClass(ch) {
-  return ch.hidden || ch.hiddenMobile ? ` n-${esc(ch.id)}` : ''
+  return ch.hidden || ch.hiddenMobile ? ` n-${cssIdent(ch.id)}` : ''
 }
 
 // Every nested child on a page that carries a visibility switch.
@@ -426,10 +426,10 @@ function containerPhoneCss(components) {
           if (ch.hiddenMobile || !ch.mobileLayout) continue
           const l = ch.mobileLayout
           const tall = `${growsInParent(ch) ? 'min-height' : 'height'}:${Math.round(l.h || 80)}px !important`
-          css += `  .cc-${esc(ch.id)} { left:${Math.round(l.x || 0)}px !important; top:${Math.round(l.y || 0)}px !important; width:${Math.round(l.w || 200)}px !important; ${tall}; }\n`
+          css += `  .cc-${cssIdent(ch.id)} { left:${Math.round(l.x || 0)}px !important; top:${Math.round(l.y || 0)}px !important; width:${Math.round(l.w || 200)}px !important; ${tall}; }\n`
           // An embed's frame is written at its desktop height; it takes the
           // phone box's, as a top-level one does.
-          if (ch.type === 'html') css += `  .cc-${esc(ch.id)} > iframe { --pwb-embed-height:${Math.round(l.h || 80)}px; }\n`
+          if (ch.type === 'html') css += `  .cc-${cssIdent(ch.id)} > iframe { --pwb-embed-height:${Math.round(l.h || 80)}px; }\n`
         }
       }
       walk(c.children)
@@ -501,7 +501,7 @@ function nestedAbsoluteChildHtml(ch, phone = false) {
   const motionVars = styleObjectBlock(motionCssVars(ch.props))
   const motionStyle = motionVars ? `;${motionVars}` : ''
   // nestedClass: the hook its "hide on PC / on mobile" rule names.
-  return `<div id="${esc(elementIdFor(ch))}" class="${`${nestedClass(ch)}${phone ? ` cc-${esc(ch.id)}` : ''}${motionClassSuffix(ch.props)}`.trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}${motionStyle}"${motionRevealAttr(ch.props)}${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
+  return `<div id="${esc(elementIdFor(ch))}" class="${`${nestedClass(ch)}${phone ? ` cc-${cssIdent(ch.id)}` : ''}${motionClassSuffix(ch.props)}`.trim()}" style="position:absolute;left:${Math.round(l.x || 0)}px;top:${Math.round(l.y || 0)}px;width:${Math.round(l.w || 200)}px${wrapH}${wrapMinH}${motionStyle}"${motionRevealAttr(ch.props)}${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
 }
 
 // media query can reposition the children. Only top-level regions get those
@@ -519,7 +519,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
       const baseStyle = classedChildren ? '' : regionChildInlineStyle(ch, designW)
       const combinedStyle = [baseStyle, motionVars].filter(Boolean).join(';')
       const geometry = combinedStyle ? ` style="${combinedStyle}"` : ''
-      return `<div id="${esc(elementIdFor(ch))}" class="region-child region-${esc(c.id)}-${esc(ch.id)}${nestedClass(ch)}${motionClassSuffix(ch.props)}"${geometry}${motionRevealAttr(ch.props)}${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
+      return `<div id="${esc(elementIdFor(ch))}" class="region-child region-${cssIdent(c.id)}-${cssIdent(ch.id)}${nestedClass(ch)}${motionClassSuffix(ch.props)}"${geometry}${motionRevealAttr(ch.props)}${showAttrs(ch.props)}>${linkWrap(filled, boxedNode(filled))}</div>`
     }).join('')
     return `<section${hook} style="position:relative;width:100%;height:100%;overflow:hidden;${styleStr}"><div class="region-inner" style="position:relative;width:100%;max-width:${designW}px;height:100%;margin:0 auto;overflow:hidden">${inner}</div></section>`
   }
@@ -614,7 +614,7 @@ function inlineNode(c, classedChildren = false, { fit = false } = {}) {
   const base = baseRules(c.type)
   if (tag === 'img') {
     const src = sanitizeImageSrc(p.src)
-    const phone = hook ? `ci-${esc(c.id)} ` : ''
+    const phone = hook ? `ci-${cssIdent(c.id)} ` : ''
     const onBase = p._otherSrc ? ` class="${phone}pwb-on-${esc(p._baseMode)}"` : hook
     const other = p._otherSrc
       ? `<img class="${phone}pwb-on-${esc(p._otherMode)}" src="${esc(sanitizeImageSrc(p._otherSrc))}" alt="${esc(p.alt)}" loading="lazy" style="${base} ${styleStr} max-width:100%;" />`
@@ -822,13 +822,13 @@ function pageBodyHtml(page, fixed) {
         const node = fit
           ? fitShell(fit, inlineNode(c))
           : inlineNode(c, c.type === 'region', { fit: !page.flowMode })
-        return `      <div id="${esc(elementIdFor(c))}" class="c-${esc(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}${showAttrs(c.props)}>${linkWrap(c, node)}</div>`
+        return `      <div id="${esc(elementIdFor(c))}" class="c-${cssIdent(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}${showAttrs(c.props)}>${linkWrap(c, node)}</div>`
       }
       const tag = tagFor(c.type, c.props)
       const fit = pageFit(c, page)
       if (fit) {
         const node = `${openTag(c, '', true)}${innerHtml(c)}</${tag}>`
-        return `      <div id="${esc(elementIdFor(c))}" class="c-${esc(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}${showAttrs(c.props)}>${linkWrap(c, fitShell(fit, node))}</div>`
+        return `      <div id="${esc(elementIdFor(c))}" class="c-${cssIdent(c.id)}${motionClassSuffix(c.props)}"${motionRevealAttr(c.props)}${sticky}${showAttrs(c.props)}>${linkWrap(c, fitShell(fit, node))}</div>`
       }
       const el =
         tag === 'img'
@@ -935,7 +935,7 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
       if (c.type === 'region') {
         const designW = regionContentWidth(c)
         for (const child of c.children || []) {
-          css += `.region-${esc(c.id)}-${esc(child.id)} { ${regionChildInlineStyle(child, designW)} }\n`
+          css += `.region-${cid}-${cssIdent(child.id)} { ${regionChildInlineStyle(child, designW)} }\n`
         }
       }
     }
@@ -950,7 +950,7 @@ body { margin: 0; font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, s
     css += `
 @media (min-width: ${MOBILE_BREAKPOINT + 1}px) {
 `
-    for (const ch of pcHidden) css += `  .n-${esc(ch.id)} { display:none; }
+    for (const ch of pcHidden) css += `  .n-${cssIdent(ch.id)} { display:none; }
 `
     css += `}
 `

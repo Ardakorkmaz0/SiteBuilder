@@ -924,4 +924,103 @@ describe('schemaToFiles & schemaToSingleHtml hardening regressions', () => {
     expect(indexHtml.indexOf('<script src="runtime.js"></script>')).toBeGreaterThan(indexHtml.indexOf('</head>'))
     expect(indexHtml.indexOf('<script src="runtime.js"></script>')).toBeGreaterThan(indexHtml.indexOf('Animated'))
   })
+
+  it('uses the same cssIdent-sanitized class name in HTML and desktop/mobile CSS for IDs like "a.b"', () => {
+    const html = schemaToSingleHtml({
+      theme: {},
+      pages: [{
+        id: 'p.1',
+        name: 'Home',
+        components: [
+          {
+            id: 'r.1',
+            type: 'region',
+            props: {},
+            styles: {},
+            layout: { x: 0, y: 0, w: 1000, h: 300 },
+            children: [{
+              id: 'a.b',
+              type: 'text',
+              props: { text: 'In section' },
+              styles: {},
+              layout: { x: 20, y: 20, w: 200, h: 60 },
+              mobileLayout: { x: 10, y: 10, w: 180, h: 60 },
+              hidden: true,
+              hiddenMobile: true,
+            }, {
+              id: 'a.vis',
+              type: 'text',
+              props: { text: 'Visible on phone' },
+              styles: {},
+              layout: { x: 40, y: 100, w: 200, h: 60 },
+              mobileLayout: { x: 12, y: 80, w: 180, h: 60 },
+              hidden: true,
+              hiddenMobile: false,
+            }],
+          },
+          {
+            id: 'box.1',
+            type: 'container',
+            props: { phoneLayout: true },
+            styles: {},
+            layout: { x: 0, y: 320, w: 600, h: 200 },
+            mobileLayout: { x: 0, y: 320, w: 360, h: 200 },
+            children: [{
+              id: 'k.2',
+              type: 'heading',
+              props: { text: 'Nested heading' },
+              styles: { color: '#111111' },
+              stylesMobile: { color: '#222222' },
+              layout: { x: 10, y: 10, w: 200, h: 50 },
+              mobileLayout: { x: 8, y: 8, w: 160, h: 50 },
+              hidden: false,
+              hiddenMobile: true,
+            }, {
+              id: 'k.3',
+              type: 'card',
+              props: { title: 'Card' },
+              styles: {},
+              stylesMobile: { backgroundColor: '#eeeeee' },
+              layout: { x: 10, y: 70, w: 200, h: 80 },
+              mobileLayout: { x: 8, y: 66, w: 160, h: 80 },
+            }],
+          },
+        ],
+      }],
+    }, 'Dotted IDs')
+
+    const style = html.slice(html.indexOf('<style>'), html.indexOf('</style>'))
+    const body = html.slice(html.indexOf('<body>'))
+    const desktopCss = style.slice(0, style.indexOf('@media (max-width: 768px)'))
+    const phoneCss = style.slice(style.indexOf('@media (max-width: 768px)'))
+
+    // Top-level inline wrapper classes match their desktop and phone CSS rules.
+    expect(body).toContain('class="c-r_1"')
+    expect(body).toContain('class="c-box_1"')
+    expect(desktopCss).toContain('.c-r_1 {')
+    expect(phoneCss).toContain('.c-r_1 {')
+
+    // Region child class matches both desktop and phone .region- rules.
+    expect(body).toContain('class="region-child region-r_1-a_vis n-a_vis"')
+    expect(desktopCss).toContain('.region-r_1-a_vis {')
+    expect(phoneCss).toContain('.region-r_1-a_vis {')
+
+    // Nested visibility hook n- matches desktop min-width and mobile max-width rules.
+    expect(desktopCss).toContain('.n-a_vis { display:none; }')
+    expect(body).toContain('n-k_2')
+    expect(phoneCss).toContain('.n-k_2 { display:none; }')
+
+    // Container phone child cc- and inline phone override ci- match between HTML and CSS.
+    expect(body).toContain('cc-k_3')
+    expect(phoneCss).toContain('.cc-k_3 {')
+    expect(body).toContain('class="ci-k_3"')
+    expect(phoneCss).toContain('.ci-k_3 {')
+
+    // Unsanitized dotted identifiers never leak into classes or selectors.
+    expect(html).not.toContain('c-r.1')
+    expect(html).not.toContain('region-r.1-a.vis')
+    expect(html).not.toContain('n-a.vis')
+    expect(html).not.toContain('cc-k.3')
+    expect(html).not.toContain('ci-k.3')
+  })
 })
