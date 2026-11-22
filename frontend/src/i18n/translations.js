@@ -1,4 +1,6 @@
-export const TURKISH_TRANSLATIONS = {
+import { TURKISH_TRANSLATIONS, extendTranslations, registerBaseTranslations } from './store.js'
+
+const BASE_TURKISH_TRANSLATIONS = {
   'Card view': 'Kart görünümü',
   'List view': 'Liste görünümü',
   'View mode': 'Görünüm biçimi',
@@ -3344,11 +3346,6 @@ export const TURKISH_TRANSLATIONS = {
   'Same as PC': 'Bilgisayarla aynı',
 }
 
-// Content libraries (templates, section blocks and component variants) carry
-// their own bilingual labels. They add them here when they load, so their
-// markup stays out of the bundle every page needs. Existing entries win.
-export function extendTranslations(dictionary) {
-  for (const [english, turkish] of Object.entries(dictionary)) {
-    if (!Object.prototype.hasOwnProperty.call(TURKISH_TRANSLATIONS, english)) TURKISH_TRANSLATIONS[english] = turkish
-  }
-}
+registerBaseTranslations(BASE_TURKISH_TRANSLATIONS)
+
+export { TURKISH_TRANSLATIONS, extendTranslations }

@@ -2,7 +2,7 @@
 // Each section is built twice from one definition — English and Turkish copy
 // from the same markup — so the block library can drop a section in the
 // language the editor is using.
-import { extendTranslations } from '../../i18n/translations.js'
+import { extendTranslations } from '../../i18n/store.js'
 import { collectTranslations } from '../templateCopy.js'
 import { TONES, copy, translator } from './kit.js'
 import { BANNER_SECTIONS, FOOTER_SECTIONS, HEADER_SECTIONS, UTILITY_SECTIONS } from './chrome.js'

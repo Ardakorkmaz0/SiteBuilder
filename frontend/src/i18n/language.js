@@ -1,4 +1,4 @@
-import { TURKISH_TRANSLATIONS } from './translations.js'
+import { TURKISH_TRANSLATIONS } from './store.js'
 
 export const LANGUAGE_STORAGE_KEY = 'pwb_language'
 export const SUPPORTED_LANGUAGES = ['en', 'tr']

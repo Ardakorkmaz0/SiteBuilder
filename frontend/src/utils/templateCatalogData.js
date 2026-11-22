@@ -7,7 +7,7 @@
 // one file per theme, and is appended below.
 import { collectTranslations, copy, item, profile, variant } from './templateCopy.js'
 import { MORE_VERTICAL_SEEDS } from './templateSeeds/index.js'
-import { extendTranslations } from '../i18n/translations.js'
+import { extendTranslations } from '../i18n/store.js'
 
 export { templateText } from './templateCopy.js'
 

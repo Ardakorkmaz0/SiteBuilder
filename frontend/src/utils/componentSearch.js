@@ -5,7 +5,7 @@
 //
 // The index is built once; a query is a pass over prefolded strings with no
 // debounce, a few milliseconds for the whole library.
-import { TURKISH_TRANSLATIONS } from '../i18n/translations.js'
+import { TURKISH_TRANSLATIONS } from '../i18n/store.js'
 
 const FOLD = { ı: 'i', ş: 's', ç: 'c', ğ: 'g', ö: 'o', ü: 'u', â: 'a', î: 'i', û: 'u' }
 
