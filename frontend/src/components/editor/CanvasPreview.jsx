@@ -94,10 +94,16 @@ function withPreviewScrollReporter(html, token) {
   // document. Its `</body>` must stay untouched: changing the first match
   // would put this script inside the attribute and corrupt the outer page.
   // The last closing body belongs to the document loaded by our preview iframe.
-  const closingBodyIndex = String(html).toLowerCase().lastIndexOf('</body>')
+  // Search the original text case-insensitively instead of `.toLowerCase()`,
+  // because characters like Turkish `İ` expand to two code units and shift indices.
+  const source = String(html || '')
+  let closingBodyIndex = -1
+  const closingBodyRe = /<\/body\s*>/gi
+  let match
+  while ((match = closingBodyRe.exec(source))) closingBodyIndex = match.index
   return closingBodyIndex >= 0
-    ? `${html.slice(0, closingBodyIndex)}${reporter}${html.slice(closingBodyIndex)}`
-    : `${html}${reporter}`
+    ? `${source.slice(0, closingBodyIndex)}${reporter}${source.slice(closingBodyIndex)}`
+    : `${source}${reporter}`
 }
 
 // Read-only component preview using the same centered, auto-fit artboard model
