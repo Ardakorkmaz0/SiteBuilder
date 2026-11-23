@@ -3,6 +3,8 @@
 // its phone layout from that instead of guessing one.
 import { test, expect } from './support.js'
 
+test.use({ isolatedAccount: false })
+
 const RESPONSIVE = `<!doctype html><html><head><style>
 body{margin:0;font:16px sans-serif}
 .cols{display:flex;gap:20px;padding:20px}
@@ -33,10 +35,10 @@ addEventListener('hashchange',go);document.querySelectorAll('a').forEach(functio
 
 // Measure in the app's own page, the way the editor does, and hand back each
 // node with an id as { rect, m }.
-async function measure(page, html) {
-  return page.evaluate(async (source) => {
+async function measure(page, html, timeout = 60000) {
+  return page.evaluate(async ({ source, timeout }) => {
     const { measureHtmlPage } = await import('/src/utils/htmlPageMeasure.js')
-    const result = await measureHtmlPage(source, { width: 1180, timeout: 60000 })
+    const result = await measureHtmlPage(source, { width: 1180, timeout })
     const byId = (root) => {
       const out = {}
       const walk = (node) => {
@@ -52,8 +54,20 @@ async function measure(page, html) {
       nodes: byId(result.root),
       states: result.states.map((state) => ({ phone: state.data.phone, width: state.data.width, nodes: byId(state.data.root) })),
     }
-  }, html)
+  }, { source: html, timeout })
 }
+
+test('Turkish dotted capitals before the closing body preserve scripted HTML conversion', async ({ page }) => {
+  await page.goto('/')
+  const html = `<!doctype html><html lang="tr"><body>
+    <!-- Example closing tag: </body> -->
+    <h1>İçerik, İletişim, İzmir</h1><p>Hazırlanıyor</p>
+    <script>document.querySelector('p').id = 'lesson-loaded'</script>
+  </BoDy ></html>`
+  const read = await measure(page, html, 8000)
+  expect(read.ran).toBe(true)
+  expect(read.nodes['lesson-loaded']).toBeDefined()
+})
 
 test('a page is read at a phone width as its own CSS lays it out there', async ({ page }) => {
   await page.goto('/')

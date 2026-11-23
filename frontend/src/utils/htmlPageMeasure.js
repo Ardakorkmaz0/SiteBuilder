@@ -1765,7 +1765,9 @@ function readPage(token, frameWindow) {
 function withReader(html, token) {
   const tag = `<script>(${readPage.toString()})(${JSON.stringify(token)})</script>`
   const source = String(html || '')
-  const end = source.toLowerCase().lastIndexOf('</body')
+  // Match in the original text: lowercasing can expand a character (e.g. İ).
+  let end = -1
+  for (const match of source.matchAll(/<\/body\s*>/gi)) end = match.index
   return end >= 0 ? `${source.slice(0, end)}${tag}${source.slice(end)}` : `${source}${tag}`
 }
 
