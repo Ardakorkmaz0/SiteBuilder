@@ -652,7 +652,10 @@ function walkNode(n, out, origin, depth, ctx, href) {
   }
   const inside = n.tag === 'a' && n.href !== undefined ? n.href : href
   const kids = n.kids || []
-  if (!isPainted(n.s) || n.rect.w < 1 || n.rect.h < 1) {
+  // A revealed group (for example, the cells of a table) moves as one box,
+  // even when its wrapper paints nothing. Use the normal container budget.
+  const entranceBox = n.showEntrance && kids.length && depth < MAX_BOX_DEPTH && n.rect.w >= MIN_W && n.rect.h >= 16
+  if ((!entranceBox && !isPainted(n.s)) || n.rect.w < 1 || n.rect.h < 1) {
     // An unpainted fixed/sticky root wrapper must stay a pinned box around
     // its children so viewport pinning is not lost.
     if (depth === 0 && isPinnedPos(n.s.position) && n.rect.w >= 1 && n.rect.h >= 1) {
@@ -829,7 +832,7 @@ function band(kid, out, ctx) {
     return
   }
   const kids = kid.kids || []
-  const wrapper = !isPainted(kid.s) && !SEMANTIC.has(kid.tag) && kids.length > 0 && kids.every((inner) => !inner.kind && isWide(inner, ctx))
+  const wrapper = !kid.showEntrance && !isPainted(kid.s) && !SEMANTIC.has(kid.tag) && kids.length > 0 && kids.every((inner) => !inner.kind && isWide(inner, ctx))
   if (wrapper) {
     const first = out.length
     bands(kid, out, ctx)

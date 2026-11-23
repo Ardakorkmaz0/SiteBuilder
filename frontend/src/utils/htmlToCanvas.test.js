@@ -509,6 +509,54 @@ describe('a page that shows its parts one at a time', () => {
 })
 
 describe('what a click on the page shows and hides', () => {
+  it('keeps a wide entrance around all its rows within the nesting and child limits', () => {
+    const showEntrance = { fromOpacity: 0, fromY: 5, durationMs: 340, delayMs: 120, easing: 'ease' }
+    const rows = Array.from({ length: 65 }, (_, i) => text('p', [10, i * 24, 100, 24], String(i)))
+    const wide = (kids, extra) => node('div', [0, 0, 1200, 1560], { kids, ...extra })
+    const result = convert(page([wide([wide(rows.slice(0, 40)), wide(rows.slice(40))], { showEntrance })]))
+    expect(result.components).toHaveLength(1)
+    expect(result.components[0].props.showEntrance).toEqual(showEntrance)
+    const labels = []
+    function visit(block, depth) {
+      expect(depth).toBeLessThanOrEqual(4)
+      expect(block.children?.length || 0).toBeLessThanOrEqual(60)
+      if (depth) expect(block.props.showEntrance).toBeUndefined()
+      if (block.type === 'text') labels.push(block.props.text)
+      for (const child of block.children || []) visit(child, depth + 1)
+    }
+    visit(result.components[0], 0)
+    expect(labels).toEqual(rows.map(row => row.text))
+  })
+
+  it('animates a transparent table wrapper once and keeps its cells editable at their own positions', () => {
+    const showEntrance = { fromOpacity: 0, fromY: 5, durationMs: 340, delayMs: 120, easing: 'ease' }
+    const cells = [
+      text('th', [140, 260, 60, 24], 'Count'),
+      text('td', [215, 260, 60, 24], 'Twelve'),
+    ]
+    const wrapper = node('div', [135, 250, 180, 70], {
+      showEntrance,
+      kids: [node('table', [140, 260, 145, 24], { kids: cells })],
+    })
+    const step = node('article', [100, 200, 300, 220], { keys: ['k2'], kids: [wrapper] })
+    const section = node('section', [0, 150, 1200, 400], { kids: [step] })
+    const { children } = convert(page([section])).components[0]
+    expect(children).toHaveLength(1)
+    const [group] = children
+    expect(group).toMatchObject({
+      type: 'container', props: { showEntrance, shownBy: ['k2'] }, styles: { backgroundColor: 'transparent' },
+      layout: { x: 135, y: 100, w: 180, h: 70 },
+    })
+    expect(group.children.map(c => [c.type, c.props.text, c.layout.x, c.layout.y, c.props.showEntrance])).toEqual([
+      ['text', 'Count', 5, 10, undefined], ['text', 'Twelve', 80, 10, undefined],
+    ])
+    const painted = { ...step, s: { ...step.s, backgroundColor: 'white' } }
+    const deeper = convert(page([{ ...section, kids: [painted] }])).components[0].children[0]
+    expect(deeper.children.map(c => [c.props.text, c.props.showEntrance])).toEqual([
+      ['Count', undefined], ['Twelve', undefined],
+    ])
+  })
+
   it('rides on every block made from the element it was learnt on', () => {
     const result = convert(page([
       node('div', [340, 100, 600, 80], { keys: ['k1'], kids: [text('p', [340, 100, 600, 24], 'Square the errors.'), text('p', [340, 140, 600, 24], 'Then add them.')] }),
