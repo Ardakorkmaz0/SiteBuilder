@@ -9,6 +9,7 @@
     .working { animation: rise 350ms both; }
     .ledger p { animation: rise 340ms linear both; }
     .ledger p + p { animation-delay: 120ms; }
+    body.overview .working, body.overview .ledger p { animation: none; }
     @keyframes rise {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
@@ -19,6 +20,7 @@
 <body>
   <h1>Garden arithmetic</h1>
   <button type="button">Next step</button>
+  <button type="button" id="overview">Show all steps</button>
   <p class="working" data-step hidden>Count three rows.</p>
   <p class="working" data-step hidden>Each row holds four seeds.</p>
   <div class="ledger" data-step hidden>
@@ -29,6 +31,10 @@
     document.querySelector('button').addEventListener('click', () => {
       const next = document.querySelector('[data-step][hidden]')
       if (next) next.hidden = false
+    })
+    document.getElementById('overview').addEventListener('click', () => {
+      document.body.classList.add('overview')
+      for (const step of document.querySelectorAll('[data-step]')) step.hidden = false
     })
   </script>
 </body>

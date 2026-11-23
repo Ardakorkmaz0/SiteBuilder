@@ -7,7 +7,7 @@ const lines = ['Count three rows.', 'Each row holds four seeds.']
 const ledger = ['Multiply three by four.', 'Plant twelve seeds.']
 const source = () => fs.readFile(new URL('./fixtures/behaviour/garden-steps.html', import.meta.url), 'utf8')
 
-async function clickStep(page, control, steps, times, duration, reduced) {
+async function clickStep(page, control, steps, times, duration, instant) {
   // Pause what the real click starts on its first painted frame, before
   // crossing back into the test runner. An untriggered effect cannot pass.
   const observation = await page.evaluateHandle(() => ({
@@ -33,13 +33,13 @@ async function clickStep(page, control, steps, times, duration, reduced) {
       return { count: animations.length, duration: timing?.duration, delay: timing?.delay, frames }
     }, { observation, times })
     await expect(target).toBeVisible()
-    expect(sample.count, 'only the newly opened lines animate').toBe(reduced ? 0 : steps.length)
-    if (!reduced) {
+    expect(sample.count, 'only the newly opened lines animate').toBe(instant ? 0 : steps.length)
+    if (!instant) {
       expect(sample.duration).toBe(duration)
       expect(sample.delay).toBe(delay)
     }
     for (const [index, frame] of sample.frames.entries()) {
-      const progress = reduced ? 1 : opacity[index]
+      const progress = instant ? 1 : opacity[index]
       expect(frame.opacity).toBeCloseTo(progress, 2)
       expect(frame.y - sample.frames.at(-1).y).toBeCloseTo(8 * (1 - progress), 1)
     }
@@ -71,6 +71,9 @@ async function readSteps(page, reduced) {
     { target: rows[1], delay: 120, opacity: [0, 0, 50 / 340, 0.5, 1] },
   ], [0, 60, 170, 290, 460], 340, reduced)
   for (const step of steps) await expect(step).toBeVisible()
+  await page.reload()
+  for (const target of [...steps, ...rows]) await expect(target).toBeHidden()
+  await clickStep(page, page.getByText('Show all steps', { exact: true }), [...steps, ...rows].map(target => ({ target })), [0, 175], 0, true)
 }
 
 test('editable lesson steps keep their click entrance after saving, reopening and publishing', async ({ page, browser, request }) => {

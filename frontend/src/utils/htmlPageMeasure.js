@@ -40,6 +40,7 @@ function readPage(token, frameWindow) {
   const ROOM_ATTR = 'data-pwb-read-room'
   const DO_ATTR = 'data-pwb-read-do'
   const entranceProbe = 'data-pwb-read-effect-' + Math.random().toString(36).slice(2)
+  const entranceSources = new WeakMap()
   let clickedEntrances = new Map()
   // A formula as a typesetter lays it out (KaTeX, MathJax, MathML): hundreds
   // of positioned glyph pieces that mean nothing apart. It is carried as a
@@ -1105,6 +1106,7 @@ function readPage(token, frameWindow) {
   async function explore() {
     const holdsState = chapterCheck()
     const frames = entranceFrames()
+    const samples = new Map()
     const pressable = (el) => !el.disabled && !el.hasAttribute(DO_ATTR) && !el.closest('a[href]')
       && !holdsState(el) && !el.closest('[data-lab], .timer') && !el.classList?.contains('p-zoom')
       && (el.checkVisibility ? el.checkVisibility({ visibilityProperty: true }) : el.getClientRects().length > 0)
@@ -1130,7 +1132,7 @@ function readPage(token, frameWindow) {
       const mark = log.length
       button.click()
       flush()
-      if (frames?.size && log.length > mark) flips(mark, true)
+      if (frames?.size && log.length > mark) flips(mark, button)
       await settle(fast ? 10 : 25)
       flush()
       let seen = log.length > mark ? flips(mark) : { shown: [], hidden: [] }
@@ -1148,7 +1150,7 @@ function readPage(token, frameWindow) {
     // What the changes since `mark` have shown and hidden: each changed
     // element and what is inside it, looked at with the old attributes put
     // back for a moment and then the new ones.
-    const flips = (mark, readEntrances = false) => {
+    const flips = (mark, button = null) => {
       flush()
       const records = log.slice(mark)
       const was = new Map()
@@ -1180,23 +1182,20 @@ function readPage(token, frameWindow) {
       const before = list.map(ownShown)
       // Merely uncovering visibility:hidden does not restart an existing
       // animation. A direct change from display:none does.
-      const outOfDisplay = readEntrances && [...was.keys()].filter(el => win.getComputedStyle(el).display === 'none')
+      const outOfDisplay = button && [...was.keys()].filter(el => win.getComputedStyle(el).display === 'none')
       put(now)
       const after = list.map(ownShown)
       const shown = []
       const hidden = []
       list.forEach((el, i) => { if (before[i] !== after[i]) (after[i] ? shown : hidden).push(el) })
-      if (readEntrances) {
+      if (button) {
         for (const el of outOfDisplay) {
           if (!shown.includes(el)) continue
           const current = readEntrancesOf(el, frames)
-          const previous = clickedEntrances.get(el)
-          // If the same reveal had a different effect on another press, it
-          // cannot be represented by a single animation on the native block.
-          if (!previous) clickedEntrances.set(el, current)
-          else for (const [target, spec] of previous) {
-            if (JSON.stringify(spec) !== JSON.stringify(current.get(target))) previous.delete(target)
-          }
+          if (!samples.has(el)) samples.set(el, new Map())
+          const byButton = samples.get(el)
+          if (!byButton.has(button)) byButton.set(button, current)
+          else retainCommon(byButton.get(button), current)
         }
       }
       flush()
@@ -1334,13 +1333,60 @@ function readPage(token, frameWindow) {
       const had = (el.getAttribute(KEY_ATTR) || '').split(' ').filter(Boolean)
       if (!had.includes(mine)) el.setAttribute(KEY_ATTR, [...had, mine].join(' '))
     }
-    for (const [button, actions] of plan) {
-      const written = actions
-        .map((action) => ({ do: action.do, keys: [...new Set(action.units.map((el) => keyOf(el)))] }))
-        .filter((action) => action.keys.length)
-      if (written.length) button.setAttribute(DO_ATTR, JSON.stringify(written))
-    }
+    writeActions(plan, samples)
     return [...off]
+  }
+
+  function retainCommon(left, right) {
+    for (const [target, spec] of left) {
+      if (JSON.stringify(spec) !== JSON.stringify(right.get(target))) left.delete(target)
+    }
+  }
+
+  function writeActions(plan, samples) {
+    // Logical steps can combine several DOM elements. Collect their effects
+    // under the final key and the button that actually opened that step.
+    const opening = new Map()
+    const actionsByButton = new Map()
+    for (const [button, actions] of plan) {
+      const written = []
+      for (const action of actions) {
+        const keys = [...new Set(action.units.map(keyOf))]
+        if (!keys.length) continue
+        written.push({ do: action.do, keys })
+        if (action.do === 'hide' || action.do === 'prev') continue
+        for (const key of keys) {
+          if (!opening.has(key)) opening.set(key, new Map())
+          opening.get(key).set(button, new Map())
+        }
+      }
+      if (written.length) actionsByButton.set(button, written)
+    }
+    for (const [box, observations] of samples) {
+      if (!keyed.has(box)) continue
+      const buttons = opening.get(keyOf(box))
+      for (const [button, entries] of observations) {
+        const effects = buttons?.get(button)
+        if (effects) for (const [target, spec] of entries) effects.set(target, spec)
+      }
+    }
+    // A silent opening is distinct from two animated openings that disagree.
+    // The latter can share only the individual effects they both displayed.
+    for (const [key, buttons] of opening) {
+      const animated = [...buttons.values()].filter(effects => effects.size)
+      if (!animated.length) continue
+      const common = new Map(animated[0])
+      for (const effects of animated.slice(1)) retainCommon(common, effects)
+      if (common.size) clickedEntrances.set(key, common)
+    }
+    for (const [button, actions] of actionsByButton) {
+      for (const action of actions) {
+        if (action.do === 'hide' || action.do === 'prev') continue
+        const quiet = action.keys.filter(key => clickedEntrances.has(key) && !opening.get(key).get(button).size)
+        if (quiet.length) action.quietKeys = quiet
+      }
+      button.setAttribute(DO_ATTR, JSON.stringify(actions))
+    }
   }
 
   // How much room each part a click shows takes on the page: how far what
@@ -1504,11 +1550,11 @@ function readPage(token, frameWindow) {
   // Read the actual cascade for an opened box and its visible children before
   // timers or the later static reading change the class that started it. Hide
   // the box before lifting its animation freeze so no animation is restarted.
-  function readEntrancesOf(box, frames, targets = [box, ...box.querySelectorAll('*')]) {
+  function readEntrancesOf(box, frames, targets) {
     const found = new Map()
     if (!frames?.size) return found
-    const visible = targets.filter(el => {
-      if (el.namespaceURI !== HTML_NS || !el.checkVisibility({ visibilityProperty: true })) return false
+    const visible = (targets || [box, ...box.querySelectorAll('*')]).filter(el => {
+      if (el.namespaceURI !== HTML_NS || !el.animate || !el.checkVisibility?.({ visibilityProperty: true })) return false
       const cs = win.getComputedStyle(el)
       return cs.opacity === '1' && cs.transform === 'none'
     })
@@ -1527,6 +1573,44 @@ function readPage(token, frameWindow) {
       box.removeAttribute(entranceProbe)
       if (style === null) box.removeAttribute('style')
       else box.setAttribute('style', style)
+    }
+    // A declaration with !important wins even over the first keyframe. Let
+    // the browser resolve it, including author styles on ancestors' selectors.
+    // All probes are removed in the same task, before a frame is painted.
+    const probes = []
+    try {
+      for (const [el, spec] of found) {
+        const first = { opacity: spec.fromOpacity, transform: `translateY(${spec.fromY}px)` }
+        const probe = el.animate([first, first], { duration: 1000, fill: 'both' })
+        probes.push([el, spec, probe])
+        probe.pause()
+        probe.currentTime = 0
+      }
+      for (const [el, spec] of probes) {
+        const cs = win.getComputedStyle(el)
+        if (spec.fromOpacity !== 1 && Number(cs.opacity) === 1) spec.fromOpacity = 1
+        if (spec.fromY && cs.transform === 'none') spec.fromY = 0
+        if (spec.fromOpacity === 1 && !spec.fromY) found.delete(el)
+      }
+    } finally {
+      for (const [, , probe] of probes) probe.cancel()
+    }
+    if (!targets && found.size) {
+      // A click may assign a row number on the line or its parent. The
+      // phone must see the same interaction inputs after explore undoes it.
+      const visited = new Set()
+      const variables = []
+      for (const target of found.keys()) {
+        for (let el = target; el && !visited.has(el); el = el.parentElement) {
+          visited.add(el)
+          if (!el.hasAttribute('style')) continue
+          for (const name of el.style) {
+            if (name.startsWith('--')) variables.push([el, name, el.style.getPropertyValue(name), el.style.getPropertyPriority(name)])
+          }
+        }
+      }
+      const source = { box, variables }
+      for (const spec of found.values()) entranceSources.set(spec, source)
     }
     return found
   }
@@ -1564,16 +1648,50 @@ function readPage(token, frameWindow) {
   async function readPhone(read, { narrow = () => {} } = {}) {
     const wide = win.innerWidth
     if (wide <= PHONE_WIDTH + 40 || !read.length) return null
+    const groups = new Map()
+    for (const [node, target] of read) {
+      const source = entranceSources.get(node.showEntrance)
+      if (!source) continue
+      if (!groups.has(source)) {
+        const changed = []
+        for (const [el, name, value, priority] of source.variables) {
+          const old = el.style.getPropertyValue(name), oldPriority = el.style.getPropertyPriority(name)
+          if (old !== value || oldPriority !== priority) changed.push({ el, name, value, priority, old, oldPriority })
+        }
+        groups.set(source, { changed, targets: new Map() })
+      }
+      groups.get(source).targets.set(target, node)
+    }
     let result = null
     let added = []
     if ((await askWidth(PHONE_WIDTH)) && (await reachWidth(PHONE_WIDTH))) {
       narrow()
       await settle(120)
       win.scrollTo(0, 0)
-      const frames = read.some(([node]) => node.showEntrance) ? entranceFrames() : null
+      const frames = groups.size ? entranceFrames() : null
+      for (const [{ box }, { changed, targets }] of groups) {
+        const restore = new Map()
+        try {
+          for (const { el, name, value, priority, old, oldPriority } of changed) {
+            // A responsive script can set its own phone value after the resize.
+            if (el.style.getPropertyValue(name) !== old || el.style.getPropertyPriority(name) !== oldPriority) continue
+            if (!restore.has(el)) restore.set(el, el.getAttribute('style'))
+            el.style.setProperty(name, value, priority)
+          }
+          const sampled = readEntrancesOf(box, frames, [...targets.keys()])
+          for (const [el, node] of targets) {
+            if (JSON.stringify(node.showEntrance) !== JSON.stringify(sampled.get(el))) delete node.showEntrance
+          }
+        } finally {
+          for (const [el, style] of restore) {
+            if (style === null) el.removeAttribute('style')
+            else el.setAttribute('style', style)
+          }
+        }
+      }
       for (const [node, target] of read) {
         node.m = shownBox(target) || { hidden: true }
-        if (node.showEntrance && (node.m.hidden || JSON.stringify(node.showEntrance) !== JSON.stringify(readEntrancesOf(target, frames, [target]).get(target)))) delete node.showEntrance
+        if (node.m.hidden) delete node.showEntrance
         // `ms`: the styles the phone gives it that differ from the desktop's.
         const changed = node.m.hidden ? null : phoneStyles(node, target)
         if (changed) node.ms = changed
@@ -1655,11 +1773,10 @@ function readPage(token, frameWindow) {
     const root = measureNode(doc.body)
     if (clickedEntrances.size) {
       const measured = new Map(seen.map(([node, el]) => [el, node]))
-      for (const [box, entries] of clickedEntrances) {
-        if (!measured.get(box)?.keys?.length) continue
+      for (const [key, entries] of clickedEntrances) {
         for (const [el, entrance] of entries) {
           const node = measured.get(el)
-          if (node) node.showEntrance = entrance
+          if (node && measured.has(el.closest(`[${KEY_ATTR}~="${key}"]`))) node.showEntrance = entrance
         }
       }
     }

@@ -43,6 +43,17 @@ def test_only_well_formed_keys_and_known_actions_get_through():
     assert page['parts'] == [{'key': 'p1', 'label': 'x' * 80}]
 
 
+def test_silent_reveals_are_limited_to_the_keys_of_that_click():
+    page = validate_and_clean_schema(_page([_block(onClick=[
+        {'do': 'show', 'keys': ['a', 'b'], 'quietKeys': ['b', 'other', 'b', 'Bad']},
+        {'do': 'next', 'keys': ['c'], 'quietKeys': ['b']},
+    ])]))['pages'][0]
+    assert page['components'][0]['props']['onClick'] == [
+        {'do': 'show', 'keys': ['a', 'b'], 'quietKeys': ['b']},
+        {'do': 'next', 'keys': ['c']},
+    ]
+
+
 def test_the_room_a_key_took_is_kept_on_a_block_shown_by_keys_and_nowhere_else():
     page = validate_and_clean_schema(_page([
         _block(shownBy=['s1'], rooms=[['s1', 8, 120.555], ['bad key', 1, 2], ['s1', True, 3], ['s2', 0, 0], 'x']),

@@ -58,7 +58,11 @@ export function clickActions(props) {
   return (Array.isArray(props?.onClick) ? props.onClick : [])
     .slice(0, 8)
     .filter((action) => action && SHOW_ACTIONS.includes(action.do))
-    .map((action) => ({ do: action.do, keys: keysOf(action.keys, 400) }))
+    .map((action) => {
+      const keys = keysOf(action.keys, 400)
+      const quietKeys = keysOf(action.quietKeys, 400).filter(key => keys.includes(key))
+      return { do: action.do, keys, ...(quietKeys.length ? { quietKeys } : {}) }
+    })
     .filter((action) => action.keys.length)
 }
 
@@ -447,15 +451,19 @@ export function pageShowRuntime(reflow, act, validateEntrance) {
     var states = gates.map(function (gate) { return state(gate, values) })
     return states.includes('gone') ? 'gone' : states.includes('hidden') ? 'hidden' : 'shown'
   }
-  function playReveals(before) {
+  function playReveals(before, actions) {
     if (!entrances.size) return
     var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    var quiet = new Set(actions.flatMap(function (action) { return action.quietKeys || [] }))
     entrances.forEach(function (entry, el) {
       var previous = entranceState(entry.gates, before)
       var current = entranceState(entry.gates, on)
       if (previous === current) return
       if (entry.animation) { entry.animation.cancel(); entry.animation = null }
       if (previous !== 'hidden' || current !== 'shown' || reduced || !el.getClientRects().length) return
+      if (quiet.size && entry.gates.some(function (gate) {
+        return words(gate.getAttribute('data-pwb-show')).some(function (key) { return quiet.has(key) && before[key] === false && on[key] !== false })
+      })) return
       var spec = entry.spec
       entry.animation = el.animate([
         { opacity: spec.fromOpacity, translate: '0px ' + spec.fromY + 'px' },
@@ -473,7 +481,7 @@ export function pageShowRuntime(reflow, act, validateEntrance) {
     var before = on
     on = act(actions, on)
     layout()
-    playReveals(before)
+    playReveals(before, actions)
   }, true)
   window.addEventListener('hashchange', function () { showPartOf(hashId(location.hash)) })
   var again = 0

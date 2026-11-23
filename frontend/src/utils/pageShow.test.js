@@ -117,6 +117,13 @@ describe('what a block and a page carry', () => {
       .toBe(' data-pwb-show="k1 k2" data-pwb-room="k1:8:120.5 k2:0:0"')
   })
 
+  it('limits silent reveals to keys changed by the same click', () => {
+    expect(clickActions({ onClick: [
+      { do: 'show', keys: ['a', 'b'], quietKeys: ['b', 'other', 'b', 'Bad'] },
+      { do: 'next', keys: ['c'], quietKeys: ['b'] },
+    ] })).toEqual([{ do: 'show', keys: ['a', 'b'], quietKeys: ['b'] }, { do: 'next', keys: ['c'] }])
+  })
+
   it('writes them as attributes, escaped', () => {
     expect(showAttrs({ shownBy: ['k1', 'p_two'], onClick: [{ do: 'toggle', keys: ['k2'] }] }))
       .toBe(' data-pwb-show="k1 p_two" data-pwb-do="[{&quot;do&quot;:&quot;toggle&quot;,&quot;keys&quot;:[&quot;k2&quot;]}]"')

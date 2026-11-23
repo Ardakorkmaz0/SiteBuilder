@@ -648,7 +648,12 @@ def sanitize_show_actions(value):
             continue
         keys = _show_keys(item.get('keys'), MAX_ACTION_KEYS)
         if keys:
-            out.append({'do': item['do'], 'keys': keys})
+            action = {'do': item['do'], 'keys': keys}
+            allowed = set(keys)
+            quiet = [key for key in _show_keys(item.get('quietKeys'), MAX_ACTION_KEYS) if key in allowed]
+            if quiet:
+                action['quietKeys'] = quiet
+            out.append(action)
     return out
 
 
