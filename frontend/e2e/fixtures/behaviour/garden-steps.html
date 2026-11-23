@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Garden arithmetic</title>
+  <style>
+    body { font: 18px/1.5 sans-serif; margin: 16px; }
+    .working { animation: rise 350ms both; }
+    .ledger p { animation: rise 340ms linear both; }
+    .ledger p + p { animation-delay: 120ms; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (prefers-reduced-motion: reduce) { .working, .ledger p { animation: none; } }
+  </style>
+</head>
+<body>
+  <h1>Garden arithmetic</h1>
+  <button type="button">Next step</button>
+  <p class="working" data-step hidden>Count three rows.</p>
+  <p class="working" data-step hidden>Each row holds four seeds.</p>
+  <div class="ledger" data-step hidden>
+    <p>Multiply three by four.</p>
+    <p>Plant twelve seeds.</p>
+  </div>
+  <script>
+    document.querySelector('button').addEventListener('click', () => {
+      const next = document.querySelector('[data-step][hidden]')
+      if (next) next.hidden = false
+    })
+  </script>
+</body>
+</html>

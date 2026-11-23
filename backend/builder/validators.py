@@ -688,11 +688,35 @@ def sanitize_page_parts(value):
     return out
 
 
+def _step_entrance(value):
+    if not isinstance(value, dict):
+        return None
+    clean = {}
+    for key, low, high in [('fromOpacity', 0, 1), ('fromY', -120, 120), ('durationMs', 0, 10000)]:
+        number = value.get(key)
+        if type(number) not in (int, float) or not low <= number <= high:
+            return None
+        clean[key] = number
+    easing = value.get('easing')
+    if clean['durationMs'] == 0 or easing not in ('linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'):
+        return None
+    delay = value.get('delayMs', 0)
+    if type(delay) not in (int, float) or not 0 <= delay <= 2000:
+        return None
+    if delay:
+        clean['delayMs'] = delay
+    return {**clean, 'easing': easing}
+
+
 def sanitize_shared_props(props):
     if not isinstance(props, dict):
         return {}
     clean = {}
     shown_by = _show_keys(props.get('shownBy'), MAX_SHOWN_BY)
+    # A line can inherit its reveal from a parent without a key of its own.
+    entrance = _step_entrance(props.get('showEntrance'))
+    if entrance:
+        clean['showEntrance'] = entrance
     if shown_by:
         clean['shownBy'] = shown_by
         rooms = sanitize_show_rooms(props.get('rooms'))

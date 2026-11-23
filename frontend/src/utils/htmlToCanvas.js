@@ -612,7 +612,11 @@ function pinBlocks(blocks, origin, n, ctx) {
 // its blocks, counted from the element's own top; the others give up none
 // of their own, as they lie inside it. See reflowLevel in utils/pageShow.js.
 function marked(made, n, origin) {
-  if (!made.length || (!n.keys?.length && !n.actions?.length)) return
+  if (!made.length) return
+  if (n.showEntrance && made.length === 1 && made[0].type !== 'html') {
+    made[0].props = { ...made[0].props, showEntrance: n.showEntrance }
+  }
+  if (!n.keys?.length && !n.actions?.length) return
   const measured = n.keys?.length && typeof n.room === 'number' && origin
   const top = measured ? n.rect.y - origin.y : 0
   const first = made.reduce((high, b) => (b.layout.y < high.layout.y ? b : high), made[0])

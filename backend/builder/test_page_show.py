@@ -52,6 +52,23 @@ def test_the_room_a_key_took_is_kept_on_a_block_shown_by_keys_and_nowhere_else()
     assert 'rooms' not in page['components'][1]['props']
 
 
+def test_a_revealed_step_keeps_its_bounded_entrance_on_save():
+    entrance = {'durationMs': 350, 'fromOpacity': 0, 'fromY': 8, 'easing': 'ease'}
+
+    def cleaned(keys, value):
+        page = validate_and_clean_schema(_page([_block(shownBy=keys, showEntrance=value)]))['pages'][0]
+        return page['components'][0]['props'].get('showEntrance')
+
+    assert cleaned(['step'], {**entrance, 'extra': 'ignored'}) == entrance
+    assert cleaned(['step'], {**entrance, 'delayMs': 120}) == {**entrance, 'delayMs': 120}
+    # A line inside a step inherits its reveal from the parent.
+    assert cleaned([], entrance) == entrance
+    for invalid in [{'durationMs': 0}, {'durationMs': 10001}, {'fromY': -121}, {'fromOpacity': True},
+                    {'fromOpacity': 1.1}, {'fromY': '8px'}, {'easing': []}, {'delayMs': -1},
+                    {'delayMs': 2001}, {'delayMs': None}]:
+        assert cleaned(['step'], {**entrance, **invalid}) is None
+
+
 def test_a_key_with_a_line_break_at_its_end_is_not_a_key():
     # Python's $ also matches before a final line break; the page's own check does not.
     page = validate_and_clean_schema(_page(

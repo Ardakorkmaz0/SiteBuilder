@@ -34,6 +34,17 @@ export function shownBy(props) {
   return [...new Set(keysOf(props?.shownBy, 16))]
 }
 
+function stepEntrance(value) {
+  if (!value || typeof value !== 'object') return null
+  const { fromOpacity, fromY, durationMs, easing, delayMs = 0 } = value
+  if (!Number.isFinite(fromOpacity) || fromOpacity < 0 || fromOpacity > 1 ||
+      !Number.isFinite(fromY) || Math.abs(fromY) > 120 ||
+      !Number.isFinite(durationMs) || durationMs <= 0 || durationMs > 10000 ||
+      !Number.isFinite(delayMs) || delayMs < 0 || delayMs > 2000 ||
+      !['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'].includes(easing)) return null
+  return { fromOpacity, fromY, durationMs, easing, ...(delayMs ? { delayMs } : {}) }
+}
+
 // The room each key's element took, on the block that stands for it:
 // [key, from the element's top to the block's, room].
 export function showRooms(props) {
@@ -69,12 +80,13 @@ const escAttr = (value) => String(value).replace(/&/g, '&amp;').replace(/"/g, '&
 
 // The attributes a block's box carries on the published page.
 export function showAttrs(props) {
-  // Nearly every block has neither: it costs nothing.
-  if (!props?.shownBy && !props?.onClick) return ''
+  if (!props?.shownBy && !props?.onClick && !props?.showEntrance) return ''
   const keys = shownBy(props)
   const actions = clickActions(props)
   const rooms = keys.length ? showRooms(props) : []
+  const entrance = stepEntrance(props.showEntrance)
   return (keys.length ? ` data-pwb-show="${keys.join(' ')}"` : '')
+    + (entrance ? ` data-pwb-show-entrance="${escAttr(JSON.stringify(entrance))}"` : '')
     + (rooms.length ? ` data-pwb-room="${rooms.map((room) => room.join(':')).join(' ')}"` : '')
     + (actions.length ? ` data-pwb-do="${escAttr(JSON.stringify(actions))}"` : '')
 }
@@ -185,7 +197,7 @@ export function reflowLevel(items) {
 
 // The script the published page runs. It is written into the page as the text
 // of these functions, so it uses nothing from outside them.
-export function pageShowRuntime(reflow, act) {
+export function pageShowRuntime(reflow, act, validateEntrance) {
   var page = document.querySelector('[data-pwb-keys]')
   if (!page || window.__pwbShowReady) return
   window.__pwbShowReady = true
@@ -231,10 +243,10 @@ export function pageShowRuntime(reflow, act) {
     })
   }
   var LEVEL = '.page, [data-pwb-container-root], .region-inner'
-  function state(el) {
+  function state(el, values = on) {
     var keys = words(el.getAttribute('data-pwb-show'))
-    var gone = keys.some(function (key) { return isPart[key] && on[key] === false })
-    var hidden = keys.some(function (key) { return !isPart[key] && on[key] === false })
+    var gone = keys.some(function (key) { return isPart[key] && values[key] === false })
+    var hidden = keys.some(function (key) { return !isPart[key] && values[key] === false })
     return gone ? 'gone' : hidden ? 'hidden' : 'shown'
   }
   // The blocks standing in a box: a link around a block is no box of its own.
@@ -422,6 +434,35 @@ export function pageShowRuntime(reflow, act) {
   function hashId(href) {
     try { return decodeURIComponent(String(href || '').replace(/^#/, '')) } catch { return '' }
   }
+  var entrances = new Map()
+  document.querySelectorAll('[data-pwb-show-entrance]').forEach(function (el) {
+    var spec
+    try { spec = validateEntrance(JSON.parse(el.getAttribute('data-pwb-show-entrance'))) } catch { return }
+    if (!spec || !el.animate) return
+    var gates = []
+    for (var gate = el.closest('[data-pwb-show]'); gate; gate = gate.parentElement?.closest('[data-pwb-show]')) gates.push(gate)
+    if (gates.length) entrances.set(el, { spec: spec, gates: gates, animation: null })
+  })
+  function entranceState(gates, values) {
+    var states = gates.map(function (gate) { return state(gate, values) })
+    return states.includes('gone') ? 'gone' : states.includes('hidden') ? 'hidden' : 'shown'
+  }
+  function playReveals(before) {
+    if (!entrances.size) return
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    entrances.forEach(function (entry, el) {
+      var previous = entranceState(entry.gates, before)
+      var current = entranceState(entry.gates, on)
+      if (previous === current) return
+      if (entry.animation) { entry.animation.cancel(); entry.animation = null }
+      if (previous !== 'hidden' || current !== 'shown' || reduced || !el.getClientRects().length) return
+      var spec = entry.spec
+      entry.animation = el.animate([
+        { opacity: spec.fromOpacity, translate: '0px ' + spec.fromY + 'px' },
+        { opacity: 1, translate: '0px 0px' },
+      ], { duration: spec.durationMs, delay: spec.delayMs || 0, easing: spec.easing, fill: 'backwards' })
+    })
+  }
   document.addEventListener('click', function (event) {
     var link = event.target && event.target.closest && event.target.closest('a[href^="#"]')
     if (link) showPartOf(hashId(link.getAttribute('href')))
@@ -429,8 +470,10 @@ export function pageShowRuntime(reflow, act) {
     if (!doer) return
     var actions
     try { actions = JSON.parse(doer.getAttribute('data-pwb-do')) } catch { return }
+    var before = on
     on = act(actions, on)
     layout()
+    playReveals(before)
   }, true)
   window.addEventListener('hashchange', function () { showPartOf(hashId(location.hash)) })
   var again = 0
@@ -441,5 +484,5 @@ export function pageShowRuntime(reflow, act) {
 
 // The runtime as the text of a script.
 export function pageShowScript() {
-  return `(${pageShowRuntime.toString()})(${reflowLevel.toString()}, ${runActions.toString()});`
+  return `(${pageShowRuntime.toString()})(${reflowLevel.toString()}, ${runActions.toString()}, ${stepEntrance.toString()});`
 }

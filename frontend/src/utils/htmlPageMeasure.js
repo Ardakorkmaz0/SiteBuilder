@@ -39,6 +39,8 @@ function readPage(token, frameWindow) {
   const STICKY_ATTR = 'data-pwb-read-sticky'
   const ROOM_ATTR = 'data-pwb-read-room'
   const DO_ATTR = 'data-pwb-read-do'
+  const entranceProbe = 'data-pwb-read-effect-' + Math.random().toString(36).slice(2)
+  let clickedEntrances = new Map()
   // A formula as a typesetter lays it out (KaTeX, MathJax, MathML): hundreds
   // of positioned glyph pieces that mean nothing apart. It is carried as a
   // picture of itself.
@@ -823,7 +825,8 @@ function readPage(token, frameWindow) {
     try {
       // Entrance effects are read as they stand once they have played.
       const still = doc.createElement('style')
-      still.textContent = 'html,*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}'
+      const probing = `:where([${entranceProbe}],[${entranceProbe}] *)`
+      still.textContent = `:not(${probing}),*::before,*::after{animation:none!important}${probing}{display:none!important}html,*,*::before,*::after{transition:none!important;scroll-behavior:auto!important}`
       doc.head?.appendChild(still)
       await Promise.race([doc.fonts?.ready || Promise.resolve(), settle(4000)])
       await Promise.race([
@@ -1101,6 +1104,7 @@ function readPage(token, frameWindow) {
 
   async function explore() {
     const holdsState = chapterCheck()
+    const frames = entranceFrames()
     const pressable = (el) => !el.disabled && !el.hasAttribute(DO_ATTR) && !el.closest('a[href]')
       && !holdsState(el) && !el.closest('[data-lab], .timer') && !el.classList?.contains('p-zoom')
       && (el.checkVisibility ? el.checkVisibility({ visibilityProperty: true }) : el.getClientRects().length > 0)
@@ -1125,6 +1129,8 @@ function readPage(token, frameWindow) {
       flush()
       const mark = log.length
       button.click()
+      flush()
+      if (frames?.size && log.length > mark) flips(mark, true)
       await settle(fast ? 10 : 25)
       flush()
       let seen = log.length > mark ? flips(mark) : { shown: [], hidden: [] }
@@ -1142,7 +1148,7 @@ function readPage(token, frameWindow) {
     // What the changes since `mark` have shown and hidden: each changed
     // element and what is inside it, looked at with the old attributes put
     // back for a moment and then the new ones.
-    const flips = (mark) => {
+    const flips = (mark, readEntrances = false) => {
       flush()
       const records = log.slice(mark)
       const was = new Map()
@@ -1172,13 +1178,29 @@ function readPage(token, frameWindow) {
       }
       put(was)
       const before = list.map(ownShown)
+      // Merely uncovering visibility:hidden does not restart an existing
+      // animation. A direct change from display:none does.
+      const outOfDisplay = readEntrances && [...was.keys()].filter(el => win.getComputedStyle(el).display === 'none')
       put(now)
       const after = list.map(ownShown)
-      flush()
-      log.length = mark + records.length
       const shown = []
       const hidden = []
       list.forEach((el, i) => { if (before[i] !== after[i]) (after[i] ? shown : hidden).push(el) })
+      if (readEntrances) {
+        for (const el of outOfDisplay) {
+          if (!shown.includes(el)) continue
+          const current = readEntrancesOf(el, frames)
+          const previous = clickedEntrances.get(el)
+          // If the same reveal had a different effect on another press, it
+          // cannot be represented by a single animation on the native block.
+          if (!previous) clickedEntrances.set(el, current)
+          else for (const [target, spec] of previous) {
+            if (JSON.stringify(spec) !== JSON.stringify(current.get(target))) previous.delete(target)
+          }
+        }
+      }
+      flush()
+      log.length = mark + records.length
       return { shown, hidden }
     }
     const same = (a, b) => a.length === b.length && a.every((el) => b.includes(el))
@@ -1458,6 +1480,86 @@ function readPage(token, frameWindow) {
     }
     return added
   }
+  // Only a unique, readable @keyframes outside grouping rules. An import,
+  // unreadable sheet or competing definition makes the source ambiguous.
+  function entranceFrames() {
+    const byName = new Map()
+    const visit = (rules, nested) => {
+      for (const rule of rules) {
+        if (rule.type === 3) return false
+        if (rule.type === 7) byName.set(rule.name, nested || byName.has(rule.name) ? null : rule)
+        else if (rule.cssRules?.length && !visit(rule.cssRules, true)) return false
+      }
+      return true
+    }
+    try {
+      for (const sheet of [...doc.styleSheets, ...(doc.adoptedStyleSheets || [])]) {
+        if (!sheet.disabled && (!sheet.media.mediaText || win.matchMedia(sheet.media.mediaText).matches)
+          && !visit(sheet.cssRules, false)) return null
+      }
+    } catch { return null }
+    return byName
+  }
+
+  // Read the actual cascade for an opened box and its visible children before
+  // timers or the later static reading change the class that started it. Hide
+  // the box before lifting its animation freeze so no animation is restarted.
+  function readEntrancesOf(box, frames, targets = [box, ...box.querySelectorAll('*')]) {
+    const found = new Map()
+    if (!frames?.size) return found
+    const visible = targets.filter(el => {
+      if (el.namespaceURI !== HTML_NS || !el.checkVisibility({ visibilityProperty: true })) return false
+      const cs = win.getComputedStyle(el)
+      return cs.opacity === '1' && cs.transform === 'none'
+    })
+    if (!visible.length) return found
+    const style = box.getAttribute('style')
+    try {
+      box.style.setProperty('display', 'none', 'important')
+      box.setAttribute(entranceProbe, '')
+      for (const el of visible) {
+        const cs = win.getComputedStyle(el)
+        const rule = frames.get(cs.animationName)
+        const spec = rule && cs.display === 'none' && entranceOf(cs, rule)
+        if (spec) found.set(el, spec)
+      }
+    } finally {
+      box.removeAttribute(entranceProbe)
+      if (style === null) box.removeAttribute('style')
+      else box.setAttribute('style', style)
+    }
+    return found
+  }
+
+  function entranceOf(cs, rule) {
+    if (rule.cssRules.length !== 2 || cs.animationIterationCount !== '1'
+      || cs.animationDirection !== 'normal' || cs.animationPlayState !== 'running'
+      || (cs.animationTimeline && cs.animationTimeline !== 'auto') || (cs.animationComposition && cs.animationComposition !== 'replace')) return null
+    const milliseconds = value => Number(value.replace(/s$/, '')) * 1000
+    const durationMs = milliseconds(cs.animationDuration)
+    const delayMs = milliseconds(cs.animationDelay)
+    if (!Number.isInteger(durationMs) || durationMs <= 0 || durationMs > 10000
+      || !Number.isInteger(delayMs) || delayMs < 0 || delayMs > 2000
+      || (delayMs > 0 && !['both', 'backwards'].includes(cs.animationFillMode))) return null
+    const easing = cs.animationTimingFunction
+    if (!['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'].includes(easing)) return null
+    const stops = [...rule.cssRules].sort((a, b) => parseFloat(a.keyText) - parseFloat(b.keyText))
+    if (stops[0].keyText !== '0%' || stops[1].keyText !== '100%') return null
+    const [start, end] = stops.map(stop => stop.style)
+    if (![start, end].every(stop => [...stop].every(key => key === 'opacity' || key === 'transform'))) return null
+    const fromOpacity = Number(start.opacity)
+    if (!start.opacity || !(fromOpacity >= 0 && fromOpacity <= 1) || end.opacity !== '1') return null
+    const offset = transform => {
+      if (!transform || transform === 'none') return 0
+      const y = /^translateY\((-?[\d.]+)px\)$/.exec(transform)
+      return y ? Number(y[1]) : NaN
+    }
+    const fromY = offset(start.transform)
+    if (!Number.isFinite(fromY) || Math.abs(fromY) > 120 || offset(end.transform) !== 0
+      || (fromY === 0 && fromOpacity === 1)) return null
+    return { fromOpacity, fromY, durationMs, easing, ...(delayMs ? { delayMs } : {}) }
+  }
+
   // `narrow` runs once the page is at the phone's width, before it is read.
   async function readPhone(read, { narrow = () => {} } = {}) {
     const wide = win.innerWidth
@@ -1468,8 +1570,10 @@ function readPage(token, frameWindow) {
       narrow()
       await settle(120)
       win.scrollTo(0, 0)
+      const frames = read.some(([node]) => node.showEntrance) ? entranceFrames() : null
       for (const [node, target] of read) {
         node.m = shownBox(target) || { hidden: true }
+        if (node.showEntrance && (node.m.hidden || JSON.stringify(node.showEntrance) !== JSON.stringify(readEntrancesOf(target, frames, [target]).get(target)))) delete node.showEntrance
         // `ms`: the styles the phone gives it that differ from the desktop's.
         const changed = node.m.hidden ? null : phoneStyles(node, target)
         if (changed) node.ms = changed
@@ -1518,6 +1622,7 @@ function readPage(token, frameWindow) {
     unshown = []
     win.scrollTo(0, 0)
     let off
+    clickedEntrances = new Map()
     try { off = await explore() } catch { off = [] }
     // What is opened to be read is closed again afterwards: the next part
     // of the page is learnt from how it opens, not from this reading.
@@ -1548,6 +1653,16 @@ function readPage(token, frameWindow) {
     const bodyStyle = win.getComputedStyle(doc.body)
     const rootStyle = win.getComputedStyle(doc.documentElement)
     const root = measureNode(doc.body)
+    if (clickedEntrances.size) {
+      const measured = new Map(seen.map(([node, el]) => [el, node]))
+      for (const [box, entries] of clickedEntrances) {
+        if (!measured.get(box)?.keys?.length) continue
+        for (const [el, entrance] of entries) {
+          const node = measured.get(el)
+          if (node) node.showEntrance = entrance
+        }
+      }
+    }
     // The page is read at a phone's width with everything opened, as it is at
     // the desktop's: the published page hides what a click shows from there
     // (pageShow.js). Opened, a hidden tab's long line of code would make the
@@ -1579,6 +1694,7 @@ function readPage(token, frameWindow) {
       }
     }
     const phone = root ? await readPhone(seen, { narrow }).catch(() => null) : null
+    if (!phone) for (const [node] of seen) delete node.showEntrance
     openedLog.push(...opened.takeRecords())
     opened.disconnect()
     // The pictures, drawn with bounded concurrency. Where one cannot be

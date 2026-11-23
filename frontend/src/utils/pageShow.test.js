@@ -123,6 +123,22 @@ describe('what a block and a page carry', () => {
     expect(showAttrs({ text: 'Plain' })).toBe('')
   })
 
+  it('exports bounded entrances on both the step and its individual lines', () => {
+    const showEntrance = { fromOpacity: 0, fromY: 8, durationMs: 350, easing: 'ease' }
+    const attrs = input => showAttrs({ shownBy: ['step'], showEntrance: input })
+    const el = document.createElement('div')
+    el.innerHTML = '<p' + attrs({ ...showEntrance, name: 'ignored' }) + '></p>'
+    expect(JSON.parse(el.firstChild.dataset.pwbShowEntrance)).toEqual(showEntrance)
+    el.innerHTML = '<p' + attrs({ ...showEntrance, delayMs: 120 }) + '></p>'
+    expect(JSON.parse(el.firstChild.dataset.pwbShowEntrance)).toEqual({ ...showEntrance, delayMs: 120 })
+    el.innerHTML = '<p' + showAttrs({ showEntrance }) + '></p>'
+    expect(JSON.parse(el.firstChild.dataset.pwbShowEntrance)).toEqual(showEntrance)
+    expect(el.firstChild.hasAttribute('data-pwb-show')).toBe(false)
+    for (const extra of [{ fromOpacity: -0.1 }, { fromY: 121 }, { durationMs: true }, { durationMs: 10001 }, { delayMs: -1 }, { delayMs: 2001 }, { delayMs: null }, { easing: 'unknown' }]) {
+      expect(attrs({ ...showEntrance, ...extra })).not.toContain('data-pwb-show-entrance')
+    }
+  })
+
   it('marks a page that shows or hides anything, and only such a page', () => {
     const page = { hiddenKeys: ['k1', 'p_two'], parts: [{ key: 'p_one', label: 'One' }, { key: 'p_two', label: 'Two' }], components: [] }
 
