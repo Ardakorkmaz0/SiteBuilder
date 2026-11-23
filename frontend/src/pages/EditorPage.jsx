@@ -2385,6 +2385,14 @@ function SiteEditor() {
         timeout: 180000,
         onProgress: (done, total) => setConvertNote(t('Reading the page: part {done} of {total}…', { done, total })),
       })
+      // The page stays editable while it is read, which can take a minute.
+      // Blocks made from the text read at the start would leave out what was
+      // typed since (only the kept HTML would have it), so stop instead.
+      flushWorkspaceDrafts()
+      if ((liveHtmlMap()[pageId] || '') !== html) {
+        setError(t('The page changed while it was being read, so nothing was changed. Convert it again.'))
+        return
+      }
       const result = canvasPageFromMeasured(measured)
       if (!result?.components.length) {
         setError(t('This page could not be read as blocks, so nothing was changed.'))

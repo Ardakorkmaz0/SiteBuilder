@@ -467,6 +467,7 @@ const BASE_TURKISH_TRANSLATIONS = {
   'Canvas page: blocks you drag and drop': 'Tuval sayfası: sürükleyip bıraktığınız bloklar',
   'Back to the HTML page': 'HTML sayfasına geri dön',
   'This page could not be read as blocks, so nothing was changed.': 'Bu sayfa bloklar hâlinde okunamadı, bu yüzden hiçbir şey değiştirilmedi.',
+  'The page changed while it was being read, so nothing was changed. Convert it again.': 'Sayfa okunurken değişti, bu yüzden hiçbir şey değiştirilmedi. Yeniden dönüştürün.',
   'Turn this page into {count} canvas blocks that you can drag, resize and edit?': 'Bu sayfa, sürükleyip boyutlandırabileceğiniz ve düzenleyebileceğiniz {count} tuval bloğuna dönüştürülsün mü?',
   '{count} of them stay HTML blocks: the canvas has no block of its own for them (a table, a form, a video, or text with a link inside it).': 'Bunların {count} tanesi HTML bloğu olarak kalır: tuvalde bunlar için ayrı bir blok yok (tablo, form, video veya içinde bağlantı olan metin).',
   '{count} parts are too large to carry over and would be left out.': '{count} parça taşınamayacak kadar büyük ve dışarıda kalır.',

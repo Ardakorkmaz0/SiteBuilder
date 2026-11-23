@@ -139,4 +139,61 @@ describe('EditorPage convertHtmlToCanvas integration', () => {
       expect(screen.getByTitle('site').getAttribute('srcdoc')).toContain('Typed while converting About')
     })
   }, 30000)
+
+  it('leaves a page as HTML when it was edited while being read, so the edit is not dropped from the blocks', async () => {
+    let resolveMeasure
+    measureMock.handler = vi.fn(() => new Promise((resolve) => { resolveMeasure = resolve }))
+
+    render(
+      <UiThemeProvider>
+        <LanguageProvider>
+          <MemoryRouter initialEntries={['/editor/1']}>
+            <Routes>
+              <Route path="/editor/:id" element={<EditorPage />} />
+            </Routes>
+          </MemoryRouter>
+        </LanguageProvider>
+      </UiThemeProvider>,
+    )
+
+    await screen.findByTitle('site', {}, { timeout: 15000 })
+    fireEvent.contextMenu(await screen.findByText('index.html'))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Convert to canvas blocks' }))
+    await waitFor(() => expect(measureMock.handler).toHaveBeenCalledTimes(1))
+
+    // The open page itself is edited while its old text is being read.
+    surface.live = '<!DOCTYPE html><html lang="en"><body><p>Home</p><p>Added while reading</p></body></html>'
+
+    await act(async () => {
+      resolveMeasure({
+        width: 1000,
+        height: 800,
+        background: ['rgb(255, 255, 255)', 'rgba(0, 0, 0, 0)'],
+        fontFamily: 'Inter, sans-serif',
+        title: 'Home',
+        description: '',
+        language: 'en',
+        scripts: 0,
+        root: {
+          tag: 'body',
+          rect: { x: 0, y: 0, w: 1000, h: 800 },
+          s: STYLE_BASE,
+          kids: [{
+            tag: 'p',
+            kind: 'text',
+            text: 'Home',
+            rect: { x: 40, y: 40, w: 400, h: 24 },
+            s: STYLE_BASE,
+          }],
+        },
+      })
+    })
+
+    expect(await screen.findByText('The page changed while it was being read, so nothing was changed. Convert it again.')).toBeInTheDocument()
+    const home = useEditorStore.getState().schema.pages.find((p) => p.id === 'home')
+    expect(home.mode).toBe('html')
+    expect(home.components).toEqual([])
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(screen.getByTitle('site').getAttribute('srcdoc')).toContain('Added while reading')
+  }, 30000)
 })
