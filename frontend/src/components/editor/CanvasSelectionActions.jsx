@@ -8,6 +8,14 @@ import { fitHtmlEmbedLayout } from '../../utils/htmlEmbedMeasure.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { selectionActionsScaleStyle } from './canvasSelectionActionsLayout.js'
 import { canvasFontFamily } from '../../utils/theme.js'
+import { NodeIcon } from '../icons.jsx'
+import {
+  SELECTION_BAR_BACKGROUND,
+  SELECTION_BAR_BORDER,
+  SELECTION_BAR_SHADOW,
+  SELECTION_ICON_SIZE,
+  selectionActionIcon,
+} from './selectionToolbar.js'
 
 function findById(components, id) {
   for (const c of components || []) {
@@ -16,90 +24,6 @@ function findById(components, id) {
     if (deep) return deep
   }
   return null
-}
-
-function LayerStepIcon({ forward }) {
-  return (
-    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-      <rect x="3" y="3" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-      <rect x="8" y="8" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d={forward ? 'M5 15V9m0 0-2 2m2-2 2 2' : 'M15 5v6m0 0-2-2m2 2 2-2'}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function DuplicateIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-      <rect x="6" y="6" width="10" height="10" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M13 6V4H4v9h2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ParentIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-      <path d="M5 15V5h10M5 5l4 4M5 5l4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ExpandIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-      <path
-        d="M8 3H3v5M12 3h5v5M8 17H3v-5M12 17h5v-5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function FitIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-      <path
-        d="M8 3v5H3M12 3v5h5M8 17v-5H3M12 17v-5h5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-// Monitor / phone glyphs with an optional slash to show "hidden on this screen".
-function MonitorIcon({ off }) {
-  return (
-    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-      <rect x="2.5" y="3.5" width="15" height="10" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M7 17h6M10 13.5V17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      {off && <path d="M3 3l14 14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />}
-    </svg>
-  )
-}
-function PhoneIcon({ off }) {
-  return (
-    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-      <rect x="5.5" y="2.5" width="9" height="15" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M8.5 15h3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      {off && <path d="M3 3l14 14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />}
-    </svg>
-  )
 }
 
 // `inline` docks the bar in the editor toolbar instead of floating it over the
@@ -115,6 +39,7 @@ export default function CanvasSelectionActions({ componentId, canvasScale = 1, s
   const moveBackward = useEditorStore((state) => state.moveBackward)
   const moveForward = useEditorStore((state) => state.moveForward)
   const remove = useEditorStore((state) => state.removeComponent)
+  const select = useEditorStore((state) => state.selectComponent)
   const fitEmbedBox = useEditorStore((state) => state.fitEmbedBox)
   const setVisibility = useEditorStore((state) => state.setVisibility)
   // Per-breakpoint visibility, pinned in the toolbar like duplicate/front/back.
@@ -142,19 +67,20 @@ export default function CanvasSelectionActions({ componentId, canvasScale = 1, s
       fitEmbedBox(componentId, patch, { releaseManual: true }),
     { font: canvasFontFamily(store.schema, selectCurrentPage(store)) })
   }
+  const icon = (id, off) => <NodeIcon key={`${id}-icon`} name={selectionActionIcon(id, { off })} size={SELECTION_ICON_SIZE} />
   const actions = [
-    ['parent', <ParentIcon key="parent-icon" />, t('Select parent'), () => selectParent(componentId), !parent],
-    ['duplicate', <DuplicateIcon key="duplicate-icon" />, t('Duplicate'), () => duplicate(componentId), false],
+    ['parent', icon('parent'), t('Select parent'), () => selectParent(componentId), !parent],
+    ['duplicate', icon('duplicate'), t('Duplicate'), () => duplicate(componentId), false],
     ...(canFit
-      ? [['fit', <FitIcon key="fit-icon" />, t('Fit to content'), fitToContent, false]]
+      ? [['fit', icon('fit'), t('Fit to content'), fitToContent, false]]
       : []),
-    ['backward', <LayerStepIcon key="backward-icon" />, t('Backward'), () => moveBackward(componentId), !canMoveBackward],
-    ['forward', <LayerStepIcon key="forward-icon" forward />, t('Forward'), () => moveForward(componentId), !canMoveForward],
+    ['backward', icon('backward'), t('Backward'), () => moveBackward(componentId), !canMoveBackward],
+    ['forward', icon('forward'), t('Forward'), () => moveForward(componentId), !canMoveForward],
     // An element may be hidden on ONE breakpoint only — hiding both would make
     // it invisible everywhere and unreachable, which is what Delete is for.
     [
       'vis-pc',
-      <MonitorIcon key="vis-pc-icon" off={pcHidden} />,
+      icon('vis-pc', pcHidden),
       pcHidden
         ? t('Show on PC')
         : mobileHidden
@@ -166,7 +92,7 @@ export default function CanvasSelectionActions({ componentId, canvasScale = 1, s
     ],
     [
       'vis-mobile',
-      <PhoneIcon key="vis-mobile-icon" off={mobileHidden} />,
+      icon('vis-mobile', mobileHidden),
       mobileHidden
         ? t('Show on Mobile')
         : pcHidden
@@ -179,9 +105,11 @@ export default function CanvasSelectionActions({ componentId, canvasScale = 1, s
     // Opens the component on its own, large: the canvas is fitted down too far
     // to judge type or spacing on.
     ...(onSpotlight
-      ? [['spotlight', <ExpandIcon key="spotlight-icon" />, t('Open large'), () => onSpotlight(componentId), false]]
+      ? [['spotlight', icon('spotlight'), t('Open large'), () => onSpotlight(componentId), false]]
       : []),
-    ['delete', <span key="delete-icon" aria-hidden="true">×</span>, t('Delete component'), () => remove(componentId), false],
+    ['delete', icon('delete'), t('Delete component'), () => remove(componentId), false],
+    // Last, as on an HTML page: let go of the selection without changing it.
+    ['deselect', icon('deselect'), t('Deselect'), () => select(null), false],
   ]
 
   return (
@@ -199,16 +127,16 @@ export default function CanvasSelectionActions({ componentId, canvasScale = 1, s
         gap: 2,
         width: 'max-content',
         padding: 4,
-        border: '1px solid rgba(255,255,255,0.18)',
+        border: `1px solid ${SELECTION_BAR_BORDER}`,
         borderRadius: 9,
-        background: '#111827',
+        background: SELECTION_BAR_BACKGROUND,
         pointerEvents: 'auto',
         ...(inline
           ? { position: 'static', flexShrink: 0 }
           : {
               position: 'absolute',
               zIndex: 36,
-              boxShadow: '0 8px 22px rgba(15,23,42,0.3)',
+              boxShadow: SELECTION_BAR_SHADOW,
               ...selectionActionsScaleStyle(canvasScale),
             }),
         ...style,
@@ -228,8 +156,8 @@ export default function CanvasSelectionActions({ componentId, canvasScale = 1, s
             event.stopPropagation()
             onClick()
           }}
-          className={`grid h-7 w-7 place-items-center rounded-md border-0 p-0 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-25 ${
-            id === 'delete' ? 'bg-[#7f1d1d] hover:bg-[#991b1b]' : 'bg-transparent hover:bg-white/10'
+          className={`grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent p-0 text-white disabled:cursor-not-allowed disabled:opacity-25 ${
+            id === 'delete' ? 'hover:bg-[#991b1b]' : 'hover:bg-white/10'
           } ${dimmed ? 'text-amber-300/80' : ''}`}
         >
           {icon}

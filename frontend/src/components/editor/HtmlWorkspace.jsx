@@ -69,6 +69,17 @@ import { applyElementMotion, applyMotionRest } from '../../utils/htmlMotion.js'
 import CanvasZoomControl from './CanvasZoomControl.jsx'
 import FullscreenStage from './FullscreenStage.jsx'
 import { previewScaleStyle } from './previewScale.js'
+import { iconMarkup } from '../iconNodes.js'
+import {
+  SELECTION_BAR_BACKGROUND,
+  SELECTION_BAR_BORDER,
+  SELECTION_BAR_SHADOW,
+  SELECTION_BUTTON_HOVER,
+  SELECTION_DANGER_HOVER,
+  SELECTION_ICON_SIZE,
+  selectionActionIcon,
+} from './selectionToolbar.js'
+import { normalizedSelectionActionsScale, selectionActionsPosition } from './canvasSelectionActionsLayout.js'
 import { readZoom, writeZoom, zoomScale } from './canvasZoom.js'
 import BrushControls from './BrushControls.jsx'
 import { EditIcon, MoveIcon, LinkIcon, PinIcon, LightbulbIcon, FileCodeIcon, WarningIcon, PaletteIcon, MoreHorizontalIcon, MonitorIcon, ChevronDownIcon } from '../icons.jsx'
@@ -314,19 +325,41 @@ function updateSelectionResizeChrome(doc, el) {
   overlay.style.width = `${Math.max(1, Math.round(rect.width))}px`
   overlay.style.height = `${Math.max(1, Math.round(rect.height))}px`
 
-  // Keep the contextual actions inside the visible iframe. Above the element
-  // is the natural position; selections near the top edge flip the bar below.
+  // The page is drawn scaled in the stage and this bar lives inside it, so it
+  // is counter-scaled and placed by the canvas' own rule (centred on the
+  // element; above it, inside a tall one, or below): on screen it is the same
+  // bar, the same size, as over a block on a canvas page.
   const toolbar = overlay.querySelector('[data-pwb-selection-toolbar]')
   if (toolbar) {
-    toolbar.style.top = rect.top >= 44 ? '-40px' : `${Math.round(rect.height + 8)}px`
-    const viewportWidth = doc.defaultView?.innerWidth || 0
-    const toolbarWidth = toolbar.getBoundingClientRect().width || 190
-    if (viewportWidth > 0) {
-      const minLeft = 4 - rect.left
-      const maxLeft = viewportWidth - 4 - rect.left - toolbarWidth
-      toolbar.style.left = `${Math.round(Math.max(minLeft, Math.min(0, maxLeft)))}px`
-    }
+    const view = doc.defaultView
+    const scale = normalizedSelectionActionsScale(frameScale(doc))
+    const place = selectionActionsPosition({
+      canvasWidth: view?.innerWidth || rect.width,
+      canvasHeight: view?.innerHeight || rect.height,
+      targetX: rect.left,
+      targetY: rect.top,
+      targetWidth: rect.width,
+      targetHeight: rect.height,
+      canvasScale: scale,
+      actionCount: toolbar.querySelectorAll('[data-pwb-selection-action]').length,
+    })
+    toolbar.style.left = `${place.left - Math.round(rect.left)}px`
+    toolbar.style.top = `${place.top - Math.round(rect.top)}px`
+    toolbar.style.transformOrigin = 'top left'
+    toolbar.style.transform = scale === 1 ? '' : `scale(${1 / scale})`
   }
+}
+
+// How large the page is drawn against its own pixels: the stage scales the
+// frame (zoom or a transform) and the page inside cannot tell.
+function frameScale(doc) {
+  try {
+    const view = doc?.defaultView
+    const inner = view?.innerWidth
+    const outer = view?.frameElement?.getBoundingClientRect?.().width
+    if (inner > 0 && outer > 0) return outer / inner
+  } catch { /* a frame of another origin */ }
+  return 1
 }
 
 // Exported only for the DOM-level chrome test below; HtmlWorkspace remains the
@@ -398,35 +431,38 @@ export function installSelectionResizeChrome(
       'gap:2px',
       'min-width:max-content',
       'padding:4px',
-      'border:1px solid rgba(255,255,255,0.18)',
+      `border:1px solid ${SELECTION_BAR_BORDER}`,
       'border-radius:9px',
-      'background:#111827',
-      'box-shadow:0 8px 22px rgba(15,23,42,0.3)',
+      `background:${SELECTION_BAR_BACKGROUND}`,
+      `box-shadow:${SELECTION_BAR_SHADOW}`,
       'pointer-events:auto',
       'font:600 13px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
       'white-space:nowrap',
     ].join(';'),
   )
   const actions = [
-    ['parent', '↖', labels.parent || 'Select parent'],
-    ['duplicate', '⧉', labels.duplicate || 'Duplicate'],
-    ['up', '↑', labels.up || 'Move up'],
-    ['down', '↓', labels.down || 'Move down'],
+    ['parent', labels.parent || 'Select parent'],
+    ['duplicate', labels.duplicate || 'Duplicate'],
+    ['up', labels.up || 'Move up'],
+    ['down', labels.down || 'Move down'],
     // Opens the element on its own, large, with the full control set — the
     // stage here is fitted down too far to judge type or spacing on.
-    ['spotlight', '⛶', labels.spotlight || 'Open large'],
+    ['spotlight', labels.spotlight || 'Open large'],
     // Offer this block to everyone else. Next to "open large" because both are
     // about the element as a thing in its own right.
-    ['share', '↗', labels.share || 'Share to the community'],
-    ['delete', '×', labels.delete || 'Delete component'],
+    ['share', labels.share || 'Share to the community'],
+    ['delete', labels.delete || 'Delete component'],
+    // Last, as on a canvas page: let go of the selection without changing it.
+    ['deselect', labels.deselect || 'Deselect'],
   ]
-  for (const [action, glyph, label] of actions) {
+  for (const [action, label] of actions) {
     const button = doc.createElement('button')
     button.type = 'button'
     button.setAttribute('data-pwb-selection-action', action)
     button.setAttribute('aria-label', label)
     button.setAttribute('title', label)
-    button.textContent = glyph
+    // Written from the same drawings the canvas bar renders (iconNodes.js).
+    button.innerHTML = iconMarkup(selectionActionIcon(action), { size: SELECTION_ICON_SIZE })
     button.setAttribute(
       'style',
       [
@@ -437,12 +473,14 @@ export function installSelectionResizeChrome(
         'padding:0',
         'border:0',
         'border-radius:6px',
-        action === 'delete' ? 'background:#7f1d1d' : 'background:transparent',
+        'background:transparent',
         'color:#fff',
-        'font:700 16px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
         'cursor:pointer',
       ].join(';'),
     )
+    const hover = action === 'delete' ? SELECTION_DANGER_HOVER : SELECTION_BUTTON_HOVER
+    button.addEventListener('pointerenter', () => { button.style.background = hover })
+    button.addEventListener('pointerleave', () => { button.style.background = 'transparent' })
     button.addEventListener('pointerdown', (e) => {
       e.preventDefault()
       e.stopPropagation()
@@ -889,6 +927,7 @@ function HtmlWorkspace({
       spotlight: t('Open large'),
       share: t('Share to the community'),
       delete: t('Delete component'),
+      deselect: t('Deselect'),
     }
   }, [t])
 
@@ -942,6 +981,8 @@ function HtmlWorkspace({
       el.remove()
       next = null
       changed = true
+    } else if (action === 'deselect') {
+      next = null
     } else {
       return
     }
@@ -1411,6 +1452,12 @@ function HtmlWorkspace({
   // there is room. Anything beyond that is the zoom control, chosen on purpose.
   const fitScale = Math.min(1, availableW / previewW || 1, availableH / previewH || 1)
   const scale = zoomScale(zoom, fitScale)
+  // The bar over the selection keeps its size on screen: draw it again for
+  // the new scale whenever the stage is zoomed or refitted.
+  useEffect(() => {
+    const doc = iframeRef.current?.contentDocument
+    if (doc && selectedRef.current) updateSelectionResizeChrome(doc, selectedRef.current)
+  }, [scale])
   // On the responsive device, going from 'fit' to a chosen zoom (or back) moves
   // the iframe between the CSS-filled frame and the scaled one, which remounts
   // it. Fold what was typed into the seed first — exactly as the browser-frame

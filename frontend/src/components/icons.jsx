@@ -1,3 +1,6 @@
+import { createElement } from 'react'
+import { ICON_NODES, ICON_STROKE_WIDTH } from './iconNodes.js'
+
 // A small set of clean, consistent line icons (Heroicons-style, 24px grid,
 // 1.8 stroke, currentColor) used across the app chrome instead of emoji — emoji
 // render inconsistently per-OS and read as amateurish. Each takes `size`
@@ -10,7 +13,7 @@ function Icon({ size = 16, className = '', children, fill = 'none', viewBox = '0
       viewBox={viewBox}
       fill={fill}
       stroke={fill === 'none' ? 'currentColor' : 'none'}
-      strokeWidth="1.8"
+      strokeWidth={ICON_STROKE_WIDTH}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
@@ -23,6 +26,32 @@ function Icon({ size = 16, className = '', children, fill = 'none', viewBox = '0
   )
 }
 
+// An icon drawn from iconNodes.js. `name` may list several drawings to lay
+// over each other (['monitor', 'slash'] is "hidden on PC").
+export function NodeIcon({ name, ...rest }) {
+  const names = Array.isArray(name) ? name : [name]
+  return (
+    <Icon {...rest}>
+      {names.flatMap((one) => ICON_NODES[one] || []).map(([tag, attrs], index) => createElement(tag, { key: index, ...attrs }))}
+    </Icon>
+  )
+}
+
+export const XIcon = (p) => <NodeIcon name="x" {...p} />
+export const CornerLeftUpIcon = (p) => <NodeIcon name="cornerLeftUp" {...p} />
+export const ArrowUpIcon = (p) => <NodeIcon name="arrowUp" {...p} />
+export const ArrowDownIcon = (p) => <NodeIcon name="arrowDown" {...p} />
+export const BringForwardIcon = (p) => <NodeIcon name="bringForward" {...p} />
+export const SendBackwardIcon = (p) => <NodeIcon name="sendBackward" {...p} />
+export const SmartphoneIcon = (p) => <NodeIcon name="smartphone" {...p} />
+export const ShareIcon = (p) => <NodeIcon name="share" {...p} />
+export const MinusIcon = (p) => <NodeIcon name="minus" {...p} />
+export const ChevronRightIcon = (p) => <NodeIcon name="chevronRight" {...p} />
+export const ExternalLinkIcon = (p) => <NodeIcon name="externalLink" {...p} />
+export const PointerIcon = (p) => <NodeIcon name="pointer" {...p} />
+export const TypeIcon = (p) => <NodeIcon name="type" {...p} />
+export const SquareIcon = (p) => <NodeIcon name="square" {...p} />
+
 export const FileIcon = (p) => (
   <Icon {...p}>
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -30,12 +59,7 @@ export const FileIcon = (p) => (
   </Icon>
 )
 
-export const CopyIcon = (p) => (
-  <Icon {...p}>
-    <rect x="8" y="8" width="11" height="11" rx="2" />
-    <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
-  </Icon>
-)
+export const CopyIcon = (p) => <NodeIcon name="copy" {...p} />
 
 export const DownloadIcon = (p) => (
   <Icon {...p}>
@@ -128,11 +152,7 @@ export const ArrowRightIcon = (p) => (
   </Icon>
 )
 
-export const ChevronDownIcon = (p) => (
-  <Icon {...p}>
-    <path d="m6 9 6 6 6-6" />
-  </Icon>
-)
+export const ChevronDownIcon = (p) => <NodeIcon name="chevronDown" {...p} />
 
 export const UserIcon = (p) => (
   <Icon {...p}>
@@ -184,12 +204,7 @@ export const MoonIcon = (p) => (
   </Icon>
 )
 
-export const MonitorIcon = (p) => (
-  <Icon {...p}>
-    <rect x="3" y="4" width="18" height="13" rx="2" />
-    <path d="M8 21h8M12 17v4" />
-  </Icon>
-)
+export const MonitorIcon = (p) => <NodeIcon name="monitor" {...p} />
 
 export const StarIcon = ({ filled = false, ...p }) => (
   <Icon {...p} fill={filled ? 'currentColor' : 'none'}>
@@ -210,11 +225,7 @@ export const ShieldIcon = (p) => (
   </Icon>
 )
 
-export const CheckIcon = (p) => (
-  <Icon {...p}>
-    <path d="m5 12 4.5 4.5L19 7" />
-  </Icon>
-)
+export const CheckIcon = (p) => <NodeIcon name="check" {...p} />
 
 export const GlobeIcon = (p) => (
   <Icon {...p}>
@@ -261,19 +272,9 @@ export const CogIcon = (p) => (
   </Icon>
 )
 
-export const ImageIcon = (p) => (
-  <Icon {...p}>
-    <rect x="3" y="4" width="18" height="16" rx="2" />
-    <circle cx="8.5" cy="9.5" r="1.5" />
-    <path d="m21 16-4.5-4.5L7 21" />
-  </Icon>
-)
+export const ImageIcon = (p) => <NodeIcon name="image" {...p} />
 
-export const PlusIcon = (p) => (
-  <Icon {...p}>
-    <path d="M12 5v14M5 12h14" />
-  </Icon>
-)
+export const PlusIcon = (p) => <NodeIcon name="plus" {...p} />
 
 export const SaveIcon = (p) => (
   <Icon {...p}>
@@ -326,14 +327,7 @@ export const BanIcon = (p) => (
   </Icon>
 )
 
-export const TrashIcon = (p) => (
-  <Icon {...p}>
-    <path d="M4 7h16" />
-    <path d="M10 11v6M14 11v6" />
-    <path d="M6 7l1 14h10l1-14" />
-    <path d="M9 7V4h6v3" />
-  </Icon>
-)
+export const TrashIcon = (p) => <NodeIcon name="trash" {...p} />
 
 export const KeyboardIcon = (p) => (
   <Icon {...p}>
@@ -406,14 +400,6 @@ export const InstagramIcon = (p) => (
   </Icon>
 )
 
-export const MaximizeIcon = (p) => (
-  <Icon {...p}>
-    <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
-  </Icon>
-)
+export const MaximizeIcon = (p) => <NodeIcon name="maximize" {...p} />
 
-export const MinimizeIcon = (p) => (
-  <Icon {...p}>
-    <path d="M3 8h5V3M21 8h-5V3M3 16h5v5M21 16h-5v5" />
-  </Icon>
-)
+export const MinimizeIcon = (p) => <NodeIcon name="minimize" {...p} />

@@ -193,7 +193,9 @@ export default function Canvas({
     !!selectedComponent
   // Desktop HTML embeds expose "fit to content", and Canvas adds "Open large"
   // whenever `onSpotlight` is wired; include both in toolbar width calculation.
-  const selectionActionCount = 7
+  // The base 8: parent, duplicate, backward, forward, the two screens, delete
+  // and deselect (CanvasSelectionActions).
+  const selectionActionCount = 8
     + (!isMobile && selectedComponent?.type === 'html' ? 1 : 0)
     + (onSpotlight ? 1 : 0)
 

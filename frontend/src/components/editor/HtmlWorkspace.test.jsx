@@ -420,11 +420,14 @@ describe('HTML selection quick actions', () => {
     const toolbar = document.querySelector('[data-pwb-selection-toolbar]')
     expect(toolbar).toHaveAttribute('role', 'toolbar')
     expect(toolbar).toHaveAttribute('aria-label', 'Düzenle')
-    expect(toolbar.style.top).toBe('-40px')
+    // Placed by the canvas bar's rule: 38px bar + 8px gap above the element,
+    // centred on it and kept 8px inside the frame (centre -4px → 8px).
+    expect(toolbar.style.top).toBe('-46px')
+    expect(toolbar.style.left).toBe('-12px')
     // Which actions, not how many — a count says nothing about what is missing.
     expect([...toolbar.querySelectorAll('[data-pwb-selection-action]')]
       .map((button) => button.getAttribute('data-pwb-selection-action')))
-      .toEqual(['parent', 'duplicate', 'up', 'down', 'spotlight', 'share', 'delete'])
+      .toEqual(['parent', 'duplicate', 'up', 'down', 'spotlight', 'share', 'delete', 'deselect'])
 
     fireEvent.click(toolbar.querySelector('[data-pwb-selection-action="delete"]'))
     expect(onAction).toHaveBeenCalledWith('delete')

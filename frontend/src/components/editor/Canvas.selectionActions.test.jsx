@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render } from '@testing-library/react'
 import { DndContext } from '@dnd-kit/core'
 import { beforeEach, describe, expect, it } from 'vitest'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
@@ -62,6 +62,8 @@ describe('canvas selection action overlay', () => {
       targetWidth: targetRect.width,
       targetHeight: targetRect.height,
       canvasScale: Number(canvas.dataset.builderCanvasScale),
+      // parent, duplicate, backward, forward, PC, mobile, delete, deselect
+      actionCount: 8,
     })
 
     act(() => window.dispatchEvent(new Event('resize')))
@@ -83,6 +85,29 @@ describe('canvas selection action overlay', () => {
     expect(toolbar.style.top).toBe(`${expected.top}px`)
   })
 
+  it('lets go of the selection with the X at the end of the bar, drawn like the HTML page bar', () => {
+    loadSelectedPage()
+    const { container } = renderCanvas()
+    const canvas = container.querySelector('#free-canvas')
+    const target = container.querySelector('[data-cid="button"]')
+    canvas.getBoundingClientRect = () => ({ left: 100, top: 50, width: 1000, height: 800, right: 1100, bottom: 850 })
+    target.getBoundingClientRect = () => ({ left: 550, top: 250, width: 100, height: 50, right: 650, bottom: 300 })
+    act(() => window.dispatchEvent(new Event('resize')))
+    const toolbar = container.querySelector('[data-canvas-selection-actions]')
+    const ids = [...toolbar.querySelectorAll('[data-canvas-selection-action]')].map((b) => b.getAttribute('data-canvas-selection-action'))
+    expect(ids.slice(-2)).toEqual(['delete', 'deselect'])
+    // Delete is a trash can, not a red box with ×.
+    const remove = toolbar.querySelector('[data-canvas-selection-action="delete"]')
+    expect(remove.textContent).toBe('')
+    expect(remove.querySelector('path[d="M9 7V4h6v3"]')).not.toBeNull()
+
+    act(() => { fireEvent.click(toolbar.querySelector('[data-canvas-selection-action="deselect"]')) })
+
+    expect(useEditorStore.getState().selectedId).toBeNull()
+    expect(container.querySelector('[data-canvas-selection-actions]')).toBeNull()
+    expect(useEditorStore.getState().schema.pages[0].components.map((c) => c.id)).toEqual(['button'])
+  })
+
   it('includes the Open large spotlight button in the toolbar width calculation', () => {
     loadSelectedPage()
     const { container } = render(
@@ -95,12 +120,12 @@ describe('canvas selection action overlay', () => {
     const canvas = container.querySelector('#free-canvas')
     const target = container.querySelector('[data-cid="button"]')
     canvas.getBoundingClientRect = () => ({ left: 100, top: 50, width: 1000, height: 800, right: 1100, bottom: 850 })
-    // Near the right edge at 1:1 scale: 8 buttons = 248px + 8px margin -> max left 744px (7 buttons would clamp to 774px).
+    // Near the right edge at 1:1 scale: 9 buttons (with deselect and Open large) = 278px + 8px margin -> max left 714px (8 buttons would clamp to 744px).
     target.getBoundingClientRect = () => ({ left: 990, top: 250, width: 100, height: 50, right: 1090, bottom: 300 })
 
     act(() => window.dispatchEvent(new Event('resize')))
 
     const toolbar = container.querySelector('[data-canvas-selection-actions]')
-    expect(toolbar.style.left).toBe('744px')
+    expect(toolbar.style.left).toBe('714px')
   })
 })
