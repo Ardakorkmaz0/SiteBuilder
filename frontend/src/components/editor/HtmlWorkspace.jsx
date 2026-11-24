@@ -2128,6 +2128,8 @@ function HtmlWorkspace({
               </button>
             )}
           </div>
+          {/* The tool palette, at the same place as on a canvas page (ToolPalette). */}
+          {mode === 'edit' && toolPalette}
 
           {/* What the mode does. Edit holds a tool and can run the page;
               Source has one action, and it is the important one. Hidden on an
@@ -2372,10 +2374,6 @@ function HtmlWorkspace({
         )}
 
         <FullscreenStage ref={fullscreenStageRef} active={fullscreen} onExit={toggleStageFullscreen}>
-        {/* The tool palette (ToolPalette), at the same place as on a canvas page. */}
-        {mode === 'edit' && !fullscreen && toolPalette && (
-          <div className="pointer-events-none absolute left-3 top-3 z-30">{toolPalette}</div>
-        )}
         {mode === 'live' ? (
           liveUrl ? (
             <main className="relative flex min-h-0 flex-1 flex-col bg-[#0b0b0b]">

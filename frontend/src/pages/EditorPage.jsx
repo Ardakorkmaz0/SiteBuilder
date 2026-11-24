@@ -3524,6 +3524,7 @@ function SiteEditor() {
                       </button>
                     ))}
                   </div>
+                  {canvasMode === 'edit' && <ToolPalette tool={activeTool} onTool={chooseTool} />}
                   {/* A page shown a part at a time: which part the canvas
                       shows (View opens on the first, as a visitor's does). */}
                   {canvasMode === 'edit' && currentParts.length > 0 && (
@@ -3719,11 +3720,6 @@ function SiteEditor() {
                 {/* Full screen shows the page as visitors get it, in the chosen
                     PC or phone size: the preview, not the editing canvas. */}
                 <FullscreenStage ref={canvasStageRef} active={fullscreen} onExit={() => toggleFullscreen()}>
-                {canvasMode === 'edit' && !fullscreen && (
-                  <div className="pointer-events-none absolute left-3 top-3 z-30">
-                    <ToolPalette tool={activeTool} onTool={chooseTool} />
-                  </div>
-                )}
                 {canvasMode === 'edit' && !fullscreen ? (
                   <Canvas
                     zoom={canvasZoom}
