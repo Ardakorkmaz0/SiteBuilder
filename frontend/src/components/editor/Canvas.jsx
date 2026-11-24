@@ -134,6 +134,8 @@ export default function Canvas({
   const mobileScreenRef = useRef(null)
   const marqueeRef = useRef(null)
   const [marquee, setMarquee] = useState(null)
+  // A palette tool dragged across the canvas: the box being drawn (canvas px).
+  const [drawBox, setDrawBox] = useState(null)
   const [editorWidth, setEditorWidth] = useState(0)
   const [editorHeight, setEditorHeight] = useState(0)
   const [selectionActionPosition, setSelectionActionPosition] = useState(null)
@@ -362,22 +364,58 @@ export default function Canvas({
     if (!pendingPlace || e.button !== 0) return
     e.stopPropagation()
     e.preventDefault()
+    if (!pendingPlace.drawable) {
+      placeAtClient(e.clientX, e.clientY)
+      return
+    }
+    // A tool from the palette: a click places it at the point, a drag draws
+    // the box it gets (ToolPalette).
+    const start = { x: e.clientX, y: e.clientY }
+    const boxTo = (ev) => ({
+      left: Math.min(start.x, ev.clientX),
+      top: Math.min(start.y, ev.clientY),
+      width: Math.abs(ev.clientX - start.x),
+      height: Math.abs(ev.clientY - start.y),
+    })
+    const onMove = (ev) => {
+      const box = boxTo(ev)
+      const rect = canvasElRef.current.getBoundingClientRect()
+      setDrawBox({
+        x: (box.left - rect.left) / canvasScale,
+        y: (box.top - rect.top) / canvasScale,
+        w: box.width / canvasScale,
+        h: box.height / canvasScale,
+      })
+    }
+    const onUp = (ev) => {
+      window.removeEventListener('pointermove', onMove, true)
+      window.removeEventListener('pointerup', onUp, true)
+      setDrawBox(null)
+      const box = boxTo(ev)
+      if (box.width < 6 && box.height < 6) placeAtClient(start.x, start.y)
+      else placeAtClient(box.left + box.width / 2, box.top + box.height / 2, { w: box.width / canvasScale, h: box.height / canvasScale })
+    }
+    window.addEventListener('pointermove', onMove, true)
+    window.addEventListener('pointerup', onUp, true)
+  }
+
+  function placeAtClient(clientX, clientY, size = null) {
     const rect = canvasElRef.current.getBoundingClientRect()
     // A tap inside a section, container or tab panel places the item IN it,
     // as a drag there does: placed on top of it instead, the item stayed
     // behind when the section moved, reflowed or was deleted.
     const holder = typeof document.elementsFromPoint === 'function'
-      ? document.elementsFromPoint(e.clientX, e.clientY)
+      ? document.elementsFromPoint(clientX, clientY)
         .find((el) => el.hasAttribute?.('data-builder-droppable-id') && canvasElRef.current.contains(el))
       : null
     let inside = null
     if (holder) {
       inside = {
         parentId: holder.getAttribute('data-builder-droppable-id'),
-        ...dropCoordinates(holder, e.clientX, e.clientY, canvasElRef.current, canvasScale),
+        ...dropCoordinates(holder, clientX, clientY, canvasElRef.current, canvasScale),
       }
     }
-    onPlaceAt((e.clientX - rect.left) / canvasScale, (e.clientY - rect.top) / canvasScale, inside)
+    onPlaceAt((clientX - rect.left) / canvasScale, (clientY - rect.top) / canvasScale, inside, size)
   }
 
   function startMarquee(e) {
@@ -554,6 +592,23 @@ export default function Canvas({
               // the shared overlay above that wrapper so it stays clickable when
               // the safe top-edge fallback places it below the selected item.
               zIndex: CANVAS_SELECTION_Z,
+            }}
+          />
+        )}
+
+        {/* The box a palette tool is drawing. */}
+        {drawBox && (
+          <div
+            data-draw-box=""
+            className="pointer-events-none absolute rounded-sm border border-dashed border-[#4f46e5]"
+            style={{
+              left: drawBox.x,
+              top: drawBox.y,
+              width: drawBox.w,
+              height: drawBox.h,
+              borderWidth: chrome.hairline,
+              backgroundColor: 'rgba(79,70,229,0.08)',
+              zIndex: 50,
             }}
           />
         )}

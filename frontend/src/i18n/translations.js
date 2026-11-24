@@ -1728,6 +1728,7 @@ const BASE_TURKISH_TRANSLATIONS = {
   'Save and leave': 'Kaydet ve çık',
   'Deselect (back to site settings)': 'Seçimi kaldır (site ayarlarına dön)',
   'Deselect': 'Seçimi bırak',
+  'Select': 'Seç',
   'Select the containing {tag}': 'Kapsayan {tag} öğesini seç',
   'Select parent': 'Üst öğeyi seç',
   'Link (href)': 'Bağlantı (href)',

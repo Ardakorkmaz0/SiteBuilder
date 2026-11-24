@@ -82,6 +82,8 @@ import PropertiesPanel from '../components/editor/PropertiesPanel.jsx'
 import HtmlElementPanel from '../components/editor/HtmlElementPanel.jsx'
 import { DEVICE_ICONS, MODE_ICONS } from '../components/editor/stageSwitchIcons.js'
 import SwitchLabel from '../components/editor/SwitchLabel.jsx'
+import ToolPalette from '../components/editor/ToolPalette.jsx'
+import { PALETTE_TOOLS, paletteToolForKey, paletteToolOfType } from '../components/editor/toolPalette.js'
 import { toggleSpotlightTarget } from '../components/editor/spotlight.js'
 import PageFilesPanel from '../components/editor/PageFilesPanel.jsx'
 import { pageFileName } from '../utils/pageFiles.js'
@@ -923,6 +925,38 @@ function SiteEditor() {
     }
   })
 
+  // The tool palette (ToolPalette): the tool it holds is the placement in
+  // progress, when that placement is one of its own. A placement ends with the
+  // tool back on Select, so the palette needs no state of its own.
+  const activeTool = currentPageIsHtml
+    ? (pendingType && !pendingHtml ? paletteToolOfType(pendingType)?.id || 'select' : 'select')
+    : (pendingPlace?.tool || 'select')
+  function chooseTool(id) {
+    const tool = PALETTE_TOOLS.find((one) => one.id === id)
+    if (!tool?.type) {
+      // Select: stop placing, whatever was being placed.
+      setPendingPlace(null)
+      setPendingType(null)
+      setPendingHtml(null)
+      setPendingAtEnd(false)
+      return
+    }
+    if (currentPageIsHtml) {
+      setPendingHtml(null)
+      setPendingAtEnd(false)
+      setPendingType(tool.type)
+      return
+    }
+    switchCanvasMode('edit')
+    // With its own default size, so a click centres the block on the point.
+    const size = registry[tool.type]?.defaultSize || {}
+    setPendingPlace({ type: tool.type, label: registry[tool.type]?.label || tool.label, tool: tool.id, drawable: true, w: size.w, h: size.h })
+  }
+  const paletteRef = useRef(null)
+  useLayoutEffect(() => {
+    paletteRef.current = { live: !fullscreen && (currentPageIsHtml || canvasMode === 'edit'), choose: chooseTool }
+  })
+
   const saveLifecycleRef = useRef(null)
   // A save never touches the undo/redo history (markSaved only clears
   // `dirty`), so Undo still works after one, and the server keeps every save
@@ -1127,6 +1161,16 @@ function SiteEditor() {
       // it must not move the selected block as well.
       if (e.defaultPrevented) return
 
+      // The tool palette's letters, on both kinds of page (toolPalette.js).
+      if (!mod && !e.altKey && !htmlHistoryRef.current.modalOpen && !escapeLayerOpen() && paletteRef.current?.live) {
+        const tool = paletteToolForKey(e.key)
+        if (tool) {
+          e.preventDefault()
+          paletteRef.current.choose(tool.id)
+          return
+        }
+      }
+
       // Everything below is the component-canvas arrange layer — not HTML pages.
       if (htmlHistoryRef.current.currentPageIsHtml || htmlHistoryRef.current.modalOpen) return
       if (!canvasArrangeKeysLive(e, { canvasMode, fullscreen, layerOpen: escapeLayerOpen() })) return
@@ -1301,11 +1345,13 @@ function SiteEditor() {
   // the section, container or tab panel that was tapped, if any (`inside`:
   // its id and the point in its own coordinates). A section never goes inside
   // another one: it is a band of the page.
-  function placePendingAt(x, y, inside = null) {
+  function placePendingAt(x, y, inside = null, size = null) {
     const d = pendingPlace
     if (!d) return
     setPendingPlace(null)
-    placeData(d, x, y, inside)
+    // A palette tool dragged across the canvas: the block takes the box drawn.
+    const drawn = size ? { ...d, w: Math.max(20, Math.round(size.w)), h: Math.max(20, Math.round(size.h)) } : d
+    placeData(drawn, x, y, inside)
   }
 
   // A palette item picked with the keyboard has no spot to land on: it goes
@@ -3310,6 +3356,7 @@ function SiteEditor() {
                   onOpenTemplates={() => setTemplateOpen(true)}
                   onImportFile={() => htmlInputRef.current?.click()}
                   pendingType={pendingType}
+                  toolPalette={<ToolPalette tool={activeTool} onTool={chooseTool} />}
                   pendingHtml={pendingHtml}
                   pendingAtEnd={pendingAtEnd}
                   onPlaced={() => { setPendingType(null); setPendingHtml(null); setPendingAtEnd(false) }}
@@ -3672,6 +3719,11 @@ function SiteEditor() {
                 {/* Full screen shows the page as visitors get it, in the chosen
                     PC or phone size: the preview, not the editing canvas. */}
                 <FullscreenStage ref={canvasStageRef} active={fullscreen} onExit={() => toggleFullscreen()}>
+                {canvasMode === 'edit' && !fullscreen && (
+                  <div className="pointer-events-none absolute left-3 top-3 z-30">
+                    <ToolPalette tool={activeTool} onTool={chooseTool} />
+                  </div>
+                )}
                 {canvasMode === 'edit' && !fullscreen ? (
                   <Canvas
                     zoom={canvasZoom}
