@@ -20,6 +20,7 @@ import { siteAddress, siteAddressUrl } from '../../utils/siteAddress.js'
 import { useGuestGate } from '../../utils/useGuestGate.jsx'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
+import { CheckIcon, XIcon } from '../icons.jsx'
 
 // Tab → why it needs an account, for the gate dialog.
 // The editor's Share button asks a guest for an account first; the Share tab
@@ -205,7 +206,7 @@ export default function SiteControlCenter({
             <h2 className="truncate text-lg font-bold text-[#111827]">{t('Site control center')}</h2>
             <p className="truncate text-xs text-[var(--studio-text-muted)]">{site.title}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('Close')} className="grid h-10 w-10 place-items-center rounded-full bg-[#f3f4f6] text-xl">×</button>
+          <button type="button" onClick={onClose} aria-label={t('Close')} className="grid h-10 w-10 place-items-center rounded-full bg-[#f3f4f6] text-xl"><XIcon size={18} /></button>
         </header>
         <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-[#e5e7eb] bg-white px-3 py-2 md:px-6" aria-label={t('Site tools')}>
           {TABS.map(([id, label]) => (
@@ -243,7 +244,7 @@ export default function SiteControlCenter({
               <div className="space-y-2">
                 {readiness.checks.map((item) => (
                   <div key={item.id} className="flex items-start gap-3 rounded-2xl border border-[#e5e7eb] bg-white p-4">
-                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm font-bold ${item.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{item.ok ? '✓' : '!'}</span>
+                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm font-bold ${item.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{item.ok ? <CheckIcon size={14} /> : '!'}</span>
                     <div><div className="text-sm font-semibold text-[#111827]">{t(item.label)}</div>{!item.ok && <div className="mt-0.5 text-xs text-[var(--studio-text-muted)]">{t(item.action, item.params)}</div>}</div>
                   </div>
                 ))}

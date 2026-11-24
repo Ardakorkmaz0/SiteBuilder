@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { MinusIcon, PlusIcon } from '../icons.jsx'
 import Favicon from './BrowserFavicon.jsx'
 import { previewScaleStyle } from './previewScale.js'
 import { pageTitle, visiblePageAddress } from './browserPageAddress.js'
@@ -307,9 +308,9 @@ export default function BrowserFrame({
                 <>
                   <div role="group" aria-label={t('Zoom')} className="flex items-center gap-1 border-b border-[var(--studio-border)] px-3 py-2">
                     <span className="mr-auto text-xs font-medium text-[var(--studio-text)]">{t('Zoom')}</span>
-                    <button type="button" onClick={() => adjustZoom(-1)} aria-label={t('Browser zoom out')} className="grid h-7 w-7 place-items-center rounded-md text-base text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]">&#8722;</button>
+                    <button type="button" onClick={() => adjustZoom(-1)} aria-label={t('Browser zoom out')} className="grid h-7 w-7 place-items-center rounded-md text-base text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]"><MinusIcon size={14} /></button>
                     <button type="button" onClick={() => setZoom(100)} title={t('Reset zoom')} className="min-w-12 rounded-md px-1.5 py-1 text-center text-[11px] font-semibold text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]">{zoomPercent}%</button>
-                    <button type="button" onClick={() => adjustZoom(1)} aria-label={t('Browser zoom in')} className="grid h-7 w-7 place-items-center rounded-md text-base text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]">+</button>
+                    <button type="button" onClick={() => adjustZoom(1)} aria-label={t('Browser zoom in')} className="grid h-7 w-7 place-items-center rounded-md text-base text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]"><PlusIcon size={14} /></button>
                   </div>
                   <button type="button" role="menuitem" onClick={() => { setZoom('fit'); setBrowserMenuOpen(false) }} className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-[var(--studio-control-hover)] ${zoom === 'fit' ? 'text-[var(--studio-accent-hover)]' : 'text-[var(--studio-text)]'}`}>
                     <span aria-hidden>&#8644;</span>

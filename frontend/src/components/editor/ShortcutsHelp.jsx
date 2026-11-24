@@ -1,6 +1,7 @@
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
+import { XIcon } from '../icons.jsx'
 
 // A small cheat-sheet modal for the canvas keyboard shortcuts. Opened from the
 // header button or with Ctrl+/ (handled in EditorPage). Esc closes it here —
@@ -62,7 +63,7 @@ export default function ShortcutsHelp({ onClose }) {
             aria-label={t('Close')}
             className="rounded px-2 py-1 text-sm text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]"
           >
-            ×
+            <XIcon size={14} />
           </button>
         </div>
         <div className="space-y-4">

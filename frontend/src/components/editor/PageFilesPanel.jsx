@@ -4,7 +4,7 @@ import { useEditorStore } from '../../store/editorStore.js'
 import { readFileText } from '../../utils/fileText.js'
 import { pageFileName, pageFileNames } from '../../utils/pageFiles.js'
 import { countLinksToPage } from '../../utils/pageLinks.js'
-import { CanvasPageIcon, FolderIcon, HtmlPageIcon, LinkIcon } from '../icons.jsx'
+import { CanvasPageIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, FolderIcon, HtmlPageIcon, LinkIcon, TrashIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
@@ -318,7 +318,7 @@ export default function PageFilesPanel({
               onClick={() => confirmDelete(page, fname)}
               className="rounded px-1 text-xs text-[var(--studio-text-faint)] hover:bg-white hover:text-red-600"
             >
-              ✕
+              <TrashIcon size={12} />
             </button>
           )}
         </span>
@@ -383,7 +383,7 @@ export default function PageFilesPanel({
                 aria-expanded={!isCollapsed}
                 className="flex w-full items-center gap-1.5 rounded-md py-1 pl-1 pr-2 text-left text-[12.5px] font-semibold text-[#374151] hover:bg-[#f3f4f6]"
               >
-                <span className="w-3 text-[10px] text-[var(--studio-text-faint)]">{isCollapsed ? '▸' : '▾'}</span>
+                <span className="w-3 text-[var(--studio-text-faint)]">{isCollapsed ? <ChevronRightIcon size={12} /> : <ChevronDownIcon size={12} />}</span>
                 <FolderIcon size={14} className="text-[var(--studio-text-muted)]" />
                 <span className="min-w-0 truncate">{folder}</span>
                 <span className="ml-auto text-[10px] font-normal text-[var(--studio-text-faint)]">{items.length}</span>
@@ -488,7 +488,7 @@ function FileMenu({ x, y, label, items, onPick, onClose }) {
           }}
           className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--studio-control-hover)] disabled:cursor-not-allowed disabled:opacity-50 ${item.danger ? 'text-[var(--studio-danger)]' : ''}`}
         >
-          <span aria-hidden className="w-3 shrink-0">{item.checked ? '✓' : ''}</span>
+          <span aria-hidden className="w-3 shrink-0">{item.checked ? <CheckIcon size={12} /> : ''}</span>
           <span className="min-w-0 flex-1">{item.label}</span>
         </button>
       )))}

@@ -3,6 +3,7 @@ import { placeCard, usableSteps } from '../../utils/tourPlacement.js'
 import { EDITOR_TOUR_STEPS, markTourSeen } from '../../utils/editorTour.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
+import { XIcon } from '../icons.jsx'
 
 // A walk through the editor: one card at a time, pointing at the thing it is
 // talking about.
@@ -108,7 +109,7 @@ export default function EditorTour({ open, steps = EDITOR_TOUR_STEPS, onClose })
       <div className="editor-tour-card" style={{ top: card.top, left: card.left, width: CARD.width }}>
         <div className="editor-tour-head">
           <span className="editor-tour-count">{index + 1}/{available.length}</span>
-          <button type="button" onClick={close} title={t('Close')} aria-label={t('Close')} className="editor-tour-close">×</button>
+          <button type="button" onClick={close} title={t('Close')} aria-label={t('Close')} className="editor-tour-close"><XIcon size={14} /></button>
         </div>
         <h2 className="editor-tour-title">{t(step.title)}</h2>
         <p className="editor-tour-body">{t(step.body)}</p>

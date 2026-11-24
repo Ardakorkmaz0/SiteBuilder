@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { configureDomain, getDomainSetup, verifyDomain } from '../../api/sites.js'
 import { apiError } from '../../utils/errors.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { CheckIcon } from '../icons.jsx'
 
 const STEP = { DOMAIN: 1, DNS: 2, VERIFY: 3, LIVE: 4 }
 const CHECK_REASON = {
@@ -22,7 +23,7 @@ function Step({ index, current, title, children }) {
     <li aria-current={active ? 'step' : undefined} className={`rounded-2xl border p-4 ${active ? 'border-[var(--studio-accent)]' : 'border-[var(--studio-border)]'}`}>
       <div className="flex items-center gap-2">
         <span aria-hidden="true" className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${done ? 'bg-[var(--studio-success)] text-[var(--studio-panel)]' : active ? 'bg-[var(--studio-accent)] text-white' : 'bg-[var(--studio-control)] text-[var(--studio-text-muted)]'}`}>
-          {done ? '✓' : index}
+          {done ? <CheckIcon size={12} /> : index}
         </span>
         <h4 className="text-sm font-bold text-[var(--studio-text)]">{title}</h4>
       </div>

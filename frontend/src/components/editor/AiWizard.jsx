@@ -16,6 +16,7 @@ import { aiErrorText } from '../../utils/aiErrorText.js'
 import { aiProviderReady } from '../../utils/aiProviders.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
+import { XIcon } from '../icons.jsx'
 
 const STEPS = ['Type', 'About', 'Style', 'Sections']
 
@@ -220,7 +221,7 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
             aria-label={t('Close')}
             className={`${phase === 'form' ? '' : 'ml-auto '}rounded-lg px-2 py-1 text-sm text-[var(--studio-text-faint)] hover:bg-[#f3f4f6] hover:text-[#374151]`}
           >
-            ✕
+            <XIcon size={14} />
           </button>
         </div>
 

@@ -44,7 +44,7 @@ import { markEditorAction } from '../../utils/aiPreferences.js'
 import { aiErrorText } from '../../utils/aiErrorText.js'
 import AiSettings from './AiSettings.jsx'
 import ChatText from './ChatText.jsx'
-import { LayersIcon, FileCodeIcon, PaletteIcon, PlusIcon, CogIcon, LightbulbIcon, SparklesIcon } from '../icons.jsx'
+import { CheckIcon, CogIcon, FileCodeIcon, LayersIcon, LightbulbIcon, PaletteIcon, PlusIcon, SparklesIcon, XIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 
 // Per-tab chat history persistence. Kept in localStorage so a refresh while
@@ -812,7 +812,7 @@ export default function AiChatPanel({
           aria-label={t('Close AI panel')}
           className="studio-icon-btn h-7 w-7 shrink-0 text-base"
         >
-          ×
+          <XIcon size={14} />
         </button>
       </div>
 
@@ -998,7 +998,7 @@ export default function AiChatPanel({
                           : 'border border-[var(--studio-border-strong)] text-[var(--studio-text-faint)]'
                       }`}
                     >
-                      {step.done ? '✓' : i + 1}
+                      {step.done ? <CheckIcon size={12} /> : i + 1}
                     </span>
                     <span className={step.done ? 'text-[var(--studio-text-faint)] line-through' : 'text-[var(--studio-text)]'}>
                       {step.text}
@@ -1393,7 +1393,7 @@ function ToolsStrip({ calls }) {
             <details key={`${c.name}-${i}`} className={`group rounded-lg border px-2.5 py-2 ${cls}`} style={style}>
               <summary className="flex cursor-pointer list-none items-start gap-2">
                 <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full text-[9px] font-bold text-white ${failed ? 'bg-[var(--studio-danger)]' : 'bg-[var(--studio-success)]'}`}>
-                  {failed ? '×' : '✓'}
+                  {failed ? <XIcon size={12} /> : <CheckIcon size={12} />}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className={`block text-[11px] font-semibold ${failed ? 'text-[var(--studio-danger)]' : 'text-[var(--studio-text)]'}`}>

@@ -80,6 +80,8 @@ import {
 } from '../utils/brush.js'
 import PropertiesPanel from '../components/editor/PropertiesPanel.jsx'
 import HtmlElementPanel from '../components/editor/HtmlElementPanel.jsx'
+import { DEVICE_ICONS, MODE_ICONS } from '../components/editor/stageSwitchIcons.js'
+import SwitchLabel from '../components/editor/SwitchLabel.jsx'
 import { toggleSpotlightTarget } from '../components/editor/spotlight.js'
 import PageFilesPanel from '../components/editor/PageFilesPanel.jsx'
 import { pageFileName } from '../utils/pageFiles.js'
@@ -3255,7 +3257,7 @@ function SiteEditor() {
                               : 'studio-segment-btn'
                           }
                         >
-                          {t('PC')}
+                          <SwitchLabel icon={DEVICE_ICONS.pc}>{t('PC')}</SwitchLabel>
                         </button>
                         <button
                           onClick={() => chooseHtmlDevice(readHtmlDevice('mobile'))}
@@ -3265,7 +3267,7 @@ function SiteEditor() {
                               : 'studio-segment-btn'
                           }
                         >
-                          {t('Mobile')}
+                          <SwitchLabel icon={DEVICE_ICONS.mobile}>{t('Mobile')}</SwitchLabel>
                         </button>
                       </div>
                       <select
@@ -3471,7 +3473,7 @@ function SiteEditor() {
                             : 'studio-segment-btn'
                         }
                       >
-                      {t(label)}
+                      <SwitchLabel icon={MODE_ICONS[id]}>{t(label)}</SwitchLabel>
                       </button>
                     ))}
                   </div>
@@ -3503,7 +3505,7 @@ function SiteEditor() {
                           : 'studio-segment-btn'
                       }
                     >
-                      {t('PC')}
+                      <SwitchLabel icon={DEVICE_ICONS.pc}>{t('PC')}</SwitchLabel>
                     </button>
                     <button
                       onClick={() => chooseViewport('mobile')}
@@ -3513,7 +3515,7 @@ function SiteEditor() {
                           : 'studio-segment-btn'
                       }
                     >
-                      {t('Mobile')}
+                      <SwitchLabel icon={DEVICE_ICONS.mobile}>{t('Mobile')}</SwitchLabel>
                     </button>
                   </div>
                   <select

@@ -24,7 +24,7 @@ import { EmbedFontContext } from '../renderer/embedFont.js'
 import { BRUSH_CURSOR } from './brushCursor.js'
 import PreviewScrollIndicator from './PreviewScrollIndicator.jsx'
 import CanvasSelectionActions from './CanvasSelectionActions.jsx'
-import { selectionActionsPosition } from './canvasSelectionActionsLayout.js'
+import { selectionActionsCanvasWidth, selectionActionsPosition } from './canvasSelectionActionsLayout.js'
 import { chromeBadgeStyle, chromeMetrics } from './selectionChrome.js'
 import { pageDirection, pageLanguage } from '../../utils/seoTags.js'
 import { colorModeFor, withColorModePage } from '../../utils/colorMode.js'
@@ -310,6 +310,9 @@ export default function Canvas({
 
   // Bounding box of a MULTI selection (top-level free-canvas items), so a group
   // toolbar (align / distribute / delete) can float above it.
+  // The multi-selection bar: its count, six aligns, two distributes, delete
+  // and deselect — eleven slots wide, kept on the artboard by that width.
+  const multiBarWidth = selectionActionsCanvasWidth(canvasScale, 11)
   const multiBox = useMemo(() => {
     if (flowMode || selectedIds.length < 2) return null
     const rects = selectedIds
@@ -581,8 +584,8 @@ export default function Canvas({
             canvasScale={canvasScale}
             style={
               multiBox.y >= 48
-                ? { left: Math.max(0, Math.min(multiBox.x, Math.max(0, canvasW - 260))), top: multiBox.y, transform: 'translateY(calc(-100% - 8px))' }
-                : { left: Math.max(0, Math.min(multiBox.x, Math.max(0, canvasW - 260))), top: multiBox.y + 8 }
+                ? { left: Math.max(0, Math.min(multiBox.x, Math.max(0, canvasW - multiBarWidth))), top: multiBox.y, transform: 'translateY(calc(-100% - 8px))' }
+                : { left: Math.max(0, Math.min(multiBox.x, Math.max(0, canvasW - multiBarWidth))), top: multiBox.y + 8 }
             }
           />
         )}

@@ -7,7 +7,7 @@ import {
 } from '../../utils/templateLibrary.js'
 import { localizeTemplateHtml } from '../../utils/templateLocalization.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
-import { EyeIcon, SearchIcon, StarIcon } from '../icons.jsx'
+import { EyeIcon, SearchIcon, StarIcon, XIcon } from '../icons.jsx'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 
@@ -186,7 +186,7 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
               </h2>
               <p className="mt-0.5 hidden text-xs text-[var(--studio-text-muted)] sm:block">{t('Search, preview and save favorites before applying a template.')}</p>
             </div>
-            <button type="button" aria-label={t('Close')} onClick={onClose} className="studio-icon-btn shrink-0 border border-[var(--studio-border)] bg-[var(--studio-control)]">×</button>
+            <button type="button" aria-label={t('Close')} onClick={onClose} className="studio-icon-btn shrink-0 border border-[var(--studio-border)] bg-[var(--studio-control)]"><XIcon size={16} /></button>
           </div>
           <div className="flex flex-wrap items-center gap-2 px-4 pb-3.5 sm:px-5">
             <label className="studio-input flex min-h-10 min-w-[180px] flex-1 items-center gap-2 px-3">
@@ -325,7 +325,7 @@ export default function TemplatePicker({ open, title, onPick, onClose }) {
           <div className="mx-auto flex w-full max-w-7xl items-center gap-3 rounded-t-2xl border border-b-0 border-[var(--studio-border)] bg-[var(--studio-panel-raised)] px-4 py-3 shadow-[var(--studio-shadow-lg)]" onClick={(event) => event.stopPropagation()}>
             <div className="min-w-0 flex-1"><strong className="block truncate text-sm text-[var(--studio-text)]">{t(preview.template.name)}</strong><span className="text-xs text-[var(--studio-text-muted)]">{t(preview.category.name)} · {contentLanguage.toUpperCase()}</span></div>
             <button type="button" onClick={() => choose(preview.template)} className="studio-btn studio-btn-primary min-h-9 px-4 text-sm">{t('Use this template')}</button>
-            <button type="button" aria-label={t('Close preview')} onClick={() => setPreview(null)} className="studio-icon-btn shrink-0 border border-[var(--studio-border)] bg-[var(--studio-control)]">×</button>
+            <button type="button" aria-label={t('Close preview')} onClick={() => setPreview(null)} className="studio-icon-btn shrink-0 border border-[var(--studio-border)] bg-[var(--studio-control)]"><XIcon size={16} /></button>
           </div>
           <iframe title={t('Full-screen template preview')} srcDoc={localizedHtml(preview.template)} sandbox="" tabIndex={-1} className="mx-auto min-h-0 w-full max-w-7xl flex-1 rounded-b-2xl border-0 bg-white" onClick={(event) => event.stopPropagation()} />
         </div>

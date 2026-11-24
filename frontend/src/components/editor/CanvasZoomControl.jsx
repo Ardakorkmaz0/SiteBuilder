@@ -7,7 +7,7 @@
 // you move between them.
 
 import { useLanguage } from '../../i18n/useLanguage.js'
-import { MaximizeIcon, MinimizeIcon } from '../icons.jsx'
+import { MaximizeIcon, MinimizeIcon, MinusIcon, PlusIcon } from '../icons.jsx'
 import { nextZoom, zoomPercent } from './canvasZoom.js'
 
 export default function CanvasZoomControl({
@@ -31,7 +31,7 @@ export default function CanvasZoomControl({
           title={t('Zoom the canvas out')}
           className="grid h-6 w-6 place-items-center rounded-md text-base leading-none text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]"
         >
-          &#8722;
+          <MinusIcon size={14} />
         </button>
         {/* The readout is also the reset: clicking it goes back to fit, which
             is the one value you cannot reach by stepping. */}
@@ -53,7 +53,7 @@ export default function CanvasZoomControl({
           title={t('Zoom the canvas in')}
           className="grid h-6 w-6 place-items-center rounded-md text-base leading-none text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]"
         >
-          +
+          <PlusIcon size={14} />
         </button>
       </div>
 

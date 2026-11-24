@@ -12,6 +12,7 @@ import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
 import { focusableElements } from '../../ui/useDialogMotion.js'
 import { SPOTLIGHT_WIDTHS, SPOTLIGHT_Z } from './spotlight.js'
+import { XIcon } from '../icons.jsx'
 
 export default function SpotlightShell({
   open,
@@ -122,7 +123,7 @@ export default function SpotlightShell({
             aria-label={t('Close')}
             className="studio-icon-btn h-8 w-8 shrink-0 border border-[var(--studio-border)] bg-[var(--studio-control)]"
           >
-            ×
+            <XIcon size={16} />
           </button>
         </div>
 

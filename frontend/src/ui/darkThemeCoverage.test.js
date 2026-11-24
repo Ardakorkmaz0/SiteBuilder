@@ -40,7 +40,6 @@ const ALLOWED = new Map([
   ['#16a34a', 'success dot / button — same green in both themes'],
   ['#fbbf24', 'favourite star hover'],
   ['#818cf8', 'chart bar fill'],
-  ['#7f1d1d', 'destructive hover on an inverted toolbar'],
   ['#991b1b', 'destructive hover on an inverted toolbar'],
   ['#bfdbfe', 'drop-indicator tint'],
   ['#dbeafe', 'drop-indicator tint'],

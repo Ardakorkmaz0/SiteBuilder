@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { NoteIcon } from '../icons.jsx'
+import { NoteIcon, TrashIcon, XIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 
 // Work journal: a month calendar + per-day notes ("today I did X"). Lives in
@@ -87,7 +87,7 @@ export default function NotesPanel({ open, onClose }) {
           aria-label={t('Close notes')}
           className="rounded-lg px-2 py-0.5 text-sm text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]"
         >
-          ✕
+          <XIcon size={14} />
         </button>
       </div>
 
@@ -188,7 +188,7 @@ export default function NotesPanel({ open, onClose }) {
                 aria-label={t('Delete note')}
                 className="rounded px-1 text-xs text-[var(--studio-text-faint)] opacity-0 hover:text-[var(--studio-danger)] focus-visible:opacity-100 group-hover:opacity-100"
               >
-                ✕
+                <TrashIcon size={12} />
               </button>
             </div>
           ))

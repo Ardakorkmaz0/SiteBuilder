@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { lineBoxIn } from '../../utils/textFieldLineBox.js'
+import { XIcon } from '../icons.jsx'
 
 // The line the live code ticker sent you to, lit up in the source view.
 //
@@ -63,7 +64,7 @@ export default function CodeLineGlow({ targetRef, text, line, endLine, onClear }
         <span className="code-glow-dot" aria-hidden="true" />
         <span>{count > 1 ? t('Jumped to lines {line}-{end}', { line, end: last }) : t('Jumped to line {line}', { line })}</span>
         <button type="button" onClick={onClear} title={t('Clear highlight')} aria-label={t('Clear highlight')}>
-          ×
+          <XIcon size={13} />
         </button>
       </div>
     </>

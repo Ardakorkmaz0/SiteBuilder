@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useProjectStore } from '../../store/projectStore.js'
 import { linkedFilesFor } from '../../utils/htmlFiles.js'
-import { FileIcon, FileCodeIcon, PaletteIcon, CogIcon, ImageIcon, FolderIcon, FolderOpenIcon, LinkIcon } from '../icons.jsx'
+import { ChevronDownIcon, ChevronRightIcon, CogIcon, FileCodeIcon, FileIcon, FolderIcon, FolderOpenIcon, ImageIcon, LinkIcon, PaletteIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 
 // VS Code-style explorer for the local "Code project" editor: the real folder
@@ -80,7 +80,7 @@ function TreeNode({ node, depth, activePath, dirty, onOpen, collapsed, toggle })
         style={{ paddingLeft: 8 + depth * 14 }}
         className="flex w-full items-center gap-1 rounded-md py-1 pr-2 text-left text-[12.5px] font-semibold text-[#374151] hover:bg-[#f3f4f6]"
       >
-        <span className="w-3 text-[10px] text-[var(--studio-text-faint)]">{isCollapsed ? '▸' : '▾'}</span>
+        <span className="w-3 text-[var(--studio-text-faint)]">{isCollapsed ? <ChevronRightIcon size={12} /> : <ChevronDownIcon size={12} />}</span>
         <FolderIcon size={14} className="text-[var(--studio-text-muted)]" />
         <span className={`min-w-0 truncate ${folderDirty ? 'text-[#15803d]' : ''}`}>{node.name}</span>
       </button>

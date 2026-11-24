@@ -11,7 +11,7 @@ import { useLanguage } from '../../i18n/useLanguage.js'
 import { apiError } from '../../utils/errors.js'
 import { groupSiteVersions } from '../../utils/versionGroups.js'
 import { changeColor, changeLabel, versionChange } from '../../utils/versionChange.js'
-import { ClockIcon, PlusIcon } from '../icons.jsx'
+import { ClockIcon, PlusIcon, XIcon } from '../icons.jsx'
 
 // Resident-Evil-style save slots. The History panel has two sections:
 //   • Checkpoints — pinned, named saves the auto-save FIFO never evicts. You
@@ -208,7 +208,7 @@ export default function HistoryPanel({
           aria-label={t('Close history panel')}
           className="studio-icon-btn h-7 w-7 shrink-0 text-lg"
         >
-          ×
+          <XIcon size={14} />
         </button>
       </div>
 

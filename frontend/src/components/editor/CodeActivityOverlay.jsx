@@ -3,6 +3,7 @@ import { useEditorStore } from '../../store/editorStore.js'
 import { schemaToFiles } from '../../utils/schemaToFiles.js'
 import { changedCodeLines } from '../../utils/codeDiff.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { XIcon } from '../icons.jsx'
 
 // Shows what an edit just did to the page's code: the settings change lands,
 // the lines it rewrote type themselves out over the canvas, then the card goes
@@ -215,7 +216,7 @@ export default function CodeActivityOverlay({
             aria-label={t('Close')}
             className="code-activity-close"
           >
-            ×
+            <XIcon size={13} />
           </button>
         </div>
         {/* The body is the button: clicking the code opens it in Source, which

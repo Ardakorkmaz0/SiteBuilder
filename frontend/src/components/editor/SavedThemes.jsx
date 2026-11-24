@@ -3,6 +3,7 @@ import { getSavedThemes, putSavedThemes } from '../../api/profile.js'
 import { apiError } from '../../utils/errors.js'
 import { normalizeTheme, sameTheme } from '../../utils/theme.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { TrashIcon } from '../icons.jsx'
 
 // One theme as a button: three dots of its own colors and its name. Shared by
 // the presets and the saved themes, so both read the same way.
@@ -134,7 +135,7 @@ export default function SavedThemes({ theme, onApply }) {
                 aria-label={t('Delete the "{name}" theme', { name: item.name })}
                 className="studio-icon-btn h-7 w-7 shrink-0 text-base leading-none disabled:opacity-50"
               >
-                ×
+                <TrashIcon size={13} />
               </button>
             </li>
           ))}

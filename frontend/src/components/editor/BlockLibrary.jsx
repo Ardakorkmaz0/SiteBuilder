@@ -5,7 +5,7 @@ import { SECTION_CATEGORIES } from '../../utils/sectionBlocks/index.js'
 import { buildSearchIndex, highlightParts, searchComponents } from '../../utils/componentSearch.js'
 import { noteRecentBlock, readRecentBlocks } from '../../utils/paletteQuick.js'
 import { buildEntries, matchesCategory } from './libraryEntries.js'
-import { LayersIcon, SearchIcon } from '../icons.jsx'
+import { LayersIcon, SearchIcon, XIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { ADDABLE_PALETTE_ITEMS, localizedHtml, previewSrcDoc } from './paletteData.js'
@@ -204,7 +204,7 @@ export default function BlockLibrary({ open, onClose, onPickComponent, onArmPlac
             aria-label={t('Close')}
             className="rounded-lg px-2 py-1 text-sm text-[var(--studio-text-faint,#9ca3af)] hover:bg-[var(--studio-control-hover,#f3f4f6)] hover:text-[var(--studio-text,#374151)]"
           >
-            ✕
+            <XIcon size={14} />
           </button>
         </div>
 

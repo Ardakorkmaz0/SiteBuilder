@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useDraggable } from '@dnd-kit/core'
 import { DRAG_MIME } from '../../utils/htmlPlacement.js'
 import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
-import { ChevronDownIcon, ChevronRightIcon, CodeIcon, FolderIcon, LayersIcon, PlusIcon, SaveIcon, SparklesIcon } from '../icons.jsx'
+import { CheckIcon, ChevronDownIcon, ChevronRightIcon, CodeIcon, FolderIcon, LayersIcon, PlusIcon, SaveIcon, SparklesIcon, TrashIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { notePaletteUse, noteRecentBlock, quickPicks, readPaletteUsage } from '../../utils/paletteQuick.js'
@@ -160,7 +160,7 @@ function VariantSwatch({ type, variant, onPick, onArm, onInspect, wide }) {
           title={t('Recommended component')}
           className="mx-auto mt-1 flex w-fit items-center gap-1 rounded-full bg-[var(--studio-accent-soft)] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[var(--studio-accent-hover)]"
         >
-          <span aria-hidden="true">✓</span> {t('Recommended')}
+          <CheckIcon size={11} /> {t('Recommended')}
         </div>
       )}
     </>
@@ -619,7 +619,7 @@ function CustomBlockPanel({ onPick, onArm, onInspect, theme }) {
                       }}
                       className="absolute right-1.5 top-1.5 z-10 grid h-5 w-5 place-items-center rounded-md bg-[#111827]/70 text-[10px] leading-none text-white opacity-0 transition hover:bg-[#a4262c] focus:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
                     >
-                      ✕
+                      <TrashIcon size={11} />
                     </button>
                   </div>
                 ))}

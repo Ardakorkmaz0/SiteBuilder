@@ -1,6 +1,8 @@
 import { useEditorStore } from '../../store/editorStore.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { selectionActionsScaleStyle } from './canvasSelectionActionsLayout.js'
+import { SELECTION_ICON_SIZE } from './selectionToolbar.js'
+import { NodeIcon } from '../icons.jsx'
 
 // Floating toolbar shown over a MULTI selection (shift-click / marquee). Single
 // selections keep their own per-item toolbar; a group instead needs align,
@@ -36,6 +38,7 @@ export default function CanvasMultiActions({ count, canvasScale = 1, style }) {
   const alignSelection = useEditorStore((s) => s.alignSelection)
   const distributeSelection = useEditorStore((s) => s.distributeSelection)
   const removeSelection = useEditorStore((s) => s.removeSelection)
+  const selectComponent = useEditorStore((s) => s.selectComponent)
   const canDistribute = count >= 3
 
   const actions = [
@@ -47,7 +50,8 @@ export default function CanvasMultiActions({ count, canvasScale = 1, style }) {
     ['bottom', <AlignIcon key="ab" dir="bottom" />, t('Align bottom'), () => alignSelection('bottom'), false],
     ['dist-h', <DistributeIcon key="dh" />, t('Distribute horizontally'), () => distributeSelection('x'), !canDistribute],
     ['dist-v', <DistributeIcon key="dv" vertical />, t('Distribute vertically'), () => distributeSelection('y'), !canDistribute],
-    ['delete', <span key="del" aria-hidden="true">×</span>, t('Delete selected'), () => removeSelection(), false],
+    ['delete', <NodeIcon key="del" name="trash" size={SELECTION_ICON_SIZE} />, t('Delete selected'), () => removeSelection(), false],
+    ['deselect', <NodeIcon key="deselect" name="x" size={SELECTION_ICON_SIZE} />, t('Deselect'), () => selectComponent(null), false],
   ]
 
   return (
@@ -91,8 +95,8 @@ export default function CanvasMultiActions({ count, canvasScale = 1, style }) {
             event.stopPropagation()
             onClick()
           }}
-          className={`grid h-7 w-7 place-items-center rounded-md border-0 p-0 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-25 ${
-            id === 'delete' ? 'bg-[#7f1d1d] hover:bg-[#991b1b]' : 'bg-transparent hover:bg-white/10'
+          className={`grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent p-0 text-white disabled:cursor-not-allowed disabled:opacity-25 ${
+            id === 'delete' ? 'hover:bg-[#991b1b]' : 'hover:bg-white/10'
           }`}
         >
           {icon}

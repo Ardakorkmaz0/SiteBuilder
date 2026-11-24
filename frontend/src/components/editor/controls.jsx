@@ -11,6 +11,7 @@ import { useLanguage } from '../../i18n/useLanguage.js'
 import { apiError } from '../../utils/errors.js'
 import { completeExternalUrl } from '../../utils/linkTargets.js'
 import { MAX_FILE_BYTES } from '../../utils/sanitize.js'
+import { ArrowDownIcon, ArrowUpIcon, TrashIcon } from '../icons.jsx'
 
 // Shared property controls inherit the active Studio theme.
 const inputCls = 'studio-input min-w-0 w-full px-2.5 py-2 text-sm'
@@ -280,7 +281,7 @@ function ImageLibrary({ value, onPick }) {
               aria-label={t('Delete from library')}
               className="absolute right-0.5 top-0.5 rounded-full bg-white/90 px-1 text-[10px] text-[#a4262c] opacity-0 shadow focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
             >
-              ×
+              <TrashIcon size={10} />
             </button>
           </div>
         ))}
@@ -657,7 +658,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
                     title={t('Move up')}
                     aria-label={t('Move up')}
                   >
-                    ↑
+                    <ArrowUpIcon size={12} />
                   </button>
                   <button
                     type="button"
@@ -667,7 +668,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
                     title={t('Move down')}
                     aria-label={t('Move down')}
                   >
-                    ↓
+                    <ArrowDownIcon size={12} />
                   </button>
                   <button
                     type="button"

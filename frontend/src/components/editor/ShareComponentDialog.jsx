@@ -18,6 +18,7 @@ import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { apiError } from '../../utils/errors.js'
 import { SPOTLIGHT_Z } from './spotlight.js'
+import { XIcon } from '../icons.jsx'
 
 const CATEGORIES = [
   ['other', 'Other'],
@@ -157,7 +158,7 @@ export default function ShareComponentDialog({ open, element, sourceSiteId, onCl
             aria-label={t('Close')}
             className="studio-icon-btn ms-auto h-8 w-8 border border-[var(--studio-border)] bg-[var(--studio-control)]"
           >
-            ×
+            <XIcon size={16} />
           </button>
         </div>
 

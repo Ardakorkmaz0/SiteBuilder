@@ -67,6 +67,8 @@ import { brushElementPatch } from '../../utils/htmlRecolor.js'
 import { hasUnsavedSourceDraft } from '../../utils/htmlSourceDraft.js'
 import { applyElementMotion, applyMotionRest } from '../../utils/htmlMotion.js'
 import CanvasZoomControl from './CanvasZoomControl.jsx'
+import { MODE_ICONS } from './stageSwitchIcons.js'
+import SwitchLabel from './SwitchLabel.jsx'
 import FullscreenStage from './FullscreenStage.jsx'
 import { previewScaleStyle } from './previewScale.js'
 import { iconMarkup } from '../iconNodes.js'
@@ -82,7 +84,7 @@ import {
 import { normalizedSelectionActionsScale, selectionActionsPosition } from './canvasSelectionActionsLayout.js'
 import { readZoom, writeZoom, zoomScale } from './canvasZoom.js'
 import BrushControls from './BrushControls.jsx'
-import { EditIcon, MoveIcon, LinkIcon, PinIcon, LightbulbIcon, FileCodeIcon, WarningIcon, PaletteIcon, MoreHorizontalIcon, MonitorIcon, ChevronDownIcon } from '../icons.jsx'
+import { ChevronDownIcon, EditIcon, ExternalLinkIcon, FileCodeIcon, LightbulbIcon, LinkIcon, MonitorIcon, MoreHorizontalIcon, MoveIcon, PaletteIcon, PinIcon, WarningIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { shouldForwardIframeShortcut } from '../../utils/editorLeave.js'
@@ -2105,14 +2107,14 @@ function HtmlWorkspace({
         <div className="studio-toolbar @container flex min-w-0 items-center gap-2 border-b px-3 py-1.5">
           <div data-tour="canvas-modes" className="studio-segment shrink-0">
             <button onClick={() => switchMode('view')} className={toggleBtn(mode === 'view')}>
-              {t('View')}
+              <SwitchLabel icon={MODE_ICONS.view}>{t('View')}</SwitchLabel>
             </button>
             <button onClick={() => switchMode('edit')} className={toggleBtn(mode === 'edit')}>
-              {t('Edit')}
+              <SwitchLabel icon={MODE_ICONS.edit}>{t('Edit')}</SwitchLabel>
             </button>
             {!simpleMode && (
               <button onClick={() => switchMode('source')} className={toggleBtn(mode === 'source')}>
-                {t('Source')}
+                <SwitchLabel icon={MODE_ICONS.source}>{t('Source')}</SwitchLabel>
               </button>
             )}
             {liveUrl && (
@@ -2293,7 +2295,7 @@ function HtmlWorkspace({
                 title={t('Open the dev server in a real window — works even when embedding is blocked (Django), and auto-reloads on Save')}
                 className="rounded-lg border border-[#4f46e5] bg-[#eef2ff] px-2.5 py-1 text-xs font-medium text-[#4f46e5] hover:bg-[#e0e7ff]"
               >
-                {t('Open live window')} ↗
+                {t('Open live window')} <ExternalLinkIcon size={12} className="inline" />
               </button>
             </div>
           ) : (

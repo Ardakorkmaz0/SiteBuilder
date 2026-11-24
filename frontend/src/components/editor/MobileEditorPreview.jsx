@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { EditIcon, EyeIcon, GlobeIcon, LayersIcon } from '../icons.jsx'
+import { CheckIcon, EditIcon, EyeIcon, GlobeIcon, LayersIcon, XIcon } from '../icons.jsx'
 import LanguageSwitcher from '../LanguageSwitcher.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
@@ -117,7 +117,7 @@ export default function MobileEditorPreview({
           aria-label={t('Exit focused preview')}
           className="fixed right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-11 w-11 place-items-center rounded-full border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] text-lg font-bold text-[var(--studio-text)] shadow-lg"
         >
-          ×
+          <XIcon size={18} />
         </button>
       </main>
     )
@@ -197,7 +197,7 @@ export default function MobileEditorPreview({
             <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-[var(--studio-border-strong)]" aria-hidden />
             <div className="flex items-center justify-between border-b border-[var(--studio-border)] px-5 py-4">
               <h2 id={`mobile-${sheet}-sheet-title`} className="text-base font-semibold text-[var(--studio-text)]">{t(sheet === 'pages' ? 'Site pages' : 'Desktop editing')}</h2>
-              <button type="button" onClick={() => setSheet(null)} className="grid h-9 w-9 place-items-center rounded-full bg-[var(--studio-control)] text-lg text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]" aria-label={t('Close')}>×</button>
+              <button type="button" onClick={() => setSheet(null)} className="grid h-9 w-9 place-items-center rounded-full bg-[var(--studio-control)] text-lg text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]" aria-label={t('Close')}><XIcon size={16} /></button>
             </div>
             {sheet === 'pages' ? (
               <div className="max-h-[55dvh] overflow-y-auto p-3">
@@ -212,7 +212,7 @@ export default function MobileEditorPreview({
                   >
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--studio-control)] text-xs font-bold">{index + 1}</span>
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold">{page.name || `${t('Pages')} ${index + 1}`}</span>
-                    {page.id === currentPage.id && <span className="text-[var(--studio-accent-text)]" aria-hidden>✓</span>}
+                    {page.id === currentPage.id && <CheckIcon size={14} className="text-[var(--studio-accent-text)]" />}
                   </button>
                 ))}
               </div>

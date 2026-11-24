@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import { useEditorStore } from '../../store/editorStore.js'
@@ -32,6 +32,20 @@ describe('CanvasMultiActions', () => {
     expect(screen.getByText('3')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Align left' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete selected' })).toBeInTheDocument()
+  })
+
+  it('deletes with a trash can and lets go with an X, as the bar over one block does', () => {
+    localStorage.setItem('pwb_language', 'en')
+    loadThree()
+    render(<LanguageProvider><CanvasMultiActions count={3} /></LanguageProvider>)
+    const remove = screen.getByRole('button', { name: 'Delete selected' })
+    expect(remove.textContent).toBe('')
+    expect(remove.querySelector('path[d="M9 7V4h6v3"]')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Deselect' }))
+
+    expect(useEditorStore.getState().selectedIds).toEqual([])
+    expect(useEditorStore.getState().schema.pages[0].components.map((c) => c.id)).toEqual(['a', 'b', 'c'])
   })
 
   it('aligns every selected item to the left edge', async () => {
