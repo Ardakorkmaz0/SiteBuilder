@@ -145,7 +145,7 @@ describe('palette placement through nested fitted containers', () => {
     canvas.getBoundingClientRect = () => ({ left: 0, top: 0, right: 250, bottom: 400, width: 250, height: 400 })
     Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: () => [target] })
     fireEvent.click(screen.getByRole('tab', { name: 'Components', exact: true }))
-    fireEvent.click(screen.getByRole('button', { name: /^■Button\d+▸$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Button\d+$/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Solid: Enter adds it at the end of the page', exact: true }))
 
     // The 220x56 Solid snippet is centred at local (410,88). At the actual

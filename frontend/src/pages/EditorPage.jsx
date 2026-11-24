@@ -3358,6 +3358,7 @@ function SiteEditor() {
                         onMoveDown={() => workspaceRef.current?.moveSelected?.('down')}
                         onDelete={() => workspaceRef.current?.deleteSelected?.()}
                         onResetMobile={() => workspaceRef.current?.resetSelectedMobileStyles?.()}
+                        onMotionChange={(patch) => workspaceRef.current?.applyMotionToSelected?.(patch)}
                         onClose={() => workspaceRef.current?.clearSelection?.()}
                       />
                     ) : (

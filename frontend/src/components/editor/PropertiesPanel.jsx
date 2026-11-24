@@ -1,8 +1,12 @@
 import { useCallback, useState } from 'react'
-import { useEditorStore, selectCurrentPage } from '../../store/editorStore.js'
+import { useEditorStore, selectComponentParent, selectCurrentPage } from '../../store/editorStore.js'
 import { registry } from '../registry.jsx'
 import PanelTabs from './PanelTabs.jsx'
 import PanelGroup from './PanelGroup.jsx'
+import PropertiesHeader from './PropertiesHeader.jsx'
+import MotionFields from './MotionFields.jsx'
+import { PROPERTIES_TABS } from './propertiesTabs.js'
+import { componentKindIcon } from './elementKindIcons.js'
 import AiComponentEdit from './AiComponentEdit.jsx'
 import { useAiAvailable } from '../../utils/aiProviders.js'
 import { LINKABLE_TYPES } from '../renderer/constants.js'
@@ -38,7 +42,6 @@ import {
   CopyIcon,
   FileIcon,
   MoreHorizontalIcon,
-  MoveIcon,
   PaletteIcon,
   SparklesIcon,
   TrashIcon,
@@ -280,12 +283,6 @@ const THEME_SHADOWS = [
 ]
 
 // The four Properties sections. Short labels — the panel is 288px wide.
-const PROPS_TABS = [
-  ['content', 'Content', FileIcon],
-  ['design', 'Design', PaletteIcon],
-  ['layout', 'Layout', MoveIcon],
-  ['motion', 'Motion', SparklesIcon],
-]
 
 const SCROLL_BEHAVIOR_OPTIONS = [
   ['normal', 'Normal'],
@@ -683,6 +680,9 @@ export default function PropertiesPanel({
   const setVisibility = useEditorStore((s) => s.setVisibility)
   const autoArrangeMobile = useEditorStore((s) => s.autoArrangeMobile)
   const duplicateComponent = useEditorStore((s) => s.duplicateComponent)
+  const selectComponent = useEditorStore((s) => s.selectComponent)
+  const selectParentComponent = useEditorStore((s) => s.selectParentComponent)
+  const parentOfSelected = useEditorStore((s) => (s.selectedId ? selectComponentParent(s, s.selectedId) : null))
   const bringToFront = useEditorStore((s) => s.bringToFront)
   const sendToBack = useEditorStore((s) => s.sendToBack)
   const moveForward = useEditorStore((s) => s.moveForward)
@@ -697,7 +697,7 @@ export default function PropertiesPanel({
   const [propsTab, setPropsTabState] = useState(() => {
     try {
       const saved = localStorage.getItem(PROPS_TAB_KEY)
-      return PROPS_TABS.some(([id]) => id === saved) ? saved : 'content'
+      return PROPERTIES_TABS.some(([id]) => id === saved) ? saved : 'content'
     } catch { return 'content' }
   })
   const setPropsTab = (tab) => {
@@ -1710,21 +1710,14 @@ export default function PropertiesPanel({
 
   return (
     <div className="studio-properties-panel flex h-full min-w-0 flex-col overflow-hidden">
-      <div className="border-b border-[var(--studio-border)] px-3 py-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <div
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[color-mix(in_srgb,var(--studio-accent)_18%,var(--studio-border))] bg-[var(--studio-accent-soft)] text-sm font-bold text-[var(--studio-accent-text)]"
-            aria-hidden="true"
-          >
-            {def.icon}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-sm font-semibold text-[var(--studio-text)]">{t(def.label)}</h2>
-            <span className="mt-0.5 inline-flex items-center rounded-full bg-[var(--studio-control)] px-2 py-0.5 text-[10px] font-semibold text-[var(--studio-text-muted)]">
-              {isFlow ? t('all screens') : t(isMobile ? 'Mobile' : 'PC')}
-            </span>
-          </div>
-          {aiOn && <button
+      <PropertiesHeader
+        icon={componentKindIcon(component.type)}
+        title={t(def.label)}
+        badge={isFlow ? t('all screens') : t(isMobile ? 'Mobile' : 'PC')}
+        onDeselect={() => selectComponent(null)}
+        parentName={parentOfSelected ? t(registry[parentOfSelected.type]?.label || parentOfSelected.type) : null}
+        onSelectParent={parentOfSelected ? () => selectParentComponent(component.id) : undefined}
+        actions={aiOn && <button
             type="button"
             aria-expanded={aiEditOpen}
             aria-label={t('Ask AI to edit this')}
@@ -1738,7 +1731,7 @@ export default function PropertiesPanel({
           >
             <SparklesIcon size={15} />
           </button>}
-        </div>
+      >
         {aiOn && aiEditOpen && (
           <div className="mt-3">
             <AiComponentEdit
@@ -1751,17 +1744,17 @@ export default function PropertiesPanel({
             />
           </div>
         )}
-      </div>
+      </PropertiesHeader>
 
       <PanelTabs
         value={propsTab}
         onChange={setPropsTab}
-        tabs={PROPS_TABS.map(([id, label, Icon]) => [id, t(label), Icon])}
+        tabs={PROPERTIES_TABS.map(([id, label, Icon]) => [id, t(label), Icon])}
       />
 
       <div
         role="tabpanel"
-        aria-label={t(PROPS_TABS.find(([id]) => id === propsTab)?.[1] || 'Content')}
+        aria-label={t(PROPERTIES_TABS.find(([id]) => id === propsTab)?.[1] || 'Content')}
         className="flex-1 space-y-2 overflow-y-auto bg-[var(--studio-panel-muted)] p-3"
       >
         {propsTab === 'content' && (
@@ -2088,58 +2081,10 @@ export default function PropertiesPanel({
             the section is hidden for them. */}
         {scrollBehavior === 'normal' && (
           <PanelGroup id="motion" title={t('Motion')} defaultOpen>
-            <LabeledSelect
-              label={t('Entrance (on scroll)')}
-              value={component.props?.animIn || 'none'}
-              onChange={(v) => updateProps(component.id, { animIn: v })}
-              options={[
-                ['none', t('None')],
-                ['fade', t('Fade in')],
-                ['fade-up', t('Fade up')],
-                ['fade-down', t('Fade down')],
-                ['slide-right', t('Slide from left')],
-                ['slide-left', t('Slide from right')],
-                ['zoom', t('Zoom in')],
-                ['zoom-out', t('Zoom out')],
-                ['flip', t('Flip in')],
-                ['rotate', t('Rotate in')],
-                ['blur', t('Blur in')],
-                ['bounce', t('Bounce up')],
-                ['wipe', t('Wipe across')],
-              ]}
+            <MotionFields
+              motion={component.props}
+              onChange={(patch) => updateProps(component.id, patch)}
             />
-            {(component.props?.animIn && component.props.animIn !== 'none') && (
-              <div className="grid grid-cols-2 gap-2">
-                <LabeledSelect
-                  label={t('Speed')}
-                  value={component.props?.animSpeed || 'normal'}
-                  onChange={(v) => updateProps(component.id, { animSpeed: v })}
-                  options={[['fast', t('Fast')], ['normal', t('Normal')], ['slow', t('Slow')]]}
-                />
-                {/* Milliseconds: a plain number (the length field put "px" beside it). */}
-                <LabeledNumber
-                  label={t('Delay (ms)')}
-                  value={component.props?.animDelay ?? 0}
-                  onChange={(v) => updateProps(component.id, { animDelay: Math.max(0, Math.round(Number(v)) || 0) })}
-                />
-              </div>
-            )}
-            <LabeledSelect
-              label={t('Hover effect')}
-              value={component.props?.animHover || 'none'}
-              onChange={(v) => updateProps(component.id, { animHover: v })}
-              options={[
-                ['none', t('None')],
-                ['lift', t('Lift')],
-                ['grow', t('Grow')],
-                ['glow', t('Glow')],
-                ['sink', t('Sink')],
-                ['tilt', t('Tilt')],
-              ]}
-            />
-            <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
-              {t('Preview motion by switching to View.')}
-            </p>
           </PanelGroup>
         )}
         {component.type !== 'region' && (

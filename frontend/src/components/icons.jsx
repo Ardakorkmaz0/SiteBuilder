@@ -52,12 +52,7 @@ export const PointerIcon = (p) => <NodeIcon name="pointer" {...p} />
 export const TypeIcon = (p) => <NodeIcon name="type" {...p} />
 export const SquareIcon = (p) => <NodeIcon name="square" {...p} />
 
-export const FileIcon = (p) => (
-  <Icon {...p}>
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <path d="M14 2v6h6" />
-  </Icon>
-)
+export const FileIcon = (p) => <NodeIcon name="file" {...p} />
 
 export const CopyIcon = (p) => <NodeIcon name="copy" {...p} />
 
@@ -206,11 +201,7 @@ export const MoonIcon = (p) => (
 
 export const MonitorIcon = (p) => <NodeIcon name="monitor" {...p} />
 
-export const StarIcon = ({ filled = false, ...p }) => (
-  <Icon {...p} fill={filled ? 'currentColor' : 'none'}>
-    <path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L4.5 9.7l5.9-.9z" />
-  </Icon>
-)
+export const StarIcon = ({ filled = false, ...p }) => <NodeIcon name="star" {...p} fill={filled ? 'currentColor' : 'none'} />
 
 export const FlagIcon = (p) => (
   <Icon {...p}>
@@ -235,35 +226,13 @@ export const GlobeIcon = (p) => (
   </Icon>
 )
 
-export const SparklesIcon = (p) => (
-  <Icon {...p}>
-    <path d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6z" />
-    <path d="M18 15l.7 2 .3.3 2 .7-2 .7-.3.3-.7 2-.7-2-.3-.3-2-.7 2-.7.3-.3z" />
-  </Icon>
-)
+export const SparklesIcon = (p) => <NodeIcon name="sparkles" {...p} />
 
-export const CodeIcon = (p) => (
-  <Icon {...p}>
-    <path d="m8 9-4 3 4 3" />
-    <path d="m16 9 4 3-4 3" />
-  </Icon>
-)
+export const CodeIcon = (p) => <NodeIcon name="code" {...p} />
 
-export const LinkIcon = (p) => (
-  <Icon {...p}>
-    <path d="M10 13a4 4 0 0 0 5.7 0l2.6-2.6a4 4 0 0 0-5.7-5.7L11 6" />
-    <path d="M14 11a4 4 0 0 0-5.7 0L5.7 13.6a4 4 0 0 0 5.7 5.7L13 18" />
-  </Icon>
-)
+export const LinkIcon = (p) => <NodeIcon name="link" {...p} />
 
-export const PaletteIcon = (p) => (
-  <Icon {...p}>
-    <path d="M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-.4-.2-.8-.5-1.1-.3-.3-.5-.7-.5-1.1 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4-4-7-9-7z" />
-    <circle cx="7.5" cy="11.5" r="1" fill="currentColor" stroke="none" />
-    <circle cx="9.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
-    <circle cx="14.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
-  </Icon>
-)
+export const PaletteIcon = (p) => <NodeIcon name="palette" {...p} />
 
 export const CogIcon = (p) => (
   <Icon {...p}>
@@ -343,11 +312,7 @@ export const EditIcon = (p) => (
   </Icon>
 )
 
-export const MoveIcon = (p) => (
-  <Icon {...p}>
-    <path d="M12 4v16M8 7l4-3 4 3M8 17l4 3 4-3" />
-  </Icon>
-)
+export const MoveIcon = (p) => <NodeIcon name="move" {...p} />
 
 export const WarningIcon = (p) => (
   <Icon {...p}>

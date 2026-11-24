@@ -20,7 +20,7 @@ export default function PanelTabs({ value, onChange, tabs }) {
       role="tablist"
       className="mx-3 my-2 flex min-w-0 gap-1 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-control)] p-1"
     >
-      {tabs.map(([id, label], index) => {
+      {tabs.map(([id, label, Icon], index) => {
         const active = value === id
         return (
           <button
@@ -32,13 +32,18 @@ export default function PanelTabs({ value, onChange, tabs }) {
             onClick={() => onChange(id)}
             onKeyDown={(event) => moveFocus(event, index)}
             title={label}
-            className={`flex min-w-0 flex-1 items-center justify-center rounded-lg px-1 py-1.5 text-[10px] font-semibold transition ${
+            className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 text-[10px] font-semibold transition ${
               active
                 ? 'bg-[var(--studio-panel-raised)] text-[var(--studio-accent-text)] shadow-[var(--studio-shadow-sm)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--studio-accent)_18%,var(--studio-border))]'
                 : 'text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]'
             }`}
           >
-            <span className="whitespace-nowrap">{label}</span>
+            {/* Above the label: four Turkish labels and their icons do not fit side by side. */}
+            {Icon && <Icon size={14} className="shrink-0" />}
+            {/* The size is on the label: index.css gives the editor's buttons
+                font-size: inherit outside the app surface, and that unlayered
+                rule beats a utility class on the button itself. */}
+            <span className="max-w-full truncate whitespace-nowrap text-[10px]">{label}</span>
           </button>
         )
       })}

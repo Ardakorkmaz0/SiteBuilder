@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useDraggable } from '@dnd-kit/core'
 import { DRAG_MIME } from '../../utils/htmlPlacement.js'
 import { selectCurrentPage, useEditorStore } from '../../store/editorStore.js'
-import { CodeIcon, FolderIcon, LayersIcon, PlusIcon, SaveIcon, SparklesIcon } from '../icons.jsx'
+import { ChevronDownIcon, ChevronRightIcon, CodeIcon, FolderIcon, LayersIcon, PlusIcon, SaveIcon, SparklesIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { notePaletteUse, noteRecentBlock, quickPicks, readPaletteUsage } from '../../utils/paletteQuick.js'
@@ -269,7 +269,9 @@ function PaletteCategory({ item, onPick, onArm, onInspect, open, onToggle, onHov
         </span>
         <span className="min-w-0 flex-1 truncate text-left font-medium text-[#374151]">{t(item.label)}</span>
         {variants.length > 0 && <span className="text-[11px] text-[var(--studio-text-faint)]">{variants.length}</span>}
-        {variants.length > 0 && <span className="w-3 text-[10px] text-[var(--studio-text-faint)]">{open ? '▾' : '▸'}</span>}
+        {variants.length > 0 && (open
+          ? <ChevronDownIcon size={12} className="shrink-0 text-[var(--studio-text-faint)]" />
+          : <ChevronRightIcon size={12} className="shrink-0 text-[var(--studio-text-faint)]" />)}
       </button>
       {open && variants.length > 0 && (
         <div className="grid grid-cols-2 gap-2 border-t border-[#f1f1f4] bg-[#fafafa] p-2">

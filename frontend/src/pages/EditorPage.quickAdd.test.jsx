@@ -78,7 +78,7 @@ describe('a quick add through the editor', () => {
     // 1000 px canvas drawn at 200 percent, design x 0 to 200.
     canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1000, height: 1000, right: 1000, bottom: 1000 })
     scroller.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 400, right: 400, bottom: 400 })
-    await openFlyout('icon', /^\W*Icon\d+▸$/)
+    await openFlyout('icon', /^Icon\d+$/)
     fireEvent.keyDown(window, { key: '1' })
 
     expect(blocks()).toHaveLength(2)
@@ -90,7 +90,7 @@ describe('a quick add through the editor', () => {
 
   it('fits each block when two are added before the first fit runs', async () => {
     await openEditor()
-    await openFlyout('button', /^\W*Button\d+▸$/)
+    await openFlyout('button', /^Button\d+$/)
     const measured = []
     vi.spyOn(embedMeasure, 'fitHtmlEmbedLayout').mockImplementation(async (component, width, apply) => {
       measured.push(component.id)

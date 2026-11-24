@@ -182,11 +182,27 @@ describe('applying a builder animation to a real element', () => {
     const node = el()
     applyElementMotion(node, { animIn: 'zoom', animSpeed: 'fast' })
     applyElementMotion(node, { animHover: 'lift' })
-    expect(readElementMotion(node)).toEqual({ animIn: 'zoom', animHover: 'lift', animSpeed: 'fast' })
+    expect(readElementMotion(node)).toEqual({ animIn: 'zoom', animHover: 'lift', animSpeed: 'fast', animDelay: 0 })
+  })
+
+  it('waits the delay a canvas block can wait, and forgets it at zero or with the entrance', () => {
+    const node = el()
+    applyElementMotion(node, { animDelay: 300 })
+    // No entrance yet: a delay on its own would wait for nothing.
+    expect(node.style.getPropertyValue('--pwb-anim-delay')).toBe('')
+    applyElementMotion(node, { animIn: 'fade', animDelay: 240.4 })
+    expect(node.style.getPropertyValue('--pwb-anim-delay')).toBe('240ms')
+    expect(readElementMotion(node).animDelay).toBe(240)
+    applyElementMotion(node, { animDelay: 0 })
+    expect(node.style.getPropertyValue('--pwb-anim-delay')).toBe('')
+    applyElementMotion(node, { animDelay: 500 })
+    applyElementMotion(node, { animIn: 'none' })
+    expect(node.style.getPropertyValue('--pwb-anim-delay')).toBe('')
+    expect(readElementMotion(node).animDelay).toBe(0)
   })
 
   it('reports nothing on an untouched element', () => {
-    expect(readElementMotion(el())).toEqual({ animIn: 'none', animHover: 'none', animSpeed: 'normal' })
+    expect(readElementMotion(el())).toEqual({ animIn: 'none', animHover: 'none', animSpeed: 'normal', animDelay: 0 })
   })
 
   it('changes one without disturbing the other', () => {

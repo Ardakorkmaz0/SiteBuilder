@@ -101,6 +101,116 @@ export const ICON_NODES = {
     ['path', { d: 'M10 14 21 3' }],
     ['path', { d: 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6' }],
   ],
+  // What a block or an element is: the same drawing for a canvas block and
+  // for the HTML element of that kind (elementKindIcons.js).
+  menu: [
+    ['path', { d: 'M4 6h16M4 12h16M4 18h16' }],
+  ],
+  heading: [
+    ['path', { d: 'M6 12h12' }],
+    ['path', { d: 'M6 20V4M18 20V4' }],
+  ],
+  text: [
+    ['path', { d: 'M21 6H3M15 12H3M17 18H3' }],
+  ],
+  button: [
+    ['rect', { x: 3, y: 7, width: 18, height: 10, rx: 3 }],
+    ['path', { d: 'M8 12h8' }],
+  ],
+  link: [
+    ['path', { d: 'M10 13a4 4 0 0 0 5.7 0l2.6-2.6a4 4 0 0 0-5.7-5.7L11 6' }],
+    ['path', { d: 'M14 11a4 4 0 0 0-5.7 0L5.7 13.6a4 4 0 0 0 5.7 5.7L13 18' }],
+  ],
+  band: [
+    ['rect', { x: 2, y: 7, width: 20, height: 10, rx: 2 }],
+    ['path', { d: 'M6 12h9' }],
+  ],
+  region: [
+    ['rect', { x: 3, y: 3, width: 18, height: 7, rx: 1.5 }],
+    ['rect', { x: 3, y: 14, width: 9, height: 7, rx: 1.5 }],
+    ['rect', { x: 16, y: 14, width: 5, height: 7, rx: 1.5 }],
+  ],
+  card: [
+    ['rect', { x: 3, y: 4, width: 18, height: 16, rx: 2 }],
+    ['path', { d: 'M3 10h18M7 15h6' }],
+  ],
+  list: [
+    ['path', { d: 'M9 6h12M9 12h12M9 18h12' }],
+    ['path', { d: 'M4 6h.01M4 12h.01M4 18h.01' }],
+  ],
+  quote: [
+    ['path', { d: 'M8 7H4v5h4v1a4 4 0 0 1-4 4' }],
+    ['path', { d: 'M20 7h-4v5h4v1a4 4 0 0 1-4 4' }],
+  ],
+  badge: [
+    ['circle', { cx: 12, cy: 12, r: 9 }],
+    ['circle', { cx: 12, cy: 12, r: 2 }],
+  ],
+  star: [
+    ['path', { d: 'M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L4.5 9.7l5.9-.9z' }],
+  ],
+  input: [
+    ['rect', { x: 2, y: 7, width: 20, height: 10, rx: 2 }],
+    ['path', { d: 'M7 10v4' }],
+  ],
+  halfCircle: [
+    ['circle', { cx: 12, cy: 12, r: 9 }],
+    ['path', { d: 'M12 3v18' }],
+  ],
+  select: [
+    ['rect', { x: 3, y: 6, width: 18, height: 12, rx: 2 }],
+    ['path', { d: 'm14 11 2 2 2-2' }],
+  ],
+  alert: [
+    ['circle', { cx: 12, cy: 12, r: 9 }],
+    ['path', { d: 'M12 16v-4M12 8h.01' }],
+  ],
+  accordion: [
+    ['path', { d: 'm3 10 2.5-2.5L3 5M3 19l2.5-2.5L3 14' }],
+    ['path', { d: 'M10 6h11M10 12h11M10 18h11' }],
+  ],
+  container: [
+    ['rect', { x: 3, y: 5, width: 18, height: 14, rx: 2 }],
+    ['rect', { x: 7, y: 9, width: 6, height: 6, rx: 1 }],
+  ],
+  tabs: [
+    ['rect', { x: 3, y: 8, width: 18, height: 12, rx: 2 }],
+    ['path', { d: 'M3 10V6a2 2 0 0 1 2-2h4l2 4' }],
+  ],
+  code: [
+    ['path', { d: 'm8 9-4 3 4 3' }],
+    ['path', { d: 'm16 9 4 3-4 3' }],
+  ],
+  divider: [
+    ['path', { d: 'M3 12h18' }],
+    ['path', { d: 'm8 8 4-4 4 4M16 16l-4 4-4-4' }],
+  ],
+  spacer: [
+    ['path', { d: 'M12 2v20' }],
+    ['path', { d: 'm8 18 4 4 4-4M8 6l4-4 4 4' }],
+  ],
+  table: [
+    ['rect', { x: 3, y: 4, width: 18, height: 16, rx: 2 }],
+    ['path', { d: 'M3 10h18M3 15h18M10 4v16' }],
+  ],
+  // The tabs of the properties panel.
+  file: [
+    ['path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }],
+    ['path', { d: 'M14 2v6h6' }],
+  ],
+  palette: [
+    ['path', { d: 'M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-.4-.2-.8-.5-1.1-.3-.3-.5-.7-.5-1.1 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4-4-7-9-7z' }],
+    ['circle', { cx: 7.5, cy: 11.5, r: 1, fill: 'currentColor', stroke: 'none' }],
+    ['circle', { cx: 9.5, cy: 7.5, r: 1, fill: 'currentColor', stroke: 'none' }],
+    ['circle', { cx: 14.5, cy: 7.5, r: 1, fill: 'currentColor', stroke: 'none' }],
+  ],
+  move: [
+    ['path', { d: 'M12 4v16M8 7l4-3 4 3M8 17l4 3 4-3' }],
+  ],
+  sparkles: [
+    ['path', { d: 'M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6z' }],
+    ['path', { d: 'M18 15l.7 2 .3.3 2 .7-2 .7-.3.3-.7 2-.7-2-.3-.3-2-.7 2-.7.3-.3z' }],
+  ],
   // The tools of the canvas palette.
   pointer: [
     ['path', { d: 'M4.04 4.69a.5.5 0 0 1 .65-.65l16 6.5a.5.5 0 0 1-.06.95l-6.13 1.58a2 2 0 0 0-1.43 1.43l-1.58 6.13a.5.5 0 0 1-.95.06z' }],

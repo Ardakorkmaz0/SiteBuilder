@@ -14,7 +14,7 @@ function renderSidebar(props = {}) {
   )
 }
 
-const navbarRow = () => screen.getByRole('button', { name: /^☰Navbar\d+▸$/ })
+const navbarRow = () => screen.getByRole('button', { name: /^Navbar\d+$/ })
 const flyout = () => document.querySelector('[data-palette-flyout]')
 const wait = (ms) => act(() => { vi.advanceTimersByTime(ms) })
 const hover = (element) => fireEvent.pointerEnter(element)

@@ -199,14 +199,16 @@ function syncInlineFix(el) {
 
 /** What motion this element already carries, in the same shape the panel uses. */
 export function readElementMotion(el) {
-  if (!el || el.nodeType !== 1) return { animIn: 'none', animHover: 'none', animSpeed: 'normal' }
+  if (!el || el.nodeType !== 1) return { animIn: 'none', animHover: 'none', animSpeed: 'normal', animDelay: 0 }
   const hover = [...el.classList].find((name) => name.startsWith(HOVER_CLASS_PREFIX))
   const duration = Number.parseInt(el.style.getPropertyValue('--pwb-anim-dur'), 10)
   const speed = Object.keys(SPEED_MS).find((key) => SPEED_MS[key] === duration) || 'normal'
+  const delay = Number.parseInt(el.style.getPropertyValue('--pwb-anim-delay'), 10)
   return {
     animIn: el.getAttribute('data-anim-in') || 'none',
     animHover: hover ? hover.slice(HOVER_CLASS_PREFIX.length) : 'none',
     animSpeed: speed,
+    animDelay: Number.isFinite(delay) && delay > 0 ? delay : 0,
   }
 }
 
@@ -228,6 +230,13 @@ export function applyElementMotion(el, patch = {}) {
   if ('animSpeed' in patch && el.hasAttribute('data-anim-in')) {
     const ms = SPEED_MS[patch.animSpeed] || SPEED_MS.normal
     el.style.setProperty('--pwb-anim-dur', `${ms}ms`)
+  }
+  // The same delay a canvas block has: the published motion CSS waits for
+  // --pwb-anim-delay before the entrance starts.
+  if ('animDelay' in patch && el.hasAttribute('data-anim-in')) {
+    const ms = Math.max(0, Math.round(Number(patch.animDelay)) || 0)
+    if (ms) el.style.setProperty('--pwb-anim-delay', `${ms}ms`)
+    else el.style.removeProperty('--pwb-anim-delay')
   }
   if ('animHover' in patch) {
     for (const name of [...el.classList]) {

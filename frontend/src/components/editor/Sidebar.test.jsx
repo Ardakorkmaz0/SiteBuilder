@@ -31,16 +31,16 @@ describe('Sidebar component recommendations', () => {
     expect(screen.getByRole('button', { name: /Browse all blocks/ })).toBeInTheDocument()
     expect(screen.queryByText('Bootstrap Navbar')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /^☰Navbar\d+▸$/ }))
+    await user.click(screen.getByRole('button', { name: /^Navbar\d+$/ }))
 
     expect(screen.getAllByText('Bootstrap Navbar')).toHaveLength(2)
     expect(screen.getByText('Recommended')).toBeInTheDocument()
 
-    expect(paletteItems.find((item) => item.type === 'navbar')).toEqual({
-      type: 'navbar',
-      label: 'Navbar',
-      icon: '☰',
-    })
+    const navbarItem = paletteItems.find((item) => item.type === 'navbar')
+    expect(navbarItem).toMatchObject({ type: 'navbar', label: 'Navbar' })
+    // The shared line drawing of a menu, not the ☰ character.
+    const { container: iconHost } = render(navbarItem.icon)
+    expect(iconHost.querySelector('path').getAttribute('d')).toBe('M4 6h16M4 12h16M4 18h16')
     expect(HTML_VARIANTS.navbar[0]).toMatchObject({
       id: 'bootstrap',
       label: 'Bootstrap Navbar',
@@ -139,7 +139,7 @@ describe('Sidebar variants in Turkish', () => {
     const user = userEvent.setup()
     const armed = []
     renderSidebar({ onArmPlacement: (data) => armed.push(data) })
-    await user.click(screen.getByRole('button', { name: /^■Düğme\d+▸$/ }))
+    await user.click(screen.getByRole('button', { name: /^Düğme\d+$/ }))
     const variant = HTML_VARIANTS.button.find((item) => item.id === 'arrow-dark-pill')
     const swatch = screen.getByText('Oklu koyu hap').closest('[title]')
     expect(swatch.innerHTML).toContain('Sonraki adım')
@@ -164,10 +164,10 @@ describe('Sidebar from the keyboard', () => {
     const user = userEvent.setup()
     const calls = []
     renderSidebar({ onArmPlacement: (data, options) => calls.push([data, options]) })
-    const category = screen.getByRole('button', { name: /^■Button\d+▸$/ })
+    const category = screen.getByRole('button', { name: /^Button\d+$/ })
     expect(category).toHaveAttribute('aria-expanded', 'false')
     await user.click(category)
-    expect(screen.getByRole('button', { name: /^■Button\d+▾$/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: /^Button\d+$/ })).toHaveAttribute('aria-expanded', 'true')
     const swatch = screen.getAllByRole('button', { name: /: Enter adds it at the end of the page$/ })[0]
 
     fireEvent.keyDown(swatch, { key: 'Enter' })
@@ -184,7 +184,7 @@ describe('Sidebar from the keyboard', () => {
     const user = userEvent.setup()
     const picks = []
     renderSidebar({ onPickComponent: (type, html, options) => picks.push([type, options]) })
-    await user.click(screen.getByRole('button', { name: /^■Button\d+▸$/ }))
+    await user.click(screen.getByRole('button', { name: /^Button\d+$/ }))
     const swatch = screen.getAllByRole('button', { name: /: Enter adds it at the end of the page$/ })[0]
 
     expect(swatch).toHaveAttribute('tabindex', '0')

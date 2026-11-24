@@ -54,7 +54,7 @@ describe('applying an animation to the selected element', () => {
     act(() => ref.current.applyMotionToSelected({ animIn: 'zoom', animSpeed: 'fast' }))
 
     expect(onElementSelect.mock.calls.at(-1)?.[0]?.motion).toEqual({
-      animIn: 'zoom', animHover: 'none', animSpeed: 'fast',
+      animIn: 'zoom', animHover: 'none', animSpeed: 'fast', animDelay: 0,
     })
   })
 

@@ -33,7 +33,11 @@ import {
 } from './renderer/components.jsx'
 import { PRESET_IMAGES } from '../utils/presetImages.js'
 import { ICON_OPTIONS } from '../utils/icons.js'
-import { LinkIcon, ImageIcon } from './icons.jsx'
+import { NodeIcon } from './icons.jsx'
+import { componentKindIcon } from './editor/elementKindIcons.js'
+
+// One drawing per kind of block, shared with HTML elements of that kind.
+const kindIcon = (type) => <NodeIcon name={componentKindIcon(type)} size={16} />
 
 const OPTIONAL_ICON_OPTIONS = [['', 'None'], ...ICON_OPTIONS]
 
@@ -52,7 +56,7 @@ export const registry = {
   navbar: {
     type: 'navbar',
     label: 'Navbar',
-    icon: '☰',
+    icon: kindIcon('navbar'),
     Render: Navbar,
     defaultSize: { w: 1000, h: 64 },
     defaultProps: {
@@ -127,7 +131,7 @@ export const registry = {
   heading: {
     type: 'heading',
     label: 'Heading',
-    icon: 'H',
+    icon: kindIcon('heading'),
     Render: Heading,
     defaultSize: { w: 520, h: 64 },
     defaultProps: { text: 'Welcome to my site', level: 'h1' },
@@ -158,7 +162,7 @@ export const registry = {
   text: {
     type: 'text',
     label: 'Text',
-    icon: 'T',
+    icon: kindIcon('text'),
     Render: Text,
     defaultSize: { w: 360, h: 80 },
     defaultProps: { text: 'Tell visitors who you are and what you do in a sentence or two.' },
@@ -180,7 +184,7 @@ export const registry = {
   button: {
     type: 'button',
     label: 'Button',
-    icon: '■',
+    icon: kindIcon('button'),
     Render: Button,
     defaultSize: { w: 180, h: 48 },
     defaultProps: { text: 'Contact Me', href: '#contact', icon: '' },
@@ -206,7 +210,7 @@ export const registry = {
   linkbutton: {
     type: 'linkbutton',
     label: 'Link Button',
-    icon: <LinkIcon size={16} />,
+    icon: kindIcon('linkbutton'),
     Render: LinkButton,
     defaultSize: { w: 220, h: 44 },
     defaultProps: { text: 'Visit my GitHub', href: 'https://github.com', icon: '' },
@@ -230,7 +234,7 @@ export const registry = {
   image: {
     type: 'image',
     label: 'Image',
-    icon: <ImageIcon size={16} />,
+    icon: kindIcon('image'),
     Render: Image,
     defaultSize: { w: 260, h: 170 },
     defaultProps: {
@@ -252,7 +256,7 @@ export const registry = {
   section: {
     type: 'section',
     label: 'Text band',
-    icon: '▬',
+    icon: kindIcon('section'),
     Render: Section,
     defaultSize: { w: 1000, h: 280 },
     defaultProps: {
@@ -285,7 +289,7 @@ export const registry = {
   region: {
     type: 'region',
     label: 'Section',
-    icon: '▤',
+    icon: kindIcon('region'),
     Render: Region,
     defaultSize: { w: 980, h: 360 },
     defaultProps: { contentWidth: 980 },
@@ -306,7 +310,7 @@ export const registry = {
   card: {
     type: 'card',
     label: 'Card',
-    icon: '▢',
+    icon: kindIcon('card'),
     Render: Card,
     defaultSize: { w: 320, h: 200 },
     defaultProps: {
@@ -334,7 +338,7 @@ export const registry = {
   list: {
     type: 'list',
     label: 'List',
-    icon: '☰',
+    icon: kindIcon('list'),
     Render: List,
     defaultSize: { w: 360, h: 150 },
     defaultProps: {
@@ -360,7 +364,7 @@ export const registry = {
   quote: {
     type: 'quote',
     label: 'Quote',
-    icon: '❝',
+    icon: kindIcon('quote'),
     Render: Quote,
     defaultSize: { w: 480, h: 130 },
     defaultProps: {
@@ -381,7 +385,7 @@ export const registry = {
   badge: {
     type: 'badge',
     label: 'Badge',
-    icon: '◉',
+    icon: kindIcon('badge'),
     Render: Badge,
     defaultSize: { w: 90, h: 30 },
     defaultProps: { text: 'New' },
@@ -404,7 +408,7 @@ export const registry = {
   icon: {
     type: 'icon',
     label: 'Icon',
-    icon: '★',
+    icon: kindIcon('icon'),
     Render: Icon,
     defaultSize: { w: 48, h: 48 },
     defaultProps: { name: 'star', label: '' },
@@ -421,7 +425,7 @@ export const registry = {
   input: {
     type: 'input',
     label: 'Form field',
-    icon: '⌨',
+    icon: kindIcon('input'),
     Render: Input,
     defaultSize: { w: 320, h: 70 },
     fieldParts: true,
@@ -449,7 +453,7 @@ export const registry = {
   themeToggle: {
     type: 'themeToggle',
     label: 'Theme switch',
-    icon: '◐',
+    icon: kindIcon('themeToggle'),
     Render: ThemeToggle,
     defaultSize: { w: 44, h: 44 },
     defaultProps: { label: 'Dark mode', showLabel: '' },
@@ -480,7 +484,7 @@ export const registry = {
   select: {
     type: 'select',
     label: 'Dropdown',
-    icon: '▾',
+    icon: kindIcon('select'),
     Render: Select,
     defaultSize: { w: 320, h: 70 },
     fieldParts: true,
@@ -505,7 +509,7 @@ export const registry = {
   alert: {
     type: 'alert',
     label: 'Alert',
-    icon: 'ⓘ',
+    icon: kindIcon('alert'),
     Render: Alert,
     defaultSize: { w: 460, h: 56 },
     defaultProps: { text: 'Suitable — all checks passed.', variant: 'success', icon: 'check' },
@@ -535,7 +539,7 @@ export const registry = {
   accordion: {
     type: 'accordion',
     label: 'Accordion',
-    icon: '⊟',
+    icon: kindIcon('accordion'),
     Render: Accordion,
     defaultSize: { w: 460, h: 56 },
     defaultProps: {
@@ -556,7 +560,7 @@ export const registry = {
   container: {
     type: 'container',
     label: 'Container',
-    icon: '▭',
+    icon: kindIcon('container'),
     Render: Container,
     defaultSize: { w: 600, h: 200 },
     defaultProps: {},
@@ -571,7 +575,7 @@ export const registry = {
   tabs: {
     type: 'tabs',
     label: 'Tabs',
-    icon: '⊞',
+    icon: kindIcon('tabs'),
     Render: Tabs,
     defaultSize: { w: 640, h: 280 },
     defaultProps: {
@@ -633,7 +637,7 @@ export const registry = {
   html: {
     type: 'html',
     label: 'HTML Embed',
-    icon: '<>',
+    icon: kindIcon('html'),
     Render: HtmlEmbed,
     defaultSize: { w: 400, h: 240 },
     defaultProps: {
@@ -688,7 +692,7 @@ export const registry = {
   divider: {
     type: 'divider',
     label: 'Divider',
-    icon: '―',
+    icon: kindIcon('divider'),
     Render: Divider,
     defaultSize: { w: 500, h: 8 },
     defaultProps: {},
@@ -700,7 +704,7 @@ export const registry = {
   spacer: {
     type: 'spacer',
     label: 'Spacer',
-    icon: '↕',
+    icon: kindIcon('spacer'),
     Render: Spacer,
     defaultSize: { w: 240, h: 48 },
     defaultProps: {},

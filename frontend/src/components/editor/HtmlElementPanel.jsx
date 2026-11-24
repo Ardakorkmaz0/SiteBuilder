@@ -12,7 +12,11 @@ import {
 } from './controls.jsx'
 import PanelGroup from './PanelGroup.jsx'
 import PanelTabs from './PanelTabs.jsx'
-import { CodeIcon, CopyIcon, MoreHorizontalIcon, TrashIcon } from '../icons.jsx'
+import PropertiesHeader from './PropertiesHeader.jsx'
+import MotionFields from './MotionFields.jsx'
+import { PROPERTIES_TABS } from './propertiesTabs.js'
+import { htmlTagKindIcon } from './elementKindIcons.js'
+import { ArrowDownIcon, ArrowUpIcon, CopyIcon, MoreHorizontalIcon, TrashIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { FONT_CHOICES, isCssColor, isGradientStop } from '../../utils/htmlElementEdit.js'
 
@@ -126,12 +130,6 @@ const BACKGROUND_SIZE_OPTIONS = [
   ['auto', 'Original size'],
 ]
 
-const PANEL_TABS = [
-  ['content', 'Content'],
-  ['design', 'Design'],
-  ['layout', 'Layout'],
-]
-
 // Empty restores the template (or PC value on a phone), while entering 0 is
 // a separate design choice such as no padding or automatic width.
 function LabeledNumber(props) {
@@ -191,7 +189,7 @@ function LinkListEditor({ links, onChange, t }) {
               title={t('Move up')}
               className="studio-icon-btn h-7 w-7 shrink-0 disabled:opacity-30"
             >
-              ↑
+              <ArrowUpIcon size={13} />
             </button>
             <button
               type="button"
@@ -201,7 +199,7 @@ function LinkListEditor({ links, onChange, t }) {
               title={t('Move down')}
               className="studio-icon-btn h-7 w-7 shrink-0 disabled:opacity-30"
             >
-              ↓
+              <ArrowDownIcon size={13} />
             </button>
             <button
               type="button"
@@ -277,6 +275,7 @@ export default function HtmlElementPanel({
   onMoveDown,
   onDelete,
   onResetMobile,
+  onMotionChange,
   onClose,
 }) {
   const { t } = useLanguage()
@@ -288,62 +287,27 @@ export default function HtmlElementPanel({
   const label = t(TAG_LABELS[info.tag] || `<${info.tag}>`)
   const isMobile = viewport === 'mobile'
   const hasContent = info.canEditText || info.href !== null || info.src !== null
-  const panelLabel = t(PANEL_TABS.find(([id]) => id === tab)?.[1] || 'Content')
+  const panelLabel = t(PROPERTIES_TABS.find(([id]) => id === tab)?.[1] || 'Content')
 
   return (
     <div className="studio-properties-panel flex h-full min-w-0 flex-col overflow-hidden">
-      <div className="border-b border-[var(--studio-border)] px-3 py-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[color-mix(in_srgb,var(--studio-accent)_18%,var(--studio-border))] bg-[var(--studio-accent-soft)] text-[var(--studio-accent-text)]">
-            <CodeIcon size={16} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-sm font-semibold text-[var(--studio-text)]">{label}</h2>
-            <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
-              <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--studio-control)] px-2 py-0.5 text-[10px] font-semibold text-[var(--studio-text-muted)]">
-                {t(isMobile ? 'Mobile' : 'PC')}
-              </span>
-              <span className="min-w-0 truncate font-mono text-[10px] text-[var(--studio-text-faint)]" title={info.classes}>
-                &lt;{info.tag}&gt;{info.classes ? ` .${info.classes.split(' ').join(' .')}` : ''}
-              </span>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t('Deselect (back to site settings)')}
-            title={t('Deselect (back to site settings)')}
-            className="studio-icon-btn h-9 w-9 shrink-0 border border-[var(--studio-border)] bg-[var(--studio-control)] text-lg"
-          >
-            ×
-          </button>
-        </div>
-
-        {(info.hasParent || info.ancestors?.length > 0) && (
-          <div className="mt-3 flex min-w-0 items-center gap-2">
-            {info.hasParent && (
-              <button
-                type="button"
-                onClick={onSelectParent}
-                title={t('Select the containing {tag}', { tag: info.parentTag })}
-                className="studio-btn studio-btn-secondary shrink-0 px-2 py-1 text-[11px] text-[var(--studio-accent-text)]"
-              >
-                ↑ {t('Select parent')} &lt;{info.parentTag}&gt;
-              </button>
-            )}
-            {info.ancestors?.length > 0 && (
-              <span className="min-w-0 truncate text-[10px] text-[var(--studio-text-faint)]" title={info.ancestors.join(' › ')}>
-                {info.ancestors.join(' › ')} › {info.tag}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+      <PropertiesHeader
+        icon={htmlTagKindIcon(info.tag)}
+        title={label}
+        badge={t(isMobile ? 'Mobile' : 'PC')}
+        detail={`<${info.tag}>${info.classes ? ` .${info.classes.split(' ').join(' .')}` : ''}`}
+        detailTitle={info.classes}
+        onDeselect={onClose}
+        parentName={info.hasParent ? `<${info.parentTag}>` : null}
+        parentTitle={info.hasParent ? t('Select the containing {tag}', { tag: info.parentTag }) : undefined}
+        onSelectParent={info.hasParent ? onSelectParent : undefined}
+        trail={info.ancestors?.length ? `${info.ancestors.join(' › ')} › ${info.tag}` : null}
+      />
 
       <PanelTabs
         value={tab}
         onChange={setTab}
-        tabs={PANEL_TABS.map(([id, tabLabel]) => [id, t(tabLabel)])}
+        tabs={PROPERTIES_TABS.map(([id, tabLabel, Icon]) => [id, t(tabLabel), Icon])}
       />
 
       <div
@@ -531,6 +495,12 @@ export default function HtmlElementPanel({
               </p>
             </PanelGroup>
           </>
+        )}
+
+        {tab === 'motion' && (
+          <PanelGroup id="html-motion" title={t('Motion')} defaultOpen>
+            <MotionFields motion={info.motion} onChange={(patch) => onMotionChange?.(patch)} />
+          </PanelGroup>
         )}
       </div>
 
