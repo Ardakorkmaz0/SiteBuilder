@@ -107,6 +107,26 @@ test('inspector edits and pointer move/resize at an explicit zoom survive undo, 
   } finally { await api(request, 'DELETE', `/sites/${siteId}/`) }
 })
 
+test('a stage switch with an icon is exactly as tall as its word alone, so the canvas does not move', async ({ page, request }) => {
+  const { siteId } = await createCanvas(request, [heading('hero', 80, 100)])
+  try {
+    await edit(page, siteId)
+    // The icon beside "View" once made the button a pixel taller: the canvas
+    // under the bar moved, and a drag at a zoom landed a pixel off (Firefox).
+    const switches = page.locator('[data-tour="canvas-modes"] button, [data-tour="devices"] button')
+    expect(await switches.count()).toBeGreaterThanOrEqual(5)
+    const heights = await switches.evaluateAll((buttons) => buttons.map((button) => {
+      const bare = button.cloneNode(true)
+      bare.querySelector('svg').remove()
+      button.after(bare)
+      const pair = [button.getBoundingClientRect().height, bare.getBoundingClientRect().height]
+      bare.remove()
+      return pair
+    }))
+    for (const [withIcon, wordAlone] of heights) expect(withIcon).toBe(wordAlone)
+  } finally { await api(request, 'DELETE', `/sites/${siteId}/`) }
+})
+
 test('three blocks align, distribute, drag together and support repeated copy, cut, undo and redo', async ({ page, request }) => {
   const { siteId } = await createCanvas(request, [heading('alpha', 70, 90), heading('beta', 350, 200), heading('gamma', 700, 300)])
   try {
