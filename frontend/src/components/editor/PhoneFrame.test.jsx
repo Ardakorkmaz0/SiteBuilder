@@ -9,6 +9,7 @@
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import PhoneFrame from './PhoneFrame.jsx'
+import { phoneModel } from './phoneFrameMetrics.js'
 
 const SCREEN_W = 393
 const SCREEN_H = 852
@@ -60,5 +61,38 @@ describe('PhoneFrame screen', () => {
       </PhoneFrame>,
     )
     expect(getByTestId('preview')).toBeTruthy()
+  })
+})
+
+describe('PhoneFrame on a foldable', () => {
+  const creases = (width, height) => {
+    const { container, unmount } = render(
+      <PhoneFrame screenWidth={width} screenHeight={height} model={phoneModel(width, height)}>
+        <span />
+      </PhoneFrame>,
+    )
+    const lines = [...container.querySelectorAll('[data-builder-hinge]')]
+    const found = lines.map((line) => ({
+      kind: line.dataset.builderHinge,
+      left: line.style.left,
+      top: line.style.top,
+      clicks: line.style.pointerEvents,
+    }))
+    unmount()
+    return found
+  }
+
+  it('draws the crease down the middle of an open book-style screen, and lets clicks through', () => {
+    expect(creases(707, 823)).toEqual([{ kind: 'vertical', left: '50%', top: '0px', clicks: 'none' }])
+  })
+
+  it('lays the Flip\'s crease across its screen', () => {
+    expect(creases(411, 1006)).toEqual([{ kind: 'horizontal', left: '0px', top: '50%', clicks: 'none' }])
+  })
+
+  it('draws two creases on a tri-fold, and none on a closed screen or a phone', () => {
+    expect(creases(1061, 744).map((line) => line.left)).toEqual(['33.333%', '66.667%'])
+    expect(creases(369, 905)).toEqual([])
+    expect(creases(393, 852)).toEqual([])
   })
 })

@@ -1,3 +1,5 @@
+import { foldableStateOfSize } from '../../utils/deviceCatalog.js'
+
 // Device bodies for the editor's phone mockup, in DESIGN pixels. Shared so the
 // Edit canvas and the View preview reserve the same room for the bezel and
 // therefore fit-scale to the same size. See PhoneFrame.jsx for the drawing.
@@ -92,6 +94,18 @@ export const PHONE_MODELS = {
     buttons: 'pixel',
     body: 'obsidian',
   },
+  // A foldable's screen (deviceCatalog.js): thin bezel, squarer corners, and
+  // the hinge drawn across the screen where the device folds.
+  foldable: {
+    id: 'foldable',
+    name: 'Foldable',
+    bezel: { side: 7, top: 7, bottom: 7 },
+    radius: 22,
+    screenRadius: 14,
+    camera: 'punch',
+    buttons: 'galaxy',
+    body: 'graphite',
+  },
 }
 
 // Every mobile preset has a distinct width, so the artboard width alone picks
@@ -102,8 +116,11 @@ const MODEL_BY_WIDTH = {
   384: 'galaxy-s24-ultra',
   390: 'iphone-notch',
   393: 'iphone-island',
+  402: 'iphone-island',
+  411: 'pixel-7',
   412: 'pixel-7',
   430: 'iphone-island',
+  440: 'iphone-island',
 }
 
 // The screen height that goes with a phone width, for the canvases that have no
@@ -116,8 +133,11 @@ const SCREEN_HEIGHT_BY_WIDTH = {
   384: 824,
   390: 844,
   393: 852,
+  402: 874,
+  411: 923,
   412: 915,
   430: 932,
+  440: 956,
 }
 
 export function phoneScreenHeight(width) {
@@ -128,8 +148,23 @@ export function phoneScreenHeight(width) {
   return Math.min(1400, Math.max(480, Math.round((w || 390) * 2.16)))
 }
 
+// Each foldable in its maker's finish and with its maker's keys; the keys also
+// pick the browser drawn on it (Safari for an iPhone, Chrome for the rest).
+const FOLDABLE_LOOKS = {
+  'iphone-fold': { buttons: 'iphone', body: 'titanium' },
+  'pixel9-pro-fold': { buttons: 'pixel', body: 'obsidian' },
+  'huawei-mate-x6': { body: 'titanium-black' },
+  'huawei-mate-xt': { body: 'titanium-black' },
+}
+
 export function phoneModel(width, fold) {
   if (Math.round(Number(width) || 0) === 390 && Number(fold) === 0) return PHONE_MODELS.generic
+  // A foldable's screen is known by its size: its width alone can be a
+  // phone's (the Flip's 411 is a Pixel 9's too).
+  const folding = foldableStateOfSize(width, fold)
+  if (folding) {
+    return { ...PHONE_MODELS.foldable, ...FOLDABLE_LOOKS[folding.group], name: folding.name, hinge: folding.hinge }
+  }
   return PHONE_MODELS[MODEL_BY_WIDTH[Math.round(Number(width) || 0)]] || PHONE_MODELS['iphone-island']
 }
 

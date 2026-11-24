@@ -262,7 +262,7 @@ test.describe('HTML editor user-path sweep', () => {
     })).toEqual(['fade-up', true])
     await save(page)
     expect(await savedHtml(request, siteId)).toContain('data-anim-in="fade-up"')
-    await page.getByRole('button', { name: 'Run', exact: true }).click()
+    await page.getByRole('button', { name: 'View', exact: true }).click()
     await expect(siteFrame(page).locator('#heading')).toHaveAttribute('data-anim-in', 'fade-up')
     await expect.poll(() => siteFrame(page).locator('#heading').evaluate((el) => getComputedStyle(el).opacity)).toBe('1')
     await page.getByRole('button', { name: 'Edit', exact: true }).click()
@@ -362,7 +362,7 @@ test.describe('HTML editor user-path sweep', () => {
   })
 
   test('View runs forms and opens script-driven content which can then be edited and saved', async ({ page, request }) => {
-    await page.getByRole('button', { name: 'Run', exact: true }).click()
+    await page.getByRole('button', { name: 'View', exact: true }).click()
     await siteFrame(page).getByRole('button', { name: 'Show details', exact: true }).click()
     await expect(siteFrame(page).locator('#details')).toBeVisible()
     await siteFrame(page).getByRole('textbox', { name: 'Name', exact: true }).fill('Test visitor')

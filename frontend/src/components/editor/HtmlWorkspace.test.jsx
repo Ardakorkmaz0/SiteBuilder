@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRef } from 'react'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import { serializeDocument } from '../../utils/htmlPlacement.js'
 import HtmlWorkspace, { installSelectionResizeChrome } from './HtmlWorkspace.jsx'
@@ -73,6 +73,69 @@ describe('HTML workspace device chrome', () => {
       'data-builder-mobile-browser',
       'ios',
     )
+  })
+
+  it('holds an open foldable like a phone even where it gets the desktop layout', () => {
+    // The Pixel 9 Pro Fold's inner screen is 791 wide: a PC size, in a phone body.
+    render(
+      <LanguageProvider>
+        <HtmlWorkspace
+          persistKey="browser-foldable"
+          html="<html><body><main>Open</main></body></html>"
+          deviceId="pixel9fold-inner"
+          browserFrame
+          onBrowserFrameToggle={vi.fn()}
+        />
+      </LanguageProvider>,
+    )
+    expect(document.querySelector('[data-builder-phone-frame]')).not.toBeNull()
+    expect(document.querySelector('[data-builder-hinge]')).toHaveAttribute('data-builder-hinge', 'vertical')
+    expect(document.querySelector('[data-builder-mobile-browser]')).toHaveAttribute('data-builder-mobile-browser', 'android')
+    // The phone's browser, not a desktop window around the phone.
+    expect([...document.querySelectorAll('[data-builder-browser-frame]')]
+      .map((frame) => frame.getAttribute('data-builder-browser-frame'))).toEqual(['mobile'])
+  })
+
+  // A bar under 760px wide hides its zoom and browser frame (container
+  // queries, which jsdom does not run) and the ⋯ menu holds them instead.
+  it('keeps the zoom and the browser frame in the ⋯ menu, working from there', () => {
+    const onBrowserFrameToggle = vi.fn()
+    render(
+      <LanguageProvider>
+        <HtmlWorkspace
+          persistKey="narrow-menu"
+          html="<html><body><main>Menu</main></body></html>"
+          deviceId="desktop-16-9"
+          browserFrame
+          onBrowserFrameToggle={onBrowserFrameToggle}
+          liveCodeControls={<p>Live code settings</p>}
+        />
+      </LanguageProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Canvas tools' }))
+    const menu = screen.getByText('Live code settings').parentElement
+    const readout = () => within(menu).getByRole('button', { name: /^Zoom: \d+% — click to fit$/ }).getAttribute('aria-label')
+    const before = readout()
+    fireEvent.click(within(menu).getByRole('button', { name: 'Zoom the canvas in' }))
+    expect(readout()).not.toBe(before)
+    // Still open: zooming is a few presses.
+    expect(within(menu).getByRole('button', { name: 'Hide browser frame', pressed: true })).toBeInTheDocument()
+    fireEvent.click(within(menu).getByRole('button', { name: 'Hide browser frame' }))
+    expect(onBrowserFrameToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('has the ⋯ menu for them even with nothing else to put in it', () => {
+    render(
+      <LanguageProvider>
+        <HtmlWorkspace
+          persistKey="narrow-menu-alone"
+          html="<html><body><main>Menu</main></body></html>"
+          deviceId="desktop-16-9"
+        />
+      </LanguageProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Canvas tools' }))
+    expect(screen.getAllByRole('button', { name: 'Zoom the canvas in' })).toHaveLength(2)
   })
 
   it('leaves the phone bare when the browser frame is off', () => {

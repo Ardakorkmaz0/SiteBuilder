@@ -167,6 +167,28 @@ function Camera({ model, inScreen = false }) {
   )
 }
 
+// Where a foldable folds: a soft crease across its open screen. It lets every
+// click through to the page under it.
+const HINGE_LINES = { vertical: ['50%'], horizontal: ['50%'], thirds: ['33.333%', '66.667%'] }
+function Hinge({ kind }) {
+  const across = kind === 'horizontal'
+  return (HINGE_LINES[kind] || []).map((at) => (
+    <span
+      key={at}
+      aria-hidden="true"
+      data-builder-hinge={kind}
+      style={{
+        position: 'absolute',
+        pointerEvents: 'none',
+        zIndex: 2,
+        ...(across
+          ? { left: 0, right: 0, top: at, height: 14, transform: 'translateY(-50%)', background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.07) 45%, rgba(255,255,255,0.12) 55%, transparent)' }
+          : { top: 0, bottom: 0, left: at, width: 14, transform: 'translateX(-50%)', background: 'linear-gradient(to right, transparent, rgba(0,0,0,0.07) 45%, rgba(255,255,255,0.12) 55%, transparent)' }),
+      }}
+    />
+  ))
+}
+
 export default function PhoneFrame({ screenWidth, screenHeight, model: suppliedModel, children }) {
   const model = suppliedModel || phoneModel(screenWidth)
   const { bezel } = model
@@ -211,6 +233,7 @@ export default function PhoneFrame({ screenWidth, screenHeight, model: suppliedM
         }}
       >
         {children}
+        {model.hinge && <Hinge kind={model.hinge} />}
         {model.camera !== 'earpiece' && <Camera model={model} inScreen />}
       </div>
 

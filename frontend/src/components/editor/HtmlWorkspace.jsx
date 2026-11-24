@@ -1420,8 +1420,11 @@ function HtmlWorkspace({
   const device = DEVICES.find((d) => d.id === deviceId) || DEVICES[0]
   const isFit = device.id === 'fit'
   const mobileDevice = isMobileDevice(device.id)
-  const framedPhone = !isFit && !landscape && mobileDevice
-  const desktopBrowser = browserFrame && !mobileDevice
+  // A foldable is held like a phone on both sides of the PC/Mobile toggle: an
+  // open screen as wide as a tablet gets the page's desktop layout, and still
+  // sits in the phone's body with a phone's browser.
+  const framedPhone = !isFit && !landscape && (mobileDevice || device.category === 'foldable')
+  const desktopBrowser = browserFrame && !mobileDevice && !framedPhone
   const mobileBrowser = browserFrame && framedPhone
   const availableW = Math.max(1, stage.w - 24)
   const availableH = Math.max(1, stage.h - 24)
@@ -1469,6 +1472,41 @@ function HtmlWorkspace({
     if (isFit && !desktopBrowser && (zoom === 'fit') !== (next === 'fit')) prepareForFrameChange()
     setZoom(next)
   }
+  const zoomControl = (
+    <CanvasZoomControl
+      zoom={zoom}
+      fitScale={fitScale}
+      onZoom={changeZoom}
+      fullscreen={fullscreen}
+      onToggleFullscreen={onToggleFullscreen ? toggleStageFullscreen : undefined}
+    />
+  )
+  const canToggleBrowserFrame = (!mobileDevice || framedPhone) && mode !== 'live' && !!onBrowserFrameToggle
+  // A stage bar under 760px has no room for how the page is looked at: the
+  // zoom, full screen and browser frame leave it (each hides itself there)
+  // and come back at the top of the ⋯ menu, so nothing falls off the end.
+  const narrowViewControls = mode !== 'live' && mode !== 'source' && (
+    <div className="mb-2 space-y-1 border-b border-[var(--studio-border)] pb-2 @[760px]:hidden">
+      <div className="flex items-center justify-between gap-2 px-1">
+        <span className="text-xs text-[var(--studio-text-muted)]">{t('Zoom')}</span>
+        {zoomControl}
+      </div>
+      {canToggleBrowserFrame && (
+        <button
+          type="button"
+          aria-pressed={browserFrame}
+          onClick={() => {
+            prepareForFrameChange()
+            onBrowserFrameToggle()
+          }}
+          className={`studio-menu-item ${browserFrame ? 'bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]' : ''}`}
+        >
+          <MonitorIcon size={14} />
+          {t(browserFrame ? 'Hide browser frame' : 'Show browser frame')}
+        </button>
+      )}
+    </div>
+  )
 
   // ----- placement: splice the component's snippet into the document ---------
   const placeAt = useCallback((clientX, clientY) => {
@@ -2108,14 +2146,14 @@ function HtmlWorkspace({
         <div className="studio-toolbar @container flex min-w-0 items-center gap-2 border-b px-3 py-1.5">
           <div data-tour="canvas-modes" className="studio-segment shrink-0">
             <button onClick={() => switchMode('view')} className={toggleBtn(mode === 'view')}>
-              <SwitchLabel icon={MODE_ICONS.view}>{t('View')}</SwitchLabel>
+              <SwitchLabel icon={MODE_ICONS.view} collapse="mode">{t('View')}</SwitchLabel>
             </button>
             <button onClick={() => switchMode('edit')} className={toggleBtn(mode === 'edit')}>
-              <SwitchLabel icon={MODE_ICONS.edit}>{t('Edit')}</SwitchLabel>
+              <SwitchLabel icon={MODE_ICONS.edit} collapse="mode">{t('Edit')}</SwitchLabel>
             </button>
             {!simpleMode && (
               <button onClick={() => switchMode('source')} className={toggleBtn(mode === 'source')}>
-                <SwitchLabel icon={MODE_ICONS.source}>{t('Source')}</SwitchLabel>
+                <SwitchLabel icon={MODE_ICONS.source} collapse="mode">{t('Source')}</SwitchLabel>
               </button>
             )}
             {liveUrl && (
@@ -2147,7 +2185,7 @@ function HtmlWorkspace({
                     title={t('Editing tools')}
                   >
                     {editTool === 'text' ? <EditIcon size={13} /> : editTool === 'rearrange' ? <MoveIcon size={13} /> : editTool === 'link' ? <LinkIcon size={13} /> : <PaletteIcon size={13} />}
-                    <span className="hidden @[860px]:inline">{t(editTool === 'text' ? 'Text' : editTool === 'rearrange' ? 'Move' : editTool === 'link' ? 'Link' : 'Brush')}</span>
+                    <span className="hidden @[1000px]:inline">{t(editTool === 'text' ? 'Text' : editTool === 'rearrange' ? 'Move' : editTool === 'link' ? 'Link' : 'Brush')}</span>
                     <ChevronDownIcon size={13} />
                   </button>
                   {toolMenuOpen && (
@@ -2175,18 +2213,10 @@ function HtmlWorkspace({
                   )}
                 </div>
               )}
-              {/* Editing runs the page without its scripts, so everything behind
-                  a click is out of reach here. This is the way to it: run the
-                  page, open what you need, come back — Edit picks the state up. */}
-              <button
-                type="button"
-                onClick={() => switchMode('view')}
-                title={t('Run the page: click through it in View, then come back — Edit shows it the way you left it.')}
-                aria-label={t('Run')}
-                className="studio-btn studio-btn-secondary inline-flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs"
-              >
-                <span aria-hidden="true">▶</span> <span className="hidden @[900px]:inline">{t('Run')}</span>
-              </button>
+              {/* There was a Run button here; it only switched to View, which
+                  the View switch beside it already does (owner, 2026-11-25).
+                  View runs the page's scripts, and Edit picks up the state the
+                  page was left in. */}
             </div>
           )}
 
@@ -2222,7 +2252,7 @@ function HtmlWorkspace({
                     its chrome is exactly what decides how much page fits on
                     screen. Only a landscape phone is left out: there is no
                     bezel to put it in. */}
-                {(!mobileDevice || framedPhone) && mode !== 'live' && onBrowserFrameToggle && (
+                {canToggleBrowserFrame && (
                   <button
                     type="button"
                     onClick={() => {
@@ -2231,7 +2261,7 @@ function HtmlWorkspace({
                     }}
                     aria-pressed={browserFrame}
                     title={t(browserFrame ? 'Hide browser frame' : 'Show browser frame')}
-                    className={`studio-btn inline-flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs ${
+                    className={`studio-btn hidden shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs @[760px]:inline-flex ${
                       browserFrame
                         ? 'border-[var(--studio-accent)] bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]'
                         : 'studio-btn-secondary'
@@ -2242,13 +2272,7 @@ function HtmlWorkspace({
                   </button>
                 )}
                 {mode !== 'live' && (
-                  <CanvasZoomControl
-                    zoom={zoom}
-                    fitScale={fitScale}
-                    onZoom={changeZoom}
-                    fullscreen={fullscreen}
-                    onToggleFullscreen={onToggleFullscreen ? toggleStageFullscreen : undefined}
-                  />
+                  <div className="hidden @[760px]:block">{zoomControl}</div>
                 )}
               </div>
             </>
@@ -2257,8 +2281,8 @@ function HtmlWorkspace({
           {/* Everything else about the canvas, in one menu rather than loose in
               the row: it belongs to the workspace, not to the editing tools,
               and it has to be reachable in View and in Simple mode too. */}
-          {liveCodeControls && mode !== 'source' && (
-            <div className="relative shrink-0">
+          {mode !== 'source' && (liveCodeControls || narrowViewControls) && (
+            <div className={`relative shrink-0 ${liveCodeControls ? '' : '@[760px]:hidden'}`}>
               <button
                 type="button"
                 onClick={() => setWorkspaceMenuOpen((open) => !open)}
@@ -2274,6 +2298,7 @@ function HtmlWorkspace({
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setWorkspaceMenuOpen(false)} />
                   <div className="studio-menu absolute right-0 top-[calc(100%+6px)] z-40 w-72 p-2">
+                    {narrowViewControls}
                     {liveCodeControls}
                   </div>
                 </>

@@ -1,20 +1,49 @@
-// Device frames for previewing HTML pages — shared by the editor header
-// (selector lives there) and the HtmlWorkspace stage (sizing math).
+import { FOLDABLE_STATES } from './deviceCatalog.js'
+
+// Device frames for previewing HTML pages — shared by the device picker above
+// the stage (DevicePicker) and the HtmlWorkspace stage (sizing math).
+// `category` places a device in the picker; `name` is what its card says.
+// Foldables come from deviceCatalog.js, a device per screen state.
+const SCREENS = [
+  { id: 'fit', name: 'Responsive', category: 'desktop', w: 0, h: 0 },
+  { id: 'desktop-16-9', name: 'Desktop 16:9', category: 'desktop', w: 1280, h: 720 },
+  { id: 'desktop-16-10', name: 'Desktop 16:10', category: 'desktop', w: 1280, h: 800 },
+  { id: 'laptop-hd', name: 'Laptop HD', category: 'desktop', w: 1366, h: 768 },
+  { id: 'laptop', name: 'Laptop', category: 'desktop', w: 1440, h: 900 },
+  { id: 'macbook-air', name: 'MacBook Air 13"', category: 'desktop', w: 1470, h: 956 },
+  { id: 'macbook-pro-16', name: 'MacBook Pro 16"', category: 'desktop', w: 1728, h: 1117 },
+  { id: 'fhd', name: 'Full HD', category: 'desktop', w: 1920, h: 1080 },
+  { id: 'qhd', name: 'QHD', category: 'desktop', w: 2560, h: 1440 },
+  { id: 'ipad-mini', name: 'iPad mini', category: 'tablet', w: 744, h: 1133 },
+  { id: 'ipad', name: 'iPad', category: 'tablet', w: 768, h: 1024 },
+  { id: 'galaxy-tab-s9', name: 'Galaxy Tab S9', category: 'tablet', w: 800, h: 1280 },
+  { id: 'ipad-air', name: 'iPad Air', category: 'tablet', w: 820, h: 1180 },
+  { id: 'ipadpro', name: 'iPad Pro', category: 'tablet', w: 1024, h: 1366 },
+  { id: 'iphone14', name: 'iPhone 14', category: 'phone', w: 390, h: 844 },
+  { id: 'iphonese', name: 'iPhone SE (3rd gen)', category: 'phone', w: 375, h: 667 },
+  { id: 'iphone15pro', name: 'iPhone 15 Pro', category: 'phone', w: 393, h: 852 },
+  { id: 'iphone15max', name: 'iPhone 15 Pro Max', category: 'phone', w: 430, h: 932 },
+  { id: 'iphone16pro', name: 'iPhone 16 Pro', category: 'phone', w: 402, h: 874 },
+  { id: 'iphone16promax', name: 'iPhone 16 Pro Max', category: 'phone', w: 440, h: 956 },
+  { id: 'galaxys24', name: 'Galaxy S24', category: 'phone', w: 360, h: 780 },
+  { id: 'galaxys24ultra', name: 'Galaxy S24 Ultra', category: 'phone', w: 384, h: 824 },
+  { id: 'pixel7', name: 'Pixel 7', category: 'phone', w: 412, h: 915 },
+  { id: 'pixel9', name: 'Pixel 9', category: 'phone', w: 411, h: 923 },
+]
+
 export const DEVICES = [
-  { id: 'fit', label: 'Responsive · area width', w: 0, h: 0 },
-  { id: 'desktop-16-9', label: 'Desktop 16:9 · 1280×720', w: 1280, h: 720 },
-  { id: 'desktop-16-10', label: 'Desktop 16:10 · 1280×800', w: 1280, h: 800 },
-  { id: 'laptop', label: 'Laptop · 1440×900', w: 1440, h: 900 },
-  { id: 'fhd', label: 'Full HD · 1920×1080', w: 1920, h: 1080 },
-  { id: 'ipad', label: 'iPad · 768×1024', w: 768, h: 1024 },
-  { id: 'ipadpro', label: 'iPad Pro · 1024×1366', w: 1024, h: 1366 },
-  { id: 'iphone14', label: 'iPhone 14 · 390×844', w: 390, h: 844 },
-  { id: 'iphonese', label: 'iPhone SE (3rd gen) · 375×667', w: 375, h: 667 },
-  { id: 'iphone15pro', label: 'iPhone 15 Pro · 393×852', w: 393, h: 852 },
-  { id: 'iphone15max', label: 'iPhone 15 Pro Max · 430×932', w: 430, h: 932 },
-  { id: 'galaxys24', label: 'Galaxy S24 · 360×780', w: 360, h: 780 },
-  { id: 'galaxys24ultra', label: 'Galaxy S24 Ultra · 384×824', w: 384, h: 824 },
-  { id: 'pixel7', label: 'Pixel 7 · 412×915', w: 412, h: 915 },
+  ...SCREENS,
+  ...FOLDABLE_STATES.map((state) => ({
+    id: state.id,
+    name: state.name,
+    category: 'foldable',
+    w: state.w,
+    h: state.h,
+    group: state.group,
+    state: state.state,
+    hinge: state.hinge,
+    concept: state.concept,
+  })),
 ]
 
 // Under this width a page is in its phone layout: the breakpoint the editor's

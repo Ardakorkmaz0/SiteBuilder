@@ -15,11 +15,12 @@ import {
   supportsProjectFolder,
 } from '../utils/projectFs.js'
 import { assemblePreviewHtml, needsBuildToRender } from '../utils/htmlFiles.js'
-import { devicesFor, isMobileDevice } from '../utils/htmlDevices.js'
+import { DEVICES, isMobileDevice } from '../utils/htmlDevices.js'
 import Sidebar from '../components/editor/Sidebar.jsx'
 import ProjectFilesPanel from '../components/editor/ProjectFilesPanel.jsx'
 import { FolderOpenIcon, CogIcon, LightbulbIcon, PaletteIcon } from '../components/icons.jsx'
 import HtmlWorkspace from '../components/editor/HtmlWorkspace.jsx'
+import DevicePicker from '../components/editor/DevicePicker.jsx'
 import HtmlElementPanel from '../components/editor/HtmlElementPanel.jsx'
 import CodeFileEditor from '../components/editor/CodeFileEditor.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
@@ -574,18 +575,7 @@ export default function CodeProjectPage() {
                   {t('Mobile')}
                 </button>
               </div>
-              <select
-                value={htmlDevice}
-                onChange={(e) => changeDevice(e.target.value)}
-                title={t('Screen / device width')}
-                className="max-w-[140px] truncate rounded-lg border border-[#d1d5db] px-2 py-1 text-xs font-medium text-[#374151] focus:border-[#4f46e5] focus:outline-none"
-              >
-                {devicesFor(isMobileDevice(htmlDevice) ? 'mobile' : 'pc').map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {t(d.label)}
-                  </option>
-                ))}
-              </select>
+              <DevicePicker items={DEVICES} value={htmlDevice} onPick={changeDevice} />
             </>
           )}
           <button onClick={openFolder} disabled={busy} className="rounded-lg px-3 py-1.5 text-sm text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-50">

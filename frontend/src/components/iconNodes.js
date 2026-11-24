@@ -71,6 +71,15 @@ export const ICON_NODES = {
     ['rect', { x: 6, y: 2, width: 12, height: 20, rx: 2.5 }],
     ['path', { d: 'M11 18h2' }],
   ],
+  tablet: [
+    ['rect', { x: 4, y: 2, width: 16, height: 20, rx: 2.5 }],
+    ['path', { d: 'M11 18h2' }],
+  ],
+  // A book-style foldable, open: two halves and the fold between them.
+  foldable: [
+    ['rect', { x: 2, y: 4, width: 20, height: 16, rx: 2.5 }],
+    ['path', { d: 'M12 4v16' }],
+  ],
   // Drawn over a device to say "hidden on this screen".
   slash: [
     ['path', { d: 'm3 3 18 18' }],

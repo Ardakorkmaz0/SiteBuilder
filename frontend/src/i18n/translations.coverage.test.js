@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { registry } from '../components/registry.jsx'
+import { MOBILE_CANVAS_PRESETS, PC_CANVAS_PRESETS, registry } from '../components/registry.jsx'
 import { AI_PROVIDERS, getModelsFor } from '../utils/aiProviders.js'
 import { SUGGESTION_STRINGS } from '../utils/aiSuggestions.js'
 import { SUGGESTION_CHIPS } from '../utils/aiTemplates.js'
 import { WIZARD_FONTS, WIZARD_MOODS, WIZARD_SECTIONS, WIZARD_SITE_TYPES } from '../utils/aiWizard.js'
 import { COMPONENT_PRESETS } from '../utils/componentPresets.js'
+import { DEVICE_CATEGORIES, FOLD_STATE_LABELS } from '../utils/deviceCatalog.js'
 import { DEVICES } from '../utils/htmlDevices.js'
 import { SITE_TEMPLATES } from '../utils/htmlTemplates.js'
 import { HTML_BLOCKS, HTML_VARIANTS } from '../utils/htmlVariants.js'
@@ -58,7 +59,10 @@ function visibleCatalogStrings() {
     for (const preset of presets) add(preset.label)
   }
   for (const image of PRESET_IMAGES) add(image.name)
-  for (const device of DEVICES) add(device.label)
+  // The device picker: every screen's name, its sections and a foldable's states.
+  for (const device of [...DEVICES, ...PC_CANVAS_PRESETS, ...MOBILE_CANVAS_PRESETS]) add(device.name)
+  for (const [, label] of DEVICE_CATEGORIES) add(label)
+  add(...Object.values(FOLD_STATE_LABELS))
   for (const template of SITE_TEMPLATES) add(template.name, template.desc)
   for (const block of HTML_BLOCKS) add(block.label, block.desc)
   for (const variants of Object.values(HTML_VARIANTS)) {

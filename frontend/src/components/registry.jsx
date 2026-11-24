@@ -35,6 +35,7 @@ import { PRESET_IMAGES } from '../utils/presetImages.js'
 import { ICON_OPTIONS } from '../utils/icons.js'
 import { NodeIcon } from './icons.jsx'
 import { componentKindIcon } from './editor/elementKindIcons.js'
+import { FOLDABLE_STATES } from '../utils/deviceCatalog.js'
 
 // One drawing per kind of block, shared with HTML elements of that kind.
 const kindIcon = (type) => <NodeIcon name={componentKindIcon(type)} size={16} />
@@ -727,25 +728,54 @@ export const CANVAS_WIDTH = 1000
 // edited independently from the desktop layout.
 export const MOBILE_CANVAS_WIDTH = 390
 
-// Artboard presets shown in the editor toolbar. Each sets the canvas WIDTH plus an
-// optional "fold" guide — the visible screen height for that aspect ratio / device,
-// drawn as a dashed line so the user sees what lands above the fold. fold:0 = off.
+// Artboard sizes offered by the device picker (DevicePicker) above the canvas.
+// Each sets the canvas WIDTH plus an optional "fold" guide — the visible screen
+// height for that aspect ratio / device, drawn as a dashed line so the user sees
+// what lands above the fold. fold:0 = off. `category` and `name` place and name
+// the size in the picker. A foldable's screens come from deviceCatalog.js: the
+// ones as wide as a desktop layout are PC sizes, the narrower ones phone sizes.
+const FOLDABLE_PRESETS = FOLDABLE_STATES.map((state) => ({
+  id: state.id,
+  name: state.name,
+  category: 'foldable',
+  width: state.w,
+  fold: state.h,
+  group: state.group,
+  state: state.state,
+  hinge: state.hinge,
+  concept: state.concept,
+}))
+
 export const PC_CANVAS_PRESETS = [
-  { id: 'std', label: 'Standard · 1000', width: 1000, fold: 0 },
-  { id: '16:9', label: '16:9 · 1280×720', width: 1280, fold: 720 },
-  { id: '16:10', label: '16:10 · 1280×800', width: 1280, fold: 800 },
-  { id: '4:3', label: '4:3 · 1024×768', width: 1024, fold: 768 },
-  { id: 'wide', label: 'Wide · 1440×900', width: 1440, fold: 900 },
-  { id: 'fhd', label: 'Full HD · 1920×1080', width: 1920, fold: 1080 },
+  { id: 'std', name: 'Standard', category: 'desktop', width: 1000, fold: 0 },
+  { id: '16:9', name: 'Desktop 16:9', category: 'desktop', width: 1280, fold: 720 },
+  { id: '16:10', name: 'Desktop 16:10', category: 'desktop', width: 1280, fold: 800 },
+  { id: '4:3', name: 'Desktop 4:3', category: 'desktop', width: 1024, fold: 768 },
+  { id: 'laptop-hd', name: 'Laptop HD', category: 'desktop', width: 1366, fold: 768 },
+  { id: 'wide', name: 'Wide', category: 'desktop', width: 1440, fold: 900 },
+  { id: 'macbook-air', name: 'MacBook Air 13"', category: 'desktop', width: 1470, fold: 956 },
+  { id: 'macbook-pro-16', name: 'MacBook Pro 16"', category: 'desktop', width: 1728, fold: 1117 },
+  { id: 'fhd', name: 'Full HD', category: 'desktop', width: 1920, fold: 1080 },
+  { id: 'qhd', name: 'QHD', category: 'desktop', width: 2560, fold: 1440 },
+  { id: 'ipad', name: 'iPad', category: 'tablet', width: 768, fold: 1024 },
+  { id: 'galaxy-tab-s9', name: 'Galaxy Tab S9', category: 'tablet', width: 800, fold: 1280 },
+  { id: 'ipad-air', name: 'iPad Air', category: 'tablet', width: 820, fold: 1180 },
+  { id: 'ipadpro', name: 'iPad Pro', category: 'tablet', width: 1024, fold: 1366 },
+  ...FOLDABLE_PRESETS.filter((preset) => preset.width >= 768),
 ]
 
 export const MOBILE_CANVAS_PRESETS = [
-  { id: 'std', label: 'Standard mobile · 390', width: 390, fold: 0 },
-  { id: 'iphone14', label: 'iPhone 14 · 390×844', width: 390, fold: 844 },
-  { id: 'se', label: 'iPhone SE (3rd gen) · 375×667', width: 375, fold: 667 },
-  { id: 'iphone15pro', label: 'iPhone 15 Pro · 393×852', width: 393, fold: 852 },
-  { id: 'iphone15max', label: 'iPhone 15 Pro Max · 430×932', width: 430, fold: 932 },
-  { id: 'galaxys24', label: 'Galaxy S24 · 360×780', width: 360, fold: 780 },
-  { id: 'galaxys24ultra', label: 'Galaxy S24 Ultra · 384×824', width: 384, fold: 824 },
-  { id: 'pixel7', label: 'Pixel 7 · 412×915', width: 412, fold: 915 },
+  { id: 'std', name: 'Standard mobile', category: 'phone', width: 390, fold: 0 },
+  { id: 'iphone14', name: 'iPhone 14', category: 'phone', width: 390, fold: 844 },
+  { id: 'se', name: 'iPhone SE (3rd gen)', category: 'phone', width: 375, fold: 667 },
+  { id: 'iphone15pro', name: 'iPhone 15 Pro', category: 'phone', width: 393, fold: 852 },
+  { id: 'iphone15max', name: 'iPhone 15 Pro Max', category: 'phone', width: 430, fold: 932 },
+  { id: 'iphone16pro', name: 'iPhone 16 Pro', category: 'phone', width: 402, fold: 874 },
+  { id: 'iphone16promax', name: 'iPhone 16 Pro Max', category: 'phone', width: 440, fold: 956 },
+  { id: 'galaxys24', name: 'Galaxy S24', category: 'phone', width: 360, fold: 780 },
+  { id: 'galaxys24ultra', name: 'Galaxy S24 Ultra', category: 'phone', width: 384, fold: 824 },
+  { id: 'pixel7', name: 'Pixel 7', category: 'phone', width: 412, fold: 915 },
+  { id: 'pixel9', name: 'Pixel 9', category: 'phone', width: 411, fold: 923 },
+  { id: 'ipad-mini', name: 'iPad mini', category: 'tablet', width: 744, fold: 1133 },
+  ...FOLDABLE_PRESETS.filter((preset) => preset.width < 768),
 ]

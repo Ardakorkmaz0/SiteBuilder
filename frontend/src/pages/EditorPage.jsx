@@ -83,11 +83,12 @@ import HtmlElementPanel from '../components/editor/HtmlElementPanel.jsx'
 import { DEVICE_ICONS, MODE_ICONS } from '../components/editor/stageSwitchIcons.js'
 import SwitchLabel from '../components/editor/SwitchLabel.jsx'
 import ToolPalette from '../components/editor/ToolPalette.jsx'
+import DevicePicker from '../components/editor/DevicePicker.jsx'
 import { PALETTE_TOOLS, paletteToolForKey, paletteToolOfType } from '../components/editor/toolPalette.js'
 import { toggleSpotlightTarget } from '../components/editor/spotlight.js'
 import PageFilesPanel from '../components/editor/PageFilesPanel.jsx'
 import { pageFileName } from '../utils/pageFiles.js'
-import { DEVICES, devicesFor, isMobileDevice } from '../utils/htmlDevices.js'
+import { DEVICES, isMobileDevice } from '../utils/htmlDevices.js'
 import { applyThemeToDocument } from '../utils/htmlTheme.js'
 import { replacePageColor } from '../utils/htmlPageColors.js'
 import { htmlFilesToDocument } from '../utils/htmlFiles.js'
@@ -201,6 +202,13 @@ function readLiveCodeHold() {
     return LIVE_CODE_HOLDS.some(([ms]) => ms === saved) ? saved : LIVE_CODE_HOLDS[0][0]
   } catch { return LIVE_CODE_HOLDS[0][0] }
 }
+
+// Every canvas size in one picker, PC and Mobile together: "std" is on both
+// lists, so an item's id names its side ("pc:std", "mobile:std").
+const CANVAS_SIZE_ITEMS = [
+  ...PC_CANVAS_PRESETS.map((preset) => ({ ...preset, id: `pc:${preset.id}`, w: preset.width, h: preset.fold })),
+  ...MOBILE_CANVAS_PRESETS.map((preset) => ({ ...preset, id: `mobile:${preset.id}`, w: preset.width, h: preset.fold })),
+]
 
 function readHtmlDevice(viewport) {
   const fallback = viewport === 'mobile' ? 'iphone15pro' : 'fit'
@@ -811,6 +819,18 @@ function SiteEditor() {
     const normalized = nextViewport === 'mobile' ? 'mobile' : 'pc'
     setViewport(normalized)
     try { localStorage.setItem(LAST_VIEWPORT_KEY, normalized) } catch { /* ignore */ }
+  }
+  // The device picker lists PC and Mobile sizes together. A canvas size from
+  // the other side switches PC/Mobile first, because setCanvasPreset writes
+  // the width of the side the store is on.
+  const pickCanvasSize = (itemId) => {
+    const at = itemId.indexOf(':')
+    const side = itemId.slice(0, at) === 'mobile' ? 'mobile' : 'pc'
+    const preset = (side === 'mobile' ? MOBILE_CANVAS_PRESETS : PC_CANVAS_PRESETS)
+      .find((candidate) => candidate.id === itemId.slice(at + 1))
+    if (!preset) return
+    if (side !== useEditorStore.getState().viewport) chooseViewport(side)
+    setCanvasPreset({ width: preset.width, fold: preset.fold })
   }
   // Linked local .html file (File System Access API): every Save also writes
   // the document back to this file. { handle, name } or null. Persisted in
@@ -2780,6 +2800,17 @@ function SiteEditor() {
   }
 
   const sizePresets = viewport === 'mobile' ? MOBILE_CANVAS_PRESETS : PC_CANVAS_PRESETS
+  // One zoom control, shown in the stage bar or, where the bar is short of
+  // room, in its ⋯ menu.
+  const canvasZoomControl = (
+    <CanvasZoomControl
+      zoom={canvasZoom}
+      fitScale={canvasFitScale}
+      onZoom={setCanvasZoom}
+      fullscreen={fullscreen}
+      onToggleFullscreen={() => toggleFullscreen(canvasStageRef.current)}
+    />
+  )
   const curW = viewport === 'mobile' ? mobileW : pcWidth
   const curFold = viewport === 'mobile' ? mobileFold : pcFold
   const curPresetId =
@@ -3294,7 +3325,10 @@ function SiteEditor() {
                   onToggleFullscreen={toggleFullscreen}
                   deviceControls={
                     <>
-                      <div className="studio-segment shrink-0">
+                      {/* The narrowest bars (a 1024px window with both rails
+                          open) keep the device picker alone: it lists both
+                          sides, and a phone picked there switches to Mobile. */}
+                      <div className="studio-segment hidden shrink-0 @[480px]:inline-flex">
                         <button
                           onClick={() => { chooseHtmlDevice(readHtmlDevice('pc')); setHtmlLandscape(false) }}
                           className={
@@ -3303,7 +3337,7 @@ function SiteEditor() {
                               : 'studio-segment-btn'
                           }
                         >
-                          <SwitchLabel icon={DEVICE_ICONS.pc}>{t('PC')}</SwitchLabel>
+                          <SwitchLabel icon={DEVICE_ICONS.pc} collapse="device">{t('PC')}</SwitchLabel>
                         </button>
                         <button
                           onClick={() => chooseHtmlDevice(readHtmlDevice('mobile'))}
@@ -3313,21 +3347,10 @@ function SiteEditor() {
                               : 'studio-segment-btn'
                           }
                         >
-                          <SwitchLabel icon={DEVICE_ICONS.mobile}>{t('Mobile')}</SwitchLabel>
+                          <SwitchLabel icon={DEVICE_ICONS.mobile} collapse="device">{t('Mobile')}</SwitchLabel>
                         </button>
                       </div>
-                      <select
-                        value={htmlDevice}
-                        onChange={(e) => chooseHtmlDevice(e.target.value)}
-                        title={t('Screen / device width')}
-                        className="studio-input hidden max-w-[190px] shrink-0 truncate px-2 py-1.5 text-xs font-medium @[980px]:block"
-                      >
-                        {devicesFor(isMobileDevice(htmlDevice) ? 'mobile' : 'pc').map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {t(d.label)}
-                          </option>
-                        ))}
-                      </select>
+                      <DevicePicker items={DEVICES} value={htmlDevice} onPick={chooseHtmlDevice} collapse />
                     </>
                   }
                   browserFrame={browserFrameEnabled}
@@ -3520,7 +3543,7 @@ function SiteEditor() {
                             : 'studio-segment-btn'
                         }
                       >
-                      <SwitchLabel icon={MODE_ICONS[id]}>{t(label)}</SwitchLabel>
+                      <SwitchLabel icon={MODE_ICONS[id]} collapse="mode">{t(label)}</SwitchLabel>
                       </button>
                     ))}
                   </div>
@@ -3544,7 +3567,8 @@ function SiteEditor() {
                       one row; they act on the canvas this bar belongs to. Same
                       order, widths and breakpoints as the HTML workspace's bar. */}
                   <span aria-hidden="true" className="studio-toolbar-sep" />
-                  <div data-tour="devices" className="studio-segment shrink-0">
+                  {/* Under 480px the device picker stands for both sides. */}
+                  <div data-tour="devices" className="studio-segment hidden shrink-0 @[480px]:inline-flex">
                     <button
                       onClick={() => chooseViewport('pc')}
                       className={
@@ -3553,7 +3577,7 @@ function SiteEditor() {
                           : 'studio-segment-btn'
                       }
                     >
-                      <SwitchLabel icon={DEVICE_ICONS.pc}>{t('PC')}</SwitchLabel>
+                      <SwitchLabel icon={DEVICE_ICONS.pc} collapse="device">{t('PC')}</SwitchLabel>
                     </button>
                     <button
                       onClick={() => chooseViewport('mobile')}
@@ -3563,38 +3587,23 @@ function SiteEditor() {
                           : 'studio-segment-btn'
                       }
                     >
-                      <SwitchLabel icon={DEVICE_ICONS.mobile}>{t('Mobile')}</SwitchLabel>
+                      <SwitchLabel icon={DEVICE_ICONS.mobile} collapse="device">{t('Mobile')}</SwitchLabel>
                     </button>
                   </div>
-                  <select
-                    value={curPresetId}
-                    onChange={(e) => {
-                      const p = sizePresets.find((x) => x.id === e.target.value)
-                      if (p) setCanvasPreset({ width: p.width, fold: p.fold })
-                    }}
-                    title={
-                      viewport === 'mobile'
-                        ? t('Phone screen size')
-                        : t('Preview screen size')
-                    }
-                    className="studio-input hidden max-w-[190px] shrink-0 truncate px-2 py-1.5 text-xs font-medium @[980px]:block"
-                  >
-                    {sizePresets.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {t(p.label)}
-                      </option>
-                    ))}
-                    {curPresetId === 'custom' && (
-                      <option value="custom">{t('Custom')} - {curW}px</option>
-                    )}
-                  </select>
+                  <DevicePicker
+                    items={CANVAS_SIZE_ITEMS}
+                    value={curPresetId === 'custom' ? null : `${viewport}:${curPresetId}`}
+                    onPick={pickCanvasSize}
+                    fallbackLabel={`${t('Custom')} · ${curFold ? `${curW}×${curFold}` : `${curW}px`}`}
+                    collapse
+                  />
                   {canvasMode !== 'source' && (
                     <button
                       type="button"
                       onClick={toggleBrowserFrame}
                       aria-pressed={browserFrameEnabled}
                       title={t(browserFrameEnabled ? 'Hide browser frame' : 'Show browser frame')}
-                      className={`studio-btn inline-flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs ${
+                      className={`studio-btn hidden shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs @[760px]:inline-flex ${
                         browserFrameEnabled
                           ? 'border-[var(--studio-accent)] bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]'
                           : 'studio-btn-secondary'
@@ -3605,13 +3614,7 @@ function SiteEditor() {
                     </button>
                   )}
                   {canvasMode === 'edit' && (
-                    <CanvasZoomControl
-                      zoom={canvasZoom}
-                      fitScale={canvasFitScale}
-                      onZoom={setCanvasZoom}
-                      fullscreen={fullscreen}
-                      onToggleFullscreen={() => toggleFullscreen(canvasStageRef.current)}
-                    />
+                    <div className="hidden @[760px]:block">{canvasZoomControl}</div>
                   )}
                   <div className="relative shrink-0">
                     <button
@@ -3629,6 +3632,28 @@ function SiteEditor() {
                       <>
                         <div className="fixed inset-0 z-30" onClick={() => setCanvasToolsOpen(false)} />
                         <div className="studio-menu absolute right-0 top-[calc(100%+6px)] z-40 w-72 p-2">
+                          {/* A bar under 760px has no room for how the page
+                              is looked at: the zoom, full screen and browser
+                              frame leave it and come back here, on top. */}
+                          {canvasMode !== 'source' && (
+                            <div className="mb-2 space-y-1 border-b border-[var(--studio-border)] pb-2 @[760px]:hidden">
+                              {canvasMode === 'edit' && (
+                                <div className="flex items-center justify-between gap-2 px-1">
+                                  <span className="text-xs text-[var(--studio-text-muted)]">{t('Zoom')}</span>
+                                  {canvasZoomControl}
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                aria-pressed={browserFrameEnabled}
+                                onClick={toggleBrowserFrame}
+                                className={`studio-menu-item ${browserFrameEnabled ? 'bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]' : ''}`}
+                              >
+                                <MonitorIcon size={14} />
+                                {t(browserFrameEnabled ? 'Hide browser frame' : 'Show browser frame')}
+                              </button>
+                            </div>
+                          )}
                           <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--studio-text-faint)]">{t('Custom resolution')}</div>
                           <div className="mb-2 flex items-center gap-1.5">
                             <input ref={resolutionWidthRef} key={`tool-width-${viewport}-${curW}`} type="number" min={viewport === 'mobile' ? 240 : 320} max={viewport === 'mobile' ? 1200 : 4000} defaultValue={curW} aria-label={t('Custom width (px)')} className="studio-input min-w-0 flex-1 px-2 py-1.5 text-xs" />
