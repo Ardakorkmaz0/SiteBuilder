@@ -80,8 +80,7 @@ const LIST_EDGE = 8
 // Where the list can be seen: the window, less whatever its ancestors clip
 // (the stage cuts off what overflows it, so a list hanging past its right end
 // lost its cards there). The window is the page's own width where that is
-// smaller: Firefox counts a scrollbar's room in `innerWidth`, and the list ran
-// 15px past the window's edge.
+// smaller: `innerWidth` counts a vertical scrollbar's room too.
 function roomFor(el) {
   const doc = el.ownerDocument
   const view = doc.defaultView
@@ -122,7 +121,10 @@ export default function DevicePicker({ items, value, onPick, fallbackLabel = '',
       const room = roomFor(root)
       const rootLeft = root.getBoundingClientRect().left
       dialog.style.width = ''
-      const natural = dialog.getBoundingClientRect().width
+      // The width it lays out at. Its box on screen is smaller while the menu's
+      // opening animation (scale .97) runs: measured then, the list was placed
+      // for 427px, grew to 440 and ran 13px past the window's edge.
+      const natural = dialog.offsetWidth || dialog.getBoundingClientRect().width
       const width = Math.min(natural, Math.max(0, room.right - room.left - LIST_EDGE * 2))
       const left = Math.max(
         Math.min(0, room.right - LIST_EDGE - (rootLeft + width)),

@@ -186,8 +186,7 @@ describe('DevicePicker', () => {
     expect(roomy.style.width).toBe('')
   })
 
-  // Firefox counts a scrollbar's room in innerWidth: the list was placed for a
-  // 1055px window that showed 1040px, and ran past its edge (CI, 2026-11-25).
+  // innerWidth counts a vertical scrollbar's room: the page itself is narrower.
   it('keeps inside the page\'s own width when the window counts a scrollbar\'s room too', () => {
     const box = (left, width) => ({ left, right: left + width, top: 0, bottom: 500, width, height: 500, x: left, y: 0 })
     const innerWidth = window.innerWidth
@@ -207,6 +206,27 @@ describe('DevicePicker', () => {
       Object.defineProperty(window, 'innerWidth', { value: innerWidth, configurable: true })
       delete document.documentElement.clientWidth
     }
+  })
+
+  // The menu opens with an animation from scale .97: measured on screen at
+  // that moment the list was 427px wide, so it was placed for 427, grew to 440
+  // and ran 13px past the window's edge (CI, Chromium and Firefox, 2026-11-25).
+  it('is placed for the width it lays out at, not its smaller box while it opens', () => {
+    const box = (left, width) => ({ left, right: left + width, top: 0, bottom: 500, width, height: 500, x: left, y: 0 })
+    renderPicker()
+    const root = trigger().parentElement
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function measured() {
+      if (this === root) return box(647, 48)
+      // On screen, mid-animation: 440 × .97.
+      if (this.getAttribute('role') === 'dialog') return box(654, 427)
+      return box(0, 0)
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function laidOut() {
+      return this.getAttribute('role') === 'dialog' ? 440 : 0
+    })
+    // jsdom's window is 1024px: less 8px, the 440px list ends at 1016 and
+    // starts at 576, 71px left of its button.
+    expect(open().style.left).toBe('-71px')
   })
 
   it('moves again when the window is resized while it is open', () => {
