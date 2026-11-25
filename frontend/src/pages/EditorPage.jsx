@@ -3576,14 +3576,16 @@ function SiteEditor() {
                   {/* A page shown a part at a time: which part the canvas
                       shows (View opens on the first, as a visitor's does).
                       It gives way first where the bar is short of room: a
-                      long part name pushed the ⋯ menu past the bar's end. */}
+                      long part name pushed the ⋯ menu past the bar's end. It
+                      may shrink as far as it must (min-w-0): a 64px floor still
+                      ran the bar 7px past its end in Firefox at 1040px. */}
                   {canvasMode === 'edit' && currentParts.length > 0 && (
                     <select
                       value={shownPartOf(currentPage)}
                       onChange={(e) => showPart(currentPage.id, e.target.value)}
                       aria-label={t('Part of the page on the canvas')}
                       title={t('Part of the page on the canvas')}
-                      className="studio-input min-w-[64px] max-w-[120px] shrink truncate px-2 py-1.5 text-xs font-medium @[1100px]:max-w-[200px]"
+                      className="studio-input min-w-0 max-w-[120px] shrink truncate px-2 py-1.5 text-xs font-medium @[1100px]:max-w-[200px]"
                     >
                       {currentParts.map((part, index) => (
                         <option key={part.key} value={part.key}>{part.label || t('Part {count}', { count: index + 1 })}</option>
