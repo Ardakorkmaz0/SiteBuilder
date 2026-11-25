@@ -47,7 +47,7 @@ export default function PanelGroup({ id, title, defaultOpen = false, aside = nul
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left"
       >
         <span className="flex-1 text-xs font-semibold text-[var(--studio-text)]">
           {title}
@@ -55,10 +55,10 @@ export default function PanelGroup({ id, title, defaultOpen = false, aside = nul
         </span>
         <ChevronDownIcon
           size={14}
-          className={`shrink-0 text-[var(--studio-text-faint,#9ca3af)] transition-transform ${open ? '' : '-rotate-90'}`}
+          className={`shrink-0 text-[var(--studio-text-faint)] transition-transform ${open ? '' : '-rotate-90'}`}
         />
       </button>
-      {open && <div className="space-y-3 border-t border-[var(--studio-border)] px-3 pb-3 pt-3">{children}</div>}
+      {open && <div className="space-y-2.5 border-t border-[var(--studio-border)] px-3 pb-3 pt-2.5">{children}</div>}
     </section>
   )
 }

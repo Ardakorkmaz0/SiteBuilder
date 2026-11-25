@@ -237,6 +237,54 @@ export const ICON_NODES = {
     ['circle', { cx: 8.5, cy: 9.5, r: 1.5 }],
     ['path', { d: 'm21 16-4.5-4.5L7 21' }],
   ],
+  // Inspector alignment, distribution, and inline text marks.
+  alignLeft: [
+    ['path', { d: 'M3 6h18M3 12h12M3 18h15' }],
+  ],
+  alignCenter: [
+    ['path', { d: 'M3 6h18M6 12h12M4.5 18h15' }],
+  ],
+  alignRight: [
+    ['path', { d: 'M3 6h18M9 12h12M6 18h15' }],
+  ],
+  alignBoxLeft: [
+    ['path', { d: 'M4 4v16' }],
+    ['rect', { x: 8, y: 7, width: 10, height: 10, rx: 2 }],
+  ],
+  alignBoxCenter: [
+    ['path', { d: 'M12 3v3M12 18v3' }],
+    ['rect', { x: 6, y: 7, width: 12, height: 10, rx: 2 }],
+  ],
+  alignBoxRight: [
+    ['path', { d: 'M20 4v16' }],
+    ['rect', { x: 6, y: 7, width: 10, height: 10, rx: 2 }],
+  ],
+  alignBoxTop: [
+    ['path', { d: 'M4 4h16' }],
+    ['rect', { x: 7, y: 8, width: 10, height: 10, rx: 2 }],
+  ],
+  alignBoxMiddle: [
+    ['path', { d: 'M3 12h3M18 12h3' }],
+    ['rect', { x: 7, y: 6, width: 10, height: 12, rx: 2 }],
+  ],
+  alignBoxBottom: [
+    ['path', { d: 'M4 20h16' }],
+    ['rect', { x: 7, y: 6, width: 10, height: 10, rx: 2 }],
+  ],
+  distributeH: [
+    ['path', { d: 'M4 4v16M20 4v16' }],
+    ['rect', { x: 9, y: 7, width: 6, height: 10, rx: 1.5 }],
+  ],
+  distributeV: [
+    ['path', { d: 'M4 4h16M4 20h16' }],
+    ['rect', { x: 7, y: 9, width: 10, height: 6, rx: 1.5 }],
+  ],
+  italic: [
+    ['path', { d: 'M10 4h8M6 20h8M14.5 4 9.5 20' }],
+  ],
+  underline: [
+    ['path', { d: 'M6 4v6a6 6 0 0 0 12 0V4M4 20h16' }],
+  ],
 }
 
 const escapeAttr = (value) => String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')

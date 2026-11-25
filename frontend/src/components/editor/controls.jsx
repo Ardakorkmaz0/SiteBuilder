@@ -11,11 +11,11 @@ import { useLanguage } from '../../i18n/useLanguage.js'
 import { apiError } from '../../utils/errors.js'
 import { completeExternalUrl } from '../../utils/linkTargets.js'
 import { MAX_FILE_BYTES } from '../../utils/sanitize.js'
-import { ArrowDownIcon, ArrowUpIcon, TrashIcon } from '../icons.jsx'
+import { ArrowDownIcon, ArrowUpIcon, NodeIcon, TrashIcon } from '../icons.jsx'
 
 // Shared property controls inherit the active Studio theme.
-const inputCls = 'studio-input min-w-0 w-full px-2.5 py-2 text-sm'
-const labelCls = 'mb-1 block text-xs font-semibold text-[var(--studio-text-muted)]'
+const inputCls = 'studio-input min-w-0 w-full px-2.5 py-1.5 text-xs'
+const labelCls = 'mb-1 block text-[11px] font-medium text-[var(--studio-text-muted)]'
 
 export function LabeledText({ label, value, onChange, placeholder }) {
   return (
@@ -110,12 +110,12 @@ export function LabeledImage({ label, value, onChange }) {
             src={value}
             alt=""
             style={{ aspectRatio: '4 / 3' }}
-            className="h-16 w-24 rounded-lg border border-[#e5e7eb] object-cover"
+            className="h-14 w-20 rounded-lg border border-[var(--studio-border)] object-cover"
           />
           <button
             type="button"
             onClick={() => onChange('')}
-            className="rounded-lg px-2 py-1 text-xs text-[var(--studio-text-muted)] hover:bg-[#f3f4f6]"
+            className="rounded-lg px-2 py-1 text-xs text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]"
           >
             {t('Clear')}
           </button>
@@ -142,10 +142,10 @@ export function LabeledImage({ label, value, onChange }) {
           e.preventDefault()
           if (!busy) fileRef.current?.click()
         }}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-3 py-4 text-center text-xs transition ${
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-3 py-3 text-center text-xs transition ${
           dragOver
-            ? 'border-[#4f46e5] bg-[#eef2ff] text-[#4f46e5]'
-            : 'border-[#d1d5db] bg-[#f9fafb] text-[var(--studio-text-muted)] hover:border-[#d1d5db]'
+            ? 'border-[var(--studio-accent)] bg-[var(--studio-accent-soft)] text-[var(--studio-accent-text)]'
+            : 'border-[var(--studio-border-strong)] bg-[var(--studio-control)] text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)]'
         }`}
       >
         {busy
@@ -160,14 +160,14 @@ export function LabeledImage({ label, value, onChange }) {
         <button
           type="button"
           onClick={() => setLibraryOpen((o) => !o)}
-          className="rounded-lg border border-[#d1d5db] px-2 py-1 text-xs font-medium text-[#374151] hover:bg-[#f3f4f6]"
+          className="studio-btn studio-btn-secondary px-2 py-1 text-xs"
         >
           {libraryOpen ? t('Hide library') : t('My library')}
         </button>
         <button
           type="button"
           onClick={() => setShowUrl((s) => !s)}
-          className="rounded-lg px-2 py-1 text-xs font-medium text-[var(--studio-text-muted)] hover:bg-[#f3f4f6]"
+          className="rounded-lg px-2 py-1 text-xs font-medium text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]"
         >
           {showUrl ? t('Hide URL') : t('Paste URL')}
         </button>
@@ -185,7 +185,7 @@ export function LabeledImage({ label, value, onChange }) {
 
       {libraryOpen ? <ImageLibrary value={value} onPick={onChange} /> : null}
 
-      {err ? <p className="mt-1 text-xs text-[#a4262c]">{err}</p> : null}
+      {err ? <p className="mt-1 text-xs text-[var(--studio-danger)]">{err}</p> : null}
 
       {/* Built-in presets */}
       <div className="mt-2">
@@ -202,8 +202,8 @@ export function LabeledImage({ label, value, onChange }) {
               style={{ aspectRatio: '4 / 3' }}
               className={`overflow-hidden rounded-lg border ${
                 value === p.src
-                  ? 'border-[#4f46e5] ring-1 ring-[#4f46e5]'
-                  : 'border-[#e5e7eb] hover:border-[#d1d5db]'
+                  ? 'border-[var(--studio-accent)] ring-1 ring-[var(--studio-accent)]'
+                  : 'border-[var(--studio-border)] hover:border-[var(--studio-border-strong)]'
               }`}
             >
               <img src={p.src} alt={p.name} className="h-full w-full object-cover" />
@@ -268,8 +268,8 @@ function ImageLibrary({ value, onPick }) {
               style={{ aspectRatio: '4 / 3' }}
               className={`block w-full overflow-hidden rounded-lg border ${
                 value === img.url
-                  ? 'border-[#4f46e5] ring-1 ring-[#4f46e5]'
-                  : 'border-[#e5e7eb] hover:border-[#d1d5db]'
+                  ? 'border-[var(--studio-accent)] ring-1 ring-[var(--studio-accent)]'
+                  : 'border-[var(--studio-border)] hover:border-[var(--studio-border-strong)]'
               }`}
             >
               <img src={img.url} alt={img.alt || ''} className="h-full w-full object-cover" />
@@ -279,14 +279,14 @@ function ImageLibrary({ value, onPick }) {
               onClick={() => remove(img.id)}
               title={t('Delete from library')}
               aria-label={t('Delete from library')}
-              className="absolute right-0.5 top-0.5 rounded-full bg-white/90 px-1 text-[10px] text-[#a4262c] opacity-0 shadow focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+              className="absolute right-0.5 top-0.5 rounded-full bg-[var(--studio-panel-raised)] px-1 text-[10px] text-[var(--studio-danger)] opacity-0 shadow focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
             >
               <TrashIcon size={10} />
             </button>
           </div>
         ))}
       </div>
-      {err ? <p className="mt-1 text-xs text-[#a4262c]">{err}</p> : null}
+      {err ? <p className="mt-1 text-xs text-[var(--studio-danger)]">{err}</p> : null}
     </div>
   )
 }
@@ -334,10 +334,10 @@ export function LabeledColor({ label, value, onChange, fallback, accepts, subjec
   return (
     <div className="block min-w-0">
       <span id={labelId} className={labelCls}>{label}</span>
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1.5">
         <input
           type="color"
-          className="h-8 w-10 cursor-pointer rounded-lg border border-[#d1d5db]"
+          className="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-[var(--studio-border)] bg-[var(--studio-control)] p-0.5"
           aria-label={typeof label === 'string' ? t('Pick a colour: {label}', { label }) : undefined}
           aria-labelledby={typeof label === 'string' ? undefined : labelId}
           value={hex}
@@ -348,7 +348,7 @@ export function LabeledColor({ label, value, onChange, fallback, accepts, subjec
         />
         <input
           type="text"
-          className={inputCls}
+          className={inputCls + ' font-mono'}
           aria-labelledby={labelId}
           value={draft ?? value ?? ''}
           placeholder={fallback || '#000000'}
@@ -393,50 +393,109 @@ export function LabeledSelect({ label, value, onChange, options }) {
   )
 }
 
-// One-click position picker: the three choices sit side by side as pressed-in
-// buttons instead of hiding inside a dropdown, so setting where the brand or the
-// links sit is a single click and the current choice is visible at a glance.
-// Each option carries a tiny diagram of the bar with the item in that spot.
-export function LabeledAlign({ label, value, onChange, options }) {
+// Segmented icon buttons for alignment and compact discrete choices.
+// Each option is [value, ariaLabel, iconName, disabled?], drawn strictly from
+// components/iconNodes.js via NodeIcon.
+export function SegmentedIconButtons({
+  label,
+  value,
+  onChange,
+  options,
+  allowClear = false,
+  inline = false,
+}) {
+  const group = (
+    <div
+      role="group"
+      aria-label={typeof label === 'string' ? label : undefined}
+      className={`flex items-center gap-0.5 rounded-lg border border-[var(--studio-border)] bg-[var(--studio-control)] p-0.5 ${
+        inline ? 'shrink-0' : 'w-full'
+      }`}
+    >
+      {options.map(([val, optionLabel, iconName, disabled]) => {
+        const active = value !== undefined && value !== null && value !== '' && value === val
+        return (
+          <button
+            key={val}
+            type="button"
+            disabled={disabled}
+            aria-label={optionLabel}
+            title={optionLabel}
+            aria-pressed={active}
+            onClick={() => onChange(allowClear && active ? '' : val)}
+            className={`flex items-center justify-center rounded-md py-1.5 transition disabled:cursor-not-allowed disabled:opacity-40 ${
+              inline ? 'px-2.5' : 'flex-1 px-2'
+            } ${
+              active
+                ? 'bg-[var(--studio-panel-raised)] text-[var(--studio-accent-text)] shadow-[var(--studio-shadow-sm)] ring-1 ring-[color-mix(in_srgb,var(--studio-accent)_32%,var(--studio-border))]'
+                : 'text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]'
+            }`}
+          >
+            <NodeIcon name={iconName} size={14} />
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  if (inline) {
+    return (
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium text-[var(--studio-text-muted)]">{label}</span>
+        {group}
+      </div>
+    )
+  }
+
   return (
     <div className="block">
-      <span className={labelCls}>{label}</span>
-      <div role="group" aria-label={label} className="flex gap-1">
-        {options.map(([val, text]) => {
-          const on = (value ?? options[0][0]) === val
-          return (
-            <button
-              key={val}
-              type="button"
-              onClick={() => onChange(val)}
-              aria-pressed={on}
-              title={text}
-              className={`flex flex-1 items-center justify-center rounded-lg border px-2 py-1.5 transition ${
-                on
-                  ? 'border-[#4f46e5] bg-[#eef2ff] text-[#4f46e5]'
-                  : 'border-[var(--studio-border,#e5e7eb)] text-[var(--studio-text-muted)] hover:border-[#4f46e5] hover:text-[#4f46e5]'
-              }`}
-            >
-              <AlignGlyph position={val} />
-              <span className="sr-only">{text}</span>
-            </button>
-          )
-        })}
-      </div>
+      {label && <span className={labelCls}>{label}</span>}
+      {group}
     </div>
   )
 }
 
-// A bar with a block parked left / centre / right — reads faster than the word.
-function AlignGlyph({ position }) {
-  const x = position === 'center' ? 8 : position === 'right' ? 14 : 2
+const ALIGN_BOX_ICONS = {
+  left: 'alignBoxLeft',
+  center: 'alignBoxCenter',
+  right: 'alignBoxRight',
+}
+
+// One-click position picker: the three choices sit side by side as pressed-in
+// buttons instead of hiding inside a dropdown, so setting where the brand or the
+// links sit is a single click and the current choice is visible at a glance.
+export function LabeledAlign({ label, value, onChange, options }) {
+  const current = value ?? options[0]?.[0]
   return (
-    <svg viewBox="0 0 24 12" width="30" height="15" aria-hidden="true">
-      <rect x="0.5" y="0.5" width="23" height="11" rx="2" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.45" />
-      <rect x={x} y="3" width="8" height="6" rx="1.5" fill="currentColor" />
-    </svg>
+    <SegmentedIconButtons
+      label={label}
+      value={current}
+      onChange={onChange}
+      options={options.map(([val, text]) => [
+        val,
+        text,
+        ALIGN_BOX_ICONS[val] || 'alignBoxLeft',
+      ])}
+    />
   )
 }
+
+function UnitInputShell({ unit, children }) {
+  if (!unit) return children
+  return (
+    <div className="studio-input flex min-w-0 items-center px-0 py-0">
+      {children}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none shrink-0 select-none pr-2.5 text-[11px] font-medium text-[var(--studio-text-faint)]"
+      >
+        {unit}
+      </span>
+    </div>
+  )
+}
+
+const bareNumberCls = 'min-w-0 flex-1 bg-transparent px-2.5 py-1.5 text-xs text-[var(--studio-text)] placeholder:text-[var(--studio-text-faint)] focus:outline-none'
 
 // One number with an optional unit, e.g. "16px", "-0.02em", "1.5rem", "50%".
 const CSS_LENGTH_RE = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|em|rem|%|vw|vh)?\s*$/i
@@ -449,15 +508,15 @@ const CSS_LENGTH_RE = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|em|rem|%|vw|vh)?\s*$/i
 // 2.5px, 50% became 51px, and "10px 24px" lost its horizontal padding. The unit
 // is now kept and shown; a value that is not a single length (several values,
 // calc(), clamp()) is edited as text so nothing is thrown away.
-export function LabeledPx({ label, value, onChange, placeholder, subject }) {
+export function LabeledPx({ label, value, onChange, placeholder, subject, defaultUnit = 'px' }) {
   const raw = String(value ?? '')
   const match = CSS_LENGTH_RE.exec(raw)
   const explicitUnit = match?.[2]?.toLowerCase() || ''
   const [lastSubject, setLastSubject] = useState(subject)
-  const [lastUnit, setLastUnit] = useState(explicitUnit || 'px')
+  const [lastUnit, setLastUnit] = useState(explicitUnit || defaultUnit)
   if (subject !== lastSubject) {
     setLastSubject(subject)
-    setLastUnit(explicitUnit || 'px')
+    setLastUnit(explicitUnit || defaultUnit)
   } else if (explicitUnit && explicitUnit !== lastUnit) {
     setLastUnit(explicitUnit)
   }
@@ -465,24 +524,23 @@ export function LabeledPx({ label, value, onChange, placeholder, subject }) {
     return <LabeledText label={label} value={raw} onChange={onChange} />
   }
   const num = match ? match[1] : ''
-  const unit = explicitUnit || (raw.trim() ? 'px' : lastUnit)
+  const unit = explicitUnit || (raw.trim() ? defaultUnit : lastUnit)
   const fine = unit === 'em' || unit === 'rem'
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className={labelCls}>{label}</span>
-      <div className="flex items-center gap-1">
+      <UnitInputShell unit={unit}>
         <input
           type="number"
           step={fine ? 0.01 : 1}
-          className={inputCls}
+          className={bareNumberCls}
           value={num}
           placeholder={placeholder}
           onChange={(e) =>
             onChange(e.target.value === '' ? '' : `${e.target.value}${unit}`)
           }
         />
-        <span className="text-xs text-[var(--studio-text-muted)]">{unit}</span>
-      </div>
+      </UnitInputShell>
     </label>
   )
 }
@@ -490,7 +548,16 @@ export function LabeledPx({ label, value, onChange, placeholder, subject }) {
 // Whole numbers unless `step` is a fraction. A line height of 1.2 and letter
 // spacing of 0.05em used to be rounded on the way in and out: they read as 1
 // and 0, and typing 1.5 turned into 2 under the cursor.
-export function LabeledNumber({ label, value, onChange, step = 1, allowEmpty = false, subject }) {
+export function LabeledNumber({
+  label,
+  value,
+  onChange,
+  step = 1,
+  allowEmpty = false,
+  subject,
+  unit,
+  placeholder,
+}) {
   const fractional = step < 1
   const keepDraft = fractional || allowEmpty
   // What the person is typing ("1.", "0.0") until they leave the field; the
@@ -508,23 +575,26 @@ export function LabeledNumber({ label, value, onChange, step = 1, allowEmpty = f
       ? String(Number(value) || 0)
       : Math.round(value ?? 0)
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className={labelCls}>{label}</span>
-      <input
-        type="number"
-        step={step}
-        className={inputCls}
-        value={draft ?? shown}
-        onChange={(e) => {
-          const raw = e.target.value
-          if (keepDraft) setDraft(raw)
-          // HTML fields opt into the distinction: empty restores the inherited
-          // style while 0 is an explicit value. Other integer consumers keep
-          // their existing clear-to-zero behavior.
-          onChange(raw === '' ? (keepDraft ? '' : 0) : Number(raw))
-        }}
-        onBlur={() => setDraft(null)}
-      />
+      <UnitInputShell unit={unit}>
+        <input
+          type="number"
+          step={step}
+          placeholder={placeholder}
+          className={unit ? bareNumberCls : inputCls}
+          value={draft ?? shown}
+          onChange={(e) => {
+            const raw = e.target.value
+            if (keepDraft) setDraft(raw)
+            // HTML fields opt into the distinction: empty restores the inherited
+            // style while 0 is an explicit value. Other integer consumers keep
+            // their existing clear-to-zero behavior.
+            onChange(raw === '' ? (keepDraft ? '' : 0) : Number(raw))
+          }}
+          onBlur={() => setDraft(null)}
+        />
+      </UnitInputShell>
     </label>
   )
 }
@@ -543,9 +613,9 @@ export function LabeledRange({ label, value, onChange, min = 0, max = 1, step = 
           step={step}
           value={v}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 accent-[#4f46e5]"
+          className="flex-1 accent-[var(--studio-accent)]"
         />
-        <span className="w-8 text-right text-xs text-[var(--studio-text-muted)]">{v}</span>
+        <span className="w-8 text-right font-mono text-[11px] text-[var(--studio-text-muted)]">{v}</span>
       </div>
     </label>
   )
@@ -556,12 +626,12 @@ export function LabeledCheckbox({ label, checked, onChange, hint }) {
     <label className="flex cursor-pointer items-center gap-2 py-0.5">
       <input
         type="checkbox"
-        className="h-4 w-4 cursor-pointer rounded-lg border-[#d1d5db] accent-[#4f46e5]"
+        className="h-3.5 w-3.5 cursor-pointer rounded border-[var(--studio-border-strong)] accent-[var(--studio-accent)]"
         checked={!!checked}
         onChange={(e) => onChange(e.target.checked)}
       />
-      <span className="text-sm text-[#374151]">{label}</span>
-      {hint && <span className="text-xs text-[var(--studio-text-muted)]">{hint}</span>}
+      <span className="text-xs text-[var(--studio-text)]">{label}</span>
+      {hint && <span className="text-[11px] text-[var(--studio-text-muted)]">{hint}</span>}
     </label>
   )
 }
@@ -635,7 +705,9 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
             <div
               key={tab.id}
               className={`rounded-lg border p-2 ${
-                sel ? 'border-[#4f46e5] bg-[#eef2ff]' : 'border-[#e5e7eb]'
+                sel
+                  ? 'border-[var(--studio-accent)] bg-[var(--studio-accent-soft)]'
+                  : 'border-[var(--studio-border)] bg-[var(--studio-panel-raised)]'
               }`}
             >
               <div className="mb-1 flex items-center justify-between gap-1">
@@ -643,7 +715,9 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
                   type="button"
                   onClick={() => onActiveChange && onActiveChange(tab.id)}
                   className={`text-xs font-semibold ${
-                    sel ? 'text-[#4f46e5]' : 'text-[var(--studio-text-muted)] hover:text-[#4f46e5]'
+                    sel
+                      ? 'text-[var(--studio-accent-text)]'
+                      : 'text-[var(--studio-text-muted)] hover:text-[var(--studio-accent-text)]'
                   }`}
                   title={t('Show this tab on the canvas')}
                 >
@@ -654,7 +728,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
                     type="button"
                     onClick={() => move(tab.id, -1)}
                     disabled={i === 0}
-                    className="rounded-lg px-1 text-xs text-[var(--studio-text-muted)] hover:bg-[#f3f4f6] disabled:opacity-30"
+                    className="rounded-lg px-1 text-xs text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] disabled:opacity-30"
                     title={t('Move up')}
                     aria-label={t('Move up')}
                   >
@@ -664,7 +738,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
                     type="button"
                     onClick={() => move(tab.id, 1)}
                     disabled={i === tabs.length - 1}
-                    className="rounded-lg px-1 text-xs text-[var(--studio-text-muted)] hover:bg-[#f3f4f6] disabled:opacity-30"
+                    className="rounded-lg px-1 text-xs text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] disabled:opacity-30"
                     title={t('Move down')}
                     aria-label={t('Move down')}
                   >
@@ -674,7 +748,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
                     type="button"
                     onClick={() => remove(tab.id)}
                     disabled={tabs.length <= 1}
-                    className="text-xs text-[#a4262c] hover:underline disabled:text-[#9ca3af] disabled:no-underline"
+                    className="text-xs text-[var(--studio-danger)] hover:underline disabled:text-[var(--studio-text-faint)] disabled:no-underline"
                   >
                     {t('Remove')}
                   </button>
@@ -693,7 +767,7 @@ export function TabsEditorControl({ label, value, onChange, activeId, onActiveCh
         <button
           type="button"
           onClick={add}
-          className="w-full rounded-lg border border-dashed border-[#d1d5db] py-1 text-xs text-[var(--studio-text-muted)] hover:border-[#4f46e5] hover:text-[#4f46e5]"
+          className="w-full rounded-lg border border-dashed border-[var(--studio-border-strong)] py-1.5 text-xs text-[var(--studio-text-muted)] hover:border-[var(--studio-accent)] hover:text-[var(--studio-accent-text)]"
         >
           {t('+ Add tab')}
         </button>
@@ -907,13 +981,13 @@ export function LinksEditor({ label, value, onChange, pages = [], sections = nul
       <span className={labelCls}>{label}</span>
       <div className="space-y-2">
         {links.map((link, i) => (
-          <div key={keys[i] ?? i} className="rounded-lg border border-[#e5e7eb] p-2">
+          <div key={keys[i] ?? i} className="rounded-lg border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-2">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-xs text-[var(--studio-text-muted)]">{t('Link')} {i + 1}</span>
               <button
                 type="button"
                 onClick={() => remove(i)}
-                className="text-xs text-[#a4262c] hover:underline"
+                className="text-xs text-[var(--studio-danger)] hover:underline"
               >
                 {t('Remove')}
               </button>
@@ -938,7 +1012,7 @@ export function LinksEditor({ label, value, onChange, pages = [], sections = nul
         <button
           type="button"
           onClick={add}
-          className="w-full rounded-lg border border-dashed border-[#d1d5db] py-1 text-xs text-[var(--studio-text-muted)] hover:border-[#4f46e5] hover:text-[#4f46e5]"
+          className="w-full rounded-lg border border-dashed border-[var(--studio-border-strong)] py-1.5 text-xs text-[var(--studio-text-muted)] hover:border-[var(--studio-accent)] hover:text-[var(--studio-accent-text)]"
         >
           {t('+ Add link')}
         </button>
@@ -957,7 +1031,7 @@ export function HtmlContentControl({ label, value, onChange, pages = [] }) {
     <div>
       <span className={labelCls}>{label}</span>
       {!hasFields ? (
-        <p className="rounded-lg border border-dashed border-[#d1d5db] bg-white p-2 text-xs leading-relaxed text-[var(--studio-text-muted)]">
+        <p className="rounded-lg border border-dashed border-[var(--studio-border-strong)] bg-[var(--studio-panel-raised)] p-2 text-xs leading-relaxed text-[var(--studio-text-muted)]">
           {t('No simple text or links found. Use the HTML / CSS / JS editor below.')}
         </p>
       ) : (
