@@ -8,7 +8,9 @@ import { test as base, expect } from '@playwright/test'
 
 export const API = process.env.E2E_API_URL || 'http://127.0.0.1:8001/api'
 export const BACKEND = API.replace(/\/api\/?$/, '')
-export const APP_ORIGIN = 'http://localhost:5173'
+// E2E_APP_ORIGIN and E2E_API_URL let a local run use its own servers on other
+// ports while the usual ones are taken.
+export const APP_ORIGIN = process.env.E2E_APP_ORIGIN || 'http://localhost:5173'
 export const AUTH_DIR = fileURLToPath(new URL('./.auth/', import.meta.url))
 export const SESSION_FILE = `${AUTH_DIR}session.json`
 export const STATE_FILE = `${AUTH_DIR}state.json`
