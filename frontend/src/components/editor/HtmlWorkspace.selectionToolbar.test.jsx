@@ -16,7 +16,7 @@ afterEach(() => vi.useRealTimers())
 
 // Edit mode with the heading selected. The heading reports a real box, as a
 // browser would; jsdom lays nothing out.
-function selectHeading({ frameWidth } = {}) {
+function selectHeading({ frameWidth, pageWidth, headingBox } = {}) {
   const onCommit = vi.fn()
   const onElementSelect = vi.fn()
   render(
@@ -26,11 +26,13 @@ function selectHeading({ frameWidth } = {}) {
   )
   const iframe = screen.getByTitle('site')
   if (frameWidth) iframe.getBoundingClientRect = () => ({ left: 0, top: 0, right: frameWidth, bottom: 400, width: frameWidth, height: 400 })
+  if (pageWidth) Object.defineProperty(iframe.contentWindow, 'innerWidth', { value: pageWidth, configurable: true })
   iframe.contentDocument.body.innerHTML = '<section><h1 id="title">Garden notes</h1></section>'
   fireEvent.load(iframe)
   const doc = iframe.contentDocument
   const heading = doc.getElementById('title')
-  heading.getBoundingClientRect = () => ({ left: 300, top: 200, right: 700, bottom: 260, width: 400, height: 60 })
+  const box = headingBox || { left: 300, top: 200, width: 400, height: 60 }
+  heading.getBoundingClientRect = () => ({ ...box, right: box.left + box.width, bottom: box.top + box.height })
   act(() => { fireEvent.click(heading) })
   return { doc, heading, onCommit, onElementSelect }
 }
@@ -75,5 +77,20 @@ describe('the bar over a selected element of an HTML page', () => {
     expect(toolbar.style.transformOrigin).toBe('top left')
     // 38px bar and 8px gap on screen = 92px above the heading in page pixels.
     expect(toolbar.style.top).toBe('-92px')
+  })
+
+  // Galaxy Z Flip6's cover screen at 50%: 320px of page drawn 160px wide. The
+  // bar kept its size on screen, wider than the page, and the frame cut off
+  // its trash can and X.
+  it('fits on a page narrower on screen than the bar, trash can and X included', () => {
+    const { doc } = selectHeading({ frameWidth: 160, pageWidth: 320, headingBox: { left: 0, top: 120, width: 320, height: 40 } })
+    const toolbar = doc.querySelector('[data-pwb-selection-toolbar]')
+    expect(toolbar.querySelectorAll('[data-pwb-selection-action]')).toHaveLength(8)
+    const drawn = Number(/scale\(([\d.]+)\)/.exec(toolbar.style.transform)?.[1] || 1)
+    const left = Number.parseFloat(toolbar.style.left)
+    // 8 buttons of 28px, 7 gaps of 2px, 4px padding and a 1px border at each end.
+    const barWidth = 248
+    expect(left).toBeGreaterThanOrEqual(0)
+    expect(left + barWidth * drawn).toBeLessThanOrEqual(320)
   })
 })

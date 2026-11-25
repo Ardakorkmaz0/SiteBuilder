@@ -83,7 +83,7 @@ import {
   SELECTION_ICON_SIZE,
   selectionActionIcon,
 } from './selectionToolbar.js'
-import { normalizedSelectionActionsScale, selectionActionsPosition } from './canvasSelectionActionsLayout.js'
+import { fittedSelectionActionsScale, selectionActionsPosition } from './canvasSelectionActionsLayout.js'
 import { readZoom, writeZoom, zoomScale } from './canvasZoom.js'
 import BrushControls from './BrushControls.jsx'
 import { ChevronDownIcon, EditIcon, ExternalLinkIcon, FileCodeIcon, LightbulbIcon, LinkIcon, MonitorIcon, MoreHorizontalIcon, MoveIcon, PaletteIcon, PinIcon, WarningIcon } from '../icons.jsx'
@@ -340,16 +340,19 @@ function updateSelectionResizeChrome(doc, el) {
   const toolbar = overlay.querySelector('[data-pwb-selection-toolbar]')
   if (toolbar) {
     const view = doc.defaultView
-    const scale = normalizedSelectionActionsScale(frameScale(doc))
+    const pageWidth = view?.innerWidth || rect.width
+    const actionCount = toolbar.querySelectorAll('[data-pwb-selection-action]').length
+    // Smaller than its size on screen only where the page is narrower than it.
+    const scale = fittedSelectionActionsScale(frameScale(doc), pageWidth, actionCount)
     const place = selectionActionsPosition({
-      canvasWidth: view?.innerWidth || rect.width,
+      canvasWidth: pageWidth,
       canvasHeight: view?.innerHeight || rect.height,
       targetX: rect.left,
       targetY: rect.top,
       targetWidth: rect.width,
       targetHeight: rect.height,
       canvasScale: scale,
-      actionCount: toolbar.querySelectorAll('[data-pwb-selection-action]').length,
+      actionCount,
     })
     toolbar.style.left = `${place.left - Math.round(rect.left)}px`
     toolbar.style.top = `${place.top - Math.round(rect.top)}px`

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  fittedSelectionActionsScale,
   selectionActionsCanvasHeight,
   selectionActionsCanvasWidth,
   selectionActionsPosition,
@@ -125,5 +126,27 @@ describe('selection action bar counter-scale', () => {
       expect(Math.ceil(unscaledWidth * factor), `w @ ${scale}`).toBe(selectionActionsCanvasWidth(scale))
       expect(Math.ceil(unscaledHeight * factor), `h @ ${scale}`).toBe(selectionActionsCanvasHeight(scale))
     }
+  })
+})
+
+// A page narrower on screen than the bar (a phone's cover screen, zoomed out)
+// cut off the trash can and the X at its end.
+describe('selection action bar on a page narrower than the bar', () => {
+  it('is drawn as wide as the page allows, and keeps its size wherever it fits', () => {
+    // 8 actions: 248px of bar and 8px at each end, 264px on screen. A 320px
+    // page drawn at half size is 160px on screen, so the bar is drawn for a
+    // scale of 264 / 320 = 0.825.
+    expect(fittedSelectionActionsScale(0.5, 320, 8)).toBe(0.825)
+    // A 1024px page at half size has room: the bar keeps its size.
+    expect(fittedSelectionActionsScale(0.5, 1024, 8)).toBe(0.5)
+    // No page width known yet: nothing changes.
+    expect(fittedSelectionActionsScale(0.5, 0, 8)).toBe(0.5)
+
+    const scale = fittedSelectionActionsScale(0.5, 320, 8)
+    const position = selectionActionsPosition({
+      canvasWidth: 320, canvasHeight: 332, targetX: 0, targetY: 120, targetWidth: 320, targetHeight: 40, canvasScale: scale, actionCount: 8,
+    })
+    expect(position.left).toBeGreaterThanOrEqual(0)
+    expect(position.left + selectionActionsCanvasWidth(scale, 8)).toBeLessThanOrEqual(320)
   })
 })

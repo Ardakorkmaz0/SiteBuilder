@@ -26,7 +26,7 @@ import { EmbedFontContext } from '../renderer/embedFont.js'
 import { BRUSH_CURSOR } from './brushCursor.js'
 import PreviewScrollIndicator from './PreviewScrollIndicator.jsx'
 import CanvasSelectionActions from './CanvasSelectionActions.jsx'
-import { selectionActionsCanvasWidth, selectionActionsPosition } from './canvasSelectionActionsLayout.js'
+import { fittedSelectionActionsScale, selectionActionsCanvasWidth, selectionActionsPosition } from './canvasSelectionActionsLayout.js'
 import { chromeBadgeStyle, chromeMetrics } from './selectionChrome.js'
 import { pageDirection, pageLanguage } from '../../utils/seoTags.js'
 import { colorModeFor, withColorModePage } from '../../utils/colorMode.js'
@@ -231,6 +231,9 @@ export default function Canvas({
   // feeding the chosen zoom through the same variable keeps hit-testing,
   // marquee selection and the counter-scaled toolbars correct at any zoom.
   const canvasScale = zoomScale(zoom, fitScale)
+  // The selection bar keeps its size on screen, or is drawn smaller where the
+  // page is narrower on screen than the bar (fittedSelectionActionsScale).
+  const selectionBarScale = fittedSelectionActionsScale(canvasScale, canvasW, selectionActionCount)
   // Canvas-level overlays (marquee, snap guides, link arrows, fold) are chrome
   // too: same physical weight at every zoom as the selection frame.
   const chrome = chromeMetrics(canvasScale)
@@ -274,7 +277,7 @@ export default function Canvas({
         targetY: (targetRect.top - canvasRect.top) / renderedScale,
         targetWidth: targetRect.width / renderedScale,
         targetHeight: targetRect.height / renderedScale,
-        canvasScale,
+        canvasScale: selectionBarScale,
         actionCount: selectionActionCount,
         }),
         componentId: selectedId,
@@ -303,7 +306,7 @@ export default function Canvas({
     }
   }, [
     canvasW,
-    canvasScale,
+    selectionBarScale,
     minHeight,
     selectedId,
     selectedComponent,
@@ -599,7 +602,7 @@ export default function Canvas({
         {showSelectionActions && selectionActionPosition?.componentId === selectedId && !marquee && (
           <CanvasSelectionActions
             componentId={selectedId}
-            canvasScale={canvasScale}
+            canvasScale={selectionBarScale}
             onSpotlight={onSpotlight}
             style={{
               left: selectionActionPosition.left,

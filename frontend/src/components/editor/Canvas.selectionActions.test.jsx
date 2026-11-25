@@ -108,6 +108,40 @@ describe('canvas selection action overlay', () => {
     expect(useEditorStore.getState().schema.pages[0].components.map((c) => c.id)).toEqual(['button'])
   })
 
+  // A phone's cover screen zoomed out (Galaxy Z Flip6, 320px at 50%): the bar
+  // kept its size on screen, wider than the page, and ran past its edge.
+  it('fits on a page narrower on screen than the bar', () => {
+    useEditorStore.getState().loadSchema({
+      theme: {},
+      pages: [{
+        id: 'home', name: 'Home', canvasWidth: 1000, mobileWidth: 320, mobileFold: 332,
+        components: [{ id: 'button', type: 'button', props: { text: 'Button' }, styles: {}, layout: { x: 0, y: 120, w: 320, h: 40 } }],
+      }],
+    })
+    useEditorStore.getState().setViewport('mobile')
+    useEditorStore.getState().selectComponent('button')
+    const { container } = render(
+      <LanguageProvider>
+        <DndContext>
+          <Canvas zoom={50} />
+        </DndContext>
+      </LanguageProvider>,
+    )
+    const canvas = container.querySelector('#free-canvas')
+    const target = container.querySelector('[data-cid="button"]')
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 160, height: 166, right: 160, bottom: 166 })
+    target.getBoundingClientRect = () => ({ left: 0, top: 60, width: 160, height: 20, right: 160, bottom: 80 })
+
+    act(() => window.dispatchEvent(new Event('resize')))
+
+    const toolbar = container.querySelector('[data-canvas-selection-actions]')
+    const drawn = Number(/scale\(([\d.]+)\)/.exec(toolbar.style.transform)?.[1] || 1)
+    const left = Number.parseFloat(toolbar.style.left)
+    // parent, duplicate, backward, forward, PC, mobile, delete, deselect: 248px.
+    expect(left).toBeGreaterThanOrEqual(0)
+    expect(left + 248 * drawn).toBeLessThanOrEqual(320)
+  })
+
   it('includes the Open large spotlight button in the toolbar width calculation', () => {
     loadSelectedPage()
     const { container } = render(

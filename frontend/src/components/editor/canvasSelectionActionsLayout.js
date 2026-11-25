@@ -36,16 +36,30 @@ export function selectionActionsScaleStyle(canvasScale = 1) {
   return { transform: `scale(${1 / scale})`, transformOrigin: 'top left' }
 }
 
-// Positioning works in design pixels, while the toolbar should keep a
-// comfortable physical size when a large artboard is scaled down.
-export function selectionActionsCanvasWidth(canvasScale = 1, actionCount = DEFAULT_SELECTION_ACTION_COUNT) {
+function selectionActionsScreenWidth(actionCount = DEFAULT_SELECTION_ACTION_COUNT) {
   const count = Math.max(1, Number(actionCount) || DEFAULT_SELECTION_ACTION_COUNT)
-  const screenWidth =
-    count * SCREEN_BUTTON +
+  return count * SCREEN_BUTTON +
     Math.max(0, count - 1) * SCREEN_GAP +
     SCREEN_PADDING * 2 +
     SCREEN_BORDER * 2
-  return Math.ceil(screenWidth / normalizedSelectionActionsScale(canvasScale))
+}
+
+// Positioning works in design pixels, while the toolbar should keep a
+// comfortable physical size when a large artboard is scaled down.
+export function selectionActionsCanvasWidth(canvasScale = 1, actionCount = DEFAULT_SELECTION_ACTION_COUNT) {
+  return Math.ceil(selectionActionsScreenWidth(actionCount) / normalizedSelectionActionsScale(canvasScale))
+}
+
+// The scale to draw the bar for, given the page's width in design pixels. The
+// bar keeps its size on screen, unless the page is narrower on screen than the
+// bar and its gaps at each end (a phone's cover screen, zoomed out). It is
+// then drawn as wide as the page allows: at its own size the trash can and the
+// X at its end were past the page, and an HTML page's frame cut them off.
+export function fittedSelectionActionsScale(canvasScale = 1, canvasWidth = 0, actionCount = DEFAULT_SELECTION_ACTION_COUNT) {
+  const scale = normalizedSelectionActionsScale(canvasScale)
+  const width = Number(canvasWidth)
+  if (!Number.isFinite(width) || width <= 0) return scale
+  return Math.max(scale, (selectionActionsScreenWidth(actionCount) + SCREEN_EDGE_GAP * 2) / width)
 }
 
 export function selectionActionsCanvasHeight(canvasScale = 1) {
