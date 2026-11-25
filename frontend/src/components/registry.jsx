@@ -35,7 +35,7 @@ import { PRESET_IMAGES } from '../utils/presetImages.js'
 import { ICON_OPTIONS } from '../utils/icons.js'
 import { NodeIcon } from './icons.jsx'
 import { componentKindIcon } from './editor/elementKindIcons.js'
-import { FOLDABLE_STATES } from '../utils/deviceCatalog.js'
+import { FOLDABLE_STATES, HANDHELD_SCREENS, PHONE_BREAKPOINT } from '../utils/deviceCatalog.js'
 
 // One drawing per kind of block, shared with HTML elements of that kind.
 const kindIcon = (type) => <NodeIcon name={componentKindIcon(type)} size={16} />
@@ -734,16 +734,10 @@ export const MOBILE_CANVAS_WIDTH = 390
 // what lands above the fold. fold:0 = off. `category` and `name` place and name
 // the size in the picker. A foldable's screens come from deviceCatalog.js: the
 // ones as wide as a desktop layout are PC sizes, the narrower ones phone sizes.
-const FOLDABLE_PRESETS = FOLDABLE_STATES.map((state) => ({
-  id: state.id,
-  name: state.name,
-  category: 'foldable',
-  width: state.w,
-  fold: state.h,
-  group: state.group,
-  state: state.state,
-  hinge: state.hinge,
-  concept: state.concept,
+const DEVICE_CANVAS_PRESETS = [...HANDHELD_SCREENS, ...FOLDABLE_STATES].map(({ w, h, ...device }) => ({
+  ...device,
+  width: w,
+  fold: h,
 }))
 
 export const PC_CANVAS_PRESETS = [
@@ -757,25 +751,18 @@ export const PC_CANVAS_PRESETS = [
   { id: 'macbook-pro-16', name: 'MacBook Pro 16"', category: 'desktop', width: 1728, fold: 1117 },
   { id: 'fhd', name: 'Full HD', category: 'desktop', width: 1920, fold: 1080 },
   { id: 'qhd', name: 'QHD', category: 'desktop', width: 2560, fold: 1440 },
-  { id: 'ipad', name: 'iPad', category: 'tablet', width: 768, fold: 1024 },
-  { id: 'galaxy-tab-s9', name: 'Galaxy Tab S9', category: 'tablet', width: 800, fold: 1280 },
-  { id: 'ipad-air', name: 'iPad Air', category: 'tablet', width: 820, fold: 1180 },
-  { id: 'ipadpro', name: 'iPad Pro', category: 'tablet', width: 1024, fold: 1366 },
-  ...FOLDABLE_PRESETS.filter((preset) => preset.width >= 768),
+  ...DEVICE_CANVAS_PRESETS.filter((preset) => preset.width >= PHONE_BREAKPOINT),
 ]
 
 export const MOBILE_CANVAS_PRESETS = [
   { id: 'std', name: 'Standard mobile', category: 'phone', width: 390, fold: 0 },
-  { id: 'iphone14', name: 'iPhone 14', category: 'phone', width: 390, fold: 844 },
-  { id: 'se', name: 'iPhone SE (3rd gen)', category: 'phone', width: 375, fold: 667 },
-  { id: 'iphone15pro', name: 'iPhone 15 Pro', category: 'phone', width: 393, fold: 852 },
-  { id: 'iphone15max', name: 'iPhone 15 Pro Max', category: 'phone', width: 430, fold: 932 },
-  { id: 'iphone16pro', name: 'iPhone 16 Pro', category: 'phone', width: 402, fold: 874 },
-  { id: 'iphone16promax', name: 'iPhone 16 Pro Max', category: 'phone', width: 440, fold: 956 },
-  { id: 'galaxys24', name: 'Galaxy S24', category: 'phone', width: 360, fold: 780 },
-  { id: 'galaxys24ultra', name: 'Galaxy S24 Ultra', category: 'phone', width: 384, fold: 824 },
-  { id: 'pixel7', name: 'Pixel 7', category: 'phone', width: 412, fold: 915 },
-  { id: 'pixel9', name: 'Pixel 9', category: 'phone', width: 411, fold: 923 },
-  { id: 'ipad-mini', name: 'iPad mini', category: 'tablet', width: 744, fold: 1133 },
-  ...FOLDABLE_PRESETS.filter((preset) => preset.width < 768),
+  ...DEVICE_CANVAS_PRESETS.filter((preset) => preset.width < PHONE_BREAKPOINT),
 ]
+
+// Old pages only have dimensions. Prefer the first matching preset (regular
+// phones are before foldables); new selections remember an exact identity.
+export function resolveCanvasPreset(viewport, width, fold, id) {
+  const presets = viewport === 'mobile' ? MOBILE_CANVAS_PRESETS : PC_CANVAS_PRESETS
+  const matches = (preset) => preset.width === width && preset.fold === fold
+  return presets.find((preset) => preset.id === id && matches(preset)) || presets.find(matches)
+}

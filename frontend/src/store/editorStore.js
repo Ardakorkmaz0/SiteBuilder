@@ -1445,8 +1445,10 @@ function normalizePage(page) {
     showScrollIndicator: page.showScrollIndicator !== false,
     canvasWidth,
     canvasFold: clampWidth(page.canvasFold, 0, 0, 20000),
+    ...(typeof page.canvasPresetId === 'string' && page.canvasPresetId ? { canvasPresetId: page.canvasPresetId } : {}),
     mobileWidth,
     mobileFold: clampWidth(page.mobileFold, 0, 0, 20000),
+    ...(typeof page.mobilePresetId === 'string' && page.mobilePresetId ? { mobilePresetId: page.mobilePresetId } : {}),
     mobileManual,
     flowMode,
   }
@@ -3200,12 +3202,13 @@ export const useEditorStore = create((set, get) => ({
   },
 
   // Artboard / device size for the active breakpoint. width + fold (0 = no guide).
-  setCanvasPreset: ({ width, fold }) => {
+  setCanvasPreset: ({ width, fold, id }) => {
     get().record('canvas-preset')
     set((state) => {
       const isMobile = state.viewport === 'mobile'
       const wKey = isMobile ? 'mobileWidth' : 'canvasWidth'
       const fKey = isMobile ? 'mobileFold' : 'canvasFold'
+      const presetKey = isMobile ? 'mobilePresetId' : 'canvasPresetId'
       return {
         schema: mapPage(state.schema, state.currentPageId, (p) => {
           const oldW = p[wKey] || (isMobile ? MOBILE_CANVAS_WIDTH : CANVAS_WIDTH)
@@ -3219,6 +3222,8 @@ export const useEditorStore = create((set, get) => ({
             ),
             [fKey]: clampWidth(fold, 0, 0, 20000),
           }
+          if (id) np[presetKey] = id
+          else delete np[presetKey]
           // Design made on a 1000px artboard should not huddle in the left
           // corner of a 1920px one: scale every box proportionally to the new
           // width so the layout re-centres and GROWS with the screen (content

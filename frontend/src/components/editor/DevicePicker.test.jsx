@@ -74,13 +74,14 @@ describe('DevicePicker', () => {
     expect(onPick).toHaveBeenCalledWith('zfold6-inner')
   })
 
-  it('gives the tri-fold its three panels, and calls the iPhone Fold a concept', () => {
+  it('gives the tri-fold three panels and shows iPhone Duo without a concept badge', () => {
     renderPicker()
     const picker = open()
     expect(within(within(picker).getByRole('group', { name: 'Huawei Mate XT' })).getAllByRole('button')
       .map((button) => button.textContent)).toEqual(['One panel', 'Two panels', 'Fully open'])
     const iphoneFold = picker.querySelector('[data-device-group="iphone-fold"]')
-    expect(iphoneFold).toHaveTextContent('Concept')
+    expect(iphoneFold).toHaveTextContent('iPhone Duo')
+    expect(iphoneFold).not.toHaveTextContent('Concept')
     expect(picker.querySelector('[data-device-group="galaxy-zfold6"]')).not.toHaveTextContent('Concept')
   })
 

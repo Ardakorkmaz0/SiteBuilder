@@ -1,3 +1,4 @@
+import { resolveCanvasPreset } from '../registry.jsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Renderer } from '../renderer/Renderer.jsx'
 import { ColorModeRoot } from '../renderer/ColorMode.jsx'
@@ -145,12 +146,15 @@ export default function CanvasPreview({
     [iframeHtml, iframeScrollToken],
   )
   const mobile = viewport === 'mobile'
-  const desktopBrowser = !mobile && browserFrame
-  const mobileBrowser = mobile && browserFrame
-  const phone = phoneModel(width, fold)
+  const preset = resolveCanvasPreset(viewport, width, fold, mobile ? page?.mobilePresetId : page?.canvasPresetId)
+  const framedPhone = preset?.category === 'foldable' || (mobile && preset?.category !== 'tablet')
+  const fixedScreen = framedPhone || preset?.category === 'tablet'
+  const desktopBrowser = !framedPhone && browserFrame
+  const mobileBrowser = framedPhone && browserFrame
+  const phone = phoneModel(preset)
   const mobileChromeH = mobileBrowser ? mobileBrowserChromeH(phone) : 0
-  const bezelW = mobile ? phoneFrameW(phone) : desktopBrowser ? browserFrameW() : 0
-  const bezelH = mobile ? phoneFrameH(phone) : desktopBrowser ? browserFrameH() : 0
+  const bezelW = framedPhone ? phoneFrameW(phone) : desktopBrowser ? browserFrameW() : 0
+  const bezelH = framedPhone ? phoneFrameH(phone) : desktopBrowser ? browserFrameH() : 0
   const components = page?.components || []
   const flowMode = !!page?.flowMode
   const showScrollIndicator = page?.showScrollIndicator !== false
@@ -161,7 +165,7 @@ export default function CanvasPreview({
   // only needs to reach the visible page area (or real content when longer),
   // exactly like the editable Canvas. Desktop retains the fold guide + margin
   // because it is a scrollable artboard rather than a device.
-  const artboardHeight = mobile
+  const artboardHeight = fixedScreen
     ? contentHeight
     : fold > 0 ? Math.max(contentHeight, fold + 40) : contentHeight
 
@@ -225,14 +229,14 @@ export default function CanvasPreview({
     const widthScale = workspace.w ? Math.min(1, workspace.w / frameW) : 1
     // Phones use the selected device height; desktop keeps using the available
     // workspace height as a resizable mini-browser viewport.
-    const viewportH = mobile
+    const viewportH = fixedScreen
       ? (fold > 0 ? fold : phoneScreenHeight(width))
       : Math.max(360, Math.round((workspace.h || 560) / widthScale) - bezelH)
     const frameH = viewportH + bezelH
     const scale = Math.min(
       1,
       widthScale,
-      mobile && workspace.h ? workspace.h / frameH : 1,
+      fixedScreen && workspace.h ? workspace.h / frameH : 1,
     )
     // This one IS a device viewport — the page scrolls inside it — so the
     // browser chrome takes its room from the page, the way it does on a phone.
@@ -252,7 +256,7 @@ export default function CanvasPreview({
     // The export iframe keeps its native scrollbar at zero width so a phone
     // layout never loses design pixels. The outer cue is therefore deliberate:
     // it is visible in View without changing the iframe's layout width.
-    const inner = mobile ? (
+    const inner = fixedScreen ? (
       <div className="relative" style={{ width, height: pageH }}>
         {iframe}
         <PreviewScrollIndicator
@@ -283,7 +287,7 @@ export default function CanvasPreview({
               ...previewScaleStyle(scale < 1 ? scale : 1),
             }}
           >
-            {mobile ? (
+            {framedPhone ? (
               <PhoneFrame screenWidth={width} screenHeight={viewportH} model={phone}>
                 {mobileBrowser ? (
                   <MobileBrowserChrome
@@ -338,27 +342,27 @@ export default function CanvasPreview({
   // On mobile that means a real device: the screen is the size of the screen the
   // user picked and the design scrolls inside it, matching both the edit canvas
   // and the iframe path above. Desktop keeps the tall artboard.
-  const deviceH = mobile ? (fold > 0 ? fold : phoneScreenHeight(width)) : 0
+  const deviceH = fixedScreen ? (fold > 0 ? fold : phoneScreenHeight(width)) : 0
   const devicePageH = Math.max(200, deviceH - mobileChromeH)
   const frameWidth = width + bezelW
-  const frameHeight = (mobile ? deviceH : artboardHeight) + bezelH
+  const frameHeight = (fixedScreen ? deviceH : artboardHeight) + bezelH
   const scale = Math.min(
     1,
     workspace.w ? workspace.w / frameWidth : 1,
-    mobile && workspace.h ? workspace.h / frameHeight : 1,
+    fixedScreen && workspace.h ? workspace.h / frameHeight : 1,
   )
   const pageContent = (
     <div
       data-builder-preview-artboard
-      className={mobile ? 'site-surface' : 'site-surface bg-white'}
+      className={fixedScreen ? 'site-surface' : 'site-surface bg-white'}
       style={{
         position: 'relative',
         width,
-        minHeight: mobile ? Math.max(artboardHeight, devicePageH) : artboardHeight,
+        minHeight: fixedScreen ? Math.max(artboardHeight, devicePageH) : artboardHeight,
         overflowX: 'clip',
         fontFamily,
         color: `var(--site-text, ${textColor})`,
-        ...(mobile ? {} : { boxShadow: PAGE_SHEET_SHADOW }),
+        ...(fixedScreen ? {} : { boxShadow: PAGE_SHEET_SHADOW }),
       }}
     >
       <ColorModeRoot mode={colorMode}>
@@ -375,7 +379,7 @@ export default function CanvasPreview({
       </ColorModeRoot>
       {/* Same as the edit canvas: on the phone the screen's bottom edge already
           IS the fold, so a dashed rule across the design says nothing. */}
-      {fold > 0 && !mobile && (
+      {fold > 0 && !fixedScreen && (
         <div className="pointer-events-none absolute inset-x-0" style={{ top: fold, zIndex: 40 }}>
           <div className="border-t-2 border-dashed border-amber-500" />
           <span className="absolute right-1 top-1 rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-medium text-white shadow">
@@ -430,7 +434,7 @@ export default function CanvasPreview({
             ...previewScaleStyle(scale < 1 ? scale : 1),
           }}
         >
-          {mobile ? (
+          {framedPhone ? (
             <PhoneFrame screenWidth={width} screenHeight={deviceH} model={phone}>
               {mobileBrowser ? (
                 <MobileBrowserChrome
@@ -454,7 +458,7 @@ export default function CanvasPreview({
           ) : desktopBrowser ? (
             <BrowserFrame
               screenWidth={width}
-              screenHeight={artboardHeight}
+              screenHeight={fixedScreen ? deviceH : artboardHeight}
               siteTitle={browserSiteTitle}
               favicon={browserFavicon}
               address={browserAddress}
@@ -465,9 +469,9 @@ export default function CanvasPreview({
               onEditFavicon={onBrowserFaviconEdit}
               onAddressChange={onBrowserAddressChange}
             >
-              {pageContent}
+              {fixedScreen ? deviceScreen : pageContent}
             </BrowserFrame>
-          ) : pageContent}
+          ) : fixedScreen ? deviceScreen : pageContent}
         </div>
       </div>
     </main>

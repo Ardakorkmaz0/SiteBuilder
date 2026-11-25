@@ -1,4 +1,4 @@
-import { FOLDABLE_STATES } from './deviceCatalog.js'
+import { FOLDABLE_STATES, HANDHELD_SCREENS, PHONE_BREAKPOINT } from './deviceCatalog.js'
 
 // Device frames for previewing HTML pages — shared by the device picker above
 // the stage (DevicePicker) and the HtmlWorkspace stage (sizing math).
@@ -14,41 +14,15 @@ const SCREENS = [
   { id: 'macbook-pro-16', name: 'MacBook Pro 16"', category: 'desktop', w: 1728, h: 1117 },
   { id: 'fhd', name: 'Full HD', category: 'desktop', w: 1920, h: 1080 },
   { id: 'qhd', name: 'QHD', category: 'desktop', w: 2560, h: 1440 },
-  { id: 'ipad-mini', name: 'iPad mini', category: 'tablet', w: 744, h: 1133 },
-  { id: 'ipad', name: 'iPad', category: 'tablet', w: 768, h: 1024 },
-  { id: 'galaxy-tab-s9', name: 'Galaxy Tab S9', category: 'tablet', w: 800, h: 1280 },
-  { id: 'ipad-air', name: 'iPad Air', category: 'tablet', w: 820, h: 1180 },
-  { id: 'ipadpro', name: 'iPad Pro', category: 'tablet', w: 1024, h: 1366 },
-  { id: 'iphone14', name: 'iPhone 14', category: 'phone', w: 390, h: 844 },
-  { id: 'iphonese', name: 'iPhone SE (3rd gen)', category: 'phone', w: 375, h: 667 },
-  { id: 'iphone15pro', name: 'iPhone 15 Pro', category: 'phone', w: 393, h: 852 },
-  { id: 'iphone15max', name: 'iPhone 15 Pro Max', category: 'phone', w: 430, h: 932 },
-  { id: 'iphone16pro', name: 'iPhone 16 Pro', category: 'phone', w: 402, h: 874 },
-  { id: 'iphone16promax', name: 'iPhone 16 Pro Max', category: 'phone', w: 440, h: 956 },
-  { id: 'galaxys24', name: 'Galaxy S24', category: 'phone', w: 360, h: 780 },
-  { id: 'galaxys24ultra', name: 'Galaxy S24 Ultra', category: 'phone', w: 384, h: 824 },
-  { id: 'pixel7', name: 'Pixel 7', category: 'phone', w: 412, h: 915 },
-  { id: 'pixel9', name: 'Pixel 9', category: 'phone', w: 411, h: 923 },
 ]
 
 export const DEVICES = [
   ...SCREENS,
-  ...FOLDABLE_STATES.map((state) => ({
-    id: state.id,
-    name: state.name,
-    category: 'foldable',
-    w: state.w,
-    h: state.h,
-    group: state.group,
-    state: state.state,
-    hinge: state.hinge,
-    concept: state.concept,
-  })),
+  ...HANDHELD_SCREENS,
+  ...FOLDABLE_STATES,
 ]
 
-// Under this width a page is in its phone layout: the breakpoint the editor's
-// own phone overrides use (max-width: 767px), and what makes a device a phone.
-export const PHONE_BREAKPOINT = 768
+export { PHONE_BREAKPOINT } from './deviceCatalog.js'
 // The narrowest a page is drawn on the PC side of the toggle.
 export const PC_MIN_WIDTH = 1024
 

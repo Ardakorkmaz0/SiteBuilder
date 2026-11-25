@@ -9,6 +9,7 @@
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import PhoneFrame from './PhoneFrame.jsx'
+import { DEVICES } from '../../utils/htmlDevices.js'
 import { phoneModel } from './phoneFrameMetrics.js'
 
 const SCREEN_W = 393
@@ -65,9 +66,9 @@ describe('PhoneFrame screen', () => {
 })
 
 describe('PhoneFrame on a foldable', () => {
-  const creases = (width, height) => {
+  const creases = (id, width, height) => {
     const { container, unmount } = render(
-      <PhoneFrame screenWidth={width} screenHeight={height} model={phoneModel(width, height)}>
+      <PhoneFrame screenWidth={width} screenHeight={height} model={phoneModel(DEVICES.find((device) => device.id === id))}>
         <span />
       </PhoneFrame>,
     )
@@ -83,16 +84,29 @@ describe('PhoneFrame on a foldable', () => {
   }
 
   it('draws the crease down the middle of an open book-style screen, and lets clicks through', () => {
-    expect(creases(707, 823)).toEqual([{ kind: 'vertical', left: '50%', top: '0px', clicks: 'none' }])
+    expect(creases('zfold6-inner', 707, 823)).toEqual([{ kind: 'vertical', left: '50%', top: '0px', clicks: 'none' }])
   })
 
   it('lays the Flip\'s crease across its screen', () => {
-    expect(creases(411, 1006)).toEqual([{ kind: 'horizontal', left: '0px', top: '50%', clicks: 'none' }])
+    expect(creases('zflip6-inner', 411, 1006)).toEqual([{ kind: 'horizontal', left: '0px', top: '50%', clicks: 'none' }])
   })
 
   it('draws two creases on a tri-fold, and none on a closed screen or a phone', () => {
-    expect(creases(1061, 744).map((line) => line.left)).toEqual(['33.333%', '66.667%'])
-    expect(creases(369, 905)).toEqual([])
-    expect(creases(393, 852)).toEqual([])
+    expect(creases('matext-full', 1061, 744).map((line) => line.left)).toEqual(['33.333%', '66.667%'])
+    expect(creases('zfold6-cover', 369, 905)).toEqual([])
+    expect(creases('iphone15pro', 393, 852)).toEqual([])
+  })
+})
+
+describe('iPhone Duo hardware', () => {
+  it.each([
+    ['iphonefold-cover', 466, 678],
+    ['iphonefold-inner', 951, 669],
+  ])('draws a vertical Dynamic Island on the right edge of %s', (id, w, h) => {
+    const { container } = render(
+      <PhoneFrame screenWidth={w} screenHeight={h} model={phoneModel(DEVICES.find((device) => device.id === id))} />,
+    )
+    const island = [...screenOf(container).children].find((element) => element.style.right === '10px')
+    expect(island).toHaveStyle({ width: '28px', height: '104px', top: '50%' })
   })
 })

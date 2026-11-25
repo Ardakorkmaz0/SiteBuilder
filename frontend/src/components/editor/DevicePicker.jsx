@@ -15,7 +15,7 @@ import {
 // proportions. A foldable is one card with a switch between its screens
 // (outer / inner, or one, two and three panels on a tri-fold).
 //
-// `items`: { id, name, w, h, category, group?, state?, concept? }. A `w` of 0
+// `items`: { id, name, w, h, category, group?, state?, hinge? }. A `w` of 0
 // is the responsive size, which follows the area. The same picker serves HTML
 // pages (htmlDevices.js) and canvas pages (the canvas presets); what a pick
 // does, including switching between PC and Mobile, is the caller's `onPick`.
@@ -210,14 +210,7 @@ export default function DevicePicker({ items, value, onPick, fallbackLabel = '',
                             <Outline w={shown.w} h={shown.h} hinge={shown.hinge} />
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="flex min-w-0 items-center gap-1.5">
-                              <span className="truncate text-xs font-semibold text-[var(--studio-text)]">{t(shown.name)}</span>
-                              {shown.concept && (
-                                <span className="shrink-0 rounded-full border border-[var(--studio-border)] px-1.5 text-[9px] font-semibold uppercase leading-4 text-[var(--studio-text-muted)]">
-                                  {t('Concept')}
-                                </span>
-                              )}
-                            </span>
+                            <span className="block truncate text-xs font-semibold text-[var(--studio-text)]">{t(shown.name)}</span>
                             <span className="block text-[10px] tabular-nums text-[var(--studio-text-faint)]">{sizeText(shown)}</span>
                           </span>
                           <span role="group" aria-label={t(shown.name)} className="studio-segment shrink-0">

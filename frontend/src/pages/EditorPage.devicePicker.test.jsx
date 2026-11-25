@@ -30,6 +30,7 @@ const openPicker = () => {
   fireEvent.click(pickerButton())
   return screen.getByRole('dialog', { name: 'Screen size' })
 }
+const phoneFrame = () => document.querySelector('[data-builder-phone-frame]')
 const foldStates = (picker, name) => within(within(picker).getByRole('group', { name })).getAllByRole('button')
 
 beforeEach(() => {
@@ -86,6 +87,57 @@ describe('the device picker on a canvas page', () => {
     expect(pickerButton()).toHaveAccessibleName('Screen size: Pixel 9 Pro Fold 791×820 · Inner screen')
   })
 
+  it('keeps an iPad mini on the mobile layout without a phone body', async () => {
+    renderEditor()
+    await screen.findByRole('textbox', { name: 'Site title', exact: true })
+    fireEvent.click(within(openPicker()).getByRole('button', { name: 'iPad mini 744×1133' }))
+    expect(state().viewport).toBe('mobile')
+    expect(page()).toMatchObject({ mobileWidth: 744, mobileFold: 1133 })
+    expect(document.querySelector('[data-builder-device-viewport="1133"]')).not.toBeNull()
+    expect(phoneFrame()).toBeNull()
+  })
+
+  it('reopens the selected Pixel at a shared size, falling back to Pixel 9 for width-only data', async () => {
+    site.schema.pages[0] = { ...site.schema.pages[0], mobileWidth: 411, mobileFold: 923 }
+    localStorage.setItem('pwb_default_editor_viewport', 'mobile')
+    renderEditor()
+    await screen.findByRole('textbox', { name: 'Site title', exact: true })
+    await waitFor(() => expect(pickerButton()).toHaveAccessibleName('Screen size: Pixel 9 411×923'))
+    expect(phoneFrame()).toHaveAttribute('aria-label', 'Pixel 9')
+
+    fireEvent.click(foldStates(openPicker(), 'Pixel 9 Pro Fold')[0])
+    expect(page()).toMatchObject({ mobileWidth: 411, mobileFold: 923, mobilePresetId: 'pixel9fold-cover' })
+    expect(phoneFrame()).toHaveAttribute('aria-label', 'Pixel 9 Pro Fold')
+    expect(pickerButton()).toHaveAccessibleName('Screen size: Pixel 9 Pro Fold 411×923 · Outer screen')
+
+    site.schema.pages[0] = structuredClone(page())
+    cleanup()
+    renderEditor()
+    await screen.findByRole('textbox', { name: 'Site title', exact: true })
+    await waitFor(() => expect(phoneFrame()).toHaveAttribute('aria-label', 'Pixel 9 Pro Fold'))
+    state().setCanvasPreset({ width: 411, fold: 923 })
+    await waitFor(() => expect(pickerButton()).toHaveAccessibleName('Screen size: Pixel 9 411×923'))
+  })
+
+  it('frames a wide iPhone Duo in Edit and View while keeping the PC layout', async () => {
+    renderEditor()
+    await screen.findByRole('textbox', { name: 'Site title', exact: true })
+    fireEvent.click(foldStates(openPicker(), 'iPhone Duo')[0])
+    expect(phoneFrame()).toHaveAttribute('data-builder-camera', 'island')
+    expect(document.querySelector('[data-builder-hinge]')).toBeNull()
+
+    fireEvent.click(foldStates(openPicker(), 'iPhone Duo')[1])
+    expect(state().viewport).toBe('pc')
+    expect(page()).toMatchObject({ canvasWidth: 951, canvasFold: 669, mobileWidth: 466, mobileFold: 678 })
+    expect(phoneFrame()).toHaveAttribute('data-builder-camera', 'island')
+    expect(document.querySelector('[data-builder-hinge="vertical"]')).toHaveStyle({ left: '50%' })
+    expect(document.querySelector('[data-builder-device-viewport="669"]')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'View', exact: true }))
+    await waitFor(() => expect(phoneFrame()).toHaveAttribute('aria-label', 'iPhone Duo'))
+    expect(document.querySelector('[data-builder-hinge="vertical"]')).not.toBeNull()
+  })
+
   it('lists the foldables in one order, though their screens are split between PC and Mobile', async () => {
     renderEditor()
     await screen.findByRole('textbox', { name: 'Site title', exact: true })
@@ -126,6 +178,15 @@ describe('the device picker on an HTML page', () => {
     await waitFor(() => expect(document.querySelector('[data-builder-phone-frame]')).not.toBeNull())
     expect(localStorage.getItem('pwb_last_html_mobile_device')).toBe('iphone16pro')
     expect(localStorage.getItem('pwb_default_editor_viewport')).toBe('mobile')
+
+    fireEvent.click(within(openPicker()).getByRole('button', { name: 'iPad mini 744×1133' }))
+    await waitFor(() => expect(phoneFrame()).toBeNull())
+    expect(localStorage.getItem('pwb_default_editor_viewport')).toBe('mobile')
+
+    fireEvent.click(within(openPicker()).getByRole('button', { name: 'Pixel 9 411×923' }))
+    await waitFor(() => expect(phoneFrame()).toHaveAttribute('aria-label', 'Pixel 9'))
+    fireEvent.click(foldStates(openPicker(), 'Pixel 9 Pro Fold')[0])
+    await waitFor(() => expect(phoneFrame()).toHaveAttribute('aria-label', 'Pixel 9 Pro Fold'))
 
     // The Mate XT fully open is a PC size, still held as a phone, creased twice.
     fireEvent.click(foldStates(openPicker(), 'Huawei Mate XT')[2])

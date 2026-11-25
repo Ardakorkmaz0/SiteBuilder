@@ -9,6 +9,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { render } from '@testing-library/react'
 import { DndContext } from '@dnd-kit/core'
+import { DEVICES } from '../../utils/htmlDevices.js'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import Canvas from './Canvas.jsx'
 import { useEditorStore } from '../../store/editorStore.js'
@@ -145,7 +146,7 @@ describe('mobile edit canvas', () => {
     loadPage()
     const { container } = renderCanvas({ browserFrame: true })
 
-    const chrome = mobileBrowserChromeH(phoneModel(393, 852))
+    const chrome = mobileBrowserChromeH(phoneModel(DEVICES.find((device) => device.id === 'iphone15pro')))
     // The device is unchanged; the page gets what the browser leaves.
     expect(phoneScreen(container).style.height).toBe('852px')
     expect(deviceViewport(container).style.height).toBe(`${852 - chrome}px`)

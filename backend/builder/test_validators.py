@@ -911,3 +911,17 @@ def test_converted_subtree_at_max_nesting_depth_4_is_preserved():
         'children': [batch],
     })
     assert saved['children'][0]['children'][0]['children'][0]['children'][0]['id'] == 'leaf_1'
+
+
+def test_schema_preserves_optional_canvas_preset_ids():
+    pages = validate_and_clean_schema({'pages': [
+        {'canvasPresetId': '16:9', 'mobilePresetId': 'pixel9fold-cover',
+         'mobileWidth': 411, 'mobileFold': 923},
+        {'mobileWidth': 411, 'mobileFold': 923},
+        {'canvasPresetId': 'x' * 51, 'mobilePresetId': {}},
+    ]})['pages']
+    assert pages[0]['canvasPresetId'] == '16:9'
+    assert pages[0]['mobilePresetId'] == 'pixel9fold-cover'
+    assert pages[0]['mobileWidth'] == 411
+    assert pages[0]['mobileFold'] == 923
+    assert all('canvasPresetId' not in page and 'mobilePresetId' not in page for page in pages[1:])

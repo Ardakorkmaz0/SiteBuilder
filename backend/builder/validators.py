@@ -1025,8 +1025,16 @@ def validate_and_clean_schema(schema):
         # A page that keeps its own theme ("This page only") carries it here;
         # one that follows the site theme has no key at all.
         own_theme = {'theme': sanitize_theme(page['theme'])} if isinstance(page.get('theme'), dict) else {}
+        # Identity disambiguates presets that share the same dimensions.
+        # Old pages keep their original shape and continue to use dimensions.
+        preset_ids = {
+            key: value
+            for key in ('canvasPresetId', 'mobilePresetId')
+            if re.fullmatch(r'[a-z0-9:-]{1,50}', (value := _str(page.get(key))))
+        }
         clean_pages.append({
             **own_theme,
+            **preset_ids,
             'id': _str(page.get('id'), 'page'),
             'name': _str(page.get('name'), 'Page')[:80],
             # Optional organizational folder label (shown in the editor's page tree).

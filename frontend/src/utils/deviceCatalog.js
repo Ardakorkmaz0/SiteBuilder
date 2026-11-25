@@ -26,8 +26,34 @@ export const HINGE_VERTICAL = 'vertical'
 export const HINGE_HORIZONTAL = 'horizontal'
 export const HINGE_THIRDS = 'thirds'
 
+// The editor uses the mobile layout below 768px, including for some tablets
+// and foldable screens. Hardware category and layout are separate.
+export const PHONE_BREAKPOINT = 768
+
+export const HANDHELD_SCREENS = [
+  { id: 'ipad-mini', name: 'iPad mini', category: 'tablet', w: 744, h: 1133 },
+  { id: 'ipad', name: 'iPad', category: 'tablet', w: 768, h: 1024 },
+  { id: 'galaxy-tab-s9', name: 'Galaxy Tab S9', category: 'tablet', w: 800, h: 1280 },
+  { id: 'ipad-air', name: 'iPad Air', category: 'tablet', w: 820, h: 1180 },
+  { id: 'ipadpro', name: 'iPad Pro', category: 'tablet', w: 1024, h: 1366 },
+  // Apple logical screen points (Human Interface Guidelines).
+  { id: 'iphone14', name: 'iPhone 14', category: 'phone', w: 390, h: 844 },
+  { id: 'iphonese', name: 'iPhone SE (3rd gen)', category: 'phone', w: 375, h: 667 },
+  { id: 'iphone15pro', name: 'iPhone 15 Pro', category: 'phone', w: 393, h: 852 },
+  { id: 'iphone15max', name: 'iPhone 15 Pro Max', category: 'phone', w: 430, h: 932 },
+  { id: 'iphone16pro', name: 'iPhone 16 Pro', category: 'phone', w: 402, h: 874 },
+  { id: 'iphone16promax', name: 'iPhone 16 Pro Max', category: 'phone', w: 440, h: 956 },
+  // Samsung logical screen sizes (Mobile FIRST device measurements).
+  { id: 'galaxys24', name: 'Galaxy S24', category: 'phone', w: 360, h: 780 },
+  { id: 'galaxys24ultra', name: 'Galaxy S24 Ultra', category: 'phone', w: 384, h: 832 },
+  // Google Pixel hardware specs, rounded to the nearest px at 2.625×.
+  { id: 'pixel7', name: 'Pixel 7', category: 'phone', w: 411, h: 914 },
+  { id: 'pixel9', name: 'Pixel 9', category: 'phone', w: 411, h: 923 },
+]
+
 export const FOLDABLES = [
   {
+    // Samsung Mobile Press panel sizes, rounded at 2.625×.
     group: 'galaxy-zfold6',
     name: 'Galaxy Z Fold6',
     states: [
@@ -36,6 +62,7 @@ export const FOLDABLES = [
     ],
   },
   {
+    // Samsung panel sizes, at 2.25× (cover) and 2.625× (inner).
     group: 'galaxy-zflip6',
     name: 'Galaxy Z Flip6',
     states: [
@@ -44,14 +71,16 @@ export const FOLDABLES = [
     ],
   },
   {
+    // Google Pixel hardware specs, rounded at 2.625×.
     group: 'pixel9-pro-fold',
     name: 'Pixel 9 Pro Fold',
     states: [
-      { id: 'pixel9fold-cover', state: 'cover', w: 410, h: 923 },
+      { id: 'pixel9fold-cover', state: 'cover', w: 411, h: 923 },
       { id: 'pixel9fold-inner', state: 'inner', w: 791, h: 820, hinge: HINGE_VERTICAL },
     ],
   },
   {
+    // Huawei panel sizes, rounded at 3×.
     group: 'huawei-mate-x6',
     name: 'Huawei Mate X6',
     states: [
@@ -60,7 +89,7 @@ export const FOLDABLES = [
     ],
   },
   {
-    // A tri-fold: one, two or all three panels open.
+    // Huawei panel sizes at 3×: one, two or all three panels open.
     group: 'huawei-mate-xt',
     name: 'Huawei Mate XT',
     states: [
@@ -70,14 +99,13 @@ export const FOLDABLES = [
     ],
   },
   {
-    // Not on sale: the sizes follow what has been reported about Apple's
-    // foldable, and the picker says it is a concept.
+    // Keep saved IDs. Apple panel sizes, with the full screen measured in
+    // iOS points; Safari 27.1 reserves part of the closed display for chrome.
     group: 'iphone-fold',
-    name: 'iPhone Fold',
-    concept: true,
+    name: 'iPhone Duo',
     states: [
-      { id: 'iphonefold-cover', state: 'cover', w: 474, h: 696 },
-      { id: 'iphonefold-inner', state: 'inner', w: 640, h: 904, hinge: HINGE_VERTICAL },
+      { id: 'iphonefold-cover', state: 'cover', w: 466, h: 678 },
+      { id: 'iphonefold-inner', state: 'inner', w: 951, h: 669, hinge: HINGE_VERTICAL },
     ],
   },
 ]
@@ -98,17 +126,11 @@ export const FOLD_STATE_ORDER = Object.keys(FOLD_STATE_LABELS)
 // states are split between the PC and Mobile lists. -1 for anything else.
 export const foldableOrder = (group) => FOLDABLES.findIndex((device) => device.group === group)
 
-// Every foldable state as a flat device: { id, w, h, name, state, group, hinge, concept }.
+// Every foldable state is a device in the same catalog as phones and tablets.
 export const FOLDABLE_STATES = FOLDABLES.flatMap((device) => device.states.map((state) => ({
   ...state,
+  category: 'foldable',
   name: device.name,
   group: device.group,
-  concept: !!device.concept,
   hinge: state.hinge || HINGE_NONE,
 })))
-
-// The state of a foldable that has this screen size, if one has: the canvas
-// presets are remembered as a width and a height, not an id.
-export function foldableStateOfSize(w, h) {
-  return FOLDABLE_STATES.find((state) => state.w === Math.round(Number(w)) && state.h === Math.round(Number(h))) || null
-}

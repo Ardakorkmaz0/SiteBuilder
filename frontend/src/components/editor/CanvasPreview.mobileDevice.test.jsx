@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
+import { DEVICES } from '../../utils/htmlDevices.js'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import CanvasPreview from './CanvasPreview.jsx'
 import { mobileBrowserChromeH } from './browserFrameMetrics.js'
@@ -24,7 +25,7 @@ function phoneScreen(container) {
 }
 
 function expectedScale(width, fold) {
-  const model = phoneModel(width, fold)
+  const model = phoneModel(DEVICES.find((device) => device.id === 'iphone15pro'))
   const deviceH = fold > 0 ? fold : phoneScreenHeight(width)
   return Math.min(
     1,
@@ -96,7 +97,7 @@ afterEach(() => {
 
 describe('CanvasPreview mobile device geometry', () => {
   it('uses the selected phone height and fits the iframe path on both axes', async () => {
-    const model = phoneModel(393, 852)
+    const model = phoneModel(DEVICES.find((device) => device.id === 'iphone15pro'))
     const chromeH = mobileBrowserChromeH(model)
     const { container, getByTitle } = renderPreview({
       browserFrame: true,
@@ -114,7 +115,7 @@ describe('CanvasPreview mobile device geometry', () => {
   })
 
   it('uses the same height and two-axis fit in the direct React path', async () => {
-    const model = phoneModel(393, 852)
+    const model = phoneModel(DEVICES.find((device) => device.id === 'iphone15pro'))
     const chromeH = mobileBrowserChromeH(model)
     const { container } = renderPreview({ browserFrame: true })
 
@@ -128,6 +129,22 @@ describe('CanvasPreview mobile device geometry', () => {
       const scale = Number(container.querySelector('[data-builder-preview-scale]').dataset.builderPreviewScale)
       expect(scale).toBeCloseTo(expectedScale(393, 852), 8)
     })
+  })
+
+  it('keeps the Duo inner screen framed in the PC export-iframe preview', () => {
+    const { container, getByTitle } = renderPreview({
+      viewport: 'pc',
+      width: 951,
+      fold: 669,
+      browserFrame: true,
+      iframeHtml: '<!doctype html><html><body>Preview</body></html>',
+      title: 'Duo preview',
+    })
+
+    expect(phoneScreen(container)).toHaveStyle({ width: '951px', height: '669px' })
+    expect(container.querySelector('[data-builder-hinge="vertical"]')).toHaveStyle({ left: '50%' })
+    expect(container.querySelector('[data-builder-mobile-browser]')).toHaveAttribute('data-builder-mobile-browser', 'ios')
+    expect(getByTitle('Duo preview')).toHaveStyle({ width: '951px', height: '539px' })
   })
 
   it('falls back to the screen height associated with a custom/default width', () => {

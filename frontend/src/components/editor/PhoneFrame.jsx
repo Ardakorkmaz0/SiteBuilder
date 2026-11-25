@@ -8,7 +8,7 @@
 // unscaled pixels — which the preview used to do — is exactly what made the two
 // canvases look like different phones.
 //
-// The body shape comes from phoneFrameMetrics.phoneModel(width): pick iPhone Pro
+// The body shape comes from phoneFrameMetrics.phoneModel(device): pick iPhone Pro
 // Max and you get an iPhone, pick a Galaxy and you get a Galaxy.
 
 import { phoneModel } from './phoneFrameMetrics.js'
@@ -75,19 +75,24 @@ function Camera({ model, inScreen = false }) {
     pointerEvents: 'none',
   }
   if (model.camera === 'island') {
+    const sideIsland = inScreen && model.cameraSide === 'right'
+    const position = sideIsland
+      ? { left: 'auto', right: 10, top: '50%', transform: 'translateY(-50%)', flexDirection: 'column' }
+      : { top: inScreen ? 10 : (model.bezel.top - 28) / 2 }
     return (
       <div
         aria-hidden="true"
         style={{
           ...centered,
-          top: inScreen ? 10 : (model.bezel.top - 28) / 2,
+          ...position,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-end',
           gap: 6,
-          width: 104,
-          height: 28,
-          paddingRight: 10,
+          width: sideIsland ? 28 : 104,
+          height: sideIsland ? 104 : 28,
+          paddingRight: sideIsland ? 0 : 10,
+          paddingBottom: sideIsland ? 10 : 0,
           borderRadius: 16,
           background: '#000105',
           boxSizing: 'border-box',
@@ -190,11 +195,12 @@ function Hinge({ kind }) {
 }
 
 export default function PhoneFrame({ screenWidth, screenHeight, model: suppliedModel, children }) {
-  const model = suppliedModel || phoneModel(screenWidth)
+  const model = suppliedModel || phoneModel()
   const { bezel } = model
   return (
     <div
       data-builder-phone-frame={model.id}
+      data-builder-camera={model.camera}
       aria-label={model.name}
       style={{
         position: 'relative',

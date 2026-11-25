@@ -25,6 +25,7 @@ import {
   MOBILE_CANVAS_WIDTH,
   PC_CANVAS_PRESETS,
   MOBILE_CANVAS_PRESETS,
+  resolveCanvasPreset,
 } from '../components/registry.jsx'
 import { componentPresetProps } from '../utils/componentPresets.js'
 import AiBar from '../components/editor/AiBar.jsx'
@@ -830,7 +831,7 @@ function SiteEditor() {
       .find((candidate) => candidate.id === itemId.slice(at + 1))
     if (!preset) return
     if (side !== useEditorStore.getState().viewport) chooseViewport(side)
-    setCanvasPreset({ width: preset.width, fold: preset.fold })
+    setCanvasPreset(preset)
   }
   // Linked local .html file (File System Access API): every Save also writes
   // the document back to this file. { handle, name } or null. Persisted in
@@ -2799,7 +2800,6 @@ function SiteEditor() {
     )
   }
 
-  const sizePresets = viewport === 'mobile' ? MOBILE_CANVAS_PRESETS : PC_CANVAS_PRESETS
   // One zoom control, shown in the stage bar or, where the bar is short of
   // room, in its ⋯ menu.
   const canvasZoomControl = (
@@ -2813,8 +2813,8 @@ function SiteEditor() {
   )
   const curW = viewport === 'mobile' ? mobileW : pcWidth
   const curFold = viewport === 'mobile' ? mobileFold : pcFold
-  const curPresetId =
-    sizePresets.find((p) => p.width === curW && p.fold === curFold)?.id || 'custom'
+  const savedPresetId = viewport === 'mobile' ? currentPage?.mobilePresetId : currentPage?.canvasPresetId
+  const curPreset = resolveCanvasPreset(viewport, curW, curFold, savedPresetId)
 
   function toggleBrowserFrame() {
     setBrowserFrameEnabled((enabled) => {
@@ -3592,7 +3592,7 @@ function SiteEditor() {
                   </div>
                   <DevicePicker
                     items={CANVAS_SIZE_ITEMS}
-                    value={curPresetId === 'custom' ? null : `${viewport}:${curPresetId}`}
+                    value={curPreset ? `${viewport}:${curPreset.id}` : null}
                     onPick={pickCanvasSize}
                     fallbackLabel={`${t('Custom')} · ${curFold ? `${curW}×${curFold}` : `${curW}px`}`}
                     collapse

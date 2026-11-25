@@ -1423,8 +1423,8 @@ function HtmlWorkspace({
   // A foldable is held like a phone on both sides of the PC/Mobile toggle: an
   // open screen as wide as a tablet gets the page's desktop layout, and still
   // sits in the phone's body with a phone's browser.
-  const framedPhone = !isFit && !landscape && (mobileDevice || device.category === 'foldable')
-  const desktopBrowser = browserFrame && !mobileDevice && !framedPhone
+  const framedPhone = !landscape && (device.category === 'phone' || device.category === 'foldable')
+  const desktopBrowser = browserFrame && !framedPhone && (!mobileDevice || device.category === 'tablet')
   const mobileBrowser = browserFrame && framedPhone
   const availableW = Math.max(1, stage.w - 24)
   const availableH = Math.max(1, stage.h - 24)
@@ -1446,7 +1446,7 @@ function HtmlWorkspace({
     : landscape
       ? device.w
       : device.h
-  const phone = phoneModel(contentW, contentH)
+  const phone = phoneModel(device)
   // A phone screen is a FIXED viewport, so the browser chrome takes its pixels
   // from the page, exactly as Safari and Chrome do on the device — the phone
   // does not grow because a browser is running on it. This is what makes the
@@ -1481,7 +1481,7 @@ function HtmlWorkspace({
       onToggleFullscreen={onToggleFullscreen ? toggleStageFullscreen : undefined}
     />
   )
-  const canToggleBrowserFrame = (!mobileDevice || framedPhone) && mode !== 'live' && !!onBrowserFrameToggle
+  const canToggleBrowserFrame = (!mobileDevice || framedPhone || device.category === 'tablet') && mode !== 'live' && !!onBrowserFrameToggle
   // A stage bar under 760px has no room for how the page is looked at: the
   // zoom, full screen and browser frame leave it (each hides itself there)
   // and come back at the top of the ⋯ menu, so nothing falls off the end.

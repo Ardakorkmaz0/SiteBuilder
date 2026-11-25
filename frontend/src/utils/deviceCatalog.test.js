@@ -1,50 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { FOLDABLE_STATES, FOLD_STATE_ORDER, foldableOrder, foldableStateOfSize } from './deviceCatalog.js'
+import { FOLD_STATE_ORDER, foldableOrder } from './deviceCatalog.js'
 import { DEVICES, isMobileDevice } from './htmlDevices.js'
 import { MOBILE_CANVAS_PRESETS, PC_CANVAS_PRESETS } from '../components/registry.jsx'
 
-describe('foldable screens', () => {
-  it('finds a foldable state by its screen size, rounding what a canvas stored', () => {
-    expect(foldableStateOfSize(707, 823)?.id).toBe('zfold6-inner')
-    expect(foldableStateOfSize('369', '905.4')?.id).toBe('zfold6-cover')
-    expect(foldableStateOfSize(1061, 744)?.hinge).toBe('thirds')
-    expect(foldableStateOfSize(411, 1006)?.hinge).toBe('horizontal')
-  })
+const canvas = [...PC_CANVAS_PRESETS, ...MOBILE_CANVAS_PRESETS]
 
-  it('does not take a phone as wide as a foldable for one', () => {
-    // The Flip's inner screen and the Pixel 9 are both 411 wide.
-    expect(foldableStateOfSize(411, 923)).toBeNull()
-    expect(foldableStateOfSize(390, 0)).toBeNull()
-    expect(foldableStateOfSize(707, 0)).toBeNull()
-  })
-
-  it('gives no other screen a foldable size, or it would be drawn with a crease', () => {
-    const others = [
-      ...DEVICES.filter((device) => device.category !== 'foldable').map((device) => `${device.id} ${device.w}×${device.h}`),
-      ...[...PC_CANVAS_PRESETS, ...MOBILE_CANVAS_PRESETS]
-        .filter((preset) => preset.category !== 'foldable')
-        .map((preset) => `${preset.id} ${preset.width}×${preset.fold}`),
-    ]
-    expect(others.filter((entry) => {
-      const [w, h] = entry.split(' ').pop().split('×')
-      return foldableStateOfSize(w, h)
-    })).toEqual([])
-    const sizes = FOLDABLE_STATES.map((state) => `${state.w}×${state.h}`)
-    expect(new Set(sizes).size).toBe(sizes.length)
-  })
-
-  it('puts a screen narrower than a tablet on the phone side, and a wider one on the PC side', () => {
-    expect(isMobileDevice('zfold6-inner')).toBe(true) // 707
-    expect(isMobileDevice('matext-double')).toBe(true) // 683
-    expect(isMobileDevice('pixel9fold-inner')).toBe(false) // 791
-    expect(isMobileDevice('matext-full')).toBe(false) // 1061
-    expect(PC_CANVAS_PRESETS.filter((preset) => preset.category === 'foldable').map((preset) => preset.id))
-      .toEqual(['pixel9fold-inner', 'matext-full'])
-    expect(MOBILE_CANVAS_PRESETS.filter((preset) => preset.category === 'foldable').map((preset) => preset.id))
-      .toEqual([
-        'zfold6-cover', 'zfold6-inner', 'zflip6-cover', 'zflip6-inner', 'pixel9fold-cover',
-        'matex6-cover', 'matex6-inner', 'matext-single', 'matext-double', 'iphonefold-cover', 'iphonefold-inner',
-      ])
+describe('device screens', () => {
+  it.each([
+    ['iphonefold-cover', 'iPhone Duo', 466, 678, null, true],
+    ['iphonefold-inner', 'iPhone Duo', 951, 669, 'vertical', false],
+    ['pixel7', 'Pixel 7', 411, 914, undefined, true],
+    ['pixel9', 'Pixel 9', 411, 923, undefined, true],
+    ['pixel9fold-cover', 'Pixel 9 Pro Fold', 411, 923, null, true],
+    ['pixel9fold-inner', 'Pixel 9 Pro Fold', 791, 820, 'vertical', false],
+    ['zflip6-inner', 'Galaxy Z Flip6', 411, 1006, 'horizontal', true],
+    ['zfold6-cover', 'Galaxy Z Fold6', 369, 905, null, true],
+    ['galaxys24ultra', 'Galaxy S24 Ultra', 384, 832, undefined, true],
+  ])('offers %s at its rounded logical screen size in both editors', (id, name, w, h, hinge, mobile) => {
+    const htmlDevice = DEVICES.find((device) => device.id === id)
+    const canvasDevice = canvas.find((device) => device.id === id)
+    expect(htmlDevice).toMatchObject({ name, w, h })
+    expect(canvasDevice).toMatchObject({ name, width: w, fold: h })
+    expect(htmlDevice.hinge).toBe(hinge)
+    expect(canvasDevice.hinge).toBe(hinge)
+    expect(isMobileDevice(id)).toBe(mobile)
+    expect((mobile ? MOBILE_CANVAS_PRESETS : PC_CANVAS_PRESETS).some((device) => device.id === id)).toBe(true)
   })
 
   it('offers a foldable closed first, then opening, in the catalog order', () => {
@@ -52,10 +32,5 @@ describe('foldable screens', () => {
     expect(foldableOrder('galaxy-zfold6')).toBe(0)
     expect(foldableOrder('iphone-fold')).toBe(5)
     expect(foldableOrder('galaxy-s24')).toBe(-1)
-  })
-
-  it('marks only the iPhone Fold as a concept', () => {
-    expect(FOLDABLE_STATES.filter((state) => state.concept).map((state) => state.id))
-      .toEqual(['iphonefold-cover', 'iphonefold-inner'])
   })
 })

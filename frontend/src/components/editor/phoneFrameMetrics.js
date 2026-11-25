@@ -1,4 +1,4 @@
-import { foldableStateOfSize } from '../../utils/deviceCatalog.js'
+import { HANDHELD_SCREENS } from '../../utils/deviceCatalog.js'
 
 // Device bodies for the editor's phone mockup, in DESIGN pixels. Shared so the
 // Edit canvas and the View preview reserve the same room for the bezel and
@@ -10,8 +10,7 @@ import { foldableStateOfSize } from '../../utils/deviceCatalog.js'
 // corner roundness, bezel thickness, camera cutout and button placement — so
 // those are what vary.
 //
-// The camera always sits IN the bezel, never notched into the screen: the page
-// keeps every pixel it was designed with.
+// Camera cutouts overlay the preview without changing the page's layout size.
 
 export const PHONE_MODELS = {
   // Neutral artboard for custom/default 390px work: it deliberately carries no
@@ -94,6 +93,15 @@ export const PHONE_MODELS = {
     buttons: 'pixel',
     body: 'obsidian',
   },
+  'pixel-9': {
+    id: 'pixel-9',
+    bezel: { side: 8, top: 8, bottom: 8 },
+    radius: 42,
+    screenRadius: 34,
+    camera: 'punch',
+    buttons: 'pixel',
+    body: 'obsidian',
+  },
   // A foldable's screen (deviceCatalog.js): thin bezel, squarer corners, and
   // the hinge drawn across the screen where the device folds.
   foldable: {
@@ -108,37 +116,24 @@ export const PHONE_MODELS = {
   },
 }
 
-// Every mobile preset has a distinct width, so the artboard width alone picks
-// the body. Anything custom falls back to the modern-iPhone shape.
-const MODEL_BY_WIDTH = {
-  360: 'galaxy-s24',
-  375: 'iphone-classic',
-  384: 'galaxy-s24-ultra',
-  390: 'iphone-notch',
-  393: 'iphone-island',
-  402: 'iphone-island',
-  411: 'pixel-7',
-  412: 'pixel-7',
-  430: 'iphone-island',
-  440: 'iphone-island',
+// Match the preset's identity; several devices have identical CSS pixels.
+const MODEL_BY_DEVICE = {
+  iphone14: 'iphone-notch',
+  iphonese: 'iphone-classic',
+  iphone15pro: 'iphone-island',
+  iphone15max: 'iphone-island',
+  iphone16pro: 'iphone-island',
+  iphone16promax: 'iphone-island',
+  galaxys24: 'galaxy-s24',
+  galaxys24ultra: 'galaxy-s24-ultra',
+  pixel7: 'pixel-7',
+  pixel9: 'pixel-9',
 }
 
-// The screen height that goes with a phone width, for the canvases that have no
-// device to ask. Every mobile preset in the toolbar carries its device height as
-// the "fold", so that value wins when it is set; this is the fallback for the
-// preset that has none (Standard mobile) and for custom widths.
-const SCREEN_HEIGHT_BY_WIDTH = {
-  360: 780,
-  375: 667,
-  384: 824,
-  390: 844,
-  393: 852,
-  402: 874,
-  411: 923,
-  412: 915,
-  430: 932,
-  440: 956,
-}
+// Heights for custom widths with no explicit screen height.
+const SCREEN_HEIGHT_BY_WIDTH = Object.fromEntries(
+  HANDHELD_SCREENS.filter((device) => device.category === 'phone').map(({ w, h }) => [w, h]),
+)
 
 export function phoneScreenHeight(width) {
   const w = Math.round(Number(width) || 0)
@@ -151,21 +146,20 @@ export function phoneScreenHeight(width) {
 // Each foldable in its maker's finish and with its maker's keys; the keys also
 // pick the browser drawn on it (Safari for an iPhone, Chrome for the rest).
 const FOLDABLE_LOOKS = {
-  'iphone-fold': { buttons: 'iphone', body: 'titanium' },
+  'iphone-fold': { buttons: 'iphone', body: 'titanium', camera: 'island', cameraSide: 'right' },
   'pixel9-pro-fold': { buttons: 'pixel', body: 'obsidian' },
   'huawei-mate-x6': { body: 'titanium-black' },
   'huawei-mate-xt': { body: 'titanium-black' },
 }
 
-export function phoneModel(width, fold) {
-  if (Math.round(Number(width) || 0) === 390 && Number(fold) === 0) return PHONE_MODELS.generic
-  // A foldable's screen is known by its size: its width alone can be a
-  // phone's (the Flip's 411 is a Pixel 9's too).
-  const folding = foldableStateOfSize(width, fold)
-  if (folding) {
-    return { ...PHONE_MODELS.foldable, ...FOLDABLE_LOOKS[folding.group], name: folding.name, hinge: folding.hinge }
+export function phoneModel(device) {
+  if (device?.category === 'foldable') {
+    return { ...PHONE_MODELS.foldable, ...FOLDABLE_LOOKS[device.group], name: device.name, hinge: device.hinge }
   }
-  return PHONE_MODELS[MODEL_BY_WIDTH[Math.round(Number(width) || 0)]] || PHONE_MODELS['iphone-island']
+  if (device?.category === 'phone' && MODEL_BY_DEVICE[device.id]) {
+    return { ...PHONE_MODELS[MODEL_BY_DEVICE[device.id]], name: device.name }
+  }
+  return PHONE_MODELS.generic
 }
 
 // How much bigger the device body is than the screen it holds.
