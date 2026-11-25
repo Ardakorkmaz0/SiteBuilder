@@ -16,7 +16,7 @@ import { aiErrorText } from '../../utils/aiErrorText.js'
 import { aiProviderReady } from '../../utils/aiProviders.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { useInitialDialogFocus } from '../../ui/useInitialDialogFocus.js'
-import { XIcon } from '../icons.jsx'
+import { NodeIcon, XIcon } from '../icons.jsx'
 
 const STEPS = ['Type', 'About', 'Style', 'Sections']
 
@@ -508,9 +508,10 @@ export default function AiWizard({ open, onClose, onApply, onOpenTemplates, init
                 type="button"
                 onClick={generate}
                 disabled={refining}
-                className="rounded-lg border border-[#d1d5db] px-3 py-2 text-sm font-medium text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#d1d5db] px-3 py-2 text-sm font-medium text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-50"
               >
-                {t('↻ Regenerate')}
+                <NodeIcon name="refresh" size={14} />
+                {t('Regenerate')}
               </button>
               {providerUsed && (
                 <span className="text-[11px] text-[var(--studio-text-faint)]">{t('via')} {providerUsed}</span>

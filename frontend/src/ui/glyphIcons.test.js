@@ -8,18 +8,27 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const SRC = path.resolve('src')
-const GLYPH = '[×✕▾▸✓↖⧉⛶↗↑↓☰]'
+const GLYPH = '[×✕▾▸✓↖⧉⛶↗↑↓☰↻⟳]'
 // A glyph alone as an element's content, alone on a JSX line, or as a quoted
-// string standing in for an icon.
+// string standing in for an icon; in a JSX expression ({'×'}), at the start of
+// a translated label (t('↻ Regenerate')) or before one (↻ {t('Reload')}, and
+// the # that stood for the grid), or written into a page as its text.
 const PATTERNS = [
   new RegExp(`>\\s*${GLYPH}\\s*<`),
   new RegExp(`^\\s*${GLYPH}\\s*$`),
   new RegExp(`\\?\\s*'${GLYPH}'|'${GLYPH}'\\s*:`),
   new RegExp(`\\}\\s*${GLYPH}\\s*$`),
+  new RegExp(`\\{\\s*['"\`]${GLYPH}['"\`]\\s*\\}`),
+  new RegExp(`\\bt\\(\\s*['"\`]${GLYPH}`),
+  new RegExp(`(?:^|>)\\s*(?:${GLYPH}|#)\\s*\\{\\s*t\\(`),
+  new RegExp(`\\.(?:textContent|innerText|innerHTML)\\s*=\\s*['"\`]${GLYPH}['"\`]`),
 ]
 // Text, not icons: each is a decision.
 const ALLOWED = [
   ['pages/EditorPage.jsx', '<span className="text-xs text-[var(--studio-text-faint)]">×</span>', 'the × between a custom width and height'],
+  // A native list's options hold text only: no icon can stand there.
+  ['components/editor/controls.jsx', '<option value="top">↑ {t(\'Top of this page\')}</option>', 'the top of the page, in a link target list'],
+  ['components/editor/controls.jsx', '<option value="section"># {t(\'Section on this page\')}</option>', 'a section of the page, in a link target list'],
 ]
 
 function files(dir, out = []) {
@@ -34,7 +43,11 @@ function files(dir, out = []) {
 describe('symbols in the editor are drawn as icons', () => {
   it('has no button or mark that shows a typed character as its icon', () => {
     const found = []
-    const targets = [...files(path.join(SRC, 'components', 'editor')), path.join(SRC, 'pages', 'EditorPage.jsx')]
+    const targets = [
+      ...files(path.join(SRC, 'components', 'editor')),
+      path.join(SRC, 'pages', 'EditorPage.jsx'),
+      path.join(SRC, 'pages', 'CodeProjectPage.jsx'),
+    ]
     for (const file of targets) {
       const rel = path.relative(SRC, file).split(path.sep).join('/')
       fs.readFileSync(file, 'utf8').split('\n').forEach((line, index) => {

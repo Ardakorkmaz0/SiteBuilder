@@ -96,6 +96,14 @@ export const ICON_NODES = {
   minus: [
     ['path', { d: 'M5 12h14' }],
   ],
+  grid: [
+    ['rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }],
+    ['path', { d: 'M3 9h18M3 15h18M9 3v18M15 3v18' }],
+  ],
+  refresh: [
+    ['path', { d: 'M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8' }],
+    ['path', { d: 'M21 3v5h-5' }],
+  ],
   check: [
     ['path', { d: 'm5 12 4.5 4.5L19 7' }],
   ],

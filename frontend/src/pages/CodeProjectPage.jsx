@@ -18,7 +18,7 @@ import { assemblePreviewHtml, needsBuildToRender } from '../utils/htmlFiles.js'
 import { DEVICES, isMobileDevice } from '../utils/htmlDevices.js'
 import Sidebar from '../components/editor/Sidebar.jsx'
 import ProjectFilesPanel from '../components/editor/ProjectFilesPanel.jsx'
-import { FolderOpenIcon, CogIcon, LightbulbIcon, PaletteIcon } from '../components/icons.jsx'
+import { ExternalLinkIcon, FolderOpenIcon, CogIcon, LightbulbIcon, NodeIcon, PaletteIcon } from '../components/icons.jsx'
 import HtmlWorkspace from '../components/editor/HtmlWorkspace.jsx'
 import DevicePicker from '../components/editor/DevicePicker.jsx'
 import HtmlElementPanel from '../components/editor/HtmlElementPanel.jsx'
@@ -63,17 +63,18 @@ function LivePane({ url, reloadKey, onReload, onOpenWindow }) {
           onClick={onReload}
           title={t('Reload the embedded preview')}
           aria-label={t('Reload the embedded preview')}
-          className="shrink-0 rounded-lg border border-[#d1d5db] px-2 py-0.5 text-[11px] text-[#374151] hover:bg-[#f3f4f6]"
+          className="grid shrink-0 place-items-center rounded-lg border border-[#d1d5db] px-2 py-0.5 text-[11px] text-[#374151] hover:bg-[#f3f4f6]"
         >
-          ↻
+          <NodeIcon name="refresh" size={12} />
         </button>
         <button
           type="button"
           onClick={() => onOpenWindow?.()}
           title={t('Open in a real window — works even when embedding is blocked (Django), and auto-reloads on Save')}
-          className="shrink-0 rounded-lg border border-[#4f46e5] bg-[#eef2ff] px-2 py-0.5 text-[11px] font-medium text-[#4f46e5] hover:bg-[#e0e7ff]"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[#4f46e5] bg-[#eef2ff] px-2 py-0.5 text-[11px] font-medium text-[#4f46e5] hover:bg-[#e0e7ff]"
         >
-          {t('Live window')} ↗
+          {t('Live window')}
+          <ExternalLinkIcon size={11} />
         </button>
       </div>
       <div className="border-b border-[#e5e7eb] bg-[#fffbeb] px-3 py-1 text-[10px] leading-snug text-[#92400e]">

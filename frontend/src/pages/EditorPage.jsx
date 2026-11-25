@@ -44,6 +44,7 @@ import {
   MonitorIcon,
   MoonIcon,
   MoreHorizontalIcon,
+  NodeIcon,
   NoteIcon,
   PaletteIcon,
   RedoIcon,
@@ -3704,7 +3705,7 @@ function SiteEditor() {
                           )}
                           {canvasMode === 'edit' && (
                             <div className="space-y-1">
-                              <button type="button" onClick={() => setGridStep(gridStep ? 0 : 10)} className={`studio-menu-item ${gridStep ? 'bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]' : ''}`}># {t('Grid')}</button>
+                              <button type="button" onClick={() => setGridStep(gridStep ? 0 : 10)} className={`studio-menu-item ${gridStep ? 'bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]' : ''}`}><NodeIcon name="grid" size={14} />{t('Grid')}</button>
                               <button type="button" onClick={() => { setBrushMode(false); setLinkMode(!linkMode); setCanvasToolsOpen(false) }} className={`studio-menu-item ${linkMode ? 'bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]' : ''}`}><LinkIcon size={13} /> {t('Link')}</button>
                               <button type="button" onClick={() => { const next = !brushMode; setBrushMode(next); if (next) setLinkMode(false); setCanvasToolsOpen(false) }} className={`studio-menu-item ${brushMode ? 'bg-[var(--studio-accent-soft)] text-[var(--studio-accent-hover)]' : ''}`}><PaletteIcon size={13} /> {t('Brush')}</button>
                             </div>

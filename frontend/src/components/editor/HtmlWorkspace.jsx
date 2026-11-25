@@ -86,7 +86,7 @@ import {
 import { fittedSelectionActionsScale, selectionActionsPosition } from './canvasSelectionActionsLayout.js'
 import { readZoom, writeZoom, zoomScale } from './canvasZoom.js'
 import BrushControls from './BrushControls.jsx'
-import { ChevronDownIcon, EditIcon, ExternalLinkIcon, FileCodeIcon, LightbulbIcon, LinkIcon, MonitorIcon, MoreHorizontalIcon, MoveIcon, PaletteIcon, PinIcon, WarningIcon } from '../icons.jsx'
+import { ChevronDownIcon, EditIcon, ExternalLinkIcon, FileCodeIcon, LightbulbIcon, LinkIcon, MonitorIcon, MoreHorizontalIcon, MoveIcon, NodeIcon, PaletteIcon, PinIcon, WarningIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
 import { shouldForwardIframeShortcut, shouldForwardIframeToolKey } from '../../utils/editorLeave.js'
@@ -2351,9 +2351,10 @@ function HtmlWorkspace({
                 type="button"
                 onClick={() => setLiveNonce((n) => n + 1)}
                 title={t('Reload the embedded preview')}
-                className="rounded-lg border border-[#d1d5db] px-2.5 py-1 text-xs text-[#374151] hover:bg-[#f3f4f6]"
+                className="inline-flex items-center gap-1 rounded-lg border border-[#d1d5db] px-2.5 py-1 text-xs text-[#374151] hover:bg-[#f3f4f6]"
               >
-                ↻ {t('Reload')}
+                <NodeIcon name="refresh" size={13} />
+                {t('Reload')}
               </button>
               <button
                 type="button"

@@ -826,7 +826,7 @@ const BASE_TURKISH_TRANSLATIONS = {
   '← Back': '← Geri',
   '✨ Generate my site': '✨ Sitemi oluştur',
   '← Edit answers': '← Yanıtları düzenle',
-  '↻ Regenerate': '↻ Yeniden oluştur',
+  'Regenerate': 'Yeniden oluştur',
   'Use this site': 'Bu siteyi kullan',
   'Template gallery': 'Şablon galerisi',
   'Search, preview and save favorites before applying a template.': 'Bir şablonu uygulamadan önce arayın, önizleyin ve favorilerinize kaydedin.',
