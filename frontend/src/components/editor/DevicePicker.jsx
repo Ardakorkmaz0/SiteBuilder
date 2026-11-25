@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDownIcon, NodeIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { closeWhenFocusLeaves } from '../../ui/closeWhenFocusLeaves.js'
@@ -74,6 +74,27 @@ function cardsOf(items) {
   return cards.sort((a, b) => rank(a) - rank(b))
 }
 
+// The list keeps this far from the end of the area it opens in.
+const LIST_EDGE = 8
+
+// Where the list can be seen: the window, less whatever its ancestors clip
+// (the stage cuts off what overflows it, so a list hanging past its right end
+// lost its cards there).
+function roomFor(el) {
+  const view = el.ownerDocument.defaultView
+  let left = 0
+  let right = view.innerWidth
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const style = view.getComputedStyle(node)
+    if ([style.overflowX, style.overflow].some((value) => value && value !== 'visible')) {
+      const box = node.getBoundingClientRect()
+      left = Math.max(left, box.left)
+      right = Math.min(right, box.right)
+    }
+  }
+  return { left, right }
+}
+
 // In a stage bar (an @container) `collapse` keeps only the button's icon below
 // 900px, where the bar is short of room; the name and size come back above.
 export default function DevicePicker({ items, value, onPick, fallbackLabel = '', collapse = false, laptopFrame = false, onLaptopFrameToggle }) {
@@ -85,6 +106,25 @@ export default function DevicePicker({ items, value, onPick, fallbackLabel = '',
   const current = items.find((item) => item.id === value) || null
   const close = () => setOpen(false)
   useEscapeToClose(open, close)
+
+  // It opens left-aligned with its button, moved left as far as it must to end
+  // inside the area it can be seen in, and no wider than that area.
+  const dialogRef = useRef(null)
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    const dialog = dialogRef.current
+    if (!open || !root || !dialog) return
+    const room = roomFor(root)
+    const rootLeft = root.getBoundingClientRect().left
+    const natural = dialog.getBoundingClientRect().width
+    const width = Math.min(natural, Math.max(0, room.right - room.left - LIST_EDGE * 2))
+    const left = Math.max(
+      Math.min(0, room.right - LIST_EDGE - (rootLeft + width)),
+      room.left + LIST_EDGE - rootLeft,
+    )
+    dialog.style.width = width < natural ? `${Math.round(width)}px` : ''
+    dialog.style.left = left ? `${Math.round(left)}px` : ''
+  }, [open])
 
   // It opens on the screen in use: that card (or that state's switch) has the
   // keyboard and is scrolled into view. Picking a type keeps the keyboard on
@@ -145,6 +185,7 @@ export default function DevicePicker({ items, value, onPick, fallbackLabel = '',
         <>
           <div className="fixed inset-0 z-30" onClick={close} />
           <div
+            ref={dialogRef}
             role="dialog"
             aria-label={t('Screen size')}
             className="studio-menu absolute left-0 top-[calc(100%+6px)] z-40 w-[min(calc(100vw-2rem),440px)] p-2"

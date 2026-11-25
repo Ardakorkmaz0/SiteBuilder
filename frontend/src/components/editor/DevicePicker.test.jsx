@@ -140,6 +140,52 @@ describe('DevicePicker', () => {
     expect(onPick).not.toHaveBeenCalled()
   })
 
+  // In a narrow window, with the rails open, the list hung off the right end of
+  // the stage, which cut it off: the cards on its right, and their switches,
+  // were out of reach.
+  it('opens inside the area that would cut it off, moved left as far as it must', () => {
+    const box = (left, width) => ({ left, right: left + width, top: 0, bottom: 500, width, height: 500, x: left, y: 0 })
+    render(
+      <LanguageProvider>
+        <div data-testid="stage" style={{ overflow: 'hidden' }}>
+          <DevicePicker items={DEVICES} value="iphone15pro" onPick={() => {}} />
+        </div>
+      </LanguageProvider>,
+    )
+    const stage = screen.getByTestId('stage')
+    const root = trigger().parentElement
+    let stageBox = box(240, 512)
+    let rootBox = box(600, 160)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function measured() {
+      if (this === stage) return stageBox
+      if (this === root) return rootBox
+      if (this.getAttribute('role') === 'dialog') return box(rootBox.left, 440)
+      return box(0, 0)
+    })
+    const picker = open()
+    // The stage ends at 752, 8px of it kept free: the 440px list ends at 744,
+    // so it starts at 304, 296px left of its button at 600.
+    expect(picker.style.left).toBe('-296px')
+    expect(picker.style.width).toBe('')
+    fireEvent.click(trigger())
+
+    // A stage narrower than the list (240 to 540): the list takes its width,
+    // less 8px at each end, 284px from 248, 152px left of its button at 400.
+    stageBox = box(240, 300)
+    rootBox = box(400, 120)
+    const narrow = open()
+    expect(narrow.style.width).toBe('284px')
+    expect(narrow.style.left).toBe('-152px')
+    fireEvent.click(trigger())
+
+    // With room, it stays where it was: left-aligned with its button.
+    stageBox = box(0, 1400)
+    rootBox = box(300, 160)
+    const roomy = open()
+    expect(roomy.style.left).toBe('')
+    expect(roomy.style.width).toBe('')
+  })
+
   it('names a size no card has with the caller\'s words', () => {
     renderPicker({ value: null, fallbackLabel: 'Custom · 1111px' })
     expect(trigger()).toHaveAccessibleName('Screen size: Custom · 1111px')
