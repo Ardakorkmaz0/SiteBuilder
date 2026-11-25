@@ -72,6 +72,10 @@ const groupTitles = (root) => {
   return [...panel.querySelectorAll('button[aria-expanded]')]
     .map((btn) => btn.textContent.trim().split('(')[0].trim())
 }
+// The motion tab's fields by their names, in order.
+const motionFields = () => [...within(screen.getByRole('tabpanel')).queryAllByRole('combobox'), ...within(screen.getByRole('tabpanel')).queryAllByRole('spinbutton')]
+  .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
+  .map((field) => field.labels?.[0]?.querySelector('span')?.textContent?.trim() || field.getAttribute('aria-label') || '')
 const buttonIconDrawings = (button) => [...button.querySelectorAll('svg path, svg rect, svg circle')]
   .map((shape) => shape.getAttribute('d') || shape.outerHTML)
 
@@ -235,15 +239,28 @@ describe('the properties panel on an HTML page and on a canvas page', () => {
   })
 
   it('gives an HTML element the motion fields a canvas block has, and sends what is picked', () => {
-    const { props } = renderHtmlElement()
+    const html = renderHtmlElement()
     fireEvent.click(screen.getByRole('tab', { name: 'Motion' }))
+    const htmlFields = motionFields()
     const entrance = screen.getByRole('combobox', { name: 'Entrance (on scroll)' })
     expect(entrance).toHaveValue('fade-up')
     expect(screen.getByRole('combobox', { name: 'Hover effect' })).toHaveValue('none')
     fireEvent.change(entrance, { target: { value: 'zoom' } })
-    expect(props.onMotionChange).toHaveBeenLastCalledWith({ animIn: 'zoom' })
+    expect(html.props.onMotionChange).toHaveBeenLastCalledWith({ animIn: 'zoom' })
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Delay (ms)' }), { target: { value: '250' } })
     fireEvent.blur(screen.getByRole('spinbutton', { name: 'Delay (ms)' }))
-    expect(props.onMotionChange).toHaveBeenCalledWith({ animDelay: 250 })
+    expect(html.props.onMotionChange).toHaveBeenCalledWith({ animDelay: 250 })
+    html.unmount()
+
+    // The canvas heading: the same fields, in the same order, written to the block.
+    renderCanvasHeading()
+    fireEvent.click(screen.getByRole('tab', { name: 'Motion' }))
+    expect(htmlFields).toEqual(expect.arrayContaining(['Entrance (on scroll)', 'Hover effect', 'Delay (ms)']))
+    expect(motionFields()).toEqual(htmlFields)
+    const canvasEntrance = screen.getByRole('combobox', { name: 'Entrance (on scroll)' })
+    expect(canvasEntrance).toHaveValue('fade-up')
+    fireEvent.change(canvasEntrance, { target: { value: 'zoom' } })
+    const heading = () => useEditorStore.getState().schema.pages[0].components[0].children[0]
+    expect(heading().props.animIn).toBe('zoom')
   })
 })

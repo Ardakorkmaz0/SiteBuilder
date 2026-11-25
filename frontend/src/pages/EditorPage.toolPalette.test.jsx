@@ -169,6 +169,31 @@ describe('the tool palette on an HTML page', () => {
     expect(screen.queryByText('Click in the page to place the', { exact: false })).toBeNull()
   }, 30000)
 
+  // The test above stops at the hint: the box has to land in the page as well.
+  it('places a box where the page is clicked, and the palette is back on Select', async () => {
+    localStorage.setItem('pwb_htmlmode_1', 'edit')
+    site.schema.pages[0] = { id: 'home', name: 'Home', mode: 'html', html: '<!DOCTYPE html><html><body><h1>Garden</h1></body></html>', components: [] }
+    render(<UiThemeProvider><LanguageProvider><MemoryRouter initialEntries={['/editor/1']}>
+      <Routes><Route path="/editor/:id" element={<EditorPage />} /></Routes>
+    </MemoryRouter></LanguageProvider></UiThemeProvider>)
+    const frame = await screen.findByTitle('site', {}, { timeout: 15000 })
+    // jsdom loads no srcdoc and lays nothing out: the page is seeded the way
+    // its load does, and the heading reports a box.
+    const doc = frame.contentDocument
+    doc.body.innerHTML = '<h1>Garden</h1>'
+    await act(async () => { fireEvent.load(frame) })
+    const heading = doc.querySelector('h1')
+    heading.getBoundingClientRect = () => ({ left: 0, top: 0, width: 600, height: 60, right: 600, bottom: 60 })
+    doc.elementFromPoint = () => heading
+
+    fireEvent.click(tool('Box (R)'))
+    await act(async () => { fireEvent.click(heading, { clientX: 100, clientY: 50 }) })
+
+    expect(heading.nextElementSibling?.textContent).toBe('Container — drop content here.')
+    expect(tool('Select (V)')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('Click in the page to place the', { exact: false })).toBeNull()
+  }, 30000)
+
   // Source has no palette. A letter pressed there (on the Source button, say)
   // still armed a tool behind it, which was waiting on the way back to Edit.
   it('takes its letters only while it is on screen, so Source arms no tool', async () => {
