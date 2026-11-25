@@ -79,11 +79,14 @@ const LIST_EDGE = 8
 
 // Where the list can be seen: the window, less whatever its ancestors clip
 // (the stage cuts off what overflows it, so a list hanging past its right end
-// lost its cards there).
+// lost its cards there). The window is the page's own width where that is
+// smaller: Firefox counts a scrollbar's room in `innerWidth`, and the list ran
+// 15px past the window's edge.
 function roomFor(el) {
-  const view = el.ownerDocument.defaultView
+  const doc = el.ownerDocument
+  const view = doc.defaultView
   let left = 0
-  let right = view.innerWidth
+  let right = Math.min(...[view.innerWidth, doc.documentElement.clientWidth].filter((width) => width > 0))
   for (let node = el.parentElement; node; node = node.parentElement) {
     const style = view.getComputedStyle(node)
     if ([style.overflowX, style.overflow].some((value) => value && value !== 'visible')) {
@@ -108,22 +111,30 @@ export default function DevicePicker({ items, value, onPick, fallbackLabel = '',
   useEscapeToClose(open, close)
 
   // It opens left-aligned with its button, moved left as far as it must to end
-  // inside the area it can be seen in, and no wider than that area.
+  // inside the area it can be seen in, and no wider than that area: when it
+  // opens, and again whenever the window is resized while it is open.
   const dialogRef = useRef(null)
   useLayoutEffect(() => {
     const root = rootRef.current
     const dialog = dialogRef.current
-    if (!open || !root || !dialog) return
-    const room = roomFor(root)
-    const rootLeft = root.getBoundingClientRect().left
-    const natural = dialog.getBoundingClientRect().width
-    const width = Math.min(natural, Math.max(0, room.right - room.left - LIST_EDGE * 2))
-    const left = Math.max(
-      Math.min(0, room.right - LIST_EDGE - (rootLeft + width)),
-      room.left + LIST_EDGE - rootLeft,
-    )
-    dialog.style.width = width < natural ? `${Math.round(width)}px` : ''
-    dialog.style.left = left ? `${Math.round(left)}px` : ''
+    if (!open || !root || !dialog) return undefined
+    const place = () => {
+      const room = roomFor(root)
+      const rootLeft = root.getBoundingClientRect().left
+      dialog.style.width = ''
+      const natural = dialog.getBoundingClientRect().width
+      const width = Math.min(natural, Math.max(0, room.right - room.left - LIST_EDGE * 2))
+      const left = Math.max(
+        Math.min(0, room.right - LIST_EDGE - (rootLeft + width)),
+        room.left + LIST_EDGE - rootLeft,
+      )
+      dialog.style.width = width < natural ? `${Math.round(width)}px` : ''
+      dialog.style.left = left ? `${Math.round(left)}px` : ''
+    }
+    place()
+    const view = root.ownerDocument.defaultView
+    view.addEventListener('resize', place)
+    return () => view.removeEventListener('resize', place)
   }, [open])
 
   // It opens on the screen in use: that card (or that state's switch) has the

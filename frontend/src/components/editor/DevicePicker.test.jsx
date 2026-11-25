@@ -186,6 +186,60 @@ describe('DevicePicker', () => {
     expect(roomy.style.width).toBe('')
   })
 
+  // Firefox counts a scrollbar's room in innerWidth: the list was placed for a
+  // 1055px window that showed 1040px, and ran past its edge (CI, 2026-11-25).
+  it('keeps inside the page\'s own width when the window counts a scrollbar\'s room too', () => {
+    const box = (left, width) => ({ left, right: left + width, top: 0, bottom: 500, width, height: 500, x: left, y: 0 })
+    const innerWidth = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { value: 1055, configurable: true })
+    Object.defineProperty(document.documentElement, 'clientWidth', { get: () => 1040, configurable: true })
+    try {
+      renderPicker()
+      const root = trigger().parentElement
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function measured() {
+        if (this === root) return box(647, 48)
+        if (this.getAttribute('role') === 'dialog') return box(647, 440)
+        return box(0, 0)
+      })
+      // 1040 less 8px is 1032: the 440px list starts at 592, 55px left of its button.
+      expect(open().style.left).toBe('-55px')
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { value: innerWidth, configurable: true })
+      delete document.documentElement.clientWidth
+    }
+  })
+
+  it('moves again when the window is resized while it is open', () => {
+    const box = (left, width) => ({ left, right: left + width, top: 0, bottom: 500, width, height: 500, x: left, y: 0 })
+    render(
+      <LanguageProvider>
+        <div data-testid="stage" style={{ overflow: 'hidden' }}>
+          <DevicePicker items={DEVICES} value="iphone15pro" onPick={() => {}} />
+        </div>
+      </LanguageProvider>,
+    )
+    const stage = screen.getByTestId('stage')
+    const root = trigger().parentElement
+    // jsdom's window is 1024px wide: the list at 300 ends at 740, inside it.
+    let stageBox = box(0, 1400)
+    let rootBox = box(300, 160)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function measured() {
+      if (this === stage) return stageBox
+      if (this === root) return rootBox
+      if (this.getAttribute('role') === 'dialog') return box(rootBox.left, 440)
+      return box(0, 0)
+    })
+    const picker = open()
+    expect(picker.style.left).toBe('')
+
+    // The stage narrows to end at 752 and the bar puts the button at 600: the
+    // list ends at 744, 296px left of its button.
+    stageBox = box(240, 512)
+    rootBox = box(600, 160)
+    fireEvent(window, new Event('resize'))
+    expect(picker.style.left).toBe('-296px')
+  })
+
   it('names a size no card has with the caller\'s words', () => {
     renderPicker({ value: null, fallbackLabel: 'Custom · 1111px' })
     expect(trigger()).toHaveAccessibleName('Screen size: Custom · 1111px')
