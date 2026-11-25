@@ -69,30 +69,52 @@ function Buttons({ kind }) {
 function Camera({ model, inScreen = false }) {
   const centered = {
     position: 'absolute',
-    left: '50%',
+    left: model.cameraX || '50%',
     transform: 'translateX(-50%)',
     zIndex: 30,
     pointerEvents: 'none',
   }
+  if (model.camera === 'under-display') return null
+
+  if (model.camera === 'rear-cameras') {
+    return (
+      <div aria-hidden="true" data-device-cutout="rear-cameras" style={{
+        position: 'absolute', zIndex: 30, pointerEvents: 'none', top: 10, left: 12,
+        padding: 9, display: 'flex', gap: 12, borderRadius: '12px 22px 12px 16px',
+        background: BODY_FINISH[model.body],
+      }}>
+        {[0, 1].map((lens) => (
+          <span key={lens} style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'radial-gradient(circle, #223146, #05070c 48%, #151922 65%, #05070c 75%)',
+            boxShadow: '0 0 0 2px rgba(220,225,245,.22)',
+          }} />
+        ))}
+        <span style={{ alignSelf: 'center', width: 7, height: 7, borderRadius: '50%', background: '#e8dcc6' }} />
+      </div>
+    )
+  }
+
   if (model.camera === 'island') {
-    const sideIsland = inScreen && model.cameraSide === 'right'
+    const sideIsland = model.cameraPlacement === 'top-right'
     const position = sideIsland
-      ? { left: 'auto', right: 10, top: '50%', transform: 'translateY(-50%)', flexDirection: 'column' }
+      ? { left: 'auto', right: 28, top: 24, transform: 'none', flexDirection: 'column' }
       : { top: inScreen ? 10 : (model.bezel.top - 28) / 2 }
     return (
       <div
         aria-hidden="true"
+        data-device-cutout="island"
         style={{
           ...centered,
           ...position,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'flex-end',
+          justifyContent: sideIsland ? 'flex-start' : 'flex-end',
           gap: 6,
-          width: sideIsland ? 28 : 104,
-          height: sideIsland ? 104 : 28,
+          width: sideIsland ? 36 : model.compactIsland ? 78 : 104,
+          height: sideIsland ? 62 : model.compactIsland ? 24 : 28,
           paddingRight: sideIsland ? 0 : 10,
-          paddingBottom: sideIsland ? 10 : 0,
+          paddingTop: sideIsland ? 9 : 0,
           borderRadius: 16,
           background: '#000105',
           boxSizing: 'border-box',
@@ -111,13 +133,24 @@ function Camera({ model, inScreen = false }) {
       </div>
     )
   }
+  if (model.camera === 'teardrop') {
+    return (
+      <div aria-hidden="true" data-device-cutout="teardrop" style={{
+        ...centered, top: 0, width: 28, height: 17,
+        borderRadius: '0 0 60% 60%', background: '#05070c',
+      }}>
+        <span style={{ position: 'absolute', left: 10, top: 3, width: 8, height: 8, borderRadius: '50%', background: '#161b28' }} />
+      </div>
+    )
+  }
   if (model.camera === 'notch') {
     return (
       <div
         aria-hidden="true"
+        data-device-cutout="notch"
         style={{
           ...centered,
-          top: inScreen ? 0 : (model.bezel.top - 28) / 2,
+          top: 0,
           width: 132,
           height: 29,
           borderRadius: '0 0 18px 18px',
@@ -134,9 +167,10 @@ function Camera({ model, inScreen = false }) {
     return (
       <span
         aria-hidden="true"
+        data-device-cutout="punch"
         style={{
           ...centered,
-          top: inScreen ? 10 : (model.bezel.top - 12) / 2,
+          top: model.cameraTop ?? 10,
           width: 12,
           height: 12,
           borderRadius: '50%',
@@ -158,7 +192,6 @@ function Camera({ model, inScreen = false }) {
         gap: 10,
       }}
     >
-      <span style={{ width: 54, height: 6, borderRadius: 3, background: '#1c2231' }} />
       <span
         style={{
           width: 8,
@@ -168,6 +201,7 @@ function Camera({ model, inScreen = false }) {
           boxShadow: 'inset 0 0 0 1px rgba(129,150,201,0.45)',
         }}
       />
+      <span style={{ width: 54, height: 6, borderRadius: 3, background: '#1c2231' }} />
     </div>
   )
 }

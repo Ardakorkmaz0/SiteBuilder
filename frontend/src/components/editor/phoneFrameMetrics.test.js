@@ -40,10 +40,10 @@ describe('foldable bodies', () => {
   })
 
   it('gives each maker its own keys, camera and browser', () => {
-    for (const id of ['iphonefold-cover', 'iphonefold-inner']) {
-      expect(modelOf(id)).toMatchObject({ buttons: 'iphone', camera: 'island', body: 'titanium' })
-      expect(mobileBrowserSkin(modelOf(id))).toBe('ios')
-    }
+    expect(modelOf('iphonefold-cover')).toMatchObject({ buttons: 'iphone', camera: 'island', body: 'titanium' })
+    expect(modelOf('iphonefold-inner')).toMatchObject({ buttons: 'iphone', camera: 'under-display', body: 'titanium' })
+    expect(mobileBrowserSkin(modelOf('iphonefold-cover'))).toBe('ios')
+    expect(mobileBrowserSkin(modelOf('iphonefold-inner'))).toBe('ios')
     expect(modelOf('pixel9fold-inner').buttons).toBe('pixel')
     expect(mobileBrowserSkin(modelOf('zfold6-inner'))).toBe('android')
   })

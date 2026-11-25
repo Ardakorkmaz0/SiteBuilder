@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FOLD_STATE_ORDER, foldableOrder } from './deviceCatalog.js'
 import { DEVICES, isMobileDevice } from './htmlDevices.js'
-import { MOBILE_CANVAS_PRESETS, PC_CANVAS_PRESETS } from '../components/registry.jsx'
+import { MOBILE_CANVAS_PRESETS, PC_CANVAS_PRESETS, resolveCanvasPreset } from '../components/registry.jsx'
 
 const canvas = [...PC_CANVAS_PRESETS, ...MOBILE_CANVAS_PRESETS]
 
@@ -32,5 +32,27 @@ describe('device screens', () => {
     expect(foldableOrder('galaxy-zfold6')).toBe(0)
     expect(foldableOrder('iphone-fold')).toBe(5)
     expect(foldableOrder('galaxy-s24')).toBe(-1)
+  })
+})
+
+describe('catalog expansion', () => {
+  it.each([
+    ['galaxya07', 360, 800],
+    ['galaxya37', 384, 832],
+    ['galaxys26ultra', 412, 891],
+    ['iphone17', 402, 874],
+    ['redmi-note15', 393, 870],
+    ['huawei-pura90', 440, 952],
+    ['acer-nitro-16', 2560, 1600],
+  ])('shares the %s size between HTML and canvas', (id, w, h) => {
+    expect(DEVICES.find((device) => device.id === id)).toMatchObject({ w, h })
+    expect(resolveCanvasPreset(w < 768 ? 'mobile' : 'pc', w, h, id)?.id).toBe(id)
+  })
+
+  it('preserves older dimensions-only choices when a new device matches', () => {
+    expect(resolveCanvasPreset('mobile', 390, 844)?.id).toBe('iphone14')
+    expect(resolveCanvasPreset('mobile', 384, 832)?.id).toBe('galaxys24ultra')
+    expect(resolveCanvasPreset('mobile', 384, 832, 'galaxya57')?.id).toBe('galaxya57')
+    expect(resolveCanvasPreset('mobile', 411, 923)?.id).toBe('pixel9')
   })
 })

@@ -98,15 +98,46 @@ describe('PhoneFrame on a foldable', () => {
   })
 })
 
-describe('iPhone Duo hardware', () => {
-  it.each([
-    ['iphonefold-cover', 466, 678],
-    ['iphonefold-inner', 951, 669],
-  ])('draws a vertical Dynamic Island on the right edge of %s', (id, w, h) => {
-    const { container } = render(
-      <PhoneFrame screenWidth={w} screenHeight={h} model={phoneModel(DEVICES.find((device) => device.id === id))} />,
-    )
-    const island = [...screenOf(container).children].find((element) => element.style.right === '10px')
-    expect(island).toHaveStyle({ width: '28px', height: '104px', top: '50%' })
+describe('device camera geometry', () => {
+  function renderDevice(id, screenWidth, screenHeight) {
+    const model = phoneModel(DEVICES.find((device) => device.id === id))
+    return render(<PhoneFrame screenWidth={screenWidth} screenHeight={screenHeight} model={model} />).container
+  }
+
+  it('puts the Duo cover island at the top right and keeps the inner camera hidden', () => {
+    const outer = renderDevice('iphonefold-cover', 466, 678)
+    const inner = renderDevice('iphonefold-inner', 951, 669)
+    const island = outer.querySelector('[data-device-cutout="island"]')
+    expect(island).toHaveStyle({ width: '36px', height: '62px', top: '24px', right: '28px' })
+    expect(inner.querySelector('[data-builder-camera]')).toHaveAttribute('data-builder-camera', 'under-display')
+    expect(inner.querySelector('[data-device-cutout]')).toBeNull()
+  })
+
+  it('draws an offset Pixel cutout and a clear display on the Fold6 inner screen', () => {
+    const pixel = renderDevice('pixel9fold-inner', 791, 820)
+    const samsung = renderDevice('zfold6-inner', 707, 823)
+    expect(pixel.querySelector('[data-device-cutout="punch"]')).toHaveStyle({ left: '96%', top: '14px' })
+    expect(samsung.querySelector('[data-device-cutout]')).toBeNull()
+  })
+
+  it('keeps the Mate XT camera over its first panel as it unfolds', () => {
+    const closed = renderDevice('matext-single', 336, 744)
+    const twoPanels = renderDevice('matext-double', 683, 744)
+    const fullyOpen = renderDevice('matext-full', 1061, 744)
+    expect(closed.querySelector('[data-device-cutout="punch"]')).toHaveStyle({ left: '50%' })
+    expect(twoPanels.querySelector('[data-device-cutout="punch"]')).toHaveStyle({ left: '25%' })
+    expect(fullyOpen.querySelector('[data-device-cutout="punch"]')).toHaveStyle({ left: '16%' })
+  })
+
+  it('uses a narrower centered island on iPhone 18 Pro', () => {
+    const device = renderDevice('iphone18pro', 402, 874)
+    expect(device.querySelector('[data-device-cutout="island"]')).toHaveStyle({ width: '78px', left: '50%' })
+  })
+
+  it('uses two rear lenses at the top of the Flip cover and a center teardrop on Galaxy A17', () => {
+    const cover = renderDevice('zflip6-cover', 320, 332)
+    const galaxy = renderDevice('galaxya17', 384, 832)
+    expect(cover.querySelector('[data-device-cutout="rear-cameras"]')).toHaveStyle({ top: '10px', left: '12px' })
+    expect(galaxy.querySelector('[data-device-cutout="teardrop"]')).toHaveStyle({ left: '50%', top: '0px' })
   })
 })

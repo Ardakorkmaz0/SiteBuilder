@@ -12,11 +12,13 @@ import { MAX_FILE_BYTES } from '../../utils/sanitize.js'
 import { liveStateDiff, withLiveState } from '../../utils/htmlLiveState.js'
 import { DEVICES, isMobileDevice, responsivePcSize } from '../../utils/htmlDevices.js'
 import PhoneFrame from './PhoneFrame.jsx'
+import LaptopFrame from './LaptopFrame.jsx'
+import { laptopFrameMetrics } from './laptopFrameMetrics.js'
 import { phoneFrameH, phoneFrameW, phoneModel } from './phoneFrameMetrics.js'
 import BrowserFrame from './BrowserFrame.jsx'
 import CodeActivityOverlay from './CodeActivityOverlay.jsx'
 import MobileBrowserChrome from './MobileBrowserChrome.jsx'
-import { browserFrameH, browserFrameW, mobileBrowserChromeH } from './browserFrameMetrics.js'
+import { BROWSER_FRAME_TOP, browserFrameH, browserFrameW, mobileBrowserChromeH } from './browserFrameMetrics.js'
 import {
   armDrag,
   disarmDrag,
@@ -1447,13 +1449,14 @@ function HtmlWorkspace({
       ? device.w
       : device.h
   const phone = phoneModel(device)
+  const laptop = !landscape && laptopFrameMetrics(device.laptop, contentW)
   // A phone screen is a FIXED viewport, so the browser chrome takes its pixels
   // from the page, exactly as Safari and Chrome do on the device — the phone
   // does not grow because a browser is running on it. This is what makes the
   // frame worth having: what is left is the real above-the-fold area.
   const pageH = mobileBrowser ? Math.max(200, contentH - mobileBrowserChromeH(phone)) : contentH
-  const previewW = contentW + (framedPhone ? phoneFrameW(phone) : desktopBrowser ? browserFrameW() : 0)
-  const previewH = contentH + (framedPhone ? phoneFrameH(phone) : desktopBrowser ? browserFrameH() : 0)
+  const previewW = contentW + (laptop?.extraWidth ?? (framedPhone ? phoneFrameW(phone) : desktopBrowser ? browserFrameW() : 0))
+  const previewH = contentH + (laptop?.extraHeight ?? (framedPhone ? phoneFrameH(phone) : desktopBrowser ? browserFrameH() : 0))
   // "Fit" keeps its old ceiling of 1:1 — the page is not blown up just because
   // there is room. Anything beyond that is the zoom control, chosen on purpose.
   const fitScale = Math.min(1, availableW / previewW || 1, availableH / previewH || 1)
@@ -2116,9 +2119,33 @@ function HtmlWorkspace({
         border: 'none',
         display: 'block',
         background: '#ffffff',
-        scrollbarGutter: framedPhone ? 'auto' : 'stable',
+        scrollbarGutter: framedPhone || laptop ? 'auto' : 'stable',
       }}
     />
+  )
+
+  const desktopPreview = desktopBrowser ? (
+    <BrowserFrame
+      screenWidth={contentW}
+      screenHeight={laptop ? contentH - BROWSER_FRAME_TOP : contentH}
+      laptopProfile={laptop?.profile}
+      siteTitle={browserSiteTitle}
+      favicon={browserFavicon}
+      address={browserAddress}
+      pages={browserPages}
+      currentPageId={browserCurrentPageId}
+      onSelectPage={onBrowserPageSelect}
+      onEditPage={onBrowserPageEdit}
+      onEditFavicon={onBrowserFaviconEdit}
+      onAddressChange={onBrowserAddressChange}
+      onBeforeReload={prepareForFrameChange}
+    >
+      {stageIframe}
+    </BrowserFrame>
+  ) : laptop ? stageIframe : (
+    <div className="h-full w-full border border-[#d1d5db] bg-white shadow-sm">
+      {stageIframe}
+    </div>
   )
 
   const toggleBtn = (active) =>
@@ -2516,7 +2543,7 @@ function HtmlWorkspace({
                     // (see previewScale.js), a transform elsewhere.
                     ...previewScaleStyle(scale),
                     outline: placing ? '2px solid #2563eb' : 'none',
-                    outlineOffset: framedPhone || desktopBrowser ? 4 : 0,
+                    outlineOffset: framedPhone || desktopBrowser || laptop ? 4 : 0,
                   }}
                 >
                   {framedPhone ? (
@@ -2541,30 +2568,11 @@ function HtmlWorkspace({
                         </MobileBrowserChrome>
                       ) : stageIframe}
                     </PhoneFrame>
-                  ) : desktopBrowser ? (
-                    <BrowserFrame
-                      screenWidth={contentW}
-                      screenHeight={contentH}
-                      siteTitle={browserSiteTitle}
-                      favicon={browserFavicon}
-                      address={browserAddress}
-                      pages={browserPages}
-                      currentPageId={browserCurrentPageId}
-                      onSelectPage={onBrowserPageSelect}
-                      onEditPage={onBrowserPageEdit}
-                      onEditFavicon={onBrowserFaviconEdit}
-                      onAddressChange={onBrowserAddressChange}
-                      onBeforeReload={prepareForFrameChange}
-                    >
-                      {stageIframe}
-                    </BrowserFrame>
-                  ) : (
-                    <div
-                      className="h-full w-full border border-[#d1d5db] bg-white shadow-sm"
-                    >
-                      {stageIframe}
-                    </div>
-                  )}
+                  ) : laptop ? (
+                    <LaptopFrame metrics={laptop} screenWidth={contentW} screenHeight={contentH}>
+                      {desktopPreview}
+                    </LaptopFrame>
+                  ) : desktopPreview}
                 </div>
               </div>
             )}

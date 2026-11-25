@@ -129,13 +129,28 @@ describe('the device picker on a canvas page', () => {
     fireEvent.click(foldStates(openPicker(), 'iPhone Duo')[1])
     expect(state().viewport).toBe('pc')
     expect(page()).toMatchObject({ canvasWidth: 951, canvasFold: 669, mobileWidth: 466, mobileFold: 678 })
-    expect(phoneFrame()).toHaveAttribute('data-builder-camera', 'island')
+    expect(phoneFrame()).toHaveAttribute('data-builder-camera', 'under-display')
     expect(document.querySelector('[data-builder-hinge="vertical"]')).toHaveStyle({ left: '50%' })
     expect(document.querySelector('[data-builder-device-viewport="669"]')).not.toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'View', exact: true }))
     await waitFor(() => expect(phoneFrame()).toHaveAttribute('aria-label', 'iPhone Duo'))
     expect(document.querySelector('[data-builder-hinge="vertical"]')).not.toBeNull()
+  })
+
+  it('renders the Acer as a PC laptop with the same screen in Edit and View', async () => {
+    renderEditor()
+    await screen.findByRole('textbox', { name: 'Site title', exact: true })
+    fireEvent.click(within(openPicker()).getByRole('button', { name: 'Acer Nitro 16 2560×1600' }))
+    expect(state().viewport).toBe('pc')
+    expect(page()).toMatchObject({ canvasWidth: 2560, canvasFold: 1600, canvasPresetId: 'acer-nitro-16' })
+    expect(document.querySelector('[data-builder-laptop-frame="nitro"]')).not.toBeNull()
+    expect(document.querySelector('[data-builder-laptop-screen]')).toHaveStyle({ width: '2560px', height: '1600px' })
+    expect(document.querySelector('[data-builder-device-viewport="1600"]')).toHaveStyle({ width: '2560px', height: '1522px' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'View', exact: true }))
+    await waitFor(() => expect(document.querySelector('[data-builder-laptop-frame="nitro"]')).not.toBeNull())
+    expect(document.querySelector('[data-builder-device-viewport="1600"]')).toHaveStyle({ width: '2560px', height: '1522px' })
   })
 
   it('lists the foldables in one order, though their screens are split between PC and Mobile', async () => {
@@ -194,4 +209,15 @@ describe('the device picker on an HTML page', () => {
     expect(localStorage.getItem('pwb_default_editor_viewport')).toBe('pc')
     await waitFor(() => expect(document.querySelectorAll('[data-builder-hinge="thirds"]')).toHaveLength(2))
   }, 20000)
+})
+
+it('puts the HTML page inside a MacBook screen at its selected width', async () => {
+  localStorage.setItem('pwb_htmlmode_1', 'edit')
+  site.schema.pages[0] = { id: 'home', name: 'Home', mode: 'html', html: '<!DOCTYPE html><html><body><h1>Garden</h1></body></html>', components: [] }
+  renderEditor()
+  await screen.findByTitle('site', {}, { timeout: 15000 })
+  fireEvent.click(within(openPicker()).getByRole('button', { name: 'MacBook Air 13" 1470×956' }))
+  const laptop = document.querySelector('[data-builder-laptop-frame="macbook"]')
+  expect(laptop.querySelector('[data-builder-laptop-screen]')).toHaveStyle({ width: '1470px', height: '956px' })
+  expect(within(laptop).getByTitle('site')).toBeInTheDocument()
 })

@@ -11,10 +11,12 @@ import { HTML_ALLOW, PUBLIC_HTML_SANDBOX } from '../../utils/htmlRuntime.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { PAGE_SHEET_SHADOW } from './pageSheet.js'
 import PhoneFrame from './PhoneFrame.jsx'
+import LaptopFrame from './LaptopFrame.jsx'
+import { laptopFrameMetrics } from './laptopFrameMetrics.js'
 import { phoneFrameH, phoneFrameW, phoneModel, phoneScreenHeight } from './phoneFrameMetrics.js'
 import BrowserFrame from './BrowserFrame.jsx'
 import MobileBrowserChrome from './MobileBrowserChrome.jsx'
-import { browserFrameH, browserFrameW, mobileBrowserChromeH } from './browserFrameMetrics.js'
+import { BROWSER_FRAME_TOP, browserFrameH, browserFrameW, mobileBrowserChromeH } from './browserFrameMetrics.js'
 import PreviewScrollIndicator from './PreviewScrollIndicator.jsx'
 import { previewScaleStyle } from './previewScale.js'
 
@@ -148,13 +150,14 @@ export default function CanvasPreview({
   const mobile = viewport === 'mobile'
   const preset = resolveCanvasPreset(viewport, width, fold, mobile ? page?.mobilePresetId : page?.canvasPresetId)
   const framedPhone = preset?.category === 'foldable' || (mobile && preset?.category !== 'tablet')
-  const fixedScreen = framedPhone || preset?.category === 'tablet'
+  const laptop = laptopFrameMetrics(preset?.laptop, width)
+  const fixedScreen = !!laptop || framedPhone || preset?.category === 'tablet'
   const desktopBrowser = !framedPhone && browserFrame
   const mobileBrowser = framedPhone && browserFrame
   const phone = phoneModel(preset)
-  const mobileChromeH = mobileBrowser ? mobileBrowserChromeH(phone) : 0
-  const bezelW = framedPhone ? phoneFrameW(phone) : desktopBrowser ? browserFrameW() : 0
-  const bezelH = framedPhone ? phoneFrameH(phone) : desktopBrowser ? browserFrameH() : 0
+  const browserChromeH = mobileBrowser ? mobileBrowserChromeH(phone) : laptop && desktopBrowser ? BROWSER_FRAME_TOP : 0
+  const bezelW = laptop?.extraWidth ?? (framedPhone ? phoneFrameW(phone) : desktopBrowser ? browserFrameW() : 0)
+  const bezelH = laptop?.extraHeight ?? (framedPhone ? phoneFrameH(phone) : desktopBrowser ? browserFrameH() : 0)
   const components = page?.components || []
   const flowMode = !!page?.flowMode
   const showScrollIndicator = page?.showScrollIndicator !== false
@@ -213,6 +216,32 @@ export default function CanvasPreview({
     return () => window.removeEventListener('message', onMessage)
   }, [iframeHtml, iframeScrollToken])
 
+  function renderDesktop(content, screenHeight) {
+    const preview = desktopBrowser ? (
+      <BrowserFrame
+        screenWidth={width}
+        screenHeight={laptop ? screenHeight - BROWSER_FRAME_TOP : screenHeight}
+        laptopProfile={laptop?.profile}
+        siteTitle={browserSiteTitle}
+        favicon={browserFavicon}
+        address={browserAddress}
+        pages={browserPages}
+        currentPageId={browserCurrentPageId || page?.id}
+        onSelectPage={onBrowserPageSelect}
+        onEditPage={onBrowserPageEdit}
+        onEditFavicon={onBrowserFaviconEdit}
+        onAddressChange={onBrowserAddressChange}
+      >
+        {content}
+      </BrowserFrame>
+    ) : content
+    return laptop ? (
+      <LaptopFrame metrics={laptop} screenWidth={width} screenHeight={screenHeight}>
+        {preview}
+      </LaptopFrame>
+    ) : preview
+  }
+
   // Fixed/sticky/JS pages render through the exported HTML in an iframe — like
   // the published Preview, but sized to the workspace so it is a real scrolling
   // MINI-BROWSER: the page scrolls INSIDE the iframe (its own viewport), so a
@@ -240,7 +269,7 @@ export default function CanvasPreview({
     )
     // This one IS a device viewport — the page scrolls inside it — so the
     // browser chrome takes its room from the page, the way it does on a phone.
-    const pageH = Math.max(200, viewportH - mobileChromeH)
+    const pageH = Math.max(200, viewportH - browserChromeH)
     const iframe = (
       <iframe
         ref={iframeRef}
@@ -308,22 +337,8 @@ export default function CanvasPreview({
                   </MobileBrowserChrome>
                 ) : inner}
               </PhoneFrame>
-            ) : desktopBrowser ? (
-              <BrowserFrame
-                screenWidth={width}
-                screenHeight={viewportH}
-                siteTitle={browserSiteTitle}
-                favicon={browserFavicon}
-                address={browserAddress}
-                pages={browserPages}
-                currentPageId={browserCurrentPageId || page?.id}
-                onSelectPage={onBrowserPageSelect}
-                onEditPage={onBrowserPageEdit}
-                onEditFavicon={onBrowserFaviconEdit}
-                onAddressChange={onBrowserAddressChange}
-              >
-                {inner}
-              </BrowserFrame>
+            ) : laptop || desktopBrowser ? (
+              renderDesktop(inner, viewportH)
             ) : (
               <div className="bg-white" style={{ boxShadow: PAGE_SHEET_SHADOW }}>
                 {inner}
@@ -343,7 +358,7 @@ export default function CanvasPreview({
   // user picked and the design scrolls inside it, matching both the edit canvas
   // and the iframe path above. Desktop keeps the tall artboard.
   const deviceH = fixedScreen ? (fold > 0 ? fold : phoneScreenHeight(width)) : 0
-  const devicePageH = Math.max(200, deviceH - mobileChromeH)
+  const devicePageH = Math.max(200, deviceH - browserChromeH)
   const frameWidth = width + bezelW
   const frameHeight = (fixedScreen ? deviceH : artboardHeight) + bezelH
   const scale = Math.min(
@@ -455,23 +470,7 @@ export default function CanvasPreview({
                 </MobileBrowserChrome>
               ) : deviceScreen}
             </PhoneFrame>
-          ) : desktopBrowser ? (
-            <BrowserFrame
-              screenWidth={width}
-              screenHeight={fixedScreen ? deviceH : artboardHeight}
-              siteTitle={browserSiteTitle}
-              favicon={browserFavicon}
-              address={browserAddress}
-              pages={browserPages}
-              currentPageId={browserCurrentPageId || page?.id}
-              onSelectPage={onBrowserPageSelect}
-              onEditPage={onBrowserPageEdit}
-              onEditFavicon={onBrowserFaviconEdit}
-              onAddressChange={onBrowserAddressChange}
-            >
-              {fixedScreen ? deviceScreen : pageContent}
-            </BrowserFrame>
-          ) : fixedScreen ? deviceScreen : pageContent}
+          ) : renderDesktop(fixedScreen ? deviceScreen : pageContent, fixedScreen ? deviceH : artboardHeight)}
         </div>
       </div>
     </main>

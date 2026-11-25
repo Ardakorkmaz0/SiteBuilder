@@ -82,6 +82,33 @@ export const PHONE_MODELS = {
     buttons: 'galaxy',
     body: 'titanium-black',
   },
+  'galaxy-ultra-rounded': {
+    id: 'galaxy-ultra-rounded',
+    bezel: { side: 8, top: 8, bottom: 9 },
+    radius: 29,
+    screenRadius: 21,
+    camera: 'punch',
+    buttons: 'galaxy',
+    body: 'titanium-black',
+  },
+  'galaxy-a-drop': {
+    id: 'galaxy-a-drop',
+    bezel: { side: 8, top: 10, bottom: 15 },
+    radius: 33,
+    screenRadius: 24,
+    camera: 'teardrop',
+    buttons: 'galaxy',
+    body: 'graphite',
+  },
+  'android-punch': {
+    id: 'android-punch',
+    bezel: { side: 8, top: 8, bottom: 10 },
+    radius: 38,
+    screenRadius: 30,
+    camera: 'punch',
+    buttons: 'galaxy',
+    body: 'graphite',
+  },
   // Pixel 7 has a rounder screen and its power key sits above the volume rocker.
   'pixel-7': {
     id: 'pixel-7',
@@ -116,23 +143,9 @@ export const PHONE_MODELS = {
   },
 }
 
-// Match the preset's identity; several devices have identical CSS pixels.
-const MODEL_BY_DEVICE = {
-  iphone14: 'iphone-notch',
-  iphonese: 'iphone-classic',
-  iphone15pro: 'iphone-island',
-  iphone15max: 'iphone-island',
-  iphone16pro: 'iphone-island',
-  iphone16promax: 'iphone-island',
-  galaxys24: 'galaxy-s24',
-  galaxys24ultra: 'galaxy-s24-ultra',
-  pixel7: 'pixel-7',
-  pixel9: 'pixel-9',
-}
-
 // Heights for custom widths with no explicit screen height.
 const SCREEN_HEIGHT_BY_WIDTH = Object.fromEntries(
-  HANDHELD_SCREENS.filter((device) => device.category === 'phone').map(({ w, h }) => [w, h]),
+  HANDHELD_SCREENS.filter((device) => device.category === 'phone').reverse().map(({ w, h }) => [w, h]),
 )
 
 export function phoneScreenHeight(width) {
@@ -146,7 +159,7 @@ export function phoneScreenHeight(width) {
 // Each foldable in its maker's finish and with its maker's keys; the keys also
 // pick the browser drawn on it (Safari for an iPhone, Chrome for the rest).
 const FOLDABLE_LOOKS = {
-  'iphone-fold': { buttons: 'iphone', body: 'titanium', camera: 'island', cameraSide: 'right' },
+  'iphone-fold': { buttons: 'iphone', body: 'titanium' },
   'pixel9-pro-fold': { buttons: 'pixel', body: 'obsidian' },
   'huawei-mate-x6': { body: 'titanium-black' },
   'huawei-mate-xt': { body: 'titanium-black' },
@@ -154,10 +167,11 @@ const FOLDABLE_LOOKS = {
 
 export function phoneModel(device) {
   if (device?.category === 'foldable') {
-    return { ...PHONE_MODELS.foldable, ...FOLDABLE_LOOKS[device.group], name: device.name, hinge: device.hinge }
+    const { camera = 'punch', cameraPlacement, cameraX, cameraTop, hinge, name } = device
+    return { ...PHONE_MODELS.foldable, ...FOLDABLE_LOOKS[device.group], camera, cameraPlacement, cameraX, cameraTop, hinge, name }
   }
-  if (device?.category === 'phone' && MODEL_BY_DEVICE[device.id]) {
-    return { ...PHONE_MODELS[MODEL_BY_DEVICE[device.id]], name: device.name }
+  if (device?.category === 'phone' && PHONE_MODELS[device.model]) {
+    return { ...PHONE_MODELS[device.model], name: device.name, compactIsland: device.compactIsland }
   }
   return PHONE_MODELS.generic
 }

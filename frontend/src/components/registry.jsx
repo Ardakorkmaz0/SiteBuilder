@@ -35,7 +35,7 @@ import { PRESET_IMAGES } from '../utils/presetImages.js'
 import { ICON_OPTIONS } from '../utils/icons.js'
 import { NodeIcon } from './icons.jsx'
 import { componentKindIcon } from './editor/elementKindIcons.js'
-import { FOLDABLE_STATES, HANDHELD_SCREENS, PHONE_BREAKPOINT } from '../utils/deviceCatalog.js'
+import { FOLDABLE_STATES, HANDHELD_SCREENS, LAPTOP_SCREENS, PHONE_BREAKPOINT } from '../utils/deviceCatalog.js'
 
 // One drawing per kind of block, shared with HTML elements of that kind.
 const kindIcon = (type) => <NodeIcon name={componentKindIcon(type)} size={16} />
@@ -745,10 +745,8 @@ export const PC_CANVAS_PRESETS = [
   { id: '16:9', name: 'Desktop 16:9', category: 'desktop', width: 1280, fold: 720 },
   { id: '16:10', name: 'Desktop 16:10', category: 'desktop', width: 1280, fold: 800 },
   { id: '4:3', name: 'Desktop 4:3', category: 'desktop', width: 1024, fold: 768 },
-  { id: 'laptop-hd', name: 'Laptop HD', category: 'desktop', width: 1366, fold: 768 },
-  { id: 'wide', name: 'Wide', category: 'desktop', width: 1440, fold: 900 },
-  { id: 'macbook-air', name: 'MacBook Air 13"', category: 'desktop', width: 1470, fold: 956 },
-  { id: 'macbook-pro-16', name: 'MacBook Pro 16"', category: 'desktop', width: 1728, fold: 1117 },
+  { id: 'wide', name: 'Wide', category: 'desktop', width: 1440, fold: 900, laptop: 'generic' },
+  ...LAPTOP_SCREENS.map(({ w, h, ...device }) => ({ ...device, width: w, fold: h })),
   { id: 'fhd', name: 'Full HD', category: 'desktop', width: 1920, fold: 1080 },
   { id: 'qhd', name: 'QHD', category: 'desktop', width: 2560, fold: 1440 },
   ...DEVICE_CANVAS_PRESETS.filter((preset) => preset.width >= PHONE_BREAKPOINT),

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
-import { MinusIcon, PlusIcon } from '../icons.jsx'
+import { MinusIcon, PlusIcon, SquareIcon, XIcon } from '../icons.jsx'
 import Favicon from './BrowserFavicon.jsx'
 import { previewScaleStyle } from './previewScale.js'
 import { pageTitle, visiblePageAddress } from './browserPageAddress.js'
@@ -32,6 +32,7 @@ function readBrowserZoom() {
 export default function BrowserFrame({
   screenWidth,
   screenHeight,
+  laptopProfile,
   siteTitle = 'My Site',
   favicon = '',
   address = 'preview.sitebuilder.local',
@@ -45,6 +46,7 @@ export default function BrowserFrame({
   children,
 }) {
   const { t } = useLanguage()
+  const integrated = !!laptopProfile
   const frameRef = useRef(null)
   const fullscreenViewportRef = useRef(null)
   const [pageMenuOpen, setPageMenuOpen] = useState(false)
@@ -150,27 +152,35 @@ export default function BrowserFrame({
       data-builder-browser-frame
       aria-label={t('Browser preview')}
       style={{
-        width: fullscreen ? '100vw' : screenWidth + browserFrameW(),
-        height: fullscreen ? '100vh' : screenHeight + browserFrameH(),
+        width: fullscreen ? '100vw' : screenWidth + (integrated ? 0 : browserFrameW()),
+        height: fullscreen ? '100vh' : screenHeight + (integrated ? BROWSER_FRAME_TOP : browserFrameH()),
         boxSizing: 'border-box',
-        padding: fullscreen
+        padding: fullscreen || integrated
           ? `${BROWSER_FRAME_TOP}px 0 0`
           : `${BROWSER_FRAME_TOP}px ${BROWSER_FRAME_SIDE}px ${BROWSER_FRAME_BOTTOM}px`,
         position: 'relative',
         overflow: 'hidden',
-        border: '1px solid var(--studio-border-strong)',
-        borderRadius: fullscreen ? 0 : 16,
+        border: integrated ? 0 : '1px solid var(--studio-border-strong)',
+        borderRadius: fullscreen || integrated ? 0 : 16,
         background: 'var(--studio-control)',
-        boxShadow: fullscreen ? 'none' : '0 26px 70px rgba(0,0,0,.28), inset 0 1px rgba(255,255,255,.05)',
+        boxShadow: fullscreen || integrated ? 'none' : '0 26px 70px rgba(0,0,0,.28), inset 0 1px rgba(255,255,255,.05)',
       }}
     >
       <div className="absolute inset-x-2 top-0 h-[39px]">
         <div className="flex h-full min-w-0 items-end gap-2">
-          <div aria-hidden="true" className="mb-3 flex shrink-0 gap-1.5 px-1">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-          </div>
+          {integrated && laptopProfile !== 'macbook' ? (
+            <div aria-hidden="true" className="order-last mb-3 flex shrink-0 items-center gap-5 px-2 text-[var(--studio-text-muted)]">
+              <MinusIcon size={11} />
+              <SquareIcon size={9} />
+              <XIcon size={12} />
+            </div>
+          ) : (
+            <div aria-hidden="true" className="mb-3 flex shrink-0 gap-1.5 px-1">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
+            </div>
+          )}
           <div role="tablist" aria-label={t('Open site pages')} className="flex min-w-0 flex-1 items-end gap-1">
             {shownTabs.map((page, index) => {
               const active = page.id === activePage?.id

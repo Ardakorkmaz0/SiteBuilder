@@ -1,4 +1,4 @@
-import { FOLDABLE_STATES, HANDHELD_SCREENS, PHONE_BREAKPOINT } from './deviceCatalog.js'
+import { FOLDABLE_STATES, HANDHELD_SCREENS, LAPTOP_SCREENS, PHONE_BREAKPOINT } from './deviceCatalog.js'
 
 // Device frames for previewing HTML pages — shared by the device picker above
 // the stage (DevicePicker) and the HtmlWorkspace stage (sizing math).
@@ -8,10 +8,8 @@ const SCREENS = [
   { id: 'fit', name: 'Responsive', category: 'desktop', w: 0, h: 0 },
   { id: 'desktop-16-9', name: 'Desktop 16:9', category: 'desktop', w: 1280, h: 720 },
   { id: 'desktop-16-10', name: 'Desktop 16:10', category: 'desktop', w: 1280, h: 800 },
-  { id: 'laptop-hd', name: 'Laptop HD', category: 'desktop', w: 1366, h: 768 },
-  { id: 'laptop', name: 'Laptop', category: 'desktop', w: 1440, h: 900 },
-  { id: 'macbook-air', name: 'MacBook Air 13"', category: 'desktop', w: 1470, h: 956 },
-  { id: 'macbook-pro-16', name: 'MacBook Pro 16"', category: 'desktop', w: 1728, h: 1117 },
+  { id: 'laptop', name: 'Laptop', category: 'desktop', w: 1440, h: 900, laptop: 'generic' },
+  ...LAPTOP_SCREENS,
   { id: 'fhd', name: 'Full HD', category: 'desktop', w: 1920, h: 1080 },
   { id: 'qhd', name: 'QHD', category: 'desktop', w: 2560, h: 1440 },
 ]
