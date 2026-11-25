@@ -105,6 +105,32 @@ describe('the tool palette on a canvas page', () => {
     expect(box.layout).toMatchObject({ x: 100, y: 200, w: 300, h: 150 })
   })
 
+  // A drawing the browser cancels (a touch turned into a scroll, the window
+  // lost the pointer) stayed on screen, and the next pointer to lift, even
+  // another finger, finished it as a box.
+  it('drops a drawing the browser cancels, and finishes a drawing only on its own pointer', async () => {
+    const canvas = await openEditor()
+    fireEvent.click(tool('Box (R)'))
+    act(() => { fireEvent.pointerDown(canvas, { button: 0, pointerId: 1, clientX: 100, clientY: 200 }) })
+    act(() => { fireEvent.pointerMove(window, { pointerId: 1, clientX: 400, clientY: 350 }) })
+    expect(document.querySelector('[data-draw-box]')).not.toBeNull()
+    act(() => { fireEvent.pointerCancel(window, { pointerId: 1 }) })
+    expect(document.querySelector('[data-draw-box]')).toBeNull()
+    act(() => { fireEvent.pointerUp(window, { pointerId: 2, clientX: 600, clientY: 500 }) })
+    await act(async () => {})
+    expect(blocks()).toHaveLength(1)
+    expect(tool('Box (R)')).toHaveAttribute('aria-pressed', 'true')
+
+    act(() => { fireEvent.pointerDown(canvas, { button: 0, pointerId: 3, clientX: 100, clientY: 200 }) })
+    act(() => { fireEvent.pointerMove(window, { pointerId: 3, clientX: 400, clientY: 350 }) })
+    act(() => { fireEvent.pointerUp(window, { pointerId: 4, clientX: 900, clientY: 700 }) })
+    await act(async () => {})
+    expect(blocks()).toHaveLength(1)
+    act(() => { fireEvent.pointerUp(window, { pointerId: 3, clientX: 400, clientY: 350 }) })
+    await waitFor(() => expect(blocks()).toHaveLength(2))
+    expect(blocks()[1].layout).toMatchObject({ x: 100, y: 200, w: 300, h: 150 })
+  })
+
   it('picks the tools by their letters, Escape-free: V puts the pointer back', async () => {
     await openEditor()
     fireEvent.keyDown(document.body, { key: 'i' })

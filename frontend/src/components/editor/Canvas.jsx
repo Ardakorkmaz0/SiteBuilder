@@ -378,7 +378,19 @@ export default function Canvas({
       width: Math.abs(ev.clientX - start.x),
       height: Math.abs(ev.clientY - start.y),
     })
+    // Only the pointer that started the box moves and finishes it: another
+    // finger lifting is not the end of this drawing. A cancelled pointer (a
+    // touch that became a scroll, a window that lost it) ends the drawing
+    // without a box, and the tool stays armed for another try.
+    const ownPointer = (ev) => ev.pointerId === e.pointerId
+    const stopDrawing = () => {
+      window.removeEventListener('pointermove', onMove, true)
+      window.removeEventListener('pointerup', onUp, true)
+      window.removeEventListener('pointercancel', onCancel, true)
+      setDrawBox(null)
+    }
     const onMove = (ev) => {
+      if (!ownPointer(ev)) return
       const box = boxTo(ev)
       const rect = canvasElRef.current.getBoundingClientRect()
       setDrawBox({
@@ -389,15 +401,18 @@ export default function Canvas({
       })
     }
     const onUp = (ev) => {
-      window.removeEventListener('pointermove', onMove, true)
-      window.removeEventListener('pointerup', onUp, true)
-      setDrawBox(null)
+      if (!ownPointer(ev)) return
+      stopDrawing()
       const box = boxTo(ev)
       if (box.width < 6 && box.height < 6) placeAtClient(start.x, start.y)
       else placeAtClient(box.left + box.width / 2, box.top + box.height / 2, { w: box.width / canvasScale, h: box.height / canvasScale })
     }
+    const onCancel = (ev) => {
+      if (ownPointer(ev)) stopDrawing()
+    }
     window.addEventListener('pointermove', onMove, true)
     window.addEventListener('pointerup', onUp, true)
+    window.addEventListener('pointercancel', onCancel, true)
   }
 
   function placeAtClient(clientX, clientY, size = null) {
