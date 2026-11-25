@@ -46,14 +46,24 @@ async function listIsInView(page, where) {
   await bar(page).getByRole('button', { name: /^Ekran boyutu:/ }).click()
   const list = page.getByRole('dialog', { name: 'Ekran boyutu', exact: true })
   await expect(list).toBeVisible()
-  const edges = await list.evaluate((element) => {
+  const { edges, seen } = await list.evaluate((element) => {
     const box = element.getBoundingClientRect()
     const midX = box.left + box.width / 2
     const midY = box.top + box.height / 2
-    return [[box.left + 4, midY], [midX, box.top + 4], [box.right - 4, midY], [midX, box.bottom - 4]]
-      .map(([x, y]) => element.contains(document.elementFromPoint(x, y)))
+    const hits = [[box.left + 4, midY], [midX, box.top + 4], [box.right - 4, midY], [midX, box.bottom - 4]]
+      .map(([x, y]) => document.elementFromPoint(x, y))
+    // What a failure needs to explain itself in a CI log.
+    const name = (node) => (node ? `${node.tagName.toLowerCase()}.${String(node.className).slice(0, 40)}` : 'nothing')
+    return {
+      edges: hits.map((hit) => element.contains(hit)),
+      seen: {
+        list: [Math.round(box.left), Math.round(box.right)],
+        window: [window.innerWidth, document.documentElement.clientWidth],
+        hits: hits.map(name),
+      },
+    }
   })
-  expect(edges, `${where}: the screen list can be seen to its left, top, right and bottom edge`).toEqual([true, true, true, true])
+  expect(edges, `${where}: the screen list can be seen to its left, top, right and bottom edge ${JSON.stringify(seen)}`).toEqual([true, true, true, true])
   await page.keyboard.press('Escape')
   await expect(list).toHaveCount(0)
 }
