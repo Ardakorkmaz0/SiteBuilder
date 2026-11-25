@@ -169,7 +169,9 @@ function parseCssNumber(value) {
   return Number.isFinite(parsed) ? parsed : ''
 }
 
-const SINGLE_TOKEN_RE = /^-?(?:\d+\.?\d*|\.\d+)(?:px|em|rem|%|vw|vh)?$/i
+// `auto` too: a block centred with `margin: 0 auto` keeps its auto sides when
+// one side is edited.
+const SINGLE_TOKEN_RE = /^(?:-?(?:\d+\.?\d*|\.\d+)(?:px|em|rem|%|vw|vh)?|auto)$/i
 
 // Expand a CSS 1..4-value box shorthand ("24px", "12px 20px", …) into its four
 // sides so per-side inputs can read and edit standard `styles.padding` on canvas.
@@ -517,11 +519,15 @@ export function createCanvasInspectorAdapter({
       case 'borderStyle':
       case 'borderColor':
         return hasBoxSurface || styleSet.has(key)
+      // Outside Simple mode every block can take a border and an overflow, as
+      // it could under Advanced CSS: the shorthand where the block has no
+      // border fields of its own.
       case 'border':
-        return hasBorderShorthand
+        return hasBorderShorthand || (extendedMode && !hasBoxSurface)
+      case 'overflow':
+        return hasEffects || extendedMode
       case 'boxShadow':
       case 'opacity':
-      case 'overflow':
         return hasEffects
       case 'objectFit':
         return styleSet.has('objectFit')

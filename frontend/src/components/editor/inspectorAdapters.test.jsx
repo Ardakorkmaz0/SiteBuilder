@@ -3,7 +3,9 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import { describeElement } from '../../utils/htmlElementEdit.js'
 import { registry } from '../registry.jsx'
+import BorderFields from './BorderFields.jsx'
 import ColorFields from './ColorFields.jsx'
+import EffectsFields from './EffectsFields.jsx'
 import FlexLayoutFields from './FlexLayoutFields.jsx'
 import SpacingFields from './SpacingFields.jsx'
 import TypographyFields from './TypographyFields.jsx'
@@ -49,6 +51,7 @@ function makeCanvasAdapter(type, overrides = {}) {
     isFlow: !!overrides.isFlow,
     layout: component.layout,
     showPositionControls: true,
+    extendedMode: overrides.extendedMode !== false,
     viewportStretchComponent: false,
     selectedIds: [component.id],
     pages: [],
@@ -116,6 +119,48 @@ describe('shared inspector adapters and field groups', () => {
     fireEvent.change(marginTop, { target: { value: '16' } })
     expect(mobileSide.updateStyles).toHaveBeenLastCalledWith('comp_1', { margin: '16px 0px 0px 0px' })
     sideView.unmount()
+  })
+
+  // A block centred with `margin: 0 auto` lost its centring when one side was
+  // edited: the shorthand was not read, and every other side was written as 0.
+  it('keeps auto side margins when the top or bottom margin is edited on canvas', () => {
+    const { adapter, updateStyles } = makeCanvasAdapter('heading', {
+      component: { styles: { margin: '0 auto' } },
+    })
+    wrap(<SpacingFields adapter={adapter} />)
+    const marginTop = screen.getByRole('spinbutton', { name: 'Margin top', exact: true })
+    expect(marginTop).toHaveValue(0)
+
+    fireEvent.change(marginTop, { target: { value: '12' } })
+    expect(updateStyles).toHaveBeenLastCalledWith('comp_1', { margin: '12px auto 0px auto' })
+
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Margin bottom', exact: true }), { target: { value: '8' } })
+    expect(updateStyles).toHaveBeenLastCalledWith('comp_1', { margin: '12px auto 8px auto' })
+
+    fireEvent.change(marginTop, { target: { value: '' } })
+    expect(updateStyles).toHaveBeenLastCalledWith('comp_1', { margin: '0px auto 8px auto' })
+  })
+
+  // Border and Overflow were offered for every block under Advanced CSS. When
+  // they moved into the Border and Effects groups, a block with no border or
+  // effects of its own (a Spacer) lost them, outside Simple mode as well.
+  it('offers Border and Overflow on a block with no border or effects of its own, outside Simple mode', () => {
+    const { adapter, updateStyles } = makeCanvasAdapter('spacer')
+    const view = wrap(<><BorderFields adapter={adapter} /><EffectsFields adapter={adapter} /></>)
+    for (const group of ['Border', 'Effects']) {
+      const header = screen.getByRole('button', { name: group, exact: true })
+      if (header.getAttribute('aria-expanded') === 'false') fireEvent.click(header)
+    }
+    fireEvent.change(screen.getByRole('textbox', { name: 'Border', exact: true }), { target: { value: '1px solid #334155' } })
+    expect(updateStyles).toHaveBeenLastCalledWith('comp_1', { border: '1px solid #334155' })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Overflow', exact: true }), { target: { value: 'hidden' } })
+    expect(updateStyles).toHaveBeenLastCalledWith('comp_1', { overflow: 'hidden' })
+    view.unmount()
+
+    const simple = makeCanvasAdapter('spacer', { extendedMode: false })
+    wrap(<><BorderFields adapter={simple.adapter} /><EffectsFields adapter={simple.adapter} /></>)
+    expect(screen.queryByRole('textbox', { name: 'Border', exact: true })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Overflow', exact: true })).toBeNull()
   })
 
   it('edits two-stop linear gradients on canvas and hides URL background images unsupported by canvas styles', () => {
