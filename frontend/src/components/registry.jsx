@@ -745,7 +745,7 @@ export const PC_CANVAS_PRESETS = [
   { id: '16:9', name: 'Desktop 16:9', category: 'desktop', width: 1280, fold: 720 },
   { id: '16:10', name: 'Desktop 16:10', category: 'desktop', width: 1280, fold: 800 },
   { id: '4:3', name: 'Desktop 4:3', category: 'desktop', width: 1024, fold: 768 },
-  { id: 'wide', name: 'Wide', category: 'desktop', width: 1440, fold: 900, laptop: 'generic' },
+  { id: 'wide', name: 'Wide', category: 'desktop', width: 1440, fold: 900 },
   ...LAPTOP_SCREENS.map(({ w, h, ...device }) => ({ ...device, width: w, fold: h })),
   { id: 'fhd', name: 'Full HD', category: 'desktop', width: 1920, fold: 1080 },
   { id: 'qhd', name: 'QHD', category: 'desktop', width: 2560, fold: 1440 },

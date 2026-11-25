@@ -595,6 +595,7 @@ function HtmlWorkspace({
   fullscreen = false,
   onToggleFullscreen,
   browserFrame = false,
+  laptopFrame = false,
   onBrowserFrameToggle,
   browserSiteTitle = 'My Site',
   browserFavicon = '',
@@ -1449,14 +1450,15 @@ function HtmlWorkspace({
       ? device.w
       : device.h
   const phone = phoneModel(device)
-  const laptop = !landscape && laptopFrameMetrics(device.laptop, contentW)
+  const laptopProfile = landscape ? undefined : device.laptop
+  const laptop = laptopFrame ? laptopFrameMetrics(laptopProfile, contentW) : null
   // A phone screen is a FIXED viewport, so the browser chrome takes its pixels
   // from the page, exactly as Safari and Chrome do on the device — the phone
   // does not grow because a browser is running on it. This is what makes the
   // frame worth having: what is left is the real above-the-fold area.
   const pageH = mobileBrowser ? Math.max(200, contentH - mobileBrowserChromeH(phone)) : contentH
-  const previewW = contentW + (laptop?.extraWidth ?? (framedPhone ? phoneFrameW(phone) : desktopBrowser ? browserFrameW() : 0))
-  const previewH = contentH + (laptop?.extraHeight ?? (framedPhone ? phoneFrameH(phone) : desktopBrowser ? browserFrameH() : 0))
+  const previewW = contentW + (laptop?.extraWidth ?? (framedPhone ? phoneFrameW(phone) : desktopBrowser && !laptopProfile ? browserFrameW() : 0))
+  const previewH = contentH + (laptop?.extraHeight ?? (framedPhone ? phoneFrameH(phone) : desktopBrowser && !laptopProfile ? browserFrameH() : 0))
   // "Fit" keeps its old ceiling of 1:1 — the page is not blown up just because
   // there is room. Anything beyond that is the zoom control, chosen on purpose.
   const fitScale = Math.min(1, availableW / previewW || 1, availableH / previewH || 1)
@@ -2119,7 +2121,7 @@ function HtmlWorkspace({
         border: 'none',
         display: 'block',
         background: '#ffffff',
-        scrollbarGutter: framedPhone || laptop ? 'auto' : 'stable',
+        scrollbarGutter: framedPhone || laptopProfile ? 'auto' : 'stable',
       }}
     />
   )
@@ -2127,8 +2129,8 @@ function HtmlWorkspace({
   const desktopPreview = desktopBrowser ? (
     <BrowserFrame
       screenWidth={contentW}
-      screenHeight={laptop ? contentH - BROWSER_FRAME_TOP : contentH}
-      laptopProfile={laptop?.profile}
+      screenHeight={laptopProfile ? contentH - BROWSER_FRAME_TOP : contentH}
+      laptopProfile={laptopProfile}
       siteTitle={browserSiteTitle}
       favicon={browserFavicon}
       address={browserAddress}
@@ -2142,7 +2144,7 @@ function HtmlWorkspace({
     >
       {stageIframe}
     </BrowserFrame>
-  ) : laptop ? stageIframe : (
+  ) : laptopProfile ? stageIframe : (
     <div className="h-full w-full border border-[#d1d5db] bg-white shadow-sm">
       {stageIframe}
     </div>

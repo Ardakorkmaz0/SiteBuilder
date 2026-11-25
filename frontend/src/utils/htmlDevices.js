@@ -8,7 +8,7 @@ const SCREENS = [
   { id: 'fit', name: 'Responsive', category: 'desktop', w: 0, h: 0 },
   { id: 'desktop-16-9', name: 'Desktop 16:9', category: 'desktop', w: 1280, h: 720 },
   { id: 'desktop-16-10', name: 'Desktop 16:10', category: 'desktop', w: 1280, h: 800 },
-  { id: 'laptop', name: 'Laptop', category: 'desktop', w: 1440, h: 900, laptop: 'generic' },
+  { id: 'laptop', name: 'Laptop', category: 'desktop', w: 1440, h: 900 },
   ...LAPTOP_SCREENS,
   { id: 'fhd', name: 'Full HD', category: 'desktop', w: 1920, h: 1080 },
   { id: 'qhd', name: 'QHD', category: 'desktop', w: 2560, h: 1440 },

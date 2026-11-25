@@ -2310,6 +2310,7 @@ const BASE_TURKISH_TRANSLATIONS = {
   'Browser': 'Tarayıcı',
   'Show browser frame': 'Tarayıcı çerçevesini göster',
   'Hide browser frame': 'Tarayıcı çerçevesini gizle',
+  'Laptop case': 'Dizüstü kasası',
   'Browser preview': 'Tarayıcı önizlemesi',
   'Open site pages': 'Açık site sayfaları',
   'Edit site icon': 'Site simgesini düzenle',

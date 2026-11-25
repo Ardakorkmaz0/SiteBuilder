@@ -31,8 +31,8 @@ export const HINGE_THIRDS = 'thirds'
 export const PHONE_BREAKPOINT = 768
 
 export const LAPTOP_SCREENS = [
-  { id: 'laptop-hd', name: 'Laptop HD', category: 'desktop', w: 1366, h: 768, laptop: 'generic' },
-  { id: 'macbook-air', name: 'MacBook Air 13"', category: 'desktop', w: 1470, h: 956, laptop: 'macbook' },
+  { id: 'laptop-hd', name: 'Laptop HD', category: 'desktop', w: 1366, h: 768 },
+  { id: 'macbook-air', name: 'MacBook Air 13"', category: 'desktop', w: 1470, h: 956 },
   { id: 'macbook-pro-16', name: 'MacBook Pro 16"', category: 'desktop', w: 1728, h: 1117, laptop: 'macbook' },
   // Acer AN16-41 WQXGA panel at 100% display scaling.
   { id: 'acer-nitro-16', name: 'Acer Nitro 16', category: 'desktop', w: 2560, h: 1600, laptop: 'nitro' },

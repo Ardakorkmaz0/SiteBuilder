@@ -72,6 +72,7 @@ export default function Canvas({
   pendingPlace = null,
   onPlaceAt = () => {},
   browserFrame = false,
+  laptopFrame = false,
   browserSiteTitle = 'My Site',
   browserFavicon = '',
   browserAddress = 'preview.sitebuilder.local',
@@ -165,20 +166,21 @@ export default function Canvas({
   const contentH = flowMode ? flowCanvasHeight(components, viewport, canvasW) : canvasHeight(components, viewport)
   const preset = resolveCanvasPreset(viewport, canvasW, fold, isMobile ? page.mobilePresetId : page.canvasPresetId)
   const framedPhone = preset?.category === 'foldable' || (isMobile && preset?.category !== 'tablet')
-  const laptop = laptopFrameMetrics(preset?.laptop, canvasW)
-  const fixedScreen = !!laptop || framedPhone || preset?.category === 'tablet'
+  const laptopProfile = preset?.laptop
+  const laptop = laptopFrame ? laptopFrameMetrics(laptopProfile, canvasW) : null
+  const fixedScreen = !!laptopProfile || framedPhone || preset?.category === 'tablet'
   const phone = phoneModel(preset)
   const desktopBrowser = !framedPhone && browserFrame
   const mobileBrowser = framedPhone && browserFrame
   // Handheld screens keep their selected height; the design scrolls inside.
   const deviceH = fold > 0 ? fold : phoneScreenHeight(canvasW)
-  const browserChromeH = mobileBrowser ? mobileBrowserChromeH(phone) : laptop && desktopBrowser ? BROWSER_FRAME_TOP : 0
+  const browserChromeH = mobileBrowser ? mobileBrowserChromeH(phone) : laptopProfile && desktopBrowser ? BROWSER_FRAME_TOP : 0
   const pageH = Math.max(200, deviceH - browserChromeH)
   const minHeight = fixedScreen
     ? Math.max(contentH, pageH)
     : fold > 0 ? Math.max(contentH, fold + 40) : contentH
-  const bezelW = laptop?.extraWidth ?? (framedPhone ? phoneFrameW(phone) : desktopBrowser ? browserFrameW() : 0)
-  const bezelH = laptop?.extraHeight ?? (framedPhone ? phoneFrameH(phone) : desktopBrowser ? browserFrameH() : 0)
+  const bezelW = laptop?.extraWidth ?? (framedPhone ? phoneFrameW(phone) : desktopBrowser && !laptopProfile ? browserFrameW() : 0)
+  const bezelH = laptop?.extraHeight ?? (framedPhone ? phoneFrameH(phone) : desktopBrowser && !laptopProfile ? browserFrameH() : 0)
   const frameW = canvasW + bezelW
   const frameH = (fixedScreen ? deviceH : minHeight) + bezelH
 
@@ -760,7 +762,7 @@ export default function Canvas({
     <BrowserFrame
       screenWidth={canvasW}
       screenHeight={height}
-      laptopProfile={laptop?.profile}
+      laptopProfile={laptopProfile}
       siteTitle={browserSiteTitle}
       favicon={browserFavicon}
       address={browserAddress}
@@ -805,7 +807,7 @@ export default function Canvas({
         />
       </div>
     )
-    const desktopScreen = desktopBrowser ? desktopFrame(screen, laptop ? pageH : deviceH) : screen
+    const desktopScreen = desktopBrowser ? desktopFrame(screen, laptopProfile ? pageH : deviceH) : screen
     return (
       <main
         ref={scrollElRef}

@@ -138,19 +138,33 @@ describe('the device picker on a canvas page', () => {
     expect(document.querySelector('[data-builder-hinge="vertical"]')).not.toBeNull()
   })
 
-  it('renders the Acer as a PC laptop with the same screen in Edit and View', async () => {
+  it('keeps the Acer case off by default and toggles it without changing the PC viewport', async () => {
     renderEditor()
     await screen.findByRole('textbox', { name: 'Site title', exact: true })
     fireEvent.click(within(openPicker()).getByRole('button', { name: 'Acer Nitro 16 2560×1600' }))
+    const frame = () => document.querySelector('[data-builder-laptop-frame="nitro"]')
+    const deviceViewport = () => document.querySelector('[data-builder-device-viewport="1600"]')
     expect(state().viewport).toBe('pc')
     expect(page()).toMatchObject({ canvasWidth: 2560, canvasFold: 1600, canvasPresetId: 'acer-nitro-16' })
-    expect(document.querySelector('[data-builder-laptop-frame="nitro"]')).not.toBeNull()
-    expect(document.querySelector('[data-builder-laptop-screen]')).toHaveStyle({ width: '2560px', height: '1600px' })
-    expect(document.querySelector('[data-builder-device-viewport="1600"]')).toHaveStyle({ width: '2560px', height: '1522px' })
+    expect(frame()).toBeNull()
+    expect(deviceViewport()).toHaveStyle({ width: '2560px', height: '1522px' })
+
+    const show = within(openPicker()).getByRole('switch', { name: 'Laptop case' })
+    expect(show).not.toBeChecked()
+    fireEvent.click(show)
+    expect(show).toBeChecked()
+    expect(localStorage.getItem('pwb_laptop_frame')).toBe('1')
+    expect(frame().querySelector('[data-builder-laptop-screen]')).toHaveStyle({ width: '2560px', height: '1600px' })
+    expect(frame().querySelector('img[data-builder-laptop-keyboard]')).toHaveAttribute('src', expect.stringContaining('nitro.webp'))
+    fireEvent.click(pickerButton())
 
     fireEvent.click(screen.getByRole('button', { name: 'View', exact: true }))
-    await waitFor(() => expect(document.querySelector('[data-builder-laptop-frame="nitro"]')).not.toBeNull())
-    expect(document.querySelector('[data-builder-device-viewport="1600"]')).toHaveStyle({ width: '2560px', height: '1522px' })
+    await waitFor(() => expect(frame()).not.toBeNull())
+    expect(deviceViewport()).toHaveStyle({ width: '2560px', height: '1522px' })
+    fireEvent.click(within(openPicker()).getByRole('switch', { name: 'Laptop case' }))
+    expect(frame()).toBeNull()
+    expect(state().viewport).toBe('pc')
+    expect(deviceViewport()).toHaveStyle({ width: '2560px', height: '1522px' })
   })
 
   it('lists the foldables in one order, though their screens are split between PC and Mobile', async () => {
@@ -211,13 +225,25 @@ describe('the device picker on an HTML page', () => {
   }, 20000)
 })
 
-it('puts the HTML page inside a MacBook screen at its selected width', async () => {
+it('offers the saved case preference on the reference MacBook Pro and keeps the Air plain', async () => {
   localStorage.setItem('pwb_htmlmode_1', 'edit')
+  localStorage.setItem('pwb_laptop_frame', '1')
   site.schema.pages[0] = { id: 'home', name: 'Home', mode: 'html', html: '<!DOCTYPE html><html><body><h1>Garden</h1></body></html>', components: [] }
   renderEditor()
   await screen.findByTitle('site', {}, { timeout: 15000 })
+
   fireEvent.click(within(openPicker()).getByRole('button', { name: 'MacBook Air 13" 1470×956' }))
-  const laptop = document.querySelector('[data-builder-laptop-frame="macbook"]')
-  expect(laptop.querySelector('[data-builder-laptop-screen]')).toHaveStyle({ width: '1470px', height: '956px' })
-  expect(within(laptop).getByTitle('site')).toBeInTheDocument()
+  expect(document.querySelector('[data-builder-laptop-frame]')).toBeNull()
+  const airPicker = within(openPicker())
+  expect(airPicker.queryByRole('switch', { name: 'Laptop case' })).toBeNull()
+  fireEvent.click(airPicker.getByRole('button', { name: 'MacBook Pro 16" 1728×1117' }))
+  const frame = () => document.querySelector('[data-builder-laptop-frame="macbook"]')
+  expect(frame().querySelector('[data-builder-laptop-screen]')).toHaveStyle({ width: '1728px', height: '1117px' })
+  expect(within(frame()).getByTitle('site')).toBeInTheDocument()
+  const show = within(openPicker()).getByRole('switch', { name: 'Laptop case' })
+  expect(show).toBeChecked()
+  fireEvent.click(show)
+  expect(frame()).toBeNull()
+  expect(screen.getByTitle('site')).toBeInTheDocument()
+  expect(localStorage.getItem('pwb_laptop_frame')).toBe('0')
 })

@@ -165,6 +165,7 @@ const EditorTour = lazyChunk(() => import('../components/editor/EditorTour.jsx')
 const LAST_VIEWPORT_KEY = 'pwb_default_editor_viewport'
 const AI_PANEL_LAYOUT_KEY = 'pwb_ai_panel_layout'
 const BROWSER_FRAME_KEY = 'pwb_browser_frame'
+const LAPTOP_FRAME_KEY = 'pwb_laptop_frame'
 const LIVE_CODE_KEY = 'pwb_live_code'
 const LIVE_CODE_HOLD_KEY = 'pwb_live_code_hold'
 // How long a written-out card stays before it fades. 0 = until it is dismissed
@@ -557,6 +558,9 @@ function SiteEditor() {
   const [canvasToolsOpen, setCanvasToolsOpen] = useState(false)
   useEscapeToClose(canvasToolsOpen, () => setCanvasToolsOpen(false))
   const [browserFrameEnabled, setBrowserFrameEnabled] = useState(readBrowserFramePreference)
+  const [laptopFrameEnabled, setLaptopFrameEnabled] = useState(() => {
+    try { return localStorage.getItem(LAPTOP_FRAME_KEY) === '1' } catch { return false }
+  })
   const [liveCodeEnabled, setLiveCodeEnabled] = useState(readLiveCodePreference)
   const [liveCodeHold, setLiveCodeHold] = useState(readLiveCodeHold)
   const [brushMode, setBrushMode] = useState(false)
@@ -2816,6 +2820,15 @@ function SiteEditor() {
   const savedPresetId = viewport === 'mobile' ? currentPage?.mobilePresetId : currentPage?.canvasPresetId
   const curPreset = resolveCanvasPreset(viewport, curW, curFold, savedPresetId)
 
+  function toggleLaptopFrame() {
+    workspaceRef.current?.prepareFrameChange?.()
+    setLaptopFrameEnabled((enabled) => {
+      const next = !enabled
+      try { localStorage.setItem(LAPTOP_FRAME_KEY, next ? '1' : '0') } catch { /* ignore */ }
+      return next
+    })
+  }
+
   function toggleBrowserFrame() {
     setBrowserFrameEnabled((enabled) => {
       const next = !enabled
@@ -3350,10 +3363,18 @@ function SiteEditor() {
                           <SwitchLabel icon={DEVICE_ICONS.mobile} collapse="device">{t('Mobile')}</SwitchLabel>
                         </button>
                       </div>
-                      <DevicePicker items={DEVICES} value={htmlDevice} onPick={chooseHtmlDevice} collapse />
+                      <DevicePicker
+                        items={DEVICES}
+                        value={htmlDevice}
+                        onPick={chooseHtmlDevice}
+                        laptopFrame={laptopFrameEnabled}
+                        onLaptopFrameToggle={toggleLaptopFrame}
+                        collapse
+                      />
                     </>
                   }
                   browserFrame={browserFrameEnabled}
+                  laptopFrame={laptopFrameEnabled}
                   onBrowserFrameToggle={toggleBrowserFrame}
                   browserSiteTitle={title}
                   browserFavicon={siteOptions?.seo?.favicon || siteOptions?.favicon || ''}
@@ -3594,6 +3615,8 @@ function SiteEditor() {
                     items={CANVAS_SIZE_ITEMS}
                     value={curPreset ? `${viewport}:${curPreset.id}` : null}
                     onPick={pickCanvasSize}
+                    laptopFrame={laptopFrameEnabled}
+                    onLaptopFrameToggle={canvasMode !== 'source' ? toggleLaptopFrame : undefined}
                     fallbackLabel={`${t('Custom')} · ${curFold ? `${curW}×${curFold}` : `${curW}px`}`}
                     collapse
                   />
@@ -3756,6 +3779,7 @@ function SiteEditor() {
                     pendingPlace={pendingPlace}
                     onPlaceAt={placePendingAt}
                     browserFrame={browserFrameEnabled}
+                    laptopFrame={laptopFrameEnabled}
                     browserSiteTitle={title}
                     browserFavicon={siteOptions?.seo?.favicon || siteOptions?.favicon || ''}
                     browserAddress={currentPage.canonicalUrl || customDomain || `${slug || 'preview'}.sitebuilder.local`}
@@ -3787,6 +3811,7 @@ function SiteEditor() {
                     colorMode={componentColorMode}
                     title={`${currentPage.name || 'Page'} preview`}
                     browserFrame={browserFrameEnabled}
+                    laptopFrame={laptopFrameEnabled}
                     browserSiteTitle={title}
                     browserFavicon={siteOptions?.seo?.favicon || siteOptions?.favicon || ''}
                     browserAddress={currentPage.canonicalUrl || customDomain || `${slug || 'preview'}.sitebuilder.local`}

@@ -121,6 +121,7 @@ export default function CanvasPreview({
   iframeHtml = '',
   title = 'Page preview',
   browserFrame = false,
+  laptopFrame = false,
   browserSiteTitle = 'My Site',
   browserFavicon = '',
   browserAddress = 'preview.sitebuilder.local',
@@ -150,14 +151,15 @@ export default function CanvasPreview({
   const mobile = viewport === 'mobile'
   const preset = resolveCanvasPreset(viewport, width, fold, mobile ? page?.mobilePresetId : page?.canvasPresetId)
   const framedPhone = preset?.category === 'foldable' || (mobile && preset?.category !== 'tablet')
-  const laptop = laptopFrameMetrics(preset?.laptop, width)
-  const fixedScreen = !!laptop || framedPhone || preset?.category === 'tablet'
+  const laptopProfile = preset?.laptop
+  const laptop = laptopFrame ? laptopFrameMetrics(laptopProfile, width) : null
+  const fixedScreen = !!laptopProfile || framedPhone || preset?.category === 'tablet'
   const desktopBrowser = !framedPhone && browserFrame
   const mobileBrowser = framedPhone && browserFrame
   const phone = phoneModel(preset)
-  const browserChromeH = mobileBrowser ? mobileBrowserChromeH(phone) : laptop && desktopBrowser ? BROWSER_FRAME_TOP : 0
-  const bezelW = laptop?.extraWidth ?? (framedPhone ? phoneFrameW(phone) : desktopBrowser ? browserFrameW() : 0)
-  const bezelH = laptop?.extraHeight ?? (framedPhone ? phoneFrameH(phone) : desktopBrowser ? browserFrameH() : 0)
+  const browserChromeH = mobileBrowser ? mobileBrowserChromeH(phone) : laptopProfile && desktopBrowser ? BROWSER_FRAME_TOP : 0
+  const bezelW = laptop?.extraWidth ?? (framedPhone ? phoneFrameW(phone) : desktopBrowser && !laptopProfile ? browserFrameW() : 0)
+  const bezelH = laptop?.extraHeight ?? (framedPhone ? phoneFrameH(phone) : desktopBrowser && !laptopProfile ? browserFrameH() : 0)
   const components = page?.components || []
   const flowMode = !!page?.flowMode
   const showScrollIndicator = page?.showScrollIndicator !== false
@@ -220,8 +222,8 @@ export default function CanvasPreview({
     const preview = desktopBrowser ? (
       <BrowserFrame
         screenWidth={width}
-        screenHeight={laptop ? screenHeight - BROWSER_FRAME_TOP : screenHeight}
-        laptopProfile={laptop?.profile}
+        screenHeight={laptopProfile ? screenHeight - BROWSER_FRAME_TOP : screenHeight}
+        laptopProfile={laptopProfile}
         siteTitle={browserSiteTitle}
         favicon={browserFavicon}
         address={browserAddress}

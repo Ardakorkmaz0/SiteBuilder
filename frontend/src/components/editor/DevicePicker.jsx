@@ -76,7 +76,7 @@ function cardsOf(items) {
 
 // In a stage bar (an @container) `collapse` keeps only the button's icon below
 // 900px, where the bar is short of room; the name and size come back above.
-export default function DevicePicker({ items, value, onPick, fallbackLabel = '', collapse = false }) {
+export default function DevicePicker({ items, value, onPick, fallbackLabel = '', collapse = false, laptopFrame = false, onLaptopFrameToggle }) {
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [category, setCategory] = useState('all')
@@ -163,6 +163,18 @@ export default function DevicePicker({ items, value, onPick, fallbackLabel = '',
                 </button>
               ))}
             </div>
+            {current?.laptop && onLaptopFrameToggle && (
+              <label className="mb-2 flex cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs text-[var(--studio-text)] hover:bg-[var(--studio-control-hover)]">
+                {t('Laptop case')}
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={laptopFrame}
+                  onChange={onLaptopFrameToggle}
+                  className="size-4 shrink-0 accent-[var(--studio-accent)]"
+                />
+              </label>
+            )}
             <div className="max-h-[min(60vh,480px)] space-y-3 overflow-y-auto overscroll-contain pr-0.5">
               {sections.map((section) => (
                 <section key={section.id} aria-label={t(section.label)}>

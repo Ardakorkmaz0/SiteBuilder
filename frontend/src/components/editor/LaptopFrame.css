@@ -1,145 +1,68 @@
-/* These colors describe the physical chassis in both editor themes. */
+/* The physical case retains its material colors in either editor theme. */
 .laptop-frame {
   position: relative;
   container-type: inline-size;
-  --laptop-metal: #939aaa;
-  --laptop-lip: #4b525f;
-  --laptop-rim: #1a1d22;
-  --laptop-keys: #15181e;
-  --laptop-accent: #c4cad4;
-}
-
-.laptop-frame[data-builder-laptop-frame="macbook"] {
-  --laptop-metal: #aab3c0;
-  --laptop-lip: #646d7b;
-  --laptop-rim: #20242c;
-}
-
-.laptop-frame[data-builder-laptop-frame="nitro"] {
-  --laptop-metal: #303740;
-  --laptop-lip: #15181d;
-  --laptop-rim: #1f252f;
-  --laptop-accent: #9b81ec;
 }
 
 .laptop-lid {
   position: relative;
   box-sizing: border-box;
-  padding: var(--laptop-bezel);
-  border-radius: 2cqw 2cqw .6cqw .6cqw;
-  background: linear-gradient(145deg, var(--laptop-metal), var(--laptop-rim) 7%, #090b10 75%, var(--laptop-rim));
-  box-shadow: inset 0 0 0 max(1px, .14cqw) rgb(221 229 248 / 24%), 0 2cqw 6cqw rgb(0 0 0 / 24%);
+  border-radius: 1.65cqw 1.65cqw .85cqw .85cqw;
+  background: linear-gradient(156deg, #24282d, #131519 18%, #101215 68%, #25282d);
+  box-shadow: inset 0 0 0 max(1px, .11cqw) rgb(204 216 240 / 19%);
+}
+
+.laptop-frame[data-builder-laptop-frame='macbook'] .laptop-lid {
+  border-radius: 1.8cqw 1.8cqw .4cqw .4cqw;
+  background: linear-gradient(180deg, #1d1e20, #0a0a0c 16%, #111214 94%, #292b2e);
+  box-shadow:
+    inset 0 0 0 max(1px, .16cqw) rgb(219 220 225 / 48%),
+    inset 0 0 0 .4cqw rgb(8 8 10 / 85%);
 }
 
 .laptop-display {
   position: relative;
   overflow: hidden;
-  border-radius: .85cqw .85cqw .32cqw .32cqw;
+  border-radius: .35cqw .35cqw .14cqw .14cqw;
   background: #fff;
+}
+
+.laptop-frame[data-builder-laptop-frame='macbook'] .laptop-display {
+  border-radius: .8cqw .8cqw .22cqw .22cqw;
 }
 
 .laptop-webcam {
   position: absolute;
   z-index: 60;
-  top: calc(var(--laptop-bezel) / 2);
+  top: calc(var(--laptop-top-bezel) / 2);
   left: 50%;
-  width: .57cqw;
-  height: .57cqw;
+  width: .65cqw;
+  height: .65cqw;
   transform: translate(-50%, -50%);
   border-radius: 100%;
   pointer-events: none;
-  background: radial-gradient(circle at 40% 40%, #50668f, #111925 38%, #05070d 70%);
+  background: radial-gradient(circle at 40% 40%, #50668f, #121824 38%, #05070d 70%);
 }
 
-.laptop-frame[data-builder-laptop-frame="macbook"] .laptop-webcam {
-  top: calc(var(--laptop-bezel) - 1px);
-  width: 7.5cqw;
-  height: 1.55cqw;
+.laptop-frame[data-builder-laptop-frame='macbook'] .laptop-webcam {
+  top: calc(var(--laptop-top-bezel) - 1px);
+  width: 8.6cqw;
+  height: 1.75cqw;
   transform: translateX(-50%);
   border-radius: 0 0 .45cqw .45cqw;
-  background: radial-gradient(circle at 50% 38%, #4c6080 0%, #171d29 7%, #090b10 11%);
+  background: radial-gradient(circle at 50% 37%, #40536d, #151921 5%, #0b0b0c 8%);
 }
 
 .laptop-deck {
   position: relative;
-  height: var(--laptop-depth);
+  z-index: 1;
+  display: block;
+  width: 100%;
+  max-width: none;
   pointer-events: none;
-  clip-path: polygon(6% 0, 94% 0, 100% 87%, 98.5% 98%, 95% 100%, 5% 100%, 1.5% 98%, 0 87%);
-  background: linear-gradient(180deg, var(--laptop-lip), var(--laptop-metal) 15%, var(--laptop-metal) 86%, var(--laptop-lip) 87%, #10141b 100%);
+  user-select: none;
 }
 
-.laptop-hinge {
-  position: absolute;
-  inset: 0 9% auto;
-  height: 8%;
-  border-radius: 0 0 .45cqw .45cqw;
-  background: linear-gradient(#0a0c11, var(--laptop-rim));
-}
-
-.laptop-keyboard {
-  position: absolute;
-  inset: 8% 12% 32%;
-  display: flex;
-  gap: .7cqw;
-  transform: perspective(var(--laptop-perspective)) rotateX(27deg);
-  transform-origin: center top;
-  border: .18cqw solid rgb(0 0 0 / 60%);
-  border-radius: .8cqw;
-  background: var(--laptop-rim);
-  padding: .45cqw;
-}
-
-.laptop-keyboard-main {
-  display: flex;
-  flex: 5;
-  flex-direction: column;
-  gap: .25cqw;
-}
-
-.laptop-key-row {
-  display: flex;
-  flex: 1;
-  gap: .27cqw;
-}
-
-.laptop-key {
-  display: grid;
-  min-width: 0;
-  place-items: center;
-  color: var(--laptop-accent);
-  font: 500 .52cqw/1 ui-monospace, monospace;
-  background: linear-gradient(#303846, var(--laptop-keys) 55%);
-  border-radius: .16cqw;
-  box-shadow: inset 0 .05cqw rgb(255 255 255 / 23%), 0 .12cqw #08090d;
-}
-
-.laptop-numpad {
-  display: grid;
-  flex: 1;
-  grid-template-columns: repeat(3, 1fr);
-  gap: .28cqw;
-}
-
-.laptop-frame[data-builder-laptop-frame="nitro"] .laptop-keyboard {
-  background: linear-gradient(110deg, #713c9b, #304789 44%, #30778c 74%, #a74463);
-  box-shadow: 0 0 1.7cqw rgb(96 98 220 / 38%);
-}
-
-.laptop-key[data-gaming-key] {
-  color: #f2edff;
-  box-shadow: inset 0 0 0 .085cqw #8a66d2, 0 .12cqw #08090d;
-}
-
-.laptop-trackpad {
-  position: absolute;
-  inset: 72% 34% 12%;
-  transform: perspective(var(--laptop-perspective)) rotateX(24deg);
-  border-radius: .52cqw;
-  border: .105cqw solid rgb(15 21 32 / 47%);
-  background: linear-gradient(165deg, rgb(226 233 248 / 12%), rgb(23 29 41 / 10%));
-  box-shadow: inset 0 .08cqw rgb(240 244 255 / 31%);
-}
-
-.laptop-frame[data-builder-laptop-frame="nitro"] .laptop-trackpad {
-  inset-inline: 30% 43%;
+.laptop-frame[data-builder-laptop-frame='macbook'] .laptop-deck {
+  clip-path: polygon(13% 0, 87% 0, 90% 10%, 99.7% 88%, 99.7% 94%, 98.6% 100%, 1.4% 100%, 0 94%, 0 89%, 10% 13%);
 }
