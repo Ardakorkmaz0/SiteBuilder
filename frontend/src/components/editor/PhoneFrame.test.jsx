@@ -88,7 +88,7 @@ describe('PhoneFrame on a foldable', () => {
   })
 
   it('lays the Flip\'s crease across its screen', () => {
-    expect(creases('zflip6-inner', 411, 1006)).toEqual([{ kind: 'horizontal', left: '0px', top: '50%', clicks: 'none' }])
+    expect(creases('zflip6-inner', 412, 1006)).toEqual([{ kind: 'horizontal', left: '0px', top: '50%', clicks: 'none' }])
   })
 
   it('draws two creases on a tri-fold, and none on a closed screen or a phone', () => {

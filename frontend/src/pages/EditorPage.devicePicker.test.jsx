@@ -98,25 +98,25 @@ describe('the device picker on a canvas page', () => {
   })
 
   it('reopens the selected Pixel at a shared size, falling back to Pixel 9 for width-only data', async () => {
-    site.schema.pages[0] = { ...site.schema.pages[0], mobileWidth: 411, mobileFold: 923 }
+    site.schema.pages[0] = { ...site.schema.pages[0], mobileWidth: 412, mobileFold: 923 }
     localStorage.setItem('pwb_default_editor_viewport', 'mobile')
     renderEditor()
     await screen.findByRole('textbox', { name: 'Site title', exact: true })
-    await waitFor(() => expect(pickerButton()).toHaveAccessibleName('Screen size: Pixel 9 411×923'))
+    await waitFor(() => expect(pickerButton()).toHaveAccessibleName('Screen size: Pixel 9 412×923'))
     expect(phoneFrame()).toHaveAttribute('aria-label', 'Pixel 9')
 
     fireEvent.click(foldStates(openPicker(), 'Pixel 9 Pro Fold')[0])
-    expect(page()).toMatchObject({ mobileWidth: 411, mobileFold: 923, mobilePresetId: 'pixel9fold-cover' })
+    expect(page()).toMatchObject({ mobileWidth: 412, mobileFold: 923, mobilePresetId: 'pixel9fold-cover' })
     expect(phoneFrame()).toHaveAttribute('aria-label', 'Pixel 9 Pro Fold')
-    expect(pickerButton()).toHaveAccessibleName('Screen size: Pixel 9 Pro Fold 411×923 · Outer screen')
+    expect(pickerButton()).toHaveAccessibleName('Screen size: Pixel 9 Pro Fold 412×923 · Outer screen')
 
     site.schema.pages[0] = structuredClone(page())
     cleanup()
     renderEditor()
     await screen.findByRole('textbox', { name: 'Site title', exact: true })
     await waitFor(() => expect(phoneFrame()).toHaveAttribute('aria-label', 'Pixel 9 Pro Fold'))
-    state().setCanvasPreset({ width: 411, fold: 923 })
-    await waitFor(() => expect(pickerButton()).toHaveAccessibleName('Screen size: Pixel 9 411×923'))
+    state().setCanvasPreset({ width: 412, fold: 923 })
+    await waitFor(() => expect(pickerButton()).toHaveAccessibleName('Screen size: Pixel 9 412×923'))
   })
 
   it('frames a wide iPhone Duo in Edit and View while keeping the PC layout', async () => {
@@ -212,7 +212,7 @@ describe('the device picker on an HTML page', () => {
     await waitFor(() => expect(phoneFrame()).toBeNull())
     expect(localStorage.getItem('pwb_default_editor_viewport')).toBe('mobile')
 
-    fireEvent.click(within(openPicker()).getByRole('button', { name: 'Pixel 9 411×923' }))
+    fireEvent.click(within(openPicker()).getByRole('button', { name: 'Pixel 9 412×923' }))
     await waitFor(() => expect(phoneFrame()).toHaveAttribute('aria-label', 'Pixel 9'))
     fireEvent.click(foldStates(openPicker(), 'Pixel 9 Pro Fold')[0])
     await waitFor(() => expect(phoneFrame()).toHaveAttribute('aria-label', 'Pixel 9 Pro Fold'))

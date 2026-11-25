@@ -77,10 +77,11 @@ export const HANDHELD_SCREENS = [
   { id: 'galaxya37', name: 'Galaxy A37 5G', category: 'phone', w: 384, h: 832, model: 'galaxy-s24' },
   { id: 'galaxya56', name: 'Galaxy A56 5G', category: 'phone', w: 384, h: 832, model: 'galaxy-s24' },
   { id: 'galaxya57', name: 'Galaxy A57 5G', category: 'phone', w: 384, h: 832, model: 'galaxy-s24' },
-  // Google Pixel hardware specs, rounded to the nearest px at 2.625×.
-  { id: 'pixel9', name: 'Pixel 9', category: 'phone', w: 411, h: 923, model: 'pixel-9' },
-  { id: 'pixel7', name: 'Pixel 7', category: 'phone', w: 411, h: 914, model: 'pixel-7' },
-  { id: 'pixel11', name: 'Pixel 11', category: 'phone', w: 411, h: 923, model: 'pixel-9' },
+  // Pixel 7 uses the Chrome DevTools 412×915 preset. Use the same 412px
+  // logical width for the other 1080px, 2.625× Pixel screen presets.
+  { id: 'pixel9', name: 'Pixel 9', category: 'phone', w: 412, h: 923, model: 'pixel-9' },
+  { id: 'pixel7', name: 'Pixel 7', category: 'phone', w: 412, h: 915, model: 'pixel-7' },
+  { id: 'pixel11', name: 'Pixel 11', category: 'phone', w: 412, h: 923, model: 'pixel-9' },
   // Huawei and Xiaomi panel specs. These are preview scales where no
   // measured browser viewport is available (3× Huawei, 2.75× Redmi Note,
   // 2× Redmi A5, and 3× Xiaomi 17).
@@ -105,20 +106,21 @@ export const FOLDABLES = [
     ],
   },
   {
-    // Samsung panel sizes, at 2.25× (cover) and 2.625× (inner).
+    // Samsung panel sizes at 2.25× (cover) and 2.625× (inner). The inner
+    // 1080px panel uses the same 412px logical width as the Pixel presets.
     group: 'galaxy-zflip6',
     name: 'Galaxy Z Flip6',
     states: [
       { id: 'zflip6-cover', state: 'cover', w: 320, h: 332, camera: 'rear-cameras' },
-      { id: 'zflip6-inner', state: 'inner', w: 411, h: 1006, hinge: HINGE_HORIZONTAL },
+      { id: 'zflip6-inner', state: 'inner', w: 412, h: 1006, hinge: HINGE_HORIZONTAL },
     ],
   },
   {
-    // Google Pixel hardware specs, rounded at 2.625×.
+    // Use the Pixel 9 logical width for the matching 1080px cover panel.
     group: 'pixel9-pro-fold',
     name: 'Pixel 9 Pro Fold',
     states: [
-      { id: 'pixel9fold-cover', state: 'cover', w: 411, h: 923 },
+      { id: 'pixel9fold-cover', state: 'cover', w: 412, h: 923 },
       { id: 'pixel9fold-inner', state: 'inner', w: 791, h: 820, hinge: HINGE_VERTICAL, cameraX: '96%', cameraTop: 14 },
     ],
   },
