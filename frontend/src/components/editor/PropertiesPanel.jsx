@@ -4,7 +4,18 @@ import { registry } from '../registry.jsx'
 import PanelTabs from './PanelTabs.jsx'
 import PanelGroup from './PanelGroup.jsx'
 import PropertiesHeader from './PropertiesHeader.jsx'
+import MobileOverrideBanner from './MobileOverrideBanner.jsx'
+import TypographyFields from './TypographyFields.jsx'
+import ColorFields from './ColorFields.jsx'
+import BorderFields from './BorderFields.jsx'
+import EffectsFields from './EffectsFields.jsx'
+import AlignmentFields from './AlignmentFields.jsx'
+import SizeFields from './SizeFields.jsx'
+import SpacingFields from './SpacingFields.jsx'
+import PositionStackFields from './PositionStackFields.jsx'
+import FlexLayoutFields from './FlexLayoutFields.jsx'
 import MotionFields from './MotionFields.jsx'
+import { createCanvasInspectorAdapter } from './inspectorAdapters.js'
 import { PROPERTIES_TABS } from './propertiesTabs.js'
 import { componentKindIcon } from './elementKindIcons.js'
 import AiComponentEdit from './AiComponentEdit.jsx'
@@ -30,19 +41,23 @@ import {
   LabeledSelect,
   LabeledPx,
   LabeledAlign,
-  LabeledNumber,
   LabeledRange,
   LabeledCheckbox,
   LinkTargetControl,
   LinksEditor,
   HtmlContentControl,
+  SegmentedIconButtons,
   TabsEditorControl,
 } from './controls.jsx'
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   CopyIcon,
   FileIcon,
+  MinusIcon,
   MoreHorizontalIcon,
   PaletteIcon,
+  PlusIcon,
   SparklesIcon,
   TrashIcon,
 } from '../icons.jsx'
@@ -70,7 +85,7 @@ function SnippetPicker({ groups, list, onPick }) {
   const { t } = useLanguage()
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-semibold text-[var(--studio-text-muted)]">
+      <span className="mb-1 block text-[11px] font-medium text-[var(--studio-text-muted)]">
         {t('Insert snippet (optional)')}
       </span>
       <select
@@ -82,7 +97,7 @@ function SnippetPicker({ groups, list, onPick }) {
           if (snippet) onPick(snippet)
           e.target.value = ''
         }}
-        className="w-full rounded-lg border border-[#d1d5db] bg-white px-2 py-1 text-sm text-[#111827] focus:border-[#4f46e5] focus:outline-none"
+        className="studio-input min-w-0 w-full px-2.5 py-1.5 text-xs"
       >
         <option value="">{t('— pick a snippet to append —')}</option>
         {groups.map((g) => (
@@ -100,102 +115,6 @@ function SnippetPicker({ groups, list, onPick }) {
 }
 
 const STYLE_META = {
-  backgroundColor: { label: 'Background', control: 'color' },
-  color: { label: 'Text color', control: 'color' },
-  fontSize: { label: 'Font size', control: 'px' },
-  fontWeight: {
-    label: 'Font weight',
-    control: 'select',
-    options: [
-      ['300', 'Light'],
-      ['400', 'Regular'],
-      ['normal', 'Normal'],
-      ['500', 'Medium'],
-      ['600', 'Semibold'],
-      ['700', 'Bold'],
-      ['bold', 'Bold'],
-      ['800', 'Extra bold'],
-    ],
-  },
-  fontStyle: {
-    label: 'Style',
-    control: 'select',
-    options: [['normal', 'Normal'], ['italic', 'Italic']],
-  },
-  fontFamily: {
-    label: 'Font',
-    control: 'select',
-    options: [['inherit', 'Theme font'], ...FONT_OPTIONS],
-  },
-  textAlign: {
-    label: 'Alignment',
-    control: 'select',
-    options: [['left', 'Left'], ['center', 'Center'], ['right', 'Right']],
-  },
-  textDecoration: {
-    label: 'Decoration',
-    control: 'select',
-    options: [['none', 'None'], ['underline', 'Underline']],
-  },
-  textTransform: {
-    label: 'Text case',
-    control: 'select',
-    options: [
-      ['none', 'Normal'],
-      ['uppercase', 'UPPERCASE'],
-      ['lowercase', 'lowercase'],
-      ['capitalize', 'Capitalize'],
-    ],
-  },
-  backgroundImage: {
-    label: 'Gradient',
-    control: 'select',
-    options: [
-      ['none', 'None'],
-      ['linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 'Purple'],
-      ['linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', 'Sky'],
-      ['linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', 'Mint'],
-      ['linear-gradient(135deg, #fa709a 0%, #fee140 100%)', 'Sunset'],
-      ['linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', 'Blossom'],
-      ['linear-gradient(135deg, #30cfd0 0%, #330867 100%)', 'Ocean'],
-      ['linear-gradient(180deg, #1d1d1f 0%, #434343 100%)', 'Charcoal'],
-    ],
-  },
-  lineHeight: { label: 'Line height', control: 'text', placeholder: 'e.g. 1.5' },
-  letterSpacing: { label: 'Letter spacing', control: 'px' },
-  border: { label: 'Border', control: 'text', placeholder: 'e.g. 1px solid #e5e7eb' },
-  borderRadius: { label: 'Corner radius', control: 'px' },
-  borderWidth: { label: 'Border width', control: 'px' },
-  borderStyle: {
-    label: 'Border style',
-    control: 'select',
-    options: [['none', 'None'], ['solid', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']],
-  },
-  borderColor: { label: 'Border color', control: 'color' },
-  boxShadow: {
-    label: 'Shadow',
-    control: 'select',
-    options: [
-      ['none', 'None'],
-      ['0 1px 3px rgba(0,0,0,0.15)', 'Small'],
-      ['0 4px 12px rgba(0,0,0,0.15)', 'Medium'],
-      ['0 4px 20px rgba(0,0,0,0.08)', 'Soft'],
-      ['0 10px 25px rgba(0,0,0,0.2)', 'Large'],
-    ],
-  },
-  opacity: { label: 'Opacity', control: 'range' },
-  objectFit: {
-    label: 'Image fit',
-    control: 'select',
-    options: [['fill', 'Fill'], ['cover', 'Cover'], ['contain', 'Contain']],
-  },
-  padding: { label: 'Padding', control: 'text', placeholder: 'e.g. 12px 20px' },
-  margin: { label: 'Margin', control: 'text', placeholder: 'e.g. 0 auto' },
-  width: { label: 'Width', control: 'text', placeholder: 'e.g. 100%' },
-  maxWidth: { label: 'Max width', control: 'text', placeholder: 'e.g. 640px' },
-  height: { label: 'Height', control: 'text', placeholder: 'e.g. 48px' },
-  minHeight: { label: 'Min height', control: 'text', placeholder: 'e.g. 200px' },
-  // Advanced / standard CSS knobs, available on every component.
   transform: { label: 'Transform', control: 'text', placeholder: 'e.g. rotate(-3deg) scale(1.05)' },
   filter: { label: 'Filter', control: 'text', placeholder: 'e.g. blur(2px) brightness(1.1)' },
   backdropFilter: { label: 'Backdrop filter', control: 'text', placeholder: 'e.g. blur(8px)' },
@@ -230,18 +149,13 @@ const STYLE_META = {
       ['not-allowed', 'Not allowed'],
     ],
   },
-  overflow: {
-    label: 'Overflow',
-    control: 'select',
-    options: [['visible', 'Visible'], ['hidden', 'Hidden'], ['auto', 'Auto'], ['scroll', 'Scroll']],
-  },
 }
 
 // Universal advanced style controls shown for every component (standard CSS).
 const ADVANCED_STYLE_KEYS = [
   'transform', 'filter', 'backdropFilter', 'textShadow', 'aspectRatio',
   'objectPosition', 'backgroundSize', 'backgroundPosition', 'backgroundRepeat',
-  'cursor', 'overflow', 'border',
+  'cursor',
 ]
 
 const PROPS_TAB_KEY = 'pwb_props_tab'
@@ -280,46 +194,6 @@ const THEME_SHADOWS = [
   ['subtle', 'Subtle shadow', '0 1px 3px rgba(15,23,42,0.08)'],
   ['soft', 'Soft shadow', '0 8px 24px rgba(15,23,42,0.10)'],
   ['strong', 'Strong shadow', '0 18px 45px rgba(15,23,42,0.18)'],
-]
-
-// The four Properties sections. Short labels — the panel is 288px wide.
-
-const SCROLL_BEHAVIOR_OPTIONS = [
-  ['normal', 'Normal'],
-  ['sticky', 'Sticky while scrolling'],
-  ['fixed', 'Fixed on screen'],
-]
-
-const PIN_Y_OPTIONS = [
-  ['top', 'Top'],
-  ['bottom', 'Bottom'],
-]
-
-const PIN_X_OPTIONS = [
-  ['left', 'Left'],
-  ['center', 'Center'],
-  ['right', 'Right'],
-]
-
-const STYLE_GROUPS = [
-  {
-    title: 'Typography',
-    keys: [
-      'fontFamily',
-      'fontSize',
-      'fontWeight',
-      'fontStyle',
-      'lineHeight',
-      'letterSpacing',
-      'textAlign',
-      'textTransform',
-      'textDecoration',
-    ],
-  },
-  { title: 'Colors', keys: ['color', 'backgroundColor', 'backgroundImage'] },
-  { title: 'Spacing', keys: ['padding', 'margin', 'width', 'maxWidth', 'height', 'minHeight'] },
-  { title: 'Border', keys: ['border', 'borderRadius', 'borderWidth', 'borderStyle', 'borderColor'] },
-  { title: 'Effects', keys: ['boxShadow', 'opacity', 'objectFit'] },
 ]
 
 // Find a component anywhere in the tree (containers and tabs nest children).
@@ -601,31 +475,6 @@ function StyleControl({ styleKey, value, onChange, subject, allowInherit = false
   )
 }
 
-function groupedStyles(keys) {
-  const available = new Set(keys || [])
-  const used = new Set()
-  const groups = STYLE_GROUPS.map((group) => {
-    const groupKeys = group.keys.filter((key) => available.has(key))
-    groupKeys.forEach((key) => used.add(key))
-    return { ...group, keys: groupKeys }
-  }).filter((group) => group.keys.length)
-  const remaining = [...available].filter((key) => !used.has(key))
-  if (remaining.length) groups.push({ title: 'Advanced', keys: remaining })
-  return groups
-}
-
-// Every group is available now; the everyday ones open by default and the rest
-// stay collapsed, which is what the old Basic/Extended switch used to decide.
-function visibleStyleGroups(keys) {
-  return groupedStyles(keys)
-}
-
-// Groups that start expanded — the ones people reach for constantly. Anything
-// else is one click away inside its own collapsed group.
-const OPEN_BY_DEFAULT = new Set(['Typography', 'Colors', 'Spacing'])
-// Spacing is layout, not looks, so it lives under the Layout tab.
-const LAYOUT_STYLE_GROUP = 'Spacing'
-
 // On an uploaded page the DOCUMENT is the page: `htmlPageSettings` is what its
 // head currently says and `onHtmlPageSettings` writes back into it. Without
 // them these controls would edit a schema nothing publishes — which is how a
@@ -828,25 +677,26 @@ export default function PropertiesPanel({
   const extendedMode = !simpleMode
 
   if (selectedLayoutItems.length > 1) {
+    const canDistribute = selectedLayoutItems.length >= 3
     return (
       <div className="studio-properties-panel flex h-full min-w-0 flex-col overflow-hidden">
-        <div className="border-b border-[#e5e7eb] px-4 py-3">
+        <div className="border-b border-[var(--studio-border)] px-3 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="truncate text-sm font-semibold text-[#111827]">{t('Selection')}</h2>
+              <h2 className="truncate text-sm font-semibold text-[var(--studio-text)]">{t('Selection')}</h2>
               <p className="truncate text-xs text-[var(--studio-text-muted)]">{t('{count} items selected', { count: selectedLayoutItems.length })}</p>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 space-y-5 overflow-y-auto p-4">
-          <div className="rounded-lg bg-[#eef2ff] px-3 py-2">
-            <span className="text-xs font-semibold text-[#4f46e5]">
+        <div className="flex-1 space-y-4 overflow-y-auto bg-[var(--studio-panel-muted)] p-3">
+          <div className="rounded-xl border border-[color-mix(in_srgb,var(--studio-accent)_22%,var(--studio-border))] bg-[var(--studio-accent-soft)] px-3 py-2">
+            <span className="text-xs font-semibold text-[var(--studio-accent-text)]">
               {isFlow ? t('Editing HTML flow layout') : t('Editing {viewport} layout', { viewport: t(isMobile ? 'Mobile' : 'PC') })}
             </span>
           </div>
 
-          <section className="space-y-3">
+          <section className="space-y-2.5 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-3 shadow-[var(--studio-shadow-sm)]">
             <SectionTitle>
               {t('Size')}
               <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">
@@ -874,9 +724,9 @@ export default function PropertiesPanel({
           </section>
 
           {multiShowPositionControls && (
-            <section className="space-y-2">
+            <section className="space-y-2.5 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-3 shadow-[var(--studio-shadow-sm)]">
               <SectionTitle>
-                {t('Align & Distribute')}
+                {t('Align')}
                 <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">
                   ({t('{count} selected', { count: selectedLayoutItems.length })})
                 </span>
@@ -886,45 +736,46 @@ export default function PropertiesPanel({
                   {t('Aligns the selected items to each other.')}
                 </p>
               )}
-              <div className="grid grid-cols-3 gap-1.5">
-                {[
-                  ['left', 'Left'],
-                  ['centerH', 'Center'],
-                  ['right', 'Right'],
-                  ['top', 'Top'],
-                  ['middleV', 'Middle'],
-                  ['bottom', 'Bottom'],
-                ].map(([mode, label]) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => alignSelection(mode)}
-                    className="rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] px-1.5 py-1.5 text-xs text-[#374151] hover:bg-[#e5e7eb]"
-                  >
-                    {t(label)}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  disabled={selectedLayoutItems.length < 3}
-                  onClick={() => distributeSelection('x')}
-                  title={t(selectedLayoutItems.length < 3 ? 'Select 3+ items to distribute' : 'Equal horizontal gaps')}
-                  className="rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] px-1.5 py-1.5 text-xs text-[#374151] hover:bg-[#e5e7eb] disabled:opacity-40"
-                >
-                  {t('Distribute X')}
-                </button>
-                <button
-                  type="button"
-                  disabled={selectedLayoutItems.length < 3}
-                  onClick={() => distributeSelection('y')}
-                  title={t(selectedLayoutItems.length < 3 ? 'Select 3+ items to distribute' : 'Equal vertical gaps')}
-                  className="rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] px-1.5 py-1.5 text-xs text-[#374151] hover:bg-[#e5e7eb] disabled:opacity-40"
-                >
-                  {t('Distribute Y')}
-                </button>
-              </div>
+              <SegmentedIconButtons
+                inline
+                label={t('Element')}
+                value=""
+                onChange={(v) => {
+                  if (v === 'left') alignSelection('left')
+                  else if (v === 'center') alignSelection('centerH')
+                  else if (v === 'right') alignSelection('right')
+                }}
+                options={[
+                  ['left', t('Left'), 'alignBoxLeft'],
+                  ['center', t('Center'), 'alignBoxCenter'],
+                  ['right', t('Right'), 'alignBoxRight'],
+                ]}
+              />
+              <SegmentedIconButtons
+                inline
+                label={t('Vertical')}
+                value=""
+                onChange={(v) => {
+                  if (v === 'top') alignSelection('top')
+                  else if (v === 'middle') alignSelection('middleV')
+                  else if (v === 'bottom') alignSelection('bottom')
+                }}
+                options={[
+                  ['top', t('Top'), 'alignBoxTop'],
+                  ['middle', t('Middle'), 'alignBoxMiddle'],
+                  ['bottom', t('Bottom'), 'alignBoxBottom'],
+                ]}
+              />
+              <SegmentedIconButtons
+                inline
+                label={t('Distribute')}
+                value=""
+                onChange={(v) => distributeSelection(v)}
+                options={[
+                  ['x', t('Distribute X'), 'distributeH', !canDistribute],
+                  ['y', t('Distribute Y'), 'distributeV', !canDistribute],
+                ]}
+              />
             </section>
           )}
         </div>
@@ -935,8 +786,8 @@ export default function PropertiesPanel({
   if (!component) {
     return (
       <div className="studio-properties-panel flex h-full min-w-0 flex-col overflow-hidden">
-        <div className="border-b border-[#e5e7eb] px-4 py-3">
-          <h2 className="text-sm font-semibold text-[#111827]">{t('Page')}</h2>
+        <div className="border-b border-[var(--studio-border)] px-3 py-3">
+          <h2 className="text-sm font-semibold text-[var(--studio-text)]">{t('Page')}</h2>
           <p className="text-xs text-[var(--studio-text-muted)]">
             {isFlow
               ? t('HTML flow layout - nothing selected')
@@ -949,7 +800,7 @@ export default function PropertiesPanel({
           tabs={pageTabs.map(([id, label, Icon]) => [id, t(label), Icon])}
         />
 
-        <div className="flex-1 space-y-1 overflow-y-auto px-4 pb-4">
+        <div className="flex-1 space-y-2 overflow-y-auto bg-[var(--studio-panel-muted)] p-2.5">
           {activePageTab === 'page' && (
             <>
         <PanelGroup id="page-basics" title={t('Page')} defaultOpen>
@@ -993,9 +844,10 @@ export default function PropertiesPanel({
               <button
                 type="button"
                 onClick={autoArrangeMobile}
-                className="w-full rounded-lg border border-[#d1d5db] bg-white py-2 text-sm font-medium text-[#374151] hover:bg-[#f3f4f6]"
+                className="studio-btn studio-btn-secondary w-full justify-between px-3 py-1.5 text-xs"
               >
-                {t('Auto-arrange mobile layout')}
+                <span>{t('Auto-arrange mobile layout')}</span>
+                <SparklesIcon size={14} className="text-[var(--studio-accent-text)]" />
               </button>
             )}
         </PanelGroup>
@@ -1450,10 +1302,7 @@ export default function PropertiesPanel({
     })
   }
   const contentSection = (def.editableProps || []).length > 0 ? (
-    <section
-      aria-label={t('Content')}
-      className="space-y-3 rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-3 shadow-[var(--studio-shadow-sm)]"
-    >
+    <PanelGroup id="content" title={t('Content')} defaultOpen>
       {/* Navbars lead with pinning, Bootstrap-style — "is this bar fixed?" is
           the first question a nav asks. Exactly two states, and toggling MUST
           NOT change the design: a full-width bar stays edge-to-edge where it
@@ -1569,7 +1418,7 @@ export default function PropertiesPanel({
           }
         />
       ))}
-    </section>
+    </PanelGroup>
   ) : null
   const linkSection = LINKABLE_TYPES.has(component.type) ? (
     <PanelGroup id="link" title={t('Link')} defaultOpen>
@@ -1605,107 +1454,45 @@ export default function PropertiesPanel({
     </PanelGroup>
   )
 
-  // Auto-layout for containers: a Stack/Row/Grid flow makes the children reflow
-  // responsively instead of sitting at fixed x/y — the single biggest lever for
-  // screen compatibility. 'Free' keeps the classic absolute mini-canvas.
-  const containerFlow = component.props.flow || 'free'
-  const layoutSection = component.type === 'container' ? (
-    <PanelGroup id="flow" title={t('Layout')} defaultOpen>
-      <LabeledSelect
-        label={t('Flow')}
-        value={containerFlow}
-        onChange={(flow) => updateProps(component.id, { flow })}
-        options={[
-          ['free', t('Free (absolute)')],
-          ['column', t('Stack (vertical)')],
-          ['row', t('Row (horizontal)')],
-          ['grid', t('Grid')],
-        ]}
-      />
-      {containerFlow !== 'free' && (
-        <>
-          <LabeledNumber
-            label={t('Gap')}
-            value={component.props.gap ?? 16}
-            onChange={(gap) => updateProps(component.id, { gap })}
-          />
-          {containerFlow === 'grid' ? (
-            <LabeledNumber
-              label={t('Columns')}
-              value={component.props.cols ?? 3}
-              onChange={(cols) => updateProps(component.id, { cols })}
-            />
-          ) : (
-            <>
-              <LabeledSelect
-                label={t('Justify')}
-                value={component.props.justify || 'start'}
-                onChange={(justify) => updateProps(component.id, { justify })}
-                options={[
-                  ['start', t('Start')],
-                  ['center', t('Center')],
-                  ['end', t('End')],
-                  ['between', t('Space between')],
-                  ['around', t('Space around')],
-                ]}
-              />
-              <LabeledSelect
-                label={t('Align')}
-                value={component.props.align || 'stretch'}
-                onChange={(align) => updateProps(component.id, { align })}
-                options={[
-                  ['stretch', t('Stretch')],
-                  ['start', t('Start')],
-                  ['center', t('Center')],
-                  ['end', t('End')],
-                ]}
-              />
-              <LabeledSelect
-                label={t('Wrap')}
-                value={component.props.wrap ? 'wrap' : 'nowrap'}
-                onChange={(v) => updateProps(component.id, { wrap: v === 'wrap' })}
-                options={[['nowrap', t('No wrap')], ['wrap', t('Wrap')]]}
-              />
-            </>
-          )}
-        </>
-      )}
-    </PanelGroup>
-  ) : null
+  const layoutSharedAcrossScreens = isFlow || (!!parentComponent && parentComponent.type !== 'region')
+  const adapter = createCanvasInspectorAdapter({
+    component,
+    def,
+    viewport,
+    isFlow,
+    layout,
+    layoutSharedAcrossScreens,
+    showPositionControls,
+    extendedMode,
+    viewportStretchComponent,
+    selectedIds,
+    pages: schema.pages,
+    linkSections,
+    updateStyles,
+    updateProps,
+    setLayout,
+    clearMobileStyles,
+    alignSelection,
+    distributeSelection,
+    scaleSingleSize,
+    presetSingleSize,
+    scrollBehavior,
+    setScrollBehavior,
+    hiddenUnderBar,
+  })
 
-  // A tab with nothing in it reads as broken, so say so plainly instead. Only
-  // Content and Design can end up empty (a container has no text or styles of
-  // its own); Layout and Motion always have something.
+  const designTabEmpty =
+    !adapter.hasAny([
+      'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing',
+      'textTransform', 'textAlign', 'italic', 'underline',
+      'color', 'background', 'gradient', 'backgroundImage',
+      'borderRadius', 'borderWidth', 'borderStyle', 'borderColor', 'border',
+      'boxShadow', 'opacity', 'overflow', 'objectFit',
+    ]) && !extendedMode
   const emptyTabHint = (
-    <p className="px-1 py-6 text-center text-[11px] leading-snug text-[var(--studio-text-faint,#9ca3af)]">
+    <p className="px-1 py-6 text-center text-[11px] leading-snug text-[var(--studio-text-faint)]">
       {t('Nothing to set here for this component.')}
     </p>
-  )
-  const effectiveStyleKeys =
-    component.styles?.border != null || component.stylesMobile?.border != null
-      ? [...new Set([...(def.editableStyles || []), 'border'])]
-      : (def.editableStyles || [])
-  const styleGroupKeySet = new Set(effectiveStyleKeys)
-  const styleGroups = visibleStyleGroups(effectiveStyleKeys)
-  const designTabEmpty =
-    styleGroups.filter((g) => g.title !== LAYOUT_STYLE_GROUP).length === 0
-    && !extendedMode
-  const layoutSharedAcrossScreens = isFlow || (!!parentComponent && parentComponent.type !== 'region')
-  const mobileStylesBanner = isMobile && !isFlow && (
-    <div className="space-y-2 rounded-lg bg-[#eef2ff] px-3 py-2">
-      <p className="text-[11px] leading-snug text-[#4f46e5]">
-        {t('Style edits here apply to MOBILE only. Clear a field to fall back to the PC value.')}
-      </p>
-      {component.stylesMobile && Object.keys(component.stylesMobile).length > 0 && (
-        <button
-          type="button"
-          onClick={() => clearMobileStyles(component.id)}
-          className="rounded-lg border border-[#4f46e5] bg-white px-2 py-0.5 text-xs font-semibold text-[#4f46e5] hover:bg-[#e0e7ff]"
-        >
-          {t('Reset mobile styles')} ({Object.keys(component.stylesMobile).length})
-        </button>
-      )}
-    </div>
   )
 
   return (
@@ -1755,401 +1542,200 @@ export default function PropertiesPanel({
       <div
         role="tabpanel"
         aria-label={t(PROPERTIES_TABS.find(([id]) => id === propsTab)?.[1] || 'Content')}
-        className="flex-1 space-y-2 overflow-y-auto bg-[var(--studio-panel-muted)] p-3"
+        className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[var(--studio-panel-muted)] p-2.5"
       >
         {propsTab === 'content' && (
           <>
-        {/* Main properties FIRST — the thing you dropped the component for
-            (its image, text, links) must not hide below secondary tooling. */}
-        {component.type === 'region' && isMobile ? null : contentSection}
-        {linkSection}
-        {anchorSection}
-        {componentPresets.length > 0 && (
-          <PanelGroup id="presets" title={t('Presets')}>
-            <LabeledSelect
-              label={t('Component preset')}
-              value=""
-              onChange={(value) => value && applyComponentPreset(component.id, value)}
-              options={presetOptions(component.type).map(([value, label]) => [value, t(label)])}
-            />
-          </PanelGroup>
-        )}
+            {/* Main properties FIRST — the thing you dropped the component for
+                (its image, text, links) must not hide below secondary tooling. */}
+            {component.type === 'region' && isMobile ? null : contentSection}
+            {linkSection}
+            {anchorSection}
+            {componentPresets.length > 0 && (
+              <PanelGroup id="presets" title={t('Presets')}>
+                <LabeledSelect
+                  label={t('Component preset')}
+                  value=""
+                  onChange={(value) => value && applyComponentPreset(component.id, value)}
+                  options={presetOptions(component.type).map(([value, label]) => [value, t(label)])}
+                />
+              </PanelGroup>
+            )}
           </>
         )}
 
         {propsTab === 'design' && (
           <>
             {designTabEmpty && emptyTabHint}
-        {/* Mobile viewport = per-breakpoint styling: controls read the merged
-            view (override ?? desktop) and writes land in stylesMobile only. */}
-        {mobileStylesBanner}
-        {styleGroups
-          .filter((group) => group.title !== LAYOUT_STYLE_GROUP)
-          .map((group) => (
-          <PanelGroup
-            key={group.title}
-            id={`style-${group.title}`}
-            title={t(group.title)}
-            defaultOpen={OPEN_BY_DEFAULT.has(group.title)}
-          >
-            {group.keys.map((styleKey) => (
-              <StyleControl
-                key={styleKey}
-                styleKey={styleKey}
-                subject={component.id}
-                allowInherit={isMobile && !isFlow}
-                value={
-                  isMobile && !isFlow
-                    ? (component.stylesMobile?.[styleKey] ?? component.styles[styleKey])
-                    : component.styles[styleKey]
-                }
-                onChange={(val) => updateStyles(component.id, { [styleKey]: val })}
+            {adapter.mobileStyleScope && (
+              <MobileOverrideBanner
+                count={adapter.mobileOverrideCount}
+                onReset={adapter.onResetMobile}
               />
-              ))}
-          </PanelGroup>
-          ))}
-        {extendedMode && (
-          <PanelGroup id="advanced-css" title={t('Advanced CSS')}>
-            {ADVANCED_STYLE_KEYS.filter((styleKey) => !styleGroupKeySet.has(styleKey)).map((styleKey) => (
-              <StyleControl
-                key={styleKey}
-                styleKey={styleKey}
-                subject={component.id}
-                allowInherit={isMobile && !isFlow}
-                value={
-                  isMobile && !isFlow
-                    ? (component.stylesMobile?.[styleKey] ?? component.styles[styleKey])
-                    : component.styles[styleKey]
-                }
-                onChange={(val) => updateStyles(component.id, { [styleKey]: val })}
-              />
-            ))}
-          </PanelGroup>
-        )}
+            )}
+            <TypographyFields adapter={adapter} />
+            <ColorFields adapter={adapter} />
+            <BorderFields adapter={adapter} />
+            <EffectsFields adapter={adapter} />
+            {extendedMode && (
+              <PanelGroup id="advanced-css" title={t('Advanced CSS')}>
+                {ADVANCED_STYLE_KEYS.map((styleKey) => (
+                  <StyleControl
+                    key={styleKey}
+                    styleKey={styleKey}
+                    subject={component.id}
+                    allowInherit={adapter.mobileStyleScope}
+                    value={
+                      adapter.mobileStyleScope
+                        ? (component.stylesMobile?.[styleKey] ?? component.styles[styleKey])
+                        : component.styles[styleKey]
+                    }
+                    onChange={(val) => updateStyles(component.id, { [styleKey]: val })}
+                  />
+                ))}
+              </PanelGroup>
+            )}
           </>
         )}
 
         {propsTab === 'layout' && (
           <>
-        {isMobile && !isFlow && (
-          <button
-            type="button"
-            onClick={autoArrangeMobile}
-            className="studio-btn studio-btn-secondary w-full justify-between px-3 text-xs"
-          >
-            <span>{t('Auto-arrange mobile layout')}</span>
-            <span aria-hidden="true" className="text-[var(--studio-accent-text)]">&#10022;</span>
-          </button>
-        )}
-        <PanelGroup
-          id="size"
-          defaultOpen
-          title={
-            <>
-              {t(showPositionControls ? 'Position & Size' : 'Layout Size')}
-              <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">
-                ({t(layoutSharedAcrossScreens ? 'all screens' : isMobile ? 'mobile' : 'PC')})
-              </span>
-            </>
-          }
-        >
-          <div className="grid grid-cols-2 gap-2">
-            {showPositionControls && extendedMode && (
-              <>
-                {!viewportStretchComponent && (
-                  <LabeledNumber
-                    label="X"
-                    subject={component.id}
-                    value={layout.x}
-                    onChange={(v) => setLayout(component.id, { x: v })}
-                  />
-                )}
-                {component.type !== 'region' && (
-                  <LabeledNumber
-                    label="Y"
-                    subject={component.id}
-                    value={layout.y}
-                    onChange={(v) => setLayout(component.id, { y: v })}
-                  />
-                )}
-              </>
-            )}
-            {!viewportStretchComponent && (
-              <LabeledNumber
-                label={t(isFlow ? 'Max width' : 'Width')}
-                subject={component.id}
-                value={layout.w}
-                onChange={(v) => setLayout(component.id, { w: v })}
+            {adapter.mobileStyleScope && (
+              <MobileOverrideBanner
+                count={adapter.mobileOverrideCount}
+                onReset={adapter.onResetMobile}
               />
             )}
-            <LabeledNumber
-              label={t(isFlow ? 'Min height' : 'Height')}
-              subject={component.id}
-              value={layout.h}
-              onChange={(v) => setLayout(component.id, { h: v })}
-            />
-          </div>
-          {!viewportStretchComponent && (
-            <SizeQuickControls
-              onScale={scaleSingleSize}
-              onPreset={presetSingleSize}
-            />
-          )}
-          {/* Resizing a block turns this on (utils/boxFit.js); here it can be
-              turned off, for a block that should keep its own size. */}
-          {!isFlow && FIT_TYPES.has(component.type) && (
-            <LabeledCheckbox
-              label={t('Content fits the box')}
-              hint={component.props?.fit === 'box' ? '' : t('Resizing turns it on')}
-              checked={component.props?.fit === 'box'}
-              onChange={(on) => updateProps(component.id, { fit: on ? 'box' : 'off' })}
-            />
-          )}
-          {component.type === 'html' && viewport !== 'mobile' && (
-            <button
-              type="button"
-              onClick={() =>
-                // releaseManual: asking for the fit hands a block sized by hand
-                // back to automatic sizing, as the toolbar's button does.
-                fitHtmlEmbedLayout(component, Math.round(component.layout?.w || 360), (patch) =>
-                  fitEmbedBox(component.id, patch, { releaseManual: true }),
-                { font: canvasFontFamily(useEditorStore.getState().schema) })
-              }
-              title={t('Measure the block and snap the box to its real size')}
-              className="w-full rounded-lg border border-[var(--studio-border,#d1d5db)] px-3 py-1.5 text-xs font-semibold text-[var(--studio-text,#374151)] hover:bg-[var(--studio-control-hover,#f3f4f6)]"
+            {isMobile && !isFlow && (
+              <button
+                type="button"
+                onClick={autoArrangeMobile}
+                className="studio-btn studio-btn-secondary w-full justify-between px-3 py-1.5 text-xs"
+              >
+                <span>{t('Auto-arrange mobile layout')}</span>
+                <SparklesIcon size={14} className="text-[var(--studio-accent-text)]" />
+              </button>
+            )}
+            <AlignmentFields adapter={adapter} />
+            <SizeFields
+              adapter={adapter}
+              scopeLabel={t(layoutSharedAcrossScreens ? 'all screens' : isMobile ? 'mobile' : 'PC')}
             >
-              {t('Fit to content')}
-            </button>
-          )}
-        </PanelGroup>
-        {layoutSection}
-        {styleGroups.some((group) => group.title === LAYOUT_STYLE_GROUP) && mobileStylesBanner}
-        {styleGroups
-          .filter((group) => group.title === LAYOUT_STYLE_GROUP)
-          .map((group) => (
-          <PanelGroup
-            key={group.title}
-            id={`style-${group.title}`}
-            title={t(group.title)}
-            defaultOpen={OPEN_BY_DEFAULT.has(group.title)}
-          >
-            {group.keys.map((styleKey) => (
-              <StyleControl
-                key={styleKey}
-                styleKey={styleKey}
-                subject={component.id}
-                allowInherit={isMobile && !isFlow}
-                value={
-                  isMobile && !isFlow
-                    ? (component.stylesMobile?.[styleKey] ?? component.styles[styleKey])
-                    : component.styles[styleKey]
-                }
-                onChange={(val) => updateStyles(component.id, { [styleKey]: val })}
-              />
-              ))}
-          </PanelGroup>
-          ))}
-        {component.type === 'region' && (
-          <PanelGroup id="region-order" title={t('Section order')} defaultOpen>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={regionIndex <= 0}
-                onClick={() => moveRegion(component.id, 'up')}
-                className="rounded-lg border border-[#d1d5db] px-2 py-1.5 text-xs font-medium text-[#374151] hover:bg-[#f3f4f6] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                ↑ {t('Move section up')}
-              </button>
-              <button
-                type="button"
-                disabled={regionIndex < 0 || regionIndex >= orderedRegions.length - 1}
-                onClick={() => moveRegion(component.id, 'down')}
-                className="rounded-lg border border-[#d1d5db] px-2 py-1.5 text-xs font-medium text-[#374151] hover:bg-[#f3f4f6] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                ↓ {t('Move section down')}
-              </button>
-            </div>
-            <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
-              {t('Sections stay stacked; changing the height pushes the content below.')}
-            </p>
-          </PanelGroup>
-        )}
-        {parentComponent?.type === 'region' && !isMobile && (
-          <PanelGroup id="dock" title={t('Dock to section')} defaultOpen>
-            <LabeledSelect
-              label={t('Horizontal docking')}
-              value={component.props?.dockX || 'auto'}
-              onChange={(value) => updateProps(component.id, { dockX: value })}
-              options={[
-                ['auto', t('Auto (nearest edge)')],
-                ['left', t('Left')],
-                ['center', t('Center')],
-                ['right', t('Right')],
-                ['stretch', t('Stretch')],
-              ]}
-            />
-            <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
-              {t('Docking keeps this element attached to the chosen grid edge as the screen width changes.')}
-            </p>
-          </PanelGroup>
-        )}
-        {/* Align & Distribute. Live snap guides still help while dragging; these
-            give precise, one-click control. One selection aligns to the
-            artboard; a multi-selection (shift-click on the canvas) aligns the
-            items to each other and can distribute equal gaps. */}
-        {showPositionControls && component.type !== 'region' && (
-          <PanelGroup
-            id="align"
-            title={
-              <>
-                {t('Align & Distribute')}
-                {selectedIds.length > 1 && (
-                  <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">({t('{count} selected', { count: selectedIds.length })})</span>
-                )}
-              </>
-            }
-          >
-            {extendedMode && (
-              <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
-                {selectedIds.length > 1
-                  ? t('Aligns the selected items to each other.')
-                  : t('Aligns this item to the artboard. Shift-click on the canvas to select more.')}
-              </p>
-            )}
-            <div className="grid grid-cols-3 gap-1.5">
-              {[
-                ['left', 'Left'],
-                ['centerH', 'Center'],
-                ['right', 'Right'],
-                ['top', 'Top'],
-                ['middleV', 'Middle'],
-                ['bottom', 'Bottom'],
-              ].map(([mode, label]) => (
+              {!viewportStretchComponent && (
+                <SizeQuickControls
+                  onScale={scaleSingleSize}
+                  onPreset={presetSingleSize}
+                />
+              )}
+              {!isFlow && FIT_TYPES.has(component.type) && (
+                <LabeledCheckbox
+                  label={t('Content fits the box')}
+                  hint={component.props?.fit === 'box' ? '' : t('Resizing turns it on')}
+                  checked={component.props?.fit === 'box'}
+                  onChange={(on) => updateProps(component.id, { fit: on ? 'box' : 'off' })}
+                />
+              )}
+              {component.type === 'html' && viewport !== 'mobile' && (
                 <button
-                  key={mode}
                   type="button"
-                  onClick={() => alignSelection(mode)}
-                  className="rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] px-1.5 py-1.5 text-xs text-[#374151] hover:bg-[#e5e7eb]"
+                  onClick={() =>
+                    // releaseManual: asking for the fit hands a block sized by hand
+                    // back to automatic sizing, as the toolbar's button does.
+                    fitHtmlEmbedLayout(component, Math.round(component.layout?.w || 360), (patch) =>
+                      fitEmbedBox(component.id, patch, { releaseManual: true }),
+                    { font: canvasFontFamily(useEditorStore.getState().schema) })
+                  }
+                  title={t('Measure the block and snap the box to its real size')}
+                  className="studio-btn studio-btn-secondary w-full px-3 py-1.5 text-xs"
                 >
-                  {t(label)}
+                  {t('Fit to content')}
                 </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                disabled={selectedIds.length < 3}
-                onClick={() => distributeSelection('x')}
-                title={t(selectedIds.length < 3 ? 'Select 3+ items (shift-click) to distribute' : 'Equal horizontal gaps')}
-                className="rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] px-1.5 py-1.5 text-xs text-[#374151] hover:bg-[#e5e7eb] disabled:opacity-40"
-              >
-                ↔ {t('Distribute')}
-              </button>
-              <button
-                type="button"
-                disabled={selectedIds.length < 3}
-                onClick={() => distributeSelection('y')}
-                title={t(selectedIds.length < 3 ? 'Select 3+ items (shift-click) to distribute' : 'Equal vertical gaps')}
-                className="rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] px-1.5 py-1.5 text-xs text-[#374151] hover:bg-[#e5e7eb] disabled:opacity-40"
-              >
-                ↕ {t('Distribute')}
-              </button>
-            </div>
-          </PanelGroup>
-        )}
-        <PanelGroup id="visibility" title={t('Responsive')}>
-          <LabeledCheckbox
-            label={t('Show on PC')}
-            checked={!component.hidden}
-            onChange={(checked) => setVisibility(component.id, { hidden: !checked })}
-          />
-          <LabeledCheckbox
-            label={t('Show on Mobile')}
-            checked={!component.hiddenMobile}
-            onChange={(checked) => setVisibility(component.id, { hiddenMobile: !checked })}
-          />
-        </PanelGroup>
+              )}
+            </SizeFields>
+            <SpacingFields adapter={adapter} />
+            <PositionStackFields adapter={adapter} />
+            <FlexLayoutFields adapter={adapter} />
+            {component.type === 'region' && (
+              <PanelGroup id="region-order" title={t('Section order')} defaultOpen>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={regionIndex <= 0}
+                    onClick={() => moveRegion(component.id, 'up')}
+                    className="studio-btn studio-btn-secondary gap-1 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ArrowUpIcon size={13} />
+                    <span>{t('Move section up')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={regionIndex < 0 || regionIndex >= orderedRegions.length - 1}
+                    onClick={() => moveRegion(component.id, 'down')}
+                    className="studio-btn studio-btn-secondary gap-1 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ArrowDownIcon size={13} />
+                    <span>{t('Move section down')}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
+                  {t('Sections stay stacked; changing the height pushes the content below.')}
+                </p>
+              </PanelGroup>
+            )}
+            {parentComponent?.type === 'region' && !isMobile && (
+              <PanelGroup id="dock" title={t('Dock to section')} defaultOpen>
+                <LabeledSelect
+                  label={t('Horizontal docking')}
+                  value={component.props?.dockX || 'auto'}
+                  onChange={(value) => updateProps(component.id, { dockX: value })}
+                  options={[
+                    ['auto', t('Auto (nearest edge)')],
+                    ['left', t('Left')],
+                    ['center', t('Center')],
+                    ['right', t('Right')],
+                    ['stretch', t('Stretch')],
+                  ]}
+                />
+                <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
+                  {t('Docking keeps this element attached to the chosen grid edge as the screen width changes.')}
+                </p>
+              </PanelGroup>
+            )}
+            <PanelGroup id="visibility" title={t('Responsive')}>
+              <LabeledCheckbox
+                label={t('Show on PC')}
+                checked={!component.hidden}
+                onChange={(checked) => setVisibility(component.id, { hidden: !checked })}
+              />
+              <LabeledCheckbox
+                label={t('Show on Mobile')}
+                checked={!component.hiddenMobile}
+                onChange={(checked) => setVisibility(component.id, { hiddenMobile: !checked })}
+              />
+            </PanelGroup>
           </>
         )}
 
         {propsTab === 'motion' && (
-          <>
-        {/* Motion: an entrance the element plays when it scrolls into view, plus
-            a hover effect. Runs on the published page and in View; the edit
-            canvas stays still (switch to View to preview). Pinned bars are
-            positioned by the runtime, which would fight a motion transform, so
-            the section is hidden for them. */}
-        {scrollBehavior === 'normal' && (
-          <PanelGroup id="motion" title={t('Motion')} defaultOpen>
-            <MotionFields
-              motion={component.props}
-              onChange={(patch) => updateProps(component.id, patch)}
-            />
-          </PanelGroup>
-        )}
-        {component.type !== 'region' && (
-        <PanelGroup id="scroll" title={t('Scroll')} defaultOpen>
-          {hiddenUnderBar > 0 && (
-            <p className="rounded-lg border border-[var(--studio-warning)] bg-[var(--studio-warning-soft)] px-2.5 py-2 text-[11px] leading-snug text-[var(--studio-text)]">
-              {t('A pinned bar covers the top {pixels}px of this element when the page opens.', { pixels: Math.round(hiddenUnderBar) })}
-            </p>
-          )}
-          <LabeledSelect
-            label={t('Behavior')}
-            value={scrollBehavior}
-            onChange={setScrollBehavior}
-            options={SCROLL_BEHAVIOR_OPTIONS.map(([value, label]) => [value, t(label)])}
-          />
-          {scrollBehavior !== 'normal' && (
-            <>
-              <div className="grid grid-cols-2 gap-2">
-                <LabeledSelect
-                  label={t('Vertical edge')}
-                  value={component.props?.pinY || 'top'}
-                  onChange={(v) => updateProps(component.id, { pinY: v })}
-                  options={PIN_Y_OPTIONS.map(([value, label]) => [value, t(label)])}
-                />
-                <LabeledSelect
-                  label={t('Horizontal edge')}
-                  value={component.props?.pinX || 'left'}
-                  onChange={(v) => updateProps(component.id, { pinX: v })}
-                  options={PIN_X_OPTIONS.map(([value, label]) => [value, t(label)])}
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <LabeledNumber
-                  label={t('Y offset')}
-                  value={component.props?.pinOffsetY ?? 0}
-                  onChange={(v) => updateProps(component.id, { pinOffsetY: v })}
-                />
-                <LabeledNumber
-                  label={t('X offset')}
-                  value={component.props?.pinOffsetX ?? 0}
-                  onChange={(v) => updateProps(component.id, { pinOffsetX: v })}
-                />
-                <LabeledNumber
-                  label={t('Layer')}
-                  value={component.props?.pinZIndex ?? (scrollBehavior === 'fixed' ? 100 : 20)}
-                  onChange={(v) => updateProps(component.id, { pinZIndex: v })}
-                />
-              </div>
-              {extendedMode && (
-                <p className="text-[11px] leading-snug text-[var(--studio-text-faint)]">
-                  {t('Sticky keeps the item in the page flow until it reaches the edge. Fixed pins it to the browser viewport.')}
-                </p>
-              )}
-            </>
-          )}
-        </PanelGroup>
-        )}
-          </>
+          scrollBehavior === 'normal' ? (
+            <PanelGroup id="motion" title={t('Motion')} defaultOpen>
+              <MotionFields
+                motion={component.props}
+                onChange={(patch) => updateProps(component.id, patch)}
+              />
+            </PanelGroup>
+          ) : (
+            <div className="rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-3 text-xs leading-relaxed text-[var(--studio-text-muted)]">
+              {t('Motion is disabled while this element is pinned to the screen.')}
+            </div>
+          )
         )}
       </div>
 
       <div
         role="region"
         aria-label={t('Arrange')}
-        className="shrink-0 border-t border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 shadow-[0_-10px_28px_color-mix(in_srgb,var(--studio-shell)_72%,transparent)]"
+        className="shrink-0 border-t border-[var(--studio-border)] bg-[var(--studio-panel)] p-2.5 shadow-[0_-10px_28px_color-mix(in_srgb,var(--studio-shell)_72%,transparent)]"
       >
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.25rem] gap-2">
           <button
@@ -2264,20 +1850,25 @@ function MixedNumber({ label, value, mixed, onChange }) {
   const [draft, setDraft] = useState(null)
 
   return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-semibold text-[var(--studio-text-muted)]">{label}</span>
-      <input
-        type="number"
-        className="w-full rounded-lg border border-[#d1d5db] px-2 py-1 text-sm text-[#111827] placeholder:text-[#9ca3af] focus:border-[#4f46e5] focus:outline-none"
-        value={draft ?? displayValue}
-        placeholder={mixed ? t('Mixed') : undefined}
-        onChange={(e) => {
-          const next = e.target.value
-          setDraft(next)
-          if (next !== '') onChange(Number(next))
-        }}
-        onBlur={() => setDraft(null)}
-      />
+    <label className="block min-w-0">
+      <span className="mb-1 block text-[11px] font-medium text-[var(--studio-text-muted)]">{label}</span>
+      <div className="studio-input flex min-w-0 items-center px-0 py-0">
+        <input
+          type="number"
+          className="min-w-0 flex-1 bg-transparent px-2.5 py-1.5 text-xs text-[var(--studio-text)] placeholder:text-[var(--studio-text-faint)] focus:outline-none"
+          value={draft ?? displayValue}
+          placeholder={mixed ? t('Mixed') : undefined}
+          onChange={(e) => {
+            const next = e.target.value
+            setDraft(next)
+            if (next !== '') onChange(Number(next))
+          }}
+          onBlur={() => setDraft(null)}
+        />
+        <span aria-hidden="true" className="pointer-events-none shrink-0 select-none pr-2.5 text-[11px] font-medium text-[var(--studio-text-faint)]">
+          px
+        </span>
+      </div>
     </label>
   )
 }
@@ -2291,18 +1882,18 @@ function SizeQuickControls({ onScale, onPreset }) {
         onClick={() => onScale(0.9)}
         title={t('10% smaller')}
         aria-label={t('10% smaller')}
-        className="rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] px-1.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#e5e7eb]"
+        className="studio-btn studio-btn-secondary px-1.5 py-1.5 text-xs"
       >
-        -
+        <MinusIcon size={13} />
       </button>
       <button
         type="button"
         onClick={() => onScale(1.1)}
         title={t('10% larger')}
         aria-label={t('10% larger')}
-        className="rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] px-1.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#e5e7eb]"
+        className="studio-btn studio-btn-secondary px-1.5 py-1.5 text-xs"
       >
-        +
+        <PlusIcon size={13} />
       </button>
       {SIZE_PRESET_OPTIONS.map(([id, label, factor]) => (
         <button
@@ -2310,7 +1901,7 @@ function SizeQuickControls({ onScale, onPreset }) {
           type="button"
           onClick={() => onPreset(factor)}
           title={t('{label} size', { label: t(label) })}
-          className="rounded-lg border border-[#e5e7eb] bg-white px-1.5 py-1.5 text-xs font-semibold text-[#374151] hover:border-[#4f46e5] hover:bg-[#eef2ff] hover:text-[#4f46e5]"
+          className="studio-btn bg-[var(--studio-panel-raised)] px-1.5 py-1.5 text-xs font-semibold text-[var(--studio-text)] ring-1 ring-inset ring-[var(--studio-border)] hover:bg-[var(--studio-accent-soft)] hover:text-[var(--studio-accent-text)]"
         >
           {t(label)}
         </button>

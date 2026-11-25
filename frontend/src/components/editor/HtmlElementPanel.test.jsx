@@ -65,8 +65,10 @@ describe('HtmlElementPanel', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Layout' }))
     expect(screen.getByRole('button', { name: 'Align' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Size & spacing' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Layout (rows / flex)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Size (PC)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Spacing' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Position & stacking' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Flex layout' })).toBeInTheDocument()
   })
 
   it('shows and resets mobile-only element overrides', async () => {
@@ -89,9 +91,9 @@ describe('HtmlElementPanel', () => {
     const user = userEvent.setup()
 
     await user.click(screen.getByRole('tab', { name: 'Design' }))
-    const lineHeight = screen.getByLabelText('Line height (×)')
+    const lineHeight = screen.getByRole('spinbutton', { name: 'Line height', exact: true })
     expect(lineHeight).toHaveValue(1.2)
-    expect(screen.getByLabelText('Letter spacing (em)')).toHaveValue(0.05)
+    expect(screen.getByRole('spinbutton', { name: 'Letter spacing', exact: true })).toHaveValue(0.05)
 
     await user.clear(lineHeight)
     await user.type(lineHeight, '1.5')
@@ -131,7 +133,7 @@ describe('HtmlElementPanel', () => {
     const user = userEvent.setup()
 
     await user.click(screen.getByRole('tab', { name: 'Design' }))
-    await user.clear(screen.getByLabelText('Letter spacing (em)'))
+    await user.clear(screen.getByRole('spinbutton', { name: 'Letter spacing', exact: true }))
     expect(props.onChange).toHaveBeenLastCalledWith({ letterSpacing: '' })
   })
 
@@ -139,7 +141,7 @@ describe('HtmlElementPanel', () => {
     const props = renderPanel({ viewport: 'mobile', info: { width: 320 } })
     const user = userEvent.setup()
     await user.click(screen.getByRole('tab', { name: 'Layout' }))
-    const width = screen.getByLabelText('Width (px, 0 = auto)')
+    const width = screen.getByRole('spinbutton', { name: 'Width', exact: true })
     await user.clear(width)
     expect(props.onChange).toHaveBeenLastCalledWith({ width: '' })
     await user.type(width, '0')

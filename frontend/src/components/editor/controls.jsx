@@ -509,6 +509,7 @@ const CSS_LENGTH_RE = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|em|rem|%|vw|vh)?\s*$/i
 // is now kept and shown; a value that is not a single length (several values,
 // calc(), clamp()) is edited as text so nothing is thrown away.
 export function LabeledPx({ label, value, onChange, placeholder, subject, defaultUnit = 'px' }) {
+  const labelId = useId()
   const raw = String(value ?? '')
   const match = CSS_LENGTH_RE.exec(raw)
   const explicitUnit = match?.[2]?.toLowerCase() || ''
@@ -533,11 +534,12 @@ export function LabeledPx({ label, value, onChange, placeholder, subject, defaul
   const fine = unit === 'em' || unit === 'rem'
   return (
     <label className="block min-w-0">
-      <span className={labelCls}>{label}</span>
+      <span id={labelId} className={labelCls}>{label}</span>
       <UnitInputShell unit={unit}>
         <input
           type="number"
           step={fine ? 0.01 : 1}
+          aria-labelledby={labelId}
           className={bareNumberCls}
           value={draft ?? num}
           placeholder={placeholder}
@@ -571,6 +573,7 @@ export function LabeledNumber({
   unit,
   placeholder,
 }) {
+  const labelId = useId()
   const fractional = step < 1
   const keepDraft = fractional || allowEmpty
   // What the person is typing ("1.", "0.0") until they leave the field; the
@@ -589,11 +592,12 @@ export function LabeledNumber({
       : Math.round(value ?? 0)
   return (
     <label className="block min-w-0">
-      <span className={labelCls}>{label}</span>
+      <span id={labelId} className={labelCls}>{label}</span>
       <UnitInputShell unit={unit}>
         <input
           type="number"
           step={step}
+          aria-labelledby={labelId}
           placeholder={placeholder}
           className={unit ? bareNumberCls : inputCls}
           value={draft ?? shown}

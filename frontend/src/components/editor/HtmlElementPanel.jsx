@@ -1,24 +1,31 @@
 import { useState } from 'react'
-import {
-  LabeledCheckbox,
-  LabeledColor,
-  LabeledImage,
-  LabeledNumber as NumberControl,
-  LabeledRange,
-  LabeledSelect,
-  LabeledText,
-  LabeledTextarea,
-  LinkTargetControl,
-} from './controls.jsx'
 import PanelGroup from './PanelGroup.jsx'
 import PanelTabs from './PanelTabs.jsx'
 import PropertiesHeader from './PropertiesHeader.jsx'
+import ContentFields from './ContentFields.jsx'
+import MobileOverrideBanner from './MobileOverrideBanner.jsx'
+import TypographyFields from './TypographyFields.jsx'
+import ColorFields from './ColorFields.jsx'
+import BorderFields from './BorderFields.jsx'
+import EffectsFields from './EffectsFields.jsx'
+import AlignmentFields from './AlignmentFields.jsx'
+import SizeFields from './SizeFields.jsx'
+import SpacingFields from './SpacingFields.jsx'
+import PositionStackFields from './PositionStackFields.jsx'
+import FlexLayoutFields from './FlexLayoutFields.jsx'
 import MotionFields from './MotionFields.jsx'
+import { createHtmlInspectorAdapter } from './inspectorAdapters.js'
 import { PROPERTIES_TABS } from './propertiesTabs.js'
 import { htmlTagKindIcon } from './elementKindIcons.js'
-import { ArrowDownIcon, ArrowUpIcon, CopyIcon, MoreHorizontalIcon, TrashIcon } from '../icons.jsx'
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CopyIcon,
+  MoreHorizontalIcon,
+  PlusIcon,
+  TrashIcon,
+} from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
-import { FONT_CHOICES, isCssColor, isGradientStop } from '../../utils/htmlElementEdit.js'
 
 const TAG_LABELS = {
   h1: 'Heading 1', h2: 'Heading 2', h3: 'Heading 3', h4: 'Heading 4',
@@ -29,136 +36,11 @@ const TAG_LABELS = {
   label: 'Label', td: 'Table cell', th: 'Table header',
 }
 
-const WEIGHT_OPTIONS = [
-  ['', 'Default'],
-  ['400', 'Normal'],
-  ['500', 'Medium'],
-  ['600', 'Semibold'],
-  ['700', 'Bold'],
-  ['800', 'Extra bold'],
-]
-
-const ALIGN_OPTIONS = [
-  ['', 'Default'],
-  ['left', 'Left'],
-  ['center', 'Center'],
-  ['right', 'Right'],
-]
-
-const DISPLAY_OPTIONS = [
-  ['', 'Default'],
-  ['block', 'Block'],
-  ['inline-block', 'Inline block'],
-  ['flex', 'Flex'],
-  ['inline', 'Inline'],
-]
-
-const JUSTIFY_OPTIONS = [
-  ['', 'Default'],
-  ['flex-start', 'Start'],
-  ['center', 'Center'],
-  ['flex-end', 'End'],
-  ['space-between', 'Space between'],
-  ['space-around', 'Space around'],
-]
-
-const ALIGN_OPTIONS_FLEX = [
-  ['', 'Default'],
-  ['stretch', 'Stretch'],
-  ['flex-start', 'Start'],
-  ['center', 'Center'],
-  ['flex-end', 'End'],
-]
-
-const BORDER_STYLE_OPTIONS = [
-  ['', 'Default'],
-  ['none', 'None'],
-  ['solid', 'Solid'],
-  ['dashed', 'Dashed'],
-  ['dotted', 'Dotted'],
-]
-
-const SHADOW_OPTIONS = [
-  ['none', 'None'],
-  ['0 1px 3px rgba(0,0,0,0.15)', 'Small'],
-  ['0 4px 12px rgba(0,0,0,0.15)', 'Medium'],
-  ['0 10px 25px rgba(0,0,0,0.2)', 'Large'],
-]
-
-const OVERFLOW_OPTIONS = [
-  ['', 'Default'],
-  ['visible', 'Visible'],
-  ['hidden', 'Hidden'],
-  ['auto', 'Auto'],
-  ['scroll', 'Scroll'],
-]
-
-const TEXT_TRANSFORM_OPTIONS = [
-  ['', 'Default'],
-  ['none', 'As typed'],
-  ['uppercase', 'UPPERCASE'],
-  ['lowercase', 'lowercase'],
-  ['capitalize', 'Capitalize'],
-]
-
-const FLEX_DIRECTION_OPTIONS = [
-  ['', 'Default'],
-  ['row', 'Row'],
-  ['column', 'Column'],
-  ['row-reverse', 'Row reversed'],
-  ['column-reverse', 'Column reversed'],
-]
-
-const FLEX_WRAP_OPTIONS = [
-  ['', 'Default'],
-  ['nowrap', 'One line'],
-  ['wrap', 'Wrap onto more lines'],
-]
-
-const POSITION_OPTIONS = [
-  ['', 'Default'],
-  ['relative', 'Relative'],
-  ['sticky', 'Sticky (follows the scroll)'],
-  ['absolute', 'Absolute'],
-  ['fixed', 'Fixed to the screen'],
-]
-
-const BACKGROUND_SIZE_OPTIONS = [
-  ['', 'Default'],
-  ['cover', 'Fill the box'],
-  ['contain', 'Fit inside'],
-  ['auto', 'Original size'],
-]
-
-// Empty restores the template (or PC value on a phone), while entering 0 is
-// a separate design choice such as no padding or automatic width.
-function LabeledNumber(props) {
-  return <NumberControl {...props} allowEmpty />
-}
-
-function TextAlignGlyph({ side }) {
-  const x = side === 'center' ? [2, 4, 3] : side === 'right' ? [2, 6, 4] : [2, 2, 2]
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path d={`M${x[0]} 4h${14 - x[0]}M${x[1]} 8h${14 - 2 * (x[1] - 2)}M${x[2]} 12h${12 - x[2]}`} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function BoxAlignGlyph({ side }) {
-  const bx = side === 'center' ? 5.5 : side === 'right' ? 9 : 2
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path d="M1 2v12M15 2v12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity="0.55" />
-      <rect x={bx} y="5" width="5" height="6" rx="1.2" fill="currentColor" />
-    </svg>
-  )
-}
-
 // The navigation editor: the whole menu at once, rather than clicking each
 // item in turn. A new row is cloned from the last link in the markup, so it
 // arrives with the template's own classes and looks like it belongs.
-function LinkListEditor({ links, onChange, t }) {
+function LinkListEditor({ links, onChange }) {
+  const { t } = useLanguage()
   const update = (index, patch) => {
     onChange(links.map((link, i) => (i === index ? { ...link, ...patch } : link)))
   }
@@ -227,39 +109,9 @@ function LinkListEditor({ links, onChange, t }) {
         title={links.length ? undefined : t('This menu has no link to copy the style from yet.')}
         className="studio-btn studio-btn-secondary w-full px-2 py-1.5 text-xs disabled:opacity-40"
       >
-        + {t('Add link')}
+        <PlusIcon size={13} />
+        <span>{t('Add link')}</span>
       </button>
-    </div>
-  )
-}
-
-function AlignButtons({ label, value, onPick, kind, t }) {
-  const Glyph = kind === 'text' ? TextAlignGlyph : BoxAlignGlyph
-  const titles = kind === 'text'
-    ? { left: t('Align text left'), center: t('Align text center'), right: t('Align text right') }
-    : { left: t('Place at the left'), center: t('Place in the center'), right: t('Place at the right') }
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-xs font-medium text-[var(--studio-text-muted)]">{label}</span>
-      <div className="flex items-center rounded-lg border border-[var(--studio-border)] bg-[var(--studio-control)] p-0.5">
-        {['left', 'center', 'right'].map((side) => (
-          <button
-            key={side}
-            type="button"
-            title={titles[side]}
-            aria-label={titles[side]}
-            aria-pressed={value === side}
-            onClick={() => onPick(value === side ? '' : side)}
-            className={
-              value === side
-                ? 'rounded-md bg-[var(--studio-accent)] px-2.5 py-1 text-white shadow-sm'
-                : 'rounded-md px-2.5 py-1 text-[var(--studio-text-muted)] hover:bg-[var(--studio-control-hover)] hover:text-[var(--studio-text)]'
-            }
-          >
-            <Glyph side={side} />
-          </button>
-        ))}
-      </div>
     </div>
   )
 }
@@ -283,10 +135,16 @@ export default function HtmlElementPanel({
   const [actionsOpen, setActionsOpen] = useState(false)
   if (!info) return null
 
-  const translatedOptions = (options) => options.map(([value, label]) => [value, t(label)])
+  const adapter = createHtmlInspectorAdapter({
+    info,
+    viewport,
+    pages,
+    onChange,
+    onResetMobile,
+  })
   const label = t(TAG_LABELS[info.tag] || `<${info.tag}>`)
   const isMobile = viewport === 'mobile'
-  const hasContent = info.canEditText || info.href !== null || info.src !== null
+  const hasContent = adapter.hasAny(['text', 'href', 'src', 'alt'])
   const panelLabel = t(PROPERTIES_TABS.find(([id]) => id === tab)?.[1] || 'Content')
 
   return (
@@ -313,55 +171,22 @@ export default function HtmlElementPanel({
       <div
         role="tabpanel"
         aria-label={panelLabel}
-        className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[var(--studio-panel-muted)] p-3"
+        className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[var(--studio-panel-muted)] p-2.5"
       >
         {tab === 'content' && (
           <>
-            {hasContent ? (
-              <PanelGroup id="html-content" title={t('Content')} defaultOpen>
-                {info.canEditText && (
-                  <LabeledTextarea
-                    label={t('Text')}
-                    value={info.text}
-                    onChange={(value) => onChange({ text: value })}
-                    rows={4}
-                  />
-                )}
-                {info.href !== null && (
-                  <LinkTargetControl
-                    label={t('Link (href)')}
-                    value={info.href}
-                    onChange={(value) => onChange({ href: value })}
-                    pages={pages}
-                    sections={info.sections}
-                  />
-                )}
-                {/* The canvas image control: upload, your library, presets or
-                    an address. It used to be an address box only here. */}
-                {info.src !== null && (
-                  <LabeledImage
-                    label={t('Image')}
-                    value={info.src}
-                    onChange={(value) => onChange({ src: value })}
-                  />
-                )}
-                {info.alt !== null && (
-                  <LabeledText
-                    label={t('Alt text')}
-                    value={info.alt}
-                    onChange={(value) => onChange({ alt: value })}
-                    placeholder={t('Describe the image')}
-                  />
-                )}
+            {hasContent && (
+              <PanelGroup id="content" title={t('Content')} defaultOpen>
+                <ContentFields adapter={adapter} />
               </PanelGroup>
-            ) : null}
+            )}
             {info.links && (
-              <PanelGroup id="html-links" title={t('Menu links')} defaultOpen>
-                <LinkListEditor links={info.links} onChange={(links) => onChange({ links })} t={t} />
+              <PanelGroup id="menu-links" title={t('Menu links')} defaultOpen>
+                <LinkListEditor links={info.links} onChange={(links) => onChange({ links })} />
               </PanelGroup>
             )}
             {!hasContent && !info.links && (
-              <div className="rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-4 text-xs leading-relaxed text-[var(--studio-text-muted)]">
+              <div className="rounded-xl border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] p-3 text-xs leading-relaxed text-[var(--studio-text-muted)]">
                 {t('This element has no editable text, link or image content.')}
               </div>
             )}
@@ -374,131 +199,36 @@ export default function HtmlElementPanel({
         {tab === 'design' && (
           <>
             {isMobile && (
-              <div className="rounded-xl border border-[color-mix(in_srgb,var(--studio-accent)_22%,var(--studio-border))] bg-[var(--studio-accent-soft)] px-3 py-2.5">
-                <p className="text-[11px] leading-relaxed text-[var(--studio-accent-text)]">
-                  {t('Style edits here apply to MOBILE only. Clear a field to fall back to the PC value.')}
-                </p>
-                {info.mobileOverrideCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={onResetMobile}
-                    className="studio-btn studio-btn-secondary mt-2 px-2 py-1 text-[11px]"
-                  >
-                    {t('Reset mobile styles')} ({info.mobileOverrideCount})
-                  </button>
-                )}
-              </div>
-            )}
-            <PanelGroup id="html-typography" title={t('Typography')} defaultOpen>
-              <LabeledSelect
-                label={t('Font')}
-                value={(isMobile ? info.mobileFontFamily : '') || info.fontFamily}
-                onChange={(value) => onChange({ fontFamily: value })}
-                options={translatedOptions(FONT_CHOICES)}
+              <MobileOverrideBanner
+                count={adapter.mobileOverrideCount}
+                onReset={onResetMobile}
               />
-              <LabeledNumber label={t('Font size (px)')} value={info.fontSize} onChange={(value) => onChange({ fontSize: value })} />
-              <LabeledSelect label={t('Font weight')} value={info.fontWeight} onChange={(value) => onChange({ fontWeight: value })} options={translatedOptions(WEIGHT_OPTIONS)} />
-              <LabeledNumber label={t('Line height (×)')} step={0.05} value={info.lineHeight} onChange={(value) => onChange({ lineHeight: value })} />
-              <LabeledNumber label={t('Letter spacing (em)')} step={0.01} value={info.letterSpacing} onChange={(value) => onChange({ letterSpacing: value })} />
-              <LabeledSelect label={t('Capitalisation')} value={info.textTransform} onChange={(value) => onChange({ textTransform: value })} options={translatedOptions(TEXT_TRANSFORM_OPTIONS)} />
-              <LabeledSelect label={t('Text align')} value={info.textAlign} onChange={(value) => onChange({ textAlign: value })} options={translatedOptions(ALIGN_OPTIONS)} />
-              <div className="flex gap-2">
-                <LabeledCheckbox label={t('Italic')} checked={info.italic} onChange={(value) => onChange({ italic: value })} />
-                <LabeledCheckbox label={t('Underline')} checked={info.underline} onChange={(value) => onChange({ underline: value })} />
-              </div>
-            </PanelGroup>
-            <PanelGroup id="html-colors" title={t('Colors')} defaultOpen>
-              <LabeledColor label={t('Text color')} value={info.color || '#000000'} accepts={isCssColor} subject={info.elementKey} onChange={(value) => onChange({ color: value })} />
-              <LabeledColor label={t('Background')} value={info.background || '#ffffff'} accepts={isCssColor} subject={info.elementKey} onChange={(value) => onChange({ background: value })} />
-            </PanelGroup>
-            <PanelGroup id="html-background" title={t('Background image & gradient')}>
-              <LabeledColor label={t('Gradient from')} value={info.gradientFrom || '#ffffff'} accepts={isGradientStop} subject={info.elementKey} onChange={(value) => onChange({ gradientFrom: value })} />
-              <LabeledColor label={t('Gradient to')} value={info.gradientTo || '#000000'} accepts={isGradientStop} subject={info.elementKey} onChange={(value) => onChange({ gradientTo: value })} />
-              <LabeledNumber label={t('Gradient angle (deg)')} value={info.gradientAngle} onChange={(value) => onChange({ gradientAngle: value })} />
-              <LabeledImage label={t('Background image')} value={info.backgroundImage} onChange={(value) => onChange({ backgroundImage: value })} />
-              <LabeledSelect label={t('Image fit')} value={info.backgroundSize} onChange={(value) => onChange({ backgroundSize: value })} options={translatedOptions(BACKGROUND_SIZE_OPTIONS)} />
-              <p className="text-[11px] leading-relaxed text-[var(--studio-text-faint)]">
-                {t('A gradient and an image share the same slot — setting one replaces the other. Clear both to fall back to the plain colour.')}
-              </p>
-            </PanelGroup>
-            <PanelGroup id="html-box" title={t('Box')}>
-              <LabeledNumber label={t('Padding (px)')} value={info.padding} onChange={(value) => onChange({ padding: value })} />
-              <LabeledNumber label={t('Corner radius (px)')} value={info.radius} onChange={(value) => onChange({ radius: value })} />
-            </PanelGroup>
-            <PanelGroup id="html-padding-sides" title={t('Padding per side')}>
-              <div className="grid grid-cols-2 gap-2">
-                <LabeledNumber label={t('Top')} value={info.paddingTop} onChange={(value) => onChange({ paddingTop: value })} />
-                <LabeledNumber label={t('Right')} value={info.paddingRight} onChange={(value) => onChange({ paddingRight: value })} />
-                <LabeledNumber label={t('Bottom')} value={info.paddingBottom} onChange={(value) => onChange({ paddingBottom: value })} />
-                <LabeledNumber label={t('Left')} value={info.paddingLeft} onChange={(value) => onChange({ paddingLeft: value })} />
-              </div>
-            </PanelGroup>
-            <PanelGroup id="html-border" title={t('Border')}>
-              <LabeledNumber label={t('Border width (px)')} value={info.borderWidth} onChange={(value) => onChange({ borderWidth: value })} />
-              <LabeledColor label={t('Border color')} value={info.borderColor || '#000000'} accepts={isCssColor} subject={info.elementKey} onChange={(value) => onChange({ borderColor: value })} />
-              <LabeledSelect label={t('Border style')} value={info.borderStyle} onChange={(value) => onChange({ borderStyle: value })} options={translatedOptions(BORDER_STYLE_OPTIONS)} />
-            </PanelGroup>
-            <PanelGroup id="html-effects" title={t('Effects')}>
-              <LabeledSelect label={t('Shadow')} value={info.boxShadow} onChange={(value) => onChange({ boxShadow: value })} options={translatedOptions(SHADOW_OPTIONS)} />
-              <LabeledRange label={t('Opacity')} value={info.opacity} onChange={(value) => onChange({ opacity: value })} />
-              <LabeledSelect label={t('Overflow')} value={info.overflow} onChange={(value) => onChange({ overflow: value })} options={translatedOptions(OVERFLOW_OPTIONS)} />
-            </PanelGroup>
+            )}
+            <TypographyFields adapter={adapter} />
+            <ColorFields adapter={adapter} />
+            <BorderFields adapter={adapter} />
+            <EffectsFields adapter={adapter} />
           </>
         )}
 
         {tab === 'layout' && (
           <>
             {isMobile && (
-              <div className="rounded-xl border border-[color-mix(in_srgb,var(--studio-accent)_22%,var(--studio-border))] bg-[var(--studio-accent-soft)] px-3 py-2 text-[11px] leading-relaxed text-[var(--studio-accent-text)]">
-                {t('Layout edits here apply to MOBILE only. Desktop values stay unchanged.')}
-              </div>
+              <MobileOverrideBanner
+                count={adapter.mobileOverrideCount}
+                onReset={onResetMobile}
+              />
             )}
-            <PanelGroup id="html-align" title={t('Align')} defaultOpen>
-              <AlignButtons
-                label={t('Text')}
-                kind="text"
-                value={info.textAlign === 'start' ? 'left' : info.textAlign === 'end' ? 'right' : info.textAlign}
-                onPick={(value) => onChange({ textAlign: value })}
-                t={t}
-              />
-              <AlignButtons
-                label={t('Element')}
-                kind="box"
-                value={(isMobile ? info.mobileAlignBlock : '') || info.alignBlock}
-                onPick={(value) => onChange({ alignBlock: value })}
-                t={t}
-              />
-              <p className="text-[11px] leading-relaxed text-[var(--studio-text-faint)]">
-                {t('Element slides the whole box inside its row — e.g. push the navbar links to the left or center.')}
-              </p>
-            </PanelGroup>
-            <PanelGroup id="html-size-spacing" title={t('Size & spacing')} defaultOpen>
-              <LabeledNumber label={t('Width (px, 0 = auto)')} value={info.width} onChange={(value) => onChange({ width: value })} />
-              <LabeledNumber label={t('Height (px, 0 = auto)')} value={info.height} onChange={(value) => onChange({ height: value })} />
-              <LabeledNumber label={t('Margin top (px)')} value={info.marginTop} onChange={(value) => onChange({ marginTop: value })} />
-              <LabeledNumber label={t('Margin bottom (px)')} value={info.marginBottom} onChange={(value) => onChange({ marginBottom: value })} />
-              <LabeledNumber label={t('Max width (px, 0 = none)')} value={info.maxWidth} onChange={(value) => onChange({ maxWidth: value })} />
-              <LabeledSelect label={t('Display')} value={info.display} onChange={(value) => onChange({ display: value })} options={translatedOptions(DISPLAY_OPTIONS)} />
-            </PanelGroup>
-            <PanelGroup id="html-position" title={t('Position & stacking')}>
-              <LabeledSelect label={t('Position')} value={info.position} onChange={(value) => onChange({ position: value })} options={translatedOptions(POSITION_OPTIONS)} />
-              <LabeledNumber label={t('Stack order (z-index)')} value={info.zIndex} onChange={(value) => onChange({ zIndex: value })} />
-            </PanelGroup>
-            <PanelGroup id="html-flex-layout" title={t('Layout (rows / flex)')}>
-              <LabeledSelect label={t('Direction')} value={info.flexDirection} onChange={(value) => onChange({ flexDirection: value })} options={translatedOptions(FLEX_DIRECTION_OPTIONS)} />
-              <LabeledSelect label={t('Justify (horizontal)')} value={info.justifyContent} onChange={(value) => onChange({ justifyContent: value })} options={translatedOptions(JUSTIFY_OPTIONS)} />
-              <LabeledSelect label={t('Align (vertical)')} value={info.alignItems} onChange={(value) => onChange({ alignItems: value })} options={translatedOptions(ALIGN_OPTIONS_FLEX)} />
-              <LabeledSelect label={t('Wrapping')} value={info.flexWrap} onChange={(value) => onChange({ flexWrap: value })} options={translatedOptions(FLEX_WRAP_OPTIONS)} />
-              <LabeledNumber label={t('Gap between items (px)')} value={info.gap} onChange={(value) => onChange({ gap: value })} />
-              <p className="text-[11px] leading-relaxed text-[var(--studio-text-faint)]">
-                {t('Tip: set Display to “Flex” first if these do not take effect — they arrange the element direct children (e.g. a navbar links).')}
-              </p>
-            </PanelGroup>
+            <AlignmentFields adapter={adapter} />
+            <SizeFields adapter={adapter} scopeLabel={t(isMobile ? 'mobile' : 'PC')} />
+            <SpacingFields adapter={adapter} />
+            <PositionStackFields adapter={adapter} />
+            <FlexLayoutFields adapter={adapter} />
           </>
         )}
 
         {tab === 'motion' && (
-          <PanelGroup id="html-motion" title={t('Motion')} defaultOpen>
+          <PanelGroup id="motion" title={t('Motion')} defaultOpen>
             <MotionFields motion={info.motion} onChange={(patch) => onMotionChange?.(patch)} />
           </PanelGroup>
         )}
@@ -507,7 +237,7 @@ export default function HtmlElementPanel({
       <div
         role="region"
         aria-label={t('Arrange')}
-        className="shrink-0 border-t border-[var(--studio-border)] bg-[var(--studio-panel)] p-3 shadow-[0_-10px_28px_color-mix(in_srgb,var(--studio-shell)_72%,transparent)]"
+        className="shrink-0 border-t border-[var(--studio-border)] bg-[var(--studio-panel)] p-2.5 shadow-[0_-10px_28px_color-mix(in_srgb,var(--studio-shell)_72%,transparent)]"
       >
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.25rem] gap-2">
           <button type="button" onClick={onDuplicate} className="studio-btn studio-btn-secondary min-w-0 px-2 text-xs">

@@ -46,7 +46,7 @@ describe('connected HTML gradient controls', () => {
     await user.click(from)
     await user.keyboard('{Control>}a{/Control}')
     await user.paste('#e11d48')
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Gradient angle (deg)' }), { target: { value: '45' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Gradient angle', exact: true }), { target: { value: '45' } })
 
     expect(screen.getByLabelText('Pick a colour: Gradient to')).toHaveValue('#2563eb')
     expect(element.style.getPropertyPriority('background-image')).toBe('important')
@@ -63,6 +63,6 @@ describe('connected HTML gradient controls', () => {
 
     expect(element.style.backgroundImage).toBe('linear-gradient(35deg, rgb(225, 29, 72), rgb(37, 99, 235))')
     expect(screen.getByRole('textbox', { name: 'Gradient from', exact: true })).toHaveValue('#e11d48')
-    expect(screen.getByRole('spinbutton', { name: 'Gradient angle (deg)' })).toHaveValue(35)
+    expect(screen.getByRole('spinbutton', { name: 'Gradient angle', exact: true })).toHaveValue(35)
   })
 })

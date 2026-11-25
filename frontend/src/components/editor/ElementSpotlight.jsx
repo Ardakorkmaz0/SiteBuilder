@@ -26,6 +26,7 @@ export default function ElementSpotlight({
   onMoveDown,
   onSelectParent,
   onResetMobile,
+  onMotionChange,
 }) {
   const { t } = useLanguage()
   const storeViewport = useEditorStore((state) => state.viewport)
@@ -73,6 +74,10 @@ export default function ElementSpotlight({
             onMoveDown={onMoveDown}
             onDelete={() => { onDelete?.(); onClose?.() }}
             onResetMobile={onResetMobile}
+            onMotionChange={(patch) => {
+              onMotionChange?.(patch)
+              setRevision((value) => value + 1)
+            }}
             onClose={onClose}
           />
         )

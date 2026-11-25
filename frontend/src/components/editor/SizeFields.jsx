@@ -22,7 +22,7 @@ export default function SizeFields({ adapter, scopeLabel, children }) {
       defaultOpen
       aside={
         scopeLabel ? (
-          <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">
+          <span className="ml-0.5 font-normal normal-case text-[var(--studio-text-faint)]">
             ({scopeLabel})
           </span>
         ) : null

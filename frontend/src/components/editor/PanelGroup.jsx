@@ -51,7 +51,7 @@ export default function PanelGroup({ id, title, defaultOpen = false, aside = nul
       >
         <span className="flex-1 text-xs font-semibold text-[var(--studio-text)]">
           {title}
-          {aside}
+          {aside ? <> {aside}</> : null}
         </span>
         <ChevronDownIcon
           size={14}

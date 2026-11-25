@@ -1210,6 +1210,7 @@ const BASE_TURKISH_TRANSLATIONS = {
   'A gradient and an image share the same slot — setting one replaces the other. Clear both to fall back to the plain colour.': 'Degrade ve görsel aynı yuvayı paylaşır; birini ayarlamak diğerinin yerine geçer. İkisini de temizlerseniz düz renge dönülür.',
   'Background image & gradient': 'Arka plan görseli ve degrade',
   'Bottom': 'Alt',
+  'Middle': 'Orta',
   'Capitalisation': 'Büyük/küçük harf',
   'Direction': 'Yön',
   'Gradient angle (deg)': 'Degrade açısı (derece)',

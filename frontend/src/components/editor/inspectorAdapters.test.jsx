@@ -73,7 +73,7 @@ describe('shared inspector adapters and field groups', () => {
     const { adapter, updateStyles } = makeCanvasAdapter('card', {
       component: { styles: { padding: '24px' } },
     })
-    wrap(<SpacingFields adapter={adapter} />)
+    const pcView = wrap(<SpacingFields adapter={adapter} />)
 
     expect(screen.getByRole('spinbutton', { name: 'Padding', exact: true })).toHaveValue(24)
     const top = screen.getByRole('spinbutton', { name: 'Top', exact: true })
@@ -81,6 +81,7 @@ describe('shared inspector adapters and field groups', () => {
 
     fireEvent.change(top, { target: { value: '40' } })
     expect(updateStyles).toHaveBeenLastCalledWith('comp_1', { padding: '40px 24px 24px 24px' })
+    pcView.unmount()
 
     // Mobile override: 0 writes '0px', while clearing sends '' so stylesMobile drops the key.
     const mobile = makeCanvasAdapter('card', {
@@ -96,6 +97,25 @@ describe('shared inspector adapters and field groups', () => {
     fireEvent.change(mobilePad, { target: { value: '' } })
     expect(mobile.updateStyles).toHaveBeenLastCalledWith('comp_1', { padding: '' })
     expect(mobile.component.stylesMobile).toBeUndefined()
+    view.unmount()
+
+    // Per-side mobile override clear restores the PC side and drops stylesMobile.padding when all sides match PC.
+    const mobileSide = makeCanvasAdapter('card', {
+      viewport: 'mobile',
+      component: { styles: { padding: '24px' }, stylesMobile: { padding: '8px 24px 24px 24px' } },
+    })
+    const sideView = wrap(<SpacingFields adapter={mobileSide.adapter} />)
+    const mobileTop = sideView.getByRole('spinbutton', { name: 'Top', exact: true })
+    expect(mobileTop).toHaveValue(8)
+    fireEvent.change(mobileTop, { target: { value: '' } })
+    expect(mobileSide.updateStyles).toHaveBeenLastCalledWith('comp_1', { padding: '' })
+    expect(mobileSide.component.stylesMobile).toBeUndefined()
+
+    // Margin top / Margin bottom work identically on canvas via styles.margin shorthand.
+    const marginTop = sideView.getByRole('spinbutton', { name: 'Margin top', exact: true })
+    fireEvent.change(marginTop, { target: { value: '16' } })
+    expect(mobileSide.updateStyles).toHaveBeenLastCalledWith('comp_1', { margin: '16px 0px 0px 0px' })
+    sideView.unmount()
   })
 
   it('edits two-stop linear gradients on canvas and hides URL background images unsupported by canvas styles', () => {

@@ -42,14 +42,14 @@ describe('ElementSpotlight', () => {
     await userEvent.setup().click(screen.getByRole('tab', { name: 'Design' }))
     expect(screen.getByText(/Style edits here apply to MOBILE only/i)).toBeInTheDocument()
 
-    const sizeInput = screen.getByLabelText('Font size (px)')
+    const sizeInput = screen.getByRole('spinbutton', { name: 'Font size', exact: true })
     fireEvent.change(sizeInput, { target: { value: '19' } })
     expect(onChange).toHaveBeenLastCalledWith({ fontSize: 19 }, { viewport: 'mobile' })
 
     await userEvent.setup().click(screen.getByRole('button', { name: /Desktop/ }))
     expect(screen.queryByText(/Style edits here apply to MOBILE only/i)).toBeNull()
 
-    fireEvent.change(screen.getByLabelText('Font size (px)'), { target: { value: '36' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Font size', exact: true }), { target: { value: '36' } })
     expect(onChange).toHaveBeenLastCalledWith({ fontSize: 36 }, { viewport: 'pc' })
   })
 })

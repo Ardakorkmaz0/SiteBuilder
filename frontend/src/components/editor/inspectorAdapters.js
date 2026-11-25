@@ -187,8 +187,9 @@ export function parseBoxSides(shorthand) {
   return { top: norm[0], right: norm[1], bottom: norm[2], left: norm[3] }
 }
 
-export function patchBoxSide(currentShorthand, side, nextValue) {
+export function patchBoxSide(currentShorthand, side, nextValue, fallbackShorthand = '') {
   const current = parseBoxSides(currentShorthand)
+  const fallback = parseBoxSides(fallbackShorthand)
   const next = {
     top: current.top || '0px',
     right: current.right || '0px',
@@ -196,11 +197,29 @@ export function patchBoxSide(currentShorthand, side, nextValue) {
     left: current.left || '0px',
   }
   if (nextValue === '' || nextValue === null || nextValue === undefined) {
-    const othersEmptyOrZero = ['top', 'right', 'bottom', 'left']
-      .filter((k) => k !== side)
-      .every((k) => !current[k] || Number.parseFloat(current[k]) === 0)
-    if (othersEmptyOrZero) return ''
-    next[side] = '0px'
+    if (String(fallbackShorthand || '').trim()) {
+      const fbNorm = {
+        top: fallback.top || '0px',
+        right: fallback.right || '0px',
+        bottom: fallback.bottom || '0px',
+        left: fallback.left || '0px',
+      }
+      next[side] = fbNorm[side]
+      if (
+        next.top === fbNorm.top &&
+        next.right === fbNorm.right &&
+        next.bottom === fbNorm.bottom &&
+        next.left === fbNorm.left
+      ) {
+        return ''
+      }
+    } else {
+      const othersEmptyOrZero = ['top', 'right', 'bottom', 'left']
+        .filter((k) => k !== side)
+        .every((k) => !current[k] || Number.parseFloat(current[k]) === 0)
+      if (othersEmptyOrZero) return ''
+      next[side] = '0px'
+    }
   } else {
     next[side] = nextValue
   }
@@ -530,7 +549,8 @@ export function createCanvasInspectorAdapter({
       case 'margin':
         return styleSet.has('margin')
       case 'marginVertical':
-        return false
+        return (styleSet.has('padding') || styleSet.has('margin') || component.type === 'divider')
+          && component.type !== 'spacer'
       case 'position':
         return component.type !== 'region'
       case 'zIndex':
@@ -661,6 +681,8 @@ export function createCanvasInspectorAdapter({
         case 'paddingBottom': return parseBoxSides(readStyle('padding')).bottom
         case 'paddingLeft': return parseBoxSides(readStyle('padding')).left
         case 'margin': return readStyle('margin') ?? ''
+        case 'marginTop': return parseBoxSides(readStyle('margin')).top
+        case 'marginBottom': return parseBoxSides(readStyle('margin')).bottom
         case 'position': return scrollBehavior || 'normal'
         case 'zIndex': return component.props?.pinZIndex ?? (scrollBehavior === 'fixed' ? 100 : 20)
         case 'pinY': return component.props?.pinY || 'top'
@@ -679,6 +701,8 @@ export function createCanvasInspectorAdapter({
     },
 
     set(key, value) {
+      const pcPadding = mobileStyleScope ? component.styles?.padding : ''
+      const pcMargin = mobileStyleScope ? component.styles?.margin : ''
       switch (key) {
         case 'fontFamily':
         case 'fontSize':
@@ -725,16 +749,22 @@ export function createCanvasInspectorAdapter({
           return
         }
         case 'paddingTop':
-          writeStyle({ padding: patchBoxSide(readStyle('padding'), 'top', value) })
+          writeStyle({ padding: patchBoxSide(readStyle('padding'), 'top', value, pcPadding) })
           return
         case 'paddingRight':
-          writeStyle({ padding: patchBoxSide(readStyle('padding'), 'right', value) })
+          writeStyle({ padding: patchBoxSide(readStyle('padding'), 'right', value, pcPadding) })
           return
         case 'paddingBottom':
-          writeStyle({ padding: patchBoxSide(readStyle('padding'), 'bottom', value) })
+          writeStyle({ padding: patchBoxSide(readStyle('padding'), 'bottom', value, pcPadding) })
           return
         case 'paddingLeft':
-          writeStyle({ padding: patchBoxSide(readStyle('padding'), 'left', value) })
+          writeStyle({ padding: patchBoxSide(readStyle('padding'), 'left', value, pcPadding) })
+          return
+        case 'marginTop':
+          writeStyle({ margin: patchBoxSide(readStyle('margin'), 'top', value, pcMargin) })
+          return
+        case 'marginBottom':
+          writeStyle({ margin: patchBoxSide(readStyle('margin'), 'bottom', value, pcMargin) })
           return
         case 'alignHorizontal':
           if (value === 'left') alignSelection?.('left')

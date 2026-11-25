@@ -79,7 +79,21 @@ describe('Properties panel tabs', () => {
     }
     unmount()
 
-    for (const group of ['Content', 'Presets', 'Typography', 'Colors', 'Position & Size', 'Responsive', 'Motion', 'Scroll']) {
+    for (const group of [
+      'Content',
+      'Presets',
+      'Typography',
+      'Colors',
+      'Background image & gradient',
+      'Border',
+      'Effects',
+      'Align',
+      'Size',
+      'Spacing',
+      'Position & stacking',
+      'Responsive',
+      'Motion',
+    ]) {
       expect(seen, `"${group}" is not reachable from any tab`).toContain(group)
     }
   })

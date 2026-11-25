@@ -18,7 +18,7 @@ export default function AlignmentFields({ adapter }) {
       defaultOpen
       aside={
         multiCount > 1 ? (
-          <span className="ml-1 font-normal normal-case text-[var(--studio-text-faint)]">
+          <span className="ml-0.5 font-normal normal-case text-[var(--studio-text-faint)]">
             ({t('{count} selected', { count: multiCount })})
           </span>
         ) : null
