@@ -376,7 +376,7 @@ export function backgroundImageUrl(value) {
 // hand-written that does not match stays untouched and simply is not shown.
 export function gradientParts(value) {
   const m = String(value || '').match(
-    /^linear-gradient\(\s*(-?[\d.]+)deg\s*,\s*(#[0-9a-f]{3,8}|rgba?\([^)]+\))\s*,\s*(#[0-9a-f]{3,8}|rgba?\([^)]+\))\s*\)$/i,
+    /^linear-gradient\(\s*(-?[\d.]+)deg\s*,\s*(#[0-9a-f]{3,8}|rgba?\([^)]+\)|[a-z]+)(?:\s+0%)?\s*,\s*(#[0-9a-f]{3,8}|rgba?\([^)]+\)|[a-z]+)(?:\s+100%)?\s*\)$/i,
   )
   if (!m) return { gradientFrom: '', gradientTo: '', gradientAngle: 160 }
   return {
@@ -402,7 +402,7 @@ export function gradientParts(value) {
 // same menu as a desktop, so these keys always write to the element itself
 // rather than into the mobile override layer.
 // The first of several candidate values that is one of our own gradients.
-function gradientPartsOf(...values) {
+export function gradientPartsOf(...values) {
   for (const value of values) {
     const parts = gradientParts(value)
     if (parts.gradientFrom) return parts
@@ -418,7 +418,7 @@ function computedBackgroundImage(el) {
   }
 }
 
-function patchedGradient(current, patch) {
+export function patchedGradient(current, patch) {
   // A missing stop uses the same initial colour shown by the panel. An
   // explicitly emptied stop still clears the gradient.
   const from = patch.gradientFrom !== undefined ? patch.gradientFrom : current.gradientFrom || '#ffffff'

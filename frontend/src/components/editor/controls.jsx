@@ -514,13 +514,18 @@ export function LabeledPx({ label, value, onChange, placeholder, subject, defaul
   const explicitUnit = match?.[2]?.toLowerCase() || ''
   const [lastSubject, setLastSubject] = useState(subject)
   const [lastUnit, setLastUnit] = useState(explicitUnit || defaultUnit)
+  const [draft, setDraft] = useState(null)
+  const [lastSent, setLastSent] = useState(null)
   if (subject !== lastSubject) {
     setLastSubject(subject)
     setLastUnit(explicitUnit || defaultUnit)
-  } else if (explicitUnit && explicitUnit !== lastUnit) {
-    setLastUnit(explicitUnit)
+    setDraft(null)
+    setLastSent(null)
+  } else {
+    if (explicitUnit && explicitUnit !== lastUnit) setLastUnit(explicitUnit)
+    if (draft !== null && draft !== '' && raw !== lastSent) setDraft(null)
   }
-  if (raw.trim() && !match) {
+  if (draft === null && raw.trim() && !match) {
     return <LabeledText label={label} value={raw} onChange={onChange} />
   }
   const num = match ? match[1] : ''
@@ -534,11 +539,19 @@ export function LabeledPx({ label, value, onChange, placeholder, subject, defaul
           type="number"
           step={fine ? 0.01 : 1}
           className={bareNumberCls}
-          value={num}
+          value={draft ?? num}
           placeholder={placeholder}
-          onChange={(e) =>
-            onChange(e.target.value === '' ? '' : `${e.target.value}${unit}`)
-          }
+          onChange={(e) => {
+            const nextRaw = e.target.value
+            const sent = nextRaw === '' ? '' : `${nextRaw}${unit}`
+            setDraft(nextRaw)
+            setLastSent(sent)
+            onChange(sent)
+          }}
+          onBlur={() => {
+            setDraft(null)
+            setLastSent(null)
+          }}
         />
       </UnitInputShell>
     </label>

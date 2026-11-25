@@ -3417,6 +3417,14 @@ const BASE_TURKISH_TRANSLATIONS = {
   'The published site is too large (max 250 MB).': 'Yayınlanan site çok büyük (en fazla 250 MB).',
   'Upload too large. A file may be at most 100 MB.': 'Yükleme çok büyük. Bir dosya en fazla 100 MB olabilir.',
   'Same as PC': 'Bilgisayarla aynı',
+  '0 sets auto size (or no max width); clear to inherit.': '0 otomatik boyutu (veya sınırsız genişliği) seçer; devralmak için boş bırakın.',
+  'Flex layout': 'Esnek dizilim',
+  'Gradient angle': 'Degrade açısı',
+  'Gradient preset': 'Hazır renk geçişi',
+  'Margin top': 'Üst dış boşluk',
+  'Margin bottom': 'Alt dış boşluk',
+  'Stack order': 'Katman sırası',
+  'Motion is disabled while this element is pinned to the screen.': 'Bu öğe ekrana sabitliyken hareket devre dışıdır.',
 }
 
 registerBaseTranslations(BASE_TURKISH_TRANSLATIONS)
