@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import LanguageProvider from '../../i18n/LanguageProvider.jsx'
 import { describeElement } from '../../utils/htmlElementEdit.js'
 import { registry } from '../registry.jsx'
@@ -79,7 +79,7 @@ describe('shared inspector adapters and field groups', () => {
     const pcView = wrap(<SpacingFields adapter={adapter} />)
 
     expect(screen.getByRole('spinbutton', { name: 'Padding', exact: true })).toHaveValue(24)
-    const top = screen.getByRole('spinbutton', { name: 'Top', exact: true })
+    const top = screen.getByRole('spinbutton', { name: 'Padding top', exact: true })
     expect(top).toHaveValue(24)
 
     fireEvent.change(top, { target: { value: '40' } })
@@ -108,7 +108,7 @@ describe('shared inspector adapters and field groups', () => {
       component: { styles: { padding: '24px' }, stylesMobile: { padding: '8px 24px 24px 24px' } },
     })
     const sideView = wrap(<SpacingFields adapter={mobileSide.adapter} />)
-    const mobileTop = sideView.getByRole('spinbutton', { name: 'Top', exact: true })
+    const mobileTop = sideView.getByRole('spinbutton', { name: 'Padding top', exact: true })
     expect(mobileTop).toHaveValue(8)
     fireEvent.change(mobileTop, { target: { value: '' } })
     expect(mobileSide.updateStyles).toHaveBeenLastCalledWith('comp_1', { padding: '' })
@@ -119,6 +119,61 @@ describe('shared inspector adapters and field groups', () => {
     fireEvent.change(marginTop, { target: { value: '16' } })
     expect(mobileSide.updateStyles).toHaveBeenLastCalledWith('comp_1', { margin: '16px 0px 0px 0px' })
     sideView.unmount()
+  })
+
+  // Padding and margin as the box they make (ChatGPT's design, 2026-11-26):
+  // the margin outside, the padding inside it, each number at its side.
+  const boxFields = () => within(screen.getByRole('group', { name: 'Box model' }))
+    .getAllByRole('spinbutton')
+    .map((field) => [field.getAttribute('aria-label'), field.value])
+
+  it('draws padding and margin as a box with each number at its side, on a canvas page and an HTML page', () => {
+    const canvas = makeCanvasAdapter('card', {
+      component: { styles: { padding: '24px 16px', margin: '12px 0px 8px 0px' } },
+    })
+    const canvasView = wrap(<SpacingFields adapter={canvas.adapter} />)
+    expect(boxFields()).toEqual([
+      ['Margin top', '12'], ['Padding top', '24'], ['Padding left', '16'],
+      ['Padding right', '16'], ['Padding bottom', '24'], ['Margin bottom', '8'],
+    ])
+    // The sides differ: the all-sides field says so instead of a shorthand.
+    const all = screen.getByRole('spinbutton', { name: 'Padding', exact: true })
+    expect(all).toHaveValue(null)
+    expect(all).toHaveAttribute('placeholder', 'Sides differ')
+    expect(all).toHaveAccessibleDescription('All sides')
+    expect(screen.getByText('Values in pixels.')).toBeInTheDocument()
+    fireEvent.change(all, { target: { value: '20' } })
+    expect(canvas.updateStyles).toHaveBeenLastCalledWith('comp_1', { padding: '20px' })
+    canvasView.unmount()
+
+    document.body.innerHTML = '<div id="box" style="padding: 24px 16px; margin: 12px 0 8px">Box</div>'
+    const onHtmlChange = vi.fn()
+    wrap(<SpacingFields adapter={createHtmlInspectorAdapter({ info: describeElement(document.getElementById('box')), onChange: onHtmlChange })} />)
+    expect(boxFields()).toEqual([
+      ['Margin top', '12'], ['Padding top', '24'], ['Padding left', '16'],
+      ['Padding right', '16'], ['Padding bottom', '24'], ['Margin bottom', '8'],
+    ])
+    // An HTML element reports its top padding as its padding: still "differ".
+    expect(screen.getByRole('spinbutton', { name: 'Padding', exact: true })).toHaveAttribute('placeholder', 'Sides differ')
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Padding right', exact: true }), { target: { value: '30' } })
+    expect(onHtmlChange).toHaveBeenLastCalledWith({ paddingRight: 30 })
+  })
+
+  it('shows a side in its own unit, and stops saying the values are pixels', () => {
+    const { adapter, updateStyles } = makeCanvasAdapter('card', { component: { styles: { padding: '1em 24px' } } })
+    wrap(<SpacingFields adapter={adapter} />)
+    const top = screen.getByRole('spinbutton', { name: 'Padding top', exact: true })
+    expect(top).toHaveValue(1)
+    expect(top.parentElement).toHaveTextContent('em')
+    expect(screen.queryByText('Values in pixels.')).toBeNull()
+    fireEvent.change(top, { target: { value: '2' } })
+    expect(updateStyles).toHaveBeenLastCalledWith('comp_1', { padding: '2em 24px 1em 24px' })
+    // Sides that agree show their value in the all-sides field.
+    const even = makeCanvasAdapter('card', { component: { styles: { padding: '18px' } } })
+    wrap(<SpacingFields adapter={even.adapter} />)
+    const allFields = screen.getAllByRole('spinbutton', { name: 'Padding', exact: true })
+    expect(allFields[allFields.length - 1]).toHaveValue(18)
+    expect(allFields[allFields.length - 1]).not.toHaveAttribute('placeholder')
   })
 
   // A block centred with `margin: 0 auto` lost its centring when one side was

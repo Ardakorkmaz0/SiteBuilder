@@ -178,7 +178,7 @@ describe('the properties panel on an HTML page and on a canvas page', () => {
       'Position & stacking',
       'Flex layout',
     ])
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Top', exact: true }), { target: { value: '32' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Padding top', exact: true }), { target: { value: '32' } })
     expect(html.props.onChange).toHaveBeenLastCalledWith({ paddingTop: 32 })
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Margin top', exact: true }), { target: { value: '18' } })
     expect(html.props.onChange).toHaveBeenLastCalledWith({ marginTop: 18 })
@@ -194,7 +194,7 @@ describe('the properties panel on an HTML page and on a canvas page', () => {
     const canvasLayoutGroups = groupTitles(document.body)
     expect(canvasLayoutGroups.slice(0, 5)).toEqual(htmlLayoutGroups)
 
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Top', exact: true }), { target: { value: '32' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Padding top', exact: true }), { target: { value: '32' } })
     expect(useEditorStore.getState().schema.pages[0].components[0].styles.padding).toBe('32px 20px 20px 20px')
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Margin top', exact: true }), { target: { value: '18' } })
     expect(useEditorStore.getState().schema.pages[0].components[0].styles.margin).toBe('18px 0px 0px 0px')

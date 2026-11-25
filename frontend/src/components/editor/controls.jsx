@@ -496,6 +496,9 @@ function UnitInputShell({ unit, children }) {
 }
 
 const bareNumberCls = 'min-w-0 flex-1 bg-transparent px-2.5 py-1.5 text-xs text-[var(--studio-text)] placeholder:text-[var(--studio-text-faint)] focus:outline-none'
+// A side of the box model (SpacingFields): a small centred number, no arrows.
+const boxFieldCls = 'studio-input inline-flex h-7 w-12 min-w-0 items-center justify-center px-1 py-0'
+const boxNumberCls = 'w-full min-w-0 bg-transparent text-center text-xs tabular-nums text-[var(--studio-text)] placeholder:text-[var(--studio-text-faint)] focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
 
 // One number with an optional unit, e.g. "16px", "-0.02em", "1.5rem", "50%".
 const CSS_LENGTH_RE = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|em|rem|%|vw|vh)?\s*$/i
@@ -508,8 +511,13 @@ const CSS_LENGTH_RE = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|em|rem|%|vw|vh)?\s*$/i
 // 2.5px, 50% became 51px, and "10px 24px" lost its horizontal padding. The unit
 // is now kept and shown; a value that is not a single length (several values,
 // calc(), clamp()) is edited as text so nothing is thrown away.
-export function LabeledPx({ label, value, onChange, placeholder, subject, defaultUnit = 'px' }) {
+//
+// `hint` sits at the right of the label and describes the field ("All sides").
+// `bare` draws it as one side of the box model: no label on screen (the label
+// is its accessible name), and the unit only where it is not px.
+export function LabeledPx({ label, value, onChange, placeholder, subject, defaultUnit = 'px', hint = '', bare = false }) {
   const labelId = useId()
+  const hintId = useId()
   const raw = String(value ?? '')
   const match = CSS_LENGTH_RE.exec(raw)
   const explicitUnit = match?.[2]?.toLowerCase() || ''
@@ -527,35 +535,63 @@ export function LabeledPx({ label, value, onChange, placeholder, subject, defaul
     if (draft !== null && draft !== '' && raw !== lastSent) setDraft(null)
   }
   if (draft === null && raw.trim() && !match) {
+    if (bare) {
+      return (
+        <span className={boxFieldCls}>
+          <input type="text" aria-label={label} title={label} className={boxNumberCls} value={raw} onChange={(e) => onChange(e.target.value)} />
+        </span>
+      )
+    }
     return <LabeledText label={label} value={raw} onChange={onChange} />
   }
   const num = match ? match[1] : ''
   const unit = explicitUnit || (raw.trim() ? defaultUnit : lastUnit)
   const fine = unit === 'em' || unit === 'rem'
+  const input = (
+    <input
+      type="number"
+      step={fine ? 0.01 : 1}
+      aria-labelledby={bare ? undefined : labelId}
+      aria-label={bare ? label : undefined}
+      aria-describedby={hint && !bare ? hintId : undefined}
+      title={bare ? label : undefined}
+      className={bare ? boxNumberCls : bareNumberCls}
+      value={draft ?? num}
+      placeholder={placeholder}
+      onChange={(e) => {
+        const nextRaw = e.target.value
+        const sent = nextRaw === '' ? '' : `${nextRaw}${unit}`
+        setDraft(nextRaw)
+        setLastSent(sent)
+        onChange(sent)
+      }}
+      onBlur={() => {
+        setDraft(null)
+        setLastSent(null)
+      }}
+    />
+  )
+  if (bare) {
+    return (
+      <span className={boxFieldCls}>
+        {input}
+        {unit !== 'px' && (
+          <span aria-hidden="true" className="shrink-0 select-none text-[9px] font-medium text-[var(--studio-text-faint)]">{unit}</span>
+        )}
+      </span>
+    )
+  }
   return (
     <label className="block min-w-0">
-      <span id={labelId} className={labelCls}>{label}</span>
-      <UnitInputShell unit={unit}>
-        <input
-          type="number"
-          step={fine ? 0.01 : 1}
-          aria-labelledby={labelId}
-          className={bareNumberCls}
-          value={draft ?? num}
-          placeholder={placeholder}
-          onChange={(e) => {
-            const nextRaw = e.target.value
-            const sent = nextRaw === '' ? '' : `${nextRaw}${unit}`
-            setDraft(nextRaw)
-            setLastSent(sent)
-            onChange(sent)
-          }}
-          onBlur={() => {
-            setDraft(null)
-            setLastSent(null)
-          }}
-        />
-      </UnitInputShell>
+      {hint ? (
+        <span className="mb-1 flex items-baseline justify-between gap-2">
+          <span id={labelId} className="text-[11px] font-medium text-[var(--studio-text-muted)]">{label}</span>
+          <span id={hintId} className="text-[10px] text-[var(--studio-text-faint)]">{hint}</span>
+        </span>
+      ) : (
+        <span id={labelId} className={labelCls}>{label}</span>
+      )}
+      <UnitInputShell unit={unit}>{input}</UnitInputShell>
     </label>
   )
 }
