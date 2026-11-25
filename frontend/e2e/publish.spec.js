@@ -16,7 +16,7 @@ test('a size set for phones only is served to phones only', async ({ page, reque
   await clickInFrame(page, '#hero')
   await properties(page).getByRole('tab', { name: 'Design' }).click()
   await expect(properties(page)).toContainText('MOBILE only')
-  await field(page, 'Font size (px)').fill('22')
+  await properties(page).getByRole('spinbutton', { name: 'Font size', exact: true }).fill('22')
   const slug = await publish(page, request, siteId)
 
   for (const [width, size] of [[375, '22px'], [1280, '40px']]) {

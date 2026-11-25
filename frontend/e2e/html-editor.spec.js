@@ -43,10 +43,10 @@ test.describe('editing an HTML page', () => {
   test('line height and letter spacing take fractions', async ({ page }) => {
     await clickInFrame(page, '#hero')
     await properties(page).getByRole('tab', { name: 'Design' }).click()
-    const lineHeight = field(page, 'Line height (×)')
+    const lineHeight = properties(page).getByRole('spinbutton', { name: 'Line height', exact: true })
     await expect(lineHeight).toHaveValue('1.2')
     await lineHeight.fill('1.5')
-    await field(page, 'Letter spacing (em)').fill('0.05')
+    await properties(page).getByRole('spinbutton', { name: 'Letter spacing', exact: true }).fill('0.05')
     const style = await inFrame(page, (doc) => {
       const cs = getComputedStyle(doc.querySelector('#hero'))
       return [cs.lineHeight, cs.letterSpacing]

@@ -38,8 +38,8 @@ async function select(page, selector, position) {
   await expect.poll(() => inFrame(page, (doc, s) => doc.querySelector(s)?.hasAttribute('data-pwb-selected'), selector)).toBe(true)
 }
 
-async function designGroup(page, name) {
-  await panel(page).getByRole('tab', { name: 'Design', exact: true }).click()
+async function openGroup(page, tabName, name) {
+  await panel(page).getByRole('tab', { name: tabName, exact: true }).click()
   const group = panel(page).getByRole('button', { name, exact: true })
   if (await group.getAttribute('aria-expanded') !== 'true') await group.click()
 }
@@ -56,24 +56,22 @@ test.describe('deep HTML editing regressions', () => {
 
   test('zero spacing and border choices override imported CSS, while empty restores the template', async ({ page }) => {
     await select(page, '#card-a', { x: 12, y: 12 })
-    await designGroup(page, 'Box')
-    await field(page, 'Padding (px)').fill('0')
-    await field(page, 'Corner radius (px)').fill('0')
-    await designGroup(page, 'Border')
-    await field(page, 'Border width (px)').fill('0')
-    await panel(page).getByRole('tab', { name: 'Layout', exact: true }).click()
-    const flex = panel(page).getByRole('button', { name: 'Layout (rows / flex)', exact: true })
-    if (await flex.getAttribute('aria-expanded') !== 'true') await flex.click()
-    await field(page, 'Gap between items (px)').fill('0')
+    await openGroup(page, 'Design', 'Border')
+    await panel(page).getByRole('spinbutton', { name: 'Corner radius', exact: true }).fill('0')
+    await panel(page).getByRole('spinbutton', { name: 'Border width', exact: true }).fill('0')
+    await openGroup(page, 'Layout', 'Spacing')
+    await panel(page).getByRole('spinbutton', { name: 'Padding', exact: true }).fill('0')
+    await openGroup(page, 'Layout', 'Flex layout')
+    await panel(page).getByRole('spinbutton', { name: 'Gap', exact: true }).fill('0')
     expect(await inFrame(page, (doc) => {
       const cs = getComputedStyle(doc.querySelector('#card-a'))
       return [cs.paddingTop, cs.borderTopWidth, cs.borderTopLeftRadius, cs.gap]
     })).toEqual(['0px', '0px', '0px', '0px'])
-    await field(page, 'Gap between items (px)').fill('')
-    await designGroup(page, 'Box')
-    await field(page, 'Padding (px)').fill('')
-    await designGroup(page, 'Border')
-    await field(page, 'Border width (px)').fill('')
+    await panel(page).getByRole('spinbutton', { name: 'Gap', exact: true }).fill('')
+    await openGroup(page, 'Layout', 'Spacing')
+    await panel(page).getByRole('spinbutton', { name: 'Padding', exact: true }).fill('')
+    await openGroup(page, 'Design', 'Border')
+    await panel(page).getByRole('spinbutton', { name: 'Border width', exact: true }).fill('')
     expect(await inFrame(page, (doc) => {
       const cs = getComputedStyle(doc.querySelector('#card-a'))
       return [cs.paddingTop, cs.borderTopWidth, cs.gap]
@@ -83,11 +81,11 @@ test.describe('deep HTML editing regressions', () => {
   test('zero auto sizing, no maximum and stack order survive save and restore independently', async ({ page, request }) => {
     await select(page, '#card-a', { x: 12, y: 12 })
     await panel(page).getByRole('tab', { name: 'Layout', exact: true }).click()
-    await field(page, 'Width (px, 0 = auto)').fill('0')
-    await field(page, 'Height (px, 0 = auto)').fill('0')
-    await field(page, 'Max width (px, 0 = none)').fill('0')
-    await panel(page).getByRole('button', { name: 'Position & stacking', exact: true }).click()
-    await field(page, 'Stack order (z-index)').fill('0')
+    await panel(page).getByRole('spinbutton', { name: 'Width', exact: true }).fill('0')
+    await panel(page).getByRole('spinbutton', { name: 'Height', exact: true }).fill('0')
+    await panel(page).getByRole('spinbutton', { name: 'Max width', exact: true }).fill('0')
+    await openGroup(page, 'Layout', 'Position & stacking')
+    await panel(page).getByRole('spinbutton', { name: 'Stack order', exact: true }).fill('0')
     expect(await inFrame(page, (doc) => {
       const style = doc.querySelector('#card-a').style
       return [style.width, style.height, style.maxWidth, style.zIndex]
@@ -95,8 +93,8 @@ test.describe('deep HTML editing regressions', () => {
     await save(page)
     const stored = await savedHtml(request, siteId)
     expect(stored).toContain('max-width: none !important')
-    await field(page, 'Width (px, 0 = auto)').fill('')
-    await field(page, 'Max width (px, 0 = none)').fill('')
+    await panel(page).getByRole('spinbutton', { name: 'Width', exact: true }).fill('')
+    await panel(page).getByRole('spinbutton', { name: 'Max width', exact: true }).fill('')
     expect(await inFrame(page, (doc) => {
       const cs = getComputedStyle(doc.querySelector('#card-a'))
       return [cs.width, cs.maxWidth]
@@ -105,16 +103,17 @@ test.describe('deep HTML editing regressions', () => {
 
   test('mobile zero is different from clearing an override and never changes the desktop padding', async ({ page, request }) => {
     await select(page, '#card-a', { x: 12, y: 12 })
-    await designGroup(page, 'Box')
-    await field(page, 'Padding (px)').fill('48')
+    await openGroup(page, 'Layout', 'Spacing')
+    await panel(page).getByRole('spinbutton', { name: 'Padding', exact: true }).fill('48')
     await page.getByRole('button', { name: 'Mobile', exact: true }).click()
     await select(page, '#card-a', { x: 12, y: 12 })
-    await designGroup(page, 'Box')
-    await field(page, 'Padding (px)').fill('0')
+    await openGroup(page, 'Layout', 'Spacing')
+    const padding = panel(page).getByRole('spinbutton', { name: 'Padding', exact: true })
+    await padding.fill('0')
     expect(await inFrame(page, (doc) => getComputedStyle(doc.querySelector('#card-a')).paddingTop)).toBe('0px')
-    await field(page, 'Padding (px)').fill('')
+    await padding.fill('')
     expect(await inFrame(page, (doc) => getComputedStyle(doc.querySelector('#card-a')).paddingTop)).toBe('48px')
-    await field(page, 'Padding (px)').fill('0')
+    await padding.fill('0')
     await page.getByRole('button', { name: 'PC', exact: true }).click()
     await expect.poll(() => inFrame(page, (doc) => doc.querySelector('#card-a') && getComputedStyle(doc.querySelector('#card-a')).paddingTop)).toBe('48px')
     await save(page)

@@ -34,13 +34,13 @@ for (const layered of [false, true]) {
     try {
       await openEditor(page, siteId, { edit: true })
       await chooseHeading(page)
-      await properties(page).getByRole('spinbutton', { name: 'Font size (px)', exact: true }).fill('52')
+      await properties(page).getByRole('spinbutton', { name: 'Font size', exact: true }).fill('52')
       await expect.poll(() => renderedStyle(page)).toEqual({ fontSize: '52px', backgroundImage: ORIGINAL_GRADIENT })
 
       await page.getByRole('button', { name: 'Mobile', exact: true }).click()
       await expect.poll(() => inFrame(page, (doc) => doc.defaultView.innerWidth)).toBeLessThan(768)
       await chooseHeading(page)
-      await properties(page).getByRole('spinbutton', { name: 'Font size (px)', exact: true }).fill('28')
+      await properties(page).getByRole('spinbutton', { name: 'Font size', exact: true }).fill('28')
       await properties(page).getByRole('button', { name: 'Background image & gradient', exact: true }).click()
       await properties(page).getByRole('textbox', { name: 'Gradient to', exact: true }).fill('#2563eb')
       // These assertions read the actual media-query cascade, not the saved

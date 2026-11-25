@@ -80,9 +80,9 @@ test.describe('HTML editor user-path sweep', () => {
   test('typography and layout choices override imported important CSS', async ({ page, request }) => {
     await clickInFrame(page, '#heading')
     await properties(page).getByRole('tab', { name: 'Design', exact: true }).click()
-    await field(properties(page), 'Font size (px)').fill('56')
-    await field(properties(page), 'Font weight').selectOption('700')
-    await field(properties(page), 'Text align').selectOption('center')
+    await properties(page).getByRole('spinbutton', { name: 'Font size', exact: true }).fill('56')
+    await properties(page).getByRole('combobox', { name: 'Font weight', exact: true }).selectOption('700')
+    await properties(page).getByRole('button', { name: 'Align text center', exact: true }).click()
     expect(await inFrame(page, (doc) => {
       const cs = getComputedStyle(doc.querySelector('#heading'))
       return [cs.fontSize, cs.fontWeight, cs.textAlign]
@@ -90,9 +90,9 @@ test.describe('HTML editor user-path sweep', () => {
     await clickInFrame(page, '#nav-home')
     await properties(page).getByRole('button', { name: /Select parent/ }).click()
     await properties(page).getByRole('tab', { name: 'Layout', exact: true }).click()
-    await properties(page).getByRole('button', { name: 'Layout (rows / flex)', exact: true }).click()
-    await field(properties(page), 'Justify (horizontal)').selectOption('space-between')
-    await field(properties(page), 'Align (vertical)').selectOption('center')
+    await properties(page).getByRole('button', { name: 'Flex layout', exact: true }).click()
+    await properties(page).getByRole('combobox', { name: 'Justify', exact: true }).selectOption('space-between')
+    await properties(page).getByRole('combobox', { name: 'Align', exact: true }).selectOption('center')
     expect(await inFrame(page, (doc) => {
       const cs = getComputedStyle(doc.querySelector('#menu'))
       return [cs.justifyContent, cs.alignItems]
@@ -140,13 +140,13 @@ test.describe('HTML editor user-path sweep', () => {
   test('mobile overrides leave desktop values intact and can be reset', async ({ page, request }) => {
     await clickInFrame(page, '#heading')
     await properties(page).getByRole('tab', { name: 'Design', exact: true }).click()
-    await field(properties(page), 'Font size (px)').fill('52')
+    await properties(page).getByRole('spinbutton', { name: 'Font size', exact: true }).fill('52')
     await page.getByRole('button', { name: 'Mobile', exact: true }).click()
     await expect.poll(() => inFrame(page, (doc) => doc.defaultView.innerWidth)).toBeLessThan(768)
     await clickInFrame(page, '#heading')
     await properties(page).getByRole('tab', { name: 'Design', exact: true }).click()
-    await field(properties(page), 'Font size (px)').fill('28')
-    await field(properties(page), 'Line height (×)').fill('1.6')
+    await properties(page).getByRole('spinbutton', { name: 'Font size', exact: true }).fill('28')
+    await properties(page).getByRole('spinbutton', { name: 'Line height', exact: true }).fill('1.6')
     expect(await inFrame(page, (doc) => getComputedStyle(doc.querySelector('#heading')).fontSize)).toBe('28px')
     await properties(page).getByRole('button', { name: 'Effects', exact: true }).click()
     await field(properties(page), 'Shadow').selectOption('0 4px 12px rgba(0,0,0,0.15)')
@@ -307,7 +307,7 @@ test.describe('HTML editor user-path sweep', () => {
   test('selection handles resize with a real pointer drag and the result is saved and undoable', async ({ page, request }) => {
     await clickInFrame(page, '#paragraph')
     await properties(page).getByRole('tab', { name: 'Layout', exact: true }).click()
-    await field(properties(page), 'Width (px, 0 = auto)').fill('300')
+    await properties(page).getByRole('spinbutton', { name: 'Width', exact: true }).fill('300')
     // Real pointer events, in screen coordinates: a locator drag inside the
     // zoomed preview would miss the handle by the iframe's CSS zoom factor.
     const point = await page.evaluate(() => {
