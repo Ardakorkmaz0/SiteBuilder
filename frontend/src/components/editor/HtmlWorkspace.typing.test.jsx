@@ -127,6 +127,31 @@ describe('typing becomes an undo step before the next action', () => {
   })
 })
 
+// Once the Move tool has been used, focus is in the page, and the palette's
+// letters typed there never reached the palette in the editor.
+describe('a palette letter pressed in the page', () => {
+  const press = (doc, key) => {
+    const seen = vi.fn()
+    window.addEventListener('keydown', seen)
+    act(() => { doc.body.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })) })
+    window.removeEventListener('keydown', seen)
+    return seen.mock.calls.map(([event]) => event.key)
+  }
+
+  it('goes to the editor when the page is not being typed into', () => {
+    const doc = mountEditing({ onCommit: vi.fn() }).contentDocument
+    doc.designMode = 'off'
+    expect(press(doc, 'i')).toEqual(['i'])
+    expect(press(doc, 'b')).toEqual([])
+  })
+
+  it('stays in the text while the caret is in it', () => {
+    const doc = mountEditing({ onCommit: vi.fn() }).contentDocument
+    doc.designMode = 'on'
+    expect(press(doc, 'i')).toEqual([])
+  })
+})
+
 // The × sits in the page, so focus is there after a delete: Ctrl+Z has to be
 // the editor's then, and the text's own only while there is typing to undo.
 describe('Ctrl+Z pressed in the page', () => {

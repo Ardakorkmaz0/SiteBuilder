@@ -168,4 +168,29 @@ describe('the tool palette on an HTML page', () => {
     expect(tool('Select (V)')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByText('Click in the page to place the', { exact: false })).toBeNull()
   }, 30000)
+
+  // Source has no palette. A letter pressed there (on the Source button, say)
+  // still armed a tool behind it, which was waiting on the way back to Edit.
+  it('takes its letters only while it is on screen, so Source arms no tool', async () => {
+    localStorage.setItem('pwb_htmlmode_1', 'edit')
+    site.schema.pages[0] = { id: 'home', name: 'Home', mode: 'html', html: '<!DOCTYPE html><html><body><h1>Garden</h1></body></html>', components: [] }
+    render(<UiThemeProvider><LanguageProvider><MemoryRouter initialEntries={['/editor/1']}>
+      <Routes><Route path="/editor/:id" element={<EditorPage />} /></Routes>
+    </MemoryRouter></LanguageProvider></UiThemeProvider>)
+    await screen.findByTitle('site', {}, { timeout: 15000 })
+
+    const source = screen.getByRole('button', { name: 'Source', exact: true })
+    await act(async () => { fireEvent.click(source) })
+    expect(screen.queryByRole('toolbar', { name: 'Tools' })).toBeNull()
+    source.focus()
+    fireEvent.keyDown(source, { key: 'i' })
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Edit', exact: true })) })
+    expect(tool('Select (V)')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('Click in the page to place the', { exact: false })).toBeNull()
+
+    // On screen again, the letters work.
+    fireEvent.keyDown(document.body, { key: 'i' })
+    expect(tool('Image (I)')).toHaveAttribute('aria-pressed', 'true')
+  }, 30000)
 })

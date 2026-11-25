@@ -76,6 +76,17 @@ export function shouldForwardIframeShortcut(event = {}, { designMode = 'off', ty
   return !typing && (key === 'z' || key === 'y')
 }
 
+// The tool palette's letters (`toolKeys`: V, T, R, I) pressed while the page
+// has focus, as it does once the Move tool has been used in it. The palette is
+// in the editor, so the page hands them over, as above, unless the person is
+// typing into the page: with the text tool the caret is in it (designMode on),
+// and a form field in the page is a field.
+export function shouldForwardIframeToolKey(event = {}, { designMode = 'off', toolKeys = [] } = {}) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return false
+  if (!toolKeys.includes(String(event.key || '').toLowerCase())) return false
+  return designMode !== 'on' && !isTypingTarget(event.target)
+}
+
 // Whether the canvas arrange keys (select all, copy, cut, paste, duplicate,
 // Delete, Esc and the arrow nudges) are live. They change the selected block,
 // so they act only while the user can see it: on the Edit canvas, with no

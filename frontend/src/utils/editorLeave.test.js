@@ -5,6 +5,7 @@ import {
   canvasClipboardOwnsShortcut,
   hasDocumentTextSelection,
   shouldForwardIframeShortcut,
+  shouldForwardIframeToolKey,
   editorShortcutScope,
   hasUnsavedEditorChanges,
   isTypingTarget,
@@ -143,6 +144,24 @@ describe('shouldForwardIframeShortcut — keys typed inside the HTML edit iframe
   it('ignores plain keys and unrelated shortcuts', () => {
     expect(shouldForwardIframeShortcut({ key: 's', target: { tagName: 'DIV' } })).toBe(false)
     expect(shouldForwardIframeShortcut(inPage('b'), { designMode: 'on' })).toBe(false)
+  })
+})
+
+describe('shouldForwardIframeToolKey — the palette letters pressed inside the HTML edit iframe', () => {
+  const toolKeys = ['v', 't', 'r', 'i']
+  const inPage = (key, extra = {}) => ({ key, target: { tagName: 'DIV' }, ...extra })
+
+  it('hands a palette letter to the editor when the page is not being typed into', () => {
+    expect(shouldForwardIframeToolKey(inPage('i'), { designMode: 'off', toolKeys })).toBe(true)
+    expect(shouldForwardIframeToolKey(inPage('V'), { designMode: 'off', toolKeys })).toBe(true)
+  })
+
+  it('leaves the letter to the text, a field in the page, and other shortcuts', () => {
+    expect(shouldForwardIframeToolKey(inPage('i'), { designMode: 'on', toolKeys })).toBe(false)
+    expect(shouldForwardIframeToolKey(inPage('i', { target: { tagName: 'INPUT' } }), { designMode: 'off', toolKeys })).toBe(false)
+    expect(shouldForwardIframeToolKey(inPage('i', { ctrlKey: true }), { designMode: 'off', toolKeys })).toBe(false)
+    expect(shouldForwardIframeToolKey(inPage('i', { altKey: true }), { designMode: 'off', toolKeys })).toBe(false)
+    expect(shouldForwardIframeToolKey(inPage('b'), { designMode: 'off', toolKeys })).toBe(false)
   })
 })
 

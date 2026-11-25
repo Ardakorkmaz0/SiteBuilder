@@ -1186,8 +1186,11 @@ function SiteEditor() {
       // it must not move the selected block as well.
       if (e.defaultPrevented) return
 
-      // The tool palette's letters, on both kinds of page (toolPalette.js).
-      if (!mod && !e.altKey && !htmlHistoryRef.current.modalOpen && !escapeLayerOpen() && paletteRef.current?.live) {
+      // The tool palette's letters, on both kinds of page (toolPalette.js),
+      // while the palette is on screen: an HTML page shows it in Edit only,
+      // and a letter pressed in Source armed a tool behind the source.
+      const paletteOnScreen = paletteRef.current?.live && !!document.querySelector('[data-tool-palette]')
+      if (!mod && !e.altKey && !htmlHistoryRef.current.modalOpen && !escapeLayerOpen() && paletteOnScreen) {
         const tool = paletteToolForKey(e.key)
         if (tool) {
           e.preventDefault()

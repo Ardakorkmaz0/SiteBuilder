@@ -89,7 +89,8 @@ import BrushControls from './BrushControls.jsx'
 import { ChevronDownIcon, EditIcon, ExternalLinkIcon, FileCodeIcon, LightbulbIcon, LinkIcon, MonitorIcon, MoreHorizontalIcon, MoveIcon, PaletteIcon, PinIcon, WarningIcon } from '../icons.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { useEscapeToClose } from '../../ui/useEscapeToClose.js'
-import { shouldForwardIframeShortcut } from '../../utils/editorLeave.js'
+import { shouldForwardIframeShortcut, shouldForwardIframeToolKey } from '../../utils/editorLeave.js'
+import { PALETTE_TOOLS } from './toolPalette.js'
 import { revealLine } from '../../utils/revealCodeLine.js'
 import CodeLineGlow from './CodeLineGlow.jsx'
 import { CodeColorsToggle, CodeField } from './CodeField.jsx'
@@ -109,6 +110,9 @@ import { CodeColorsToggle, CodeField } from './CodeField.jsx'
 //   automatically when the document lacks one, so every page previews the
 //   way a real phone renders it. The device selector itself lives in the
 //   editor HEADER (shared chrome) — this component receives it as props.
+
+// The palette's letters, handed to the editor when pressed in the page.
+const PALETTE_TOOL_KEYS = PALETTE_TOOLS.map((tool) => tool.key)
 
 function setDocumentDesignMode(doc, value) {
   try {
@@ -1884,7 +1888,9 @@ function HtmlWorkspace({
 
   function attachShortcutForwarding(doc) {
     doc.addEventListener('keydown', (e) => {
-      if (!shouldForwardIframeShortcut(e, { designMode: doc.designMode, typingPending: typedSinceCommitRef.current })) return
+      const forward = shouldForwardIframeShortcut(e, { designMode: doc.designMode, typingPending: typedSinceCommitRef.current })
+        || shouldForwardIframeToolKey(e, { designMode: doc.designMode, toolKeys: PALETTE_TOOL_KEYS })
+      if (!forward) return
       const relay = new KeyboardEvent('keydown', {
         key: e.key,
         code: e.code,
