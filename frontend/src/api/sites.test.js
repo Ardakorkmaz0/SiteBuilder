@@ -22,7 +22,7 @@ function makeSite(revision = 5) {
       theme: { primaryColor: '#0071e3' },
       customCss: '',
       customJs: '',
-      fontFaces: "@font-face { font-family: 'Custom'; src: url(data:font/woff2;base64," + 'F'.repeat(5000) + '); }',
+      fontFaces: "@font-face { font-family: 'Custom'; src: url(data:font/woff2;base64," + 'F'.repeat(16000) + '); }',
       pages: [
         {
           id: 'p_home',
@@ -37,9 +37,9 @@ function makeSite(revision = 5) {
           name: 'Canvas',
           mode: 'empty',
           html: '',
-          htmlBackup: '<div>' + 'B'.repeat(8000) + '</div>',
+          htmlBackup: '<div>' + 'B'.repeat(12000) + '</div>',
           components: [
-            { id: 'c_heavy', type: 'image', props: { src: 'data:image/png;base64,' + 'A'.repeat(8000) }, styles: {}, layout: { x: 0, y: 0, w: 400, h: 300 } },
+            { id: 'c_heavy', type: 'image', props: { src: 'data:image/png;base64,' + 'A'.repeat(12000) }, styles: {}, layout: { x: 0, y: 0, w: 400, h: 300 } },
             { id: 'c_text', type: 'text', props: { text: 'Original line' }, styles: {}, layout: { x: 0, y: 320, w: 400, h: 40 } },
           ],
         },
@@ -57,13 +57,14 @@ afterEach(() => {
 })
 
 describe('sites API delta saves and draft preview', () => {
-  it('sends a compact schema_patch with omit_content=1 instead of re-uploading unchanged pages and backups', async () => {
+  it('sends a compact schema_patch with X-Site-Omit-Content on /sites/<id>/ without query string', async () => {
     const requests = []
     const loaded = makeSite(5)
     client.defaults.adapter = async (config) => {
       requests.push({
         method: config.method,
         url: config.url,
+        headers: config.headers,
         body: config.data ? JSON.parse(config.data) : null,
       })
       if (config.method === 'get') {
@@ -105,7 +106,8 @@ describe('sites API delta saves and draft preview', () => {
     expect(requests).toHaveLength(2)
     const saveReq = requests[1]
     expect(saveReq.method).toBe('patch')
-    expect(saveReq.url).toBe('/sites/20/?omit_content=1')
+    expect(saveReq.url).toBe('/sites/20/')
+    expect(saveReq.headers['X-Site-Omit-Content']).toBe('1')
     expect(saveReq.body.schema).toBeUndefined()
     expect(saveReq.body.html).toBeUndefined()
     expect(saveReq.body.schema_patch.fontFaces).toBeUndefined()
@@ -116,13 +118,13 @@ describe('sites API delta saves and draft preview', () => {
     expect(saveReq.body.schema_patch.pages[1].components[1].set.props.text).toBe('Edited line')
   })
 
-  it('tracks revision bumps from live-page actions and version restores, and falls back to full PUT on forced saves', async () => {
+  it('tracks revision bumps from live-page actions and version restores, and falls back to full PUT on forced or small saves', async () => {
     const requests = []
     const loaded = makeSite(10)
     client.defaults.adapter = async (config) => {
       const body = config.data ? JSON.parse(config.data) : null
-      requests.push({ method: config.method, url: config.url, body })
-      if (config.url === '/sites/20/') {
+      requests.push({ method: config.method, url: config.url, headers: config.headers, body })
+      if (config.url === '/sites/20/' && config.method === 'get') {
         return { data: loaded, status: 200, statusText: 'OK', headers: {}, config }
       }
       if (config.url === '/sites/20/page-live/') {
@@ -150,14 +152,15 @@ describe('sites API delta saves and draft preview', () => {
       { op: 'keep', id: 'p_canvas' },
     ])
 
-    // Forced conflict overwrite omits base_revision and sends full PUT with ?omit_content=1.
+    // Forced conflict overwrite omits base_revision and sends full PUT on /sites/20/.
     await updateSite(20, {
       title: 'Heavy Project',
       schema: loaded.schema,
       html: '<h1>Home</h1>',
     })
     expect(requests[3].method).toBe('put')
-    expect(requests[3].url).toBe('/sites/20/?omit_content=1')
+    expect(requests[3].url).toBe('/sites/20/')
+    expect(requests[3].headers['X-Site-Omit-Content']).toBe('1')
     expect(requests[3].body.schema).toBeDefined()
 
     // Version restore refreshes the synced revision and schema.

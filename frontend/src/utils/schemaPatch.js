@@ -50,8 +50,11 @@ function indexPage(page) {
   const compsById = new Map()
   const compIds = []
   let orderedUnique = true
+  let compChars = 0
   const seen = new Set()
   for (const comp of comps) {
+    const json = componentJson(comp)
+    compChars += json.length
     const cid = typeof comp?.id === 'string' && comp.id ? comp.id : null
     if (!cid || seen.has(cid)) {
       orderedUnique = false
@@ -60,23 +63,32 @@ function indexPage(page) {
     }
     seen.add(cid)
     compIds.push(cid)
-    compsById.set(cid, componentJson(comp))
+    compsById.set(cid, json)
   }
+  const metaJson = stableJson(extractPageMeta(page))
+  const html = typeof page?.html === 'string' ? page.html : ''
+  const htmlBackup = typeof page?.htmlBackup === 'string' ? page.htmlBackup : ''
   return {
-    metaJson: stableJson(extractPageMeta(page)),
-    html: typeof page?.html === 'string' ? page.html : '',
-    htmlBackup: typeof page?.htmlBackup === 'string' ? page.htmlBackup : '',
+    metaJson,
+    html,
+    htmlBackup,
     compIds: orderedUnique ? compIds : null,
     compsById,
+    totalChars: metaJson.length + html.length + htmlBackup.length + compChars,
   }
 }
+
+export const DELTA_SAVE_MIN_BYTES = 32 * 1024
 
 export function indexSchema(schema) {
   if (!schema || typeof schema !== 'object') return null
   const pages = Array.isArray(schema.pages) ? schema.pages : []
   const pagesById = new Map()
   const seenPages = new Set()
+  let pagesChars = 0
   for (const page of pages) {
+    const indexed = indexPage(page)
+    pagesChars += indexed.totalChars
     const pid = typeof page?.id === 'string' && page.id ? page.id : null
     if (!pid) continue
     if (seenPages.has(pid)) {
@@ -84,15 +96,27 @@ export function indexSchema(schema) {
       continue
     }
     seenPages.add(pid)
-    pagesById.set(pid, indexPage(page))
+    pagesById.set(pid, indexed)
   }
+  const themeJson = stableJson(schema.theme || {})
+  const colorModeJson = schema.colorMode ? stableJson(schema.colorMode) : ''
+  const customCss = typeof schema.customCss === 'string' ? schema.customCss : ''
+  const customJs = typeof schema.customJs === 'string' ? schema.customJs : ''
+  const fontFaces = typeof schema.fontFaces === 'string' ? schema.fontFaces : ''
   return {
-    themeJson: stableJson(schema.theme || {}),
-    colorModeJson: schema.colorMode ? stableJson(schema.colorMode) : '',
-    customCss: typeof schema.customCss === 'string' ? schema.customCss : '',
-    customJs: typeof schema.customJs === 'string' ? schema.customJs : '',
-    fontFaces: typeof schema.fontFaces === 'string' ? schema.fontFaces : '',
+    themeJson,
+    colorModeJson,
+    customCss,
+    customJs,
+    fontFaces,
     pagesById,
+    totalChars:
+      themeJson.length +
+      colorModeJson.length +
+      customCss.length +
+      customJs.length +
+      fontFaces.length +
+      pagesChars,
   }
 }
 
@@ -215,6 +239,7 @@ export function prepareSiteSave(siteId, payload) {
   if (
     entry &&
     nextSnapshot &&
+    Math.max(entry.snapshot.totalChars, nextSnapshot.totalChars) >= DELTA_SAVE_MIN_BYTES &&
     Number.isInteger(payload?.base_revision) &&
     entry.revision === payload.base_revision &&
     Array.isArray(payload?.schema?.pages) &&

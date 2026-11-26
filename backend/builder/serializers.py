@@ -682,7 +682,10 @@ class SiteSerializer(serializers.ModelSerializer):
         if (
             request is not None
             and request.method in ('PUT', 'PATCH')
-            and request.query_params.get('omit_content') == '1'
+            and (
+                request.headers.get('X-Site-Omit-Content') == '1'
+                or request.query_params.get('omit_content') == '1'
+            )
         ):
             data.pop('schema', None)
             data.pop('html', None)

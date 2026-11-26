@@ -258,6 +258,34 @@ class TestDeltaSaveAndOmitContent:
         assert 'schema' in res.data
         assert 'html' in res.data
 
+        header_res = api.patch(
+            f'/api/sites/{multi_page_site.pk}/',
+            {
+                'base_revision': res.data['revision'],
+                'schema_patch': {
+                    'pages': [
+                        {'op': 'keep', 'id': 'p_home'},
+                        {'op': 'keep', 'id': 'p_about'},
+                    ],
+                },
+            },
+            format='json',
+            HTTP_X_SITE_OMIT_CONTENT='1',
+        )
+        assert header_res.status_code == 200
+        assert 'schema' not in header_res.data
+        assert 'html' not in header_res.data
+
+        preflight = _as_user(None).options(
+            f'/api/sites/{multi_page_site.pk}/',
+            HTTP_ORIGIN='http://localhost:5173',
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD='PATCH',
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS='content-type,x-site-save-source,x-site-omit-content',
+        )
+        assert preflight.status_code == 200
+        allowed_headers = preflight.headers.get('Access-Control-Allow-Headers', '').lower()
+        assert 'x-site-omit-content' in allowed_headers
+
     def test_delta_save_requires_matching_base_revision_and_valid_ids(self, owner, multi_page_site):
         api = _as_user(owner)
         before_rev = multi_page_site.revision

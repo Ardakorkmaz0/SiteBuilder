@@ -23,8 +23,11 @@ export const getSite = (id) =>
 
 export const updateSite = (id, payload, { saveSource = 'manual' } = {}) => {
   const { method, body, commit } = prepareSiteSave(id, payload)
-  return client[method](`/sites/${id}/?omit_content=1`, body, {
-    headers: { 'X-Site-Save-Source': saveSource },
+  return client[method](`/sites/${id}/`, body, {
+    headers: {
+      'X-Site-Save-Source': saveSource,
+      'X-Site-Omit-Content': '1',
+    },
   }).then((r) => {
     commit(r.data?.revision)
     return r.data
