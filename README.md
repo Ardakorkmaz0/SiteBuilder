@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/demo.gif" alt="Changing a heading's text and colour by clicking on the page, checking it on a phone, reading the HTML it wrote, publishing it and opening the published page" width="960">
+  <img src="docs/screenshots/demo.gif" alt="Editing an HTML heading with live code diffs and the visual box model, converting an HTML page into draggable canvas blocks, adding scroll-reveal motion, testing phone and tablet device presets, previewing light and dark visitor palettes, inspecting syntax-colored CSS and saved version checkpoints, and sending the draft live" width="960">
 </p>
 
 ## What makes it different
