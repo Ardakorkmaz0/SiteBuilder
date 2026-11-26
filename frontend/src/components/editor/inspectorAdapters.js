@@ -169,17 +169,39 @@ function parseCssNumber(value) {
   return Number.isFinite(parsed) ? parsed : ''
 }
 
-// `auto` too: a block centred with `margin: 0 auto` keeps its auto sides when
-// one side is edited.
-const SINGLE_TOKEN_RE = /^(?:-?(?:\d+\.?\d*|\.\d+)(?:px|em|rem|%|vw|vh)?|auto)$/i
+// A side's value, split on the spaces between sides only: the spaces inside
+// calc(), clamp() or var() belong to that side. A side such as `auto` or
+// `calc(1em + 4px)` is kept as it is, so editing another side leaves it alone
+// (`calc(1em + 4px) 16px` was read as no sides at all, and editing the right
+// side wrote 0 into the other three).
+function boxSideValues(raw) {
+  const sides = []
+  let depth = 0
+  let current = ''
+  for (const ch of raw) {
+    if (ch === '(') depth += 1
+    if (ch === ')') depth = Math.max(0, depth - 1)
+    if (depth === 0 && /\s/.test(ch)) {
+      if (current) sides.push(current)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  if (current) sides.push(current)
+  return sides
+}
+
+// A keyword that stands for the whole property and cannot be one side of it.
+const WHOLE_PROPERTY_RE = /^(?:inherit|initial|unset|revert|revert-layer)$/i
 
 // Expand a CSS 1..4-value box shorthand ("24px", "12px 20px", …) into its four
 // sides so per-side inputs can read and edit standard `styles.padding` on canvas.
 export function parseBoxSides(shorthand) {
   const raw = String(shorthand || '').trim()
   if (!raw) return { top: '', right: '', bottom: '', left: '' }
-  const parts = raw.split(/\s+/).filter(Boolean)
-  if (!parts.length || parts.length > 4 || !parts.every((p) => SINGLE_TOKEN_RE.test(p))) {
+  const parts = boxSideValues(raw)
+  if (!parts.length || parts.length > 4 || parts.some((p) => WHOLE_PROPERTY_RE.test(p) || /[;{}]/.test(p))) {
     return { top: '', right: '', bottom: '', left: '' }
   }
   const norm = parts.map((p) => (/^\s*-?(?:\d+\.?\d*|\.\d+)\s*$/.test(p) ? `${p.trim()}px` : p))

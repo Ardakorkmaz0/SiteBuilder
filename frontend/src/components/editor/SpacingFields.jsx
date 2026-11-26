@@ -18,7 +18,7 @@ const inPixels = (value) => !value || /^\s*-?(?:\d+\.?\d*|\.\d+)\s*(px)?\s*$/i.t
 
 function Caption({ children }) {
   return (
-    <span className="block text-[10px] font-semibold text-[var(--studio-text-muted)]">{children}</span>
+    <span className="block text-[11px] font-semibold text-[var(--studio-text-muted)]">{children}</span>
   )
 }
 
@@ -33,18 +33,22 @@ export default function SpacingFields({ adapter }) {
   const hasSides = adapter.has('paddingSides')
   const hasMarginSides = adapter.has('marginVertical')
   const get = (key) => String(adapter.get(key) ?? '')
+  const sides = hasSides ? PADDING_SIDES.map(get) : []
+  const padding = allSides(get('padding'), sides)
+  const boxValues = [...sides, ...(hasMarginSides ? [get('marginTop'), get('marginBottom')] : [])]
+  // Every side shows its unit where the box mixes units: a bare 24 beside a
+  // 1em read as 24em.
+  const inPixelsOnly = boxValues.every(inPixels)
   const field = (key, label) => (
     <LabeledPx
       bare
+      showUnit={!inPixelsOnly}
       label={t(label)}
       value={get(key)}
       subject={adapter.subject}
       onChange={(v) => adapter.set(key, v)}
     />
   )
-  const sides = hasSides ? PADDING_SIDES.map(get) : []
-  const padding = allSides(get('padding'), sides)
-  const boxValues = [...sides, ...(hasMarginSides ? [get('marginTop'), get('marginBottom')] : [])]
 
   return (
     <PanelGroup id="spacing" title={t('Spacing')} defaultOpen>
@@ -81,28 +85,27 @@ export default function SpacingFields({ adapter }) {
           )}
           <div
             className={hasSides
-              ? 'space-y-1.5 rounded-md border border-dashed border-[var(--studio-accent)] bg-[var(--studio-accent-soft)] p-2'
+              ? 'space-y-1.5 rounded-md border border-dashed border-[var(--studio-accent-text)] bg-[var(--studio-accent-soft)] p-2'
               : 'p-0.5'}
           >
-            {hasSides && (
-              <>
-                <Caption>{t('Padding')}</Caption>
-                <div className="flex justify-center">{field('paddingTop', 'Padding top')}</div>
-              </>
-            )}
-            <div className="flex items-center gap-1.5">
-              {hasSides && field('paddingLeft', 'Padding left')}
-              <span className="flex h-8 min-w-0 flex-1 items-center justify-center rounded-md border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] text-[10px] text-[var(--studio-text-muted)]">
+            {hasSides && <Caption>{t('Padding')}</Caption>}
+            {/* The sides in the order CSS writes them (top, right, bottom,
+                left), so Tab goes round the box clockwise; the grid puts each
+                one at its side. */}
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5">
+              {hasSides && <div className="col-start-2 row-start-1 flex justify-center">{field('paddingTop', 'Padding top')}</div>}
+              {hasSides && <div className="col-start-3 row-start-2">{field('paddingRight', 'Padding right')}</div>}
+              {hasSides && <div className="col-start-2 row-start-3 flex justify-center">{field('paddingBottom', 'Padding bottom')}</div>}
+              {hasSides && <div className="col-start-1 row-start-2">{field('paddingLeft', 'Padding left')}</div>}
+              <span className="col-start-2 row-start-2 flex h-8 min-w-0 items-center justify-center rounded-md border border-[var(--studio-border)] bg-[var(--studio-panel-raised)] text-[10px] text-[var(--studio-text-muted)]">
                 {t('Content')}
               </span>
-              {hasSides && field('paddingRight', 'Padding right')}
             </div>
-            {hasSides && <div className="flex justify-center">{field('paddingBottom', 'Padding bottom')}</div>}
           </div>
           {hasMarginSides && <div className="flex justify-center">{field('marginBottom', 'Margin bottom')}</div>}
         </div>
       )}
-      {(hasSides || hasMarginSides) && boxValues.every(inPixels) && (
+      {(hasSides || hasMarginSides) && inPixelsOnly && (
         <p className="text-[10px] text-[var(--studio-text-faint)]">{t('Values in pixels.')}</p>
       )}
     </PanelGroup>

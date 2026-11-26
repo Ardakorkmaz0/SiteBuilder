@@ -497,8 +497,10 @@ function UnitInputShell({ unit, children }) {
 
 const bareNumberCls = 'min-w-0 flex-1 bg-transparent px-2.5 py-1.5 text-xs text-[var(--studio-text)] placeholder:text-[var(--studio-text-faint)] focus:outline-none'
 // A side of the box model (SpacingFields): a small centred number, no arrows.
-const boxFieldCls = 'studio-input inline-flex h-7 w-12 min-w-0 items-center justify-center px-1 py-0'
-const boxNumberCls = 'w-full min-w-0 bg-transparent text-center text-xs tabular-nums text-[var(--studio-text)] placeholder:text-[var(--studio-text-faint)] focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+// Its size is on the box, not the input: in the editor every input takes its
+// font from around it (index.css), and a text-xs on the input drew 16px.
+const boxFieldCls = 'studio-input inline-flex h-7 w-[41px] min-w-0 items-center justify-center gap-px px-1 py-0 text-sm'
+const boxNumberCls = 'w-full min-w-0 bg-transparent text-center tabular-nums text-[var(--studio-text)] placeholder:text-[var(--studio-text-faint)] focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
 
 // One number with an optional unit, e.g. "16px", "-0.02em", "1.5rem", "50%".
 const CSS_LENGTH_RE = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|em|rem|%|vw|vh)?\s*$/i
@@ -514,10 +516,12 @@ const CSS_LENGTH_RE = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|em|rem|%|vw|vh)?\s*$/i
 //
 // `hint` sits at the right of the label and describes the field ("All sides").
 // `bare` draws it as one side of the box model: no label on screen (the label
-// is its accessible name), and the unit only where it is not px.
-export function LabeledPx({ label, value, onChange, placeholder, subject, defaultUnit = 'px', hint = '', bare = false }) {
+// is its accessible name), and the unit only where it is not px, or always
+// (`showUnit`) where the box mixes units. A unit on screen is read with it.
+export function LabeledPx({ label, value, onChange, placeholder, subject, defaultUnit = 'px', hint = '', bare = false, showUnit = false }) {
   const labelId = useId()
   const hintId = useId()
+  const unitId = useId()
   const raw = String(value ?? '')
   const match = CSS_LENGTH_RE.exec(raw)
   const explicitUnit = match?.[2]?.toLowerCase() || ''
@@ -547,13 +551,14 @@ export function LabeledPx({ label, value, onChange, placeholder, subject, defaul
   const num = match ? match[1] : ''
   const unit = explicitUnit || (raw.trim() ? defaultUnit : lastUnit)
   const fine = unit === 'em' || unit === 'rem'
+  const unitShown = bare && (unit !== 'px' || showUnit)
   const input = (
     <input
       type="number"
       step={fine ? 0.01 : 1}
       aria-labelledby={bare ? undefined : labelId}
       aria-label={bare ? label : undefined}
-      aria-describedby={hint && !bare ? hintId : undefined}
+      aria-describedby={hint && !bare ? hintId : unitShown ? unitId : undefined}
       title={bare ? label : undefined}
       className={bare ? boxNumberCls : bareNumberCls}
       value={draft ?? num}
@@ -575,8 +580,8 @@ export function LabeledPx({ label, value, onChange, placeholder, subject, defaul
     return (
       <span className={boxFieldCls}>
         {input}
-        {unit !== 'px' && (
-          <span aria-hidden="true" className="shrink-0 select-none text-[9px] font-medium text-[var(--studio-text-faint)]">{unit}</span>
+        {unitShown && (
+          <span id={unitId} className="shrink-0 select-none text-[9px] font-medium text-[var(--studio-text-faint)]">{unit}</span>
         )}
       </span>
     )

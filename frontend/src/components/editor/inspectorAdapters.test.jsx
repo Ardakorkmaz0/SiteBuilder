@@ -12,6 +12,8 @@ import TypographyFields from './TypographyFields.jsx'
 import {
   createCanvasInspectorAdapter,
   createHtmlInspectorAdapter,
+  parseBoxSides,
+  patchBoxSide,
 } from './inspectorAdapters.js'
 
 function wrap(ui) {
@@ -132,9 +134,10 @@ describe('shared inspector adapters and field groups', () => {
       component: { styles: { padding: '24px 16px', margin: '12px 0px 8px 0px' } },
     })
     const canvasView = wrap(<SpacingFields adapter={canvas.adapter} />)
+    // In the order CSS writes the sides, so Tab goes round the box clockwise.
     expect(boxFields()).toEqual([
-      ['Margin top', '12'], ['Padding top', '24'], ['Padding left', '16'],
-      ['Padding right', '16'], ['Padding bottom', '24'], ['Margin bottom', '8'],
+      ['Margin top', '12'], ['Padding top', '24'], ['Padding right', '16'],
+      ['Padding bottom', '24'], ['Padding left', '16'], ['Margin bottom', '8'],
     ])
     // The sides differ: the all-sides field says so instead of a shorthand.
     const all = screen.getByRole('spinbutton', { name: 'Padding', exact: true })
@@ -149,9 +152,10 @@ describe('shared inspector adapters and field groups', () => {
     document.body.innerHTML = '<div id="box" style="padding: 24px 16px; margin: 12px 0 8px">Box</div>'
     const onHtmlChange = vi.fn()
     wrap(<SpacingFields adapter={createHtmlInspectorAdapter({ info: describeElement(document.getElementById('box')), onChange: onHtmlChange })} />)
+    // In the order CSS writes the sides, so Tab goes round the box clockwise.
     expect(boxFields()).toEqual([
-      ['Margin top', '12'], ['Padding top', '24'], ['Padding left', '16'],
-      ['Padding right', '16'], ['Padding bottom', '24'], ['Margin bottom', '8'],
+      ['Margin top', '12'], ['Padding top', '24'], ['Padding right', '16'],
+      ['Padding bottom', '24'], ['Padding left', '16'], ['Margin bottom', '8'],
     ])
     // An HTML element reports its top padding as its padding: still "differ".
     expect(screen.getByRole('spinbutton', { name: 'Padding', exact: true })).toHaveAttribute('placeholder', 'Sides differ')
@@ -166,6 +170,11 @@ describe('shared inspector adapters and field groups', () => {
     expect(top).toHaveValue(1)
     expect(top.parentElement).toHaveTextContent('em')
     expect(screen.queryByText('Values in pixels.')).toBeNull()
+    // The box mixes units: the px sides say px too, and every unit is read out.
+    expect(top).toHaveAccessibleDescription('em')
+    const right = screen.getByRole('spinbutton', { name: 'Padding right', exact: true })
+    expect(right.parentElement).toHaveTextContent('px')
+    expect(right).toHaveAccessibleDescription('px')
     fireEvent.change(top, { target: { value: '2' } })
     expect(updateStyles).toHaveBeenLastCalledWith('comp_1', { padding: '2em 24px 1em 24px' })
     // Sides that agree show their value in the all-sides field.
@@ -174,6 +183,23 @@ describe('shared inspector adapters and field groups', () => {
     const allFields = screen.getAllByRole('spinbutton', { name: 'Padding', exact: true })
     expect(allFields[allFields.length - 1]).toHaveValue(18)
     expect(allFields[allFields.length - 1]).not.toHaveAttribute('placeholder')
+  })
+
+  // `calc(1em + 4px) 16px` was read as no sides at all: editing the right side
+  // wrote 0 into the other three (ChatGPT's check of the box model).
+  it('edits one side of a padding written with calc() and leaves the others as they were', () => {
+    expect(parseBoxSides('calc(1em + 4px) 16px')).toEqual({
+      top: 'calc(1em + 4px)', right: '16px', bottom: 'calc(1em + 4px)', left: '16px',
+    })
+    expect(patchBoxSide('calc(1em + 4px) 16px', 'right', '8px')).toBe('calc(1em + 4px) 8px calc(1em + 4px) 16px')
+    // A keyword for the whole property cannot be one side of it.
+    expect(parseBoxSides('inherit')).toEqual({ top: '', right: '', bottom: '', left: '' })
+
+    const { adapter, updateStyles } = makeCanvasAdapter('card', { component: { styles: { padding: 'calc(1em + 4px) 16px' } } })
+    wrap(<SpacingFields adapter={adapter} />)
+    expect(screen.getByRole('textbox', { name: 'Padding top', exact: true })).toHaveValue('calc(1em + 4px)')
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Padding right', exact: true }), { target: { value: '8' } })
+    expect(updateStyles).toHaveBeenLastCalledWith('comp_1', { padding: 'calc(1em + 4px) 8px calc(1em + 4px) 16px' })
   })
 
   // A block centred with `margin: 0 auto` lost its centring when one side was
