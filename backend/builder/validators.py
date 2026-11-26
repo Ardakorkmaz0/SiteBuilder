@@ -1008,6 +1008,101 @@ def sanitize_color_mode(value):
     }
 
 
+def _clean_page_fields(page, *, clean_html, clean_html_backup, clean_components):
+    # A page that keeps its own theme ("This page only") carries it here;
+    # one that follows the site theme has no key at all.
+    own_theme = {'theme': sanitize_theme(page['theme'])} if isinstance(page.get('theme'), dict) else {}
+    # Identity disambiguates presets that share the same dimensions.
+    # Old pages keep their original shape and continue to use dimensions.
+    preset_ids = {
+        key: value
+        for key in ('canvasPresetId', 'mobilePresetId')
+        if re.fullmatch(r'[a-z0-9:-]{1,50}', (value := _str(page.get(key))))
+    }
+    return {
+        **own_theme,
+        **preset_ids,
+        'id': _str(page.get('id'), 'page'),
+        'name': _str(page.get('name'), 'Page')[:80],
+        # Optional organizational folder label (shown in the editor's page tree).
+        'folder': _str(page.get('folder'))[:80],
+        # Search + social metadata. Clipped to the lengths Google and the
+        # link-preview scrapers actually read, so an over-long value is
+        # stored the way it will be shown rather than silently truncated
+        # later. The image goes through the same allowlist as any user image.
+        'seoTitle': _str(page.get('seoTitle'))[:70],
+        'seoDescription': _str(page.get('seoDescription'))[:200],
+        'seoImage': sanitize_image_src(page.get('seoImage')),
+        # Any well-formed BCP 47 tag, not a fixed pair: the editor offers a
+        # long list and a site may legitimately carry one we never listed.
+        # Shape is what matters — the value lands in lang="".
+        'language': sanitize_language(page.get('language')),
+        # '' means "follow the language"; the writers resolve it.
+        'direction': page.get('direction') if page.get('direction') in ('ltr', 'rtl') else '',
+        'themeColor': sanitize_hex_color(page.get('themeColor')),
+        'smoothScroll': bool(page.get('smoothScroll')),
+        'canonicalUrl': sanitize_url(page.get('canonicalUrl'))[:500],
+        'noIndex': bool(page.get('noIndex')),
+        # Editor preview chrome: preserved independently from published
+        # HTML, with an opt-out only when the client explicitly sends false.
+        'showScrollIndicator': page.get('showScrollIndicator') is not False,
+        'background': sanitize_color(page.get('background')),
+        'backgroundMobile': sanitize_color(page.get('backgroundMobile')),
+        # Per-breakpoint artboard width + optional "fold" (visible-screen) guide.
+        'canvasWidth': _num(page.get('canvasWidth'), 1000, 320, 4000),
+        'canvasFold': _num(page.get('canvasFold'), 0, 0, 20000),
+        'mobileWidth': _num(page.get('mobileWidth'), 390, 240, 1200),
+        'mobileFold': _num(page.get('mobileFold'), 0, 0, 20000),
+        'mobileManual': bool(page.get('mobileManual')),
+        'flowMode': bool(page.get('flowMode')),
+        # Which editor a page opens in. Derived from `html` when absent
+        # (old data), but stored explicitly so an HTML page whose document
+        # has been emptied does not silently turn back into a component
+        # canvas on the next load.
+        'mode': 'html' if page.get('mode') == 'html' or clean_html.strip() else 'empty',
+        # Multi-page HTML sites keep one full document per page.
+        'html': clean_html,
+        # The document a page had before its owner turned it into a
+        # canvas: the way back. Never rendered from here; the editor moves
+        # it into `html` when the owner goes back.
+        'htmlBackup': clean_html_backup,
+        # Web fonts the page loads beside its theme's (a page that came
+        # from an HTML document keeps the ones that document loaded).
+        'fonts': sanitize_page_fonts(page.get('fonts')),
+        # Absent on a page that shows everything it has, so older pages
+        # stay byte-identical.
+        **({'hiddenKeys': hidden_keys} if (hidden_keys := _show_keys(page.get('hiddenKeys'), MAX_PAGE_KEYS)) else {}),
+        **({'parts': parts} if (parts := sanitize_page_parts(page.get('parts'))) else {}),
+        'components': clean_components,
+    }
+
+
+def _clean_single_page(page):
+    if not isinstance(page, dict):
+        raise serializers.ValidationError('Each page must be an object.')
+    comps = page.get('components', [])
+    if not isinstance(comps, list):
+        raise serializers.ValidationError('Page "components" must be an array.')
+    return _clean_page_fields(
+        page,
+        clean_html=_page_html(page.get('html')),
+        clean_html_backup=_page_html(page.get('htmlBackup')),
+        clean_components=[sanitize_component(c) for c in comps],
+    )
+
+
+def _unique_by_id(items):
+    by_id = {}
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        item_id = item.get('id')
+        if not isinstance(item_id, str) or not item_id:
+            continue
+        by_id[item_id] = None if item_id in by_id else item
+    return by_id
+
+
 def validate_and_clean_schema(schema):
     """Validate the overall structure and return a fully sanitized copy."""
     if not isinstance(schema, dict):
@@ -1015,79 +1110,7 @@ def validate_and_clean_schema(schema):
     pages = schema.get('pages')
     if not isinstance(pages, list) or not pages:
         raise serializers.ValidationError('Schema must contain a non-empty "pages" array.')
-    clean_pages = []
-    for page in pages:
-        if not isinstance(page, dict):
-            raise serializers.ValidationError('Each page must be an object.')
-        comps = page.get('components', [])
-        if not isinstance(comps, list):
-            raise serializers.ValidationError('Page "components" must be an array.')
-        # A page that keeps its own theme ("This page only") carries it here;
-        # one that follows the site theme has no key at all.
-        own_theme = {'theme': sanitize_theme(page['theme'])} if isinstance(page.get('theme'), dict) else {}
-        # Identity disambiguates presets that share the same dimensions.
-        # Old pages keep their original shape and continue to use dimensions.
-        preset_ids = {
-            key: value
-            for key in ('canvasPresetId', 'mobilePresetId')
-            if re.fullmatch(r'[a-z0-9:-]{1,50}', (value := _str(page.get(key))))
-        }
-        clean_pages.append({
-            **own_theme,
-            **preset_ids,
-            'id': _str(page.get('id'), 'page'),
-            'name': _str(page.get('name'), 'Page')[:80],
-            # Optional organizational folder label (shown in the editor's page tree).
-            'folder': _str(page.get('folder'))[:80],
-            # Search + social metadata. Clipped to the lengths Google and the
-            # link-preview scrapers actually read, so an over-long value is
-            # stored the way it will be shown rather than silently truncated
-            # later. The image goes through the same allowlist as any user image.
-            'seoTitle': _str(page.get('seoTitle'))[:70],
-            'seoDescription': _str(page.get('seoDescription'))[:200],
-            'seoImage': sanitize_image_src(page.get('seoImage')),
-            # Any well-formed BCP 47 tag, not a fixed pair: the editor offers a
-            # long list and a site may legitimately carry one we never listed.
-            # Shape is what matters — the value lands in lang="".
-            'language': sanitize_language(page.get('language')),
-            # '' means "follow the language"; the writers resolve it.
-            'direction': page.get('direction') if page.get('direction') in ('ltr', 'rtl') else '',
-            'themeColor': sanitize_hex_color(page.get('themeColor')),
-            'smoothScroll': bool(page.get('smoothScroll')),
-            'canonicalUrl': sanitize_url(page.get('canonicalUrl'))[:500],
-            'noIndex': bool(page.get('noIndex')),
-            # Editor preview chrome: preserved independently from published
-            # HTML, with an opt-out only when the client explicitly sends false.
-            'showScrollIndicator': page.get('showScrollIndicator') is not False,
-            'background': sanitize_color(page.get('background')),
-            'backgroundMobile': sanitize_color(page.get('backgroundMobile')),
-            # Per-breakpoint artboard width + optional "fold" (visible-screen) guide.
-            'canvasWidth': _num(page.get('canvasWidth'), 1000, 320, 4000),
-            'canvasFold': _num(page.get('canvasFold'), 0, 0, 20000),
-            'mobileWidth': _num(page.get('mobileWidth'), 390, 240, 1200),
-            'mobileFold': _num(page.get('mobileFold'), 0, 0, 20000),
-            'mobileManual': bool(page.get('mobileManual')),
-            'flowMode': bool(page.get('flowMode')),
-            # Which editor a page opens in. Derived from `html` when absent
-            # (old data), but stored explicitly so an HTML page whose document
-            # has been emptied does not silently turn back into a component
-            # canvas on the next load.
-            'mode': 'html' if page.get('mode') == 'html' or _page_html(page.get('html')).strip() else 'empty',
-            # Multi-page HTML sites keep one full document per page.
-            'html': _page_html(page.get('html')),
-            # The document a page had before its owner turned it into a
-            # canvas: the way back. Never rendered from here; the editor moves
-            # it into `html` when the owner goes back.
-            'htmlBackup': _page_html(page.get('htmlBackup')),
-            # Web fonts the page loads beside its theme's (a page that came
-            # from an HTML document keeps the ones that document loaded).
-            'fonts': sanitize_page_fonts(page.get('fonts')),
-            # Absent on a page that shows everything it has, so older pages
-            # stay byte-identical.
-            **({'hiddenKeys': hidden_keys} if (hidden_keys := _show_keys(page.get('hiddenKeys'), MAX_PAGE_KEYS)) else {}),
-            **({'parts': parts} if (parts := sanitize_page_parts(page.get('parts'))) else {}),
-            'components': [sanitize_component(c) for c in comps],
-        })
+    clean_pages = [_clean_single_page(page) for page in pages]
     color_mode = sanitize_color_mode(schema.get('colorMode'))
     font_faces = sanitize_font_faces(schema.get('fontFaces'))
     return {
@@ -1099,6 +1122,121 @@ def validate_and_clean_schema(schema):
         'customJs': sanitize_custom_js(schema.get('customJs')),
         # Absent until a document that carries its own fonts is turned into
         # canvas pages, so older schemas stay byte-identical.
+        **({'fontFaces': font_faces} if font_faces else {}),
+        'pages': clean_pages,
+    }
+
+
+def apply_schema_patch(existing_schema, patch):
+    """Merge a revision-guarded delta patch into an already-stored schema.
+
+    Unchanged pages, htmlBackups and components are reused from `existing_schema`
+    without re-uploading or re-sanitizing multi-megabyte blobs on every save,
+    while every newly supplied field or component goes through the exact same
+    sanitizers as `validate_and_clean_schema`.
+    """
+    if not isinstance(patch, dict):
+        raise serializers.ValidationError('schema_patch must be an object.')
+    page_ops = patch.get('pages')
+    if not isinstance(page_ops, list) or not page_ops:
+        raise serializers.ValidationError('schema_patch must contain a non-empty "pages" array.')
+
+    existing = existing_schema if isinstance(existing_schema, dict) else {}
+    existing_pages = _unique_by_id(existing.get('pages'))
+    clean_pages = []
+
+    for entry in page_ops:
+        if not isinstance(entry, dict):
+            raise serializers.ValidationError('Each page entry in schema_patch must be an object.')
+        op = entry.get('op')
+        if op == 'keep':
+            page_id = entry.get('id')
+            prev_page = existing_pages.get(page_id) if isinstance(page_id, str) else None
+            if prev_page is None:
+                raise serializers.ValidationError('Unknown page id in schema_patch.')
+            clean_pages.append(_clean_page_fields(
+                prev_page,
+                clean_html=prev_page.get('html') if isinstance(prev_page.get('html'), str) else '',
+                clean_html_backup=prev_page.get('htmlBackup') if isinstance(prev_page.get('htmlBackup'), str) else '',
+                clean_components=prev_page.get('components') if isinstance(prev_page.get('components'), list) else [],
+            ))
+        elif op == 'full':
+            clean_pages.append(_clean_single_page(entry.get('page')))
+        elif op == 'patch':
+            page_id = entry.get('id')
+            prev_page = existing_pages.get(page_id) if isinstance(page_id, str) else None
+            if prev_page is None:
+                raise serializers.ValidationError('Unknown page id in schema_patch.')
+            meta = entry.get('meta')
+            if meta is not None and not isinstance(meta, dict):
+                raise serializers.ValidationError('Patched page "meta" must be an object.')
+            merged_meta = meta if isinstance(meta, dict) else prev_page
+            clean_html = (
+                _page_html(entry.get('html'))
+                if 'html' in entry
+                else (prev_page.get('html') if isinstance(prev_page.get('html'), str) else '')
+            )
+            clean_html_backup = (
+                _page_html(entry.get('htmlBackup'))
+                if 'htmlBackup' in entry
+                else (prev_page.get('htmlBackup') if isinstance(prev_page.get('htmlBackup'), str) else '')
+            )
+            if 'components' not in entry:
+                clean_components = prev_page.get('components') if isinstance(prev_page.get('components'), list) else []
+            else:
+                comp_ops = entry.get('components')
+                if not isinstance(comp_ops, list):
+                    raise serializers.ValidationError('Patched page "components" must be an array.')
+                prev_comps = _unique_by_id(prev_page.get('components'))
+                clean_components = []
+                for item in comp_ops:
+                    if not isinstance(item, dict):
+                        raise serializers.ValidationError('Each component patch entry must be an object.')
+                    if 'keep' in item and 'set' not in item:
+                        cid = item.get('keep')
+                        kept = prev_comps.get(cid) if isinstance(cid, str) else None
+                        if kept is None:
+                            raise serializers.ValidationError('Unknown component id in schema_patch.')
+                        clean_components.append(kept)
+                    elif 'set' in item and 'keep' not in item:
+                        clean_components.append(sanitize_component(item.get('set')))
+                    else:
+                        raise serializers.ValidationError('Component patch entry must specify "keep" or "set".')
+            clean_pages.append(_clean_page_fields(
+                {**merged_meta, 'id': page_id},
+                clean_html=clean_html,
+                clean_html_backup=clean_html_backup,
+                clean_components=clean_components,
+            ))
+        else:
+            raise serializers.ValidationError('Invalid page operation in schema_patch.')
+
+    theme = sanitize_theme(patch['theme'] if 'theme' in patch else existing.get('theme'))
+    color_mode = (
+        sanitize_color_mode(patch.get('colorMode'))
+        if 'colorMode' in patch
+        else (existing.get('colorMode') if isinstance(existing.get('colorMode'), dict) else None)
+    )
+    custom_css = (
+        sanitize_custom_css(patch.get('customCss'))
+        if 'customCss' in patch
+        else (existing.get('customCss') if isinstance(existing.get('customCss'), str) else '')
+    )
+    custom_js = (
+        sanitize_custom_js(patch.get('customJs'))
+        if 'customJs' in patch
+        else (existing.get('customJs') if isinstance(existing.get('customJs'), str) else '')
+    )
+    font_faces = (
+        sanitize_font_faces(patch.get('fontFaces'))
+        if 'fontFaces' in patch
+        else (existing.get('fontFaces') if isinstance(existing.get('fontFaces'), str) else '')
+    )
+    return {
+        'theme': theme,
+        **({'colorMode': color_mode} if color_mode else {}),
+        'customCss': custom_css,
+        'customJs': custom_js,
         **({'fontFaces': font_faces} if font_faces else {}),
         'pages': clean_pages,
     }

@@ -32,7 +32,9 @@ from .svg_images import check_svg, is_svg_upload
 from .live_pages import (
     draft_is_ahead, forget_live_version, send_draft_live_without_pages, send_site_live, statuses,
 )
-from .validators import MAX_FILE_BYTES, clean_published_pages, text_bytes, validate_and_clean_schema
+from .validators import (
+    MAX_FILE_BYTES, apply_schema_patch, clean_published_pages, text_bytes, validate_and_clean_schema,
+)
 
 
 def password_errors(error):
@@ -638,6 +640,10 @@ class SiteSerializer(serializers.ModelSerializer):
     published_pages = serializers.ListField(
         child=serializers.DictField(), write_only=True, required=False,
     )
+    # Revision-guarded incremental schema update: unchanged pages, htmlBackups
+    # and components are reused from the locked database row instead of
+    # re-uploading multi-megabyte schemas on every save.
+    schema_patch = serializers.DictField(write_only=True, required=False)
     # The revision the sender loaded or last saved. Omitted, the save goes
     # through as before (older clients, scripts, "save mine anyway").
     base_revision = serializers.IntegerField(write_only=True, required=False, allow_null=True, min_value=0)
@@ -649,11 +655,11 @@ class SiteSerializer(serializers.ModelSerializer):
     # Per page of the draft: {id: 'live' | 'older'}, nothing for one not live.
     page_live = serializers.SerializerMethodField()
     live_undo = serializers.SerializerMethodField()
-    _CONTENT_FIELDS = {'title', 'schema', 'html', 'published', 'published_pages', 'category', 'tags'}
+    _CONTENT_FIELDS = {'title', 'schema', 'schema_patch', 'html', 'published', 'published_pages', 'category', 'tags'}
 
     class Meta:
         model = Site
-        fields = ('id', 'title', 'slug', 'schema', 'html', 'published',
+        fields = ('id', 'title', 'slug', 'schema', 'schema_patch', 'html', 'published',
                   'published_pages', 'revision', 'base_revision',
                   'live_from_version', 'live_at', 'live_differs',
                   'page_live', 'private_pages', 'live_undo',
@@ -669,6 +675,18 @@ class SiteSerializer(serializers.ModelSerializer):
             'domain_verification_token', 'moderation_blocked', 'view_count',
             'created_at', 'updated_at', 'revision', 'live_at', 'private_pages',
         )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        if (
+            request is not None
+            and request.method in ('PUT', 'PATCH')
+            and request.query_params.get('omit_content') == '1'
+        ):
+            data.pop('schema', None)
+            data.pop('html', None)
+        return data
 
     def get_live_differs(self, obj):
         return draft_is_ahead(obj)
@@ -741,6 +759,17 @@ class SiteSerializer(serializers.ModelSerializer):
                 'code': 'site_changed',
                 'revision': instance.revision,
             })
+        schema_patch = validated_data.pop('schema_patch', None)
+        if schema_patch is not None:
+            if base_revision is None:
+                raise serializers.ValidationError({
+                    'schema_patch': 'base_revision is required when sending schema_patch.',
+                })
+            if 'schema' in validated_data:
+                raise serializers.ValidationError({
+                    'schema_patch': 'Send either schema or schema_patch, not both.',
+                })
+            validated_data['schema'] = apply_schema_patch(instance.schema, schema_patch)
         # Only what the editor's save writes moves the revision on: a settings
         # PATCH (SEO, from the control centre) sends none of it, and must not
         # make every other open tab look out of date.
@@ -785,6 +814,10 @@ class SiteSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         owner = User.objects.select_for_update().get(pk=validated_data['owner'].pk)
         validated_data.pop('base_revision', None)
+        if validated_data.pop('schema_patch', None) is not None:
+            raise serializers.ValidationError({
+                'schema_patch': 'schema_patch is only valid on update.',
+            })
         try:
             self._validate_publish_state(validated_data.get('published', False), owner, None)
         except serializers.ValidationError as exc:
@@ -827,12 +860,32 @@ class PublicSiteSerializer(serializers.ModelSerializer):
                   'site_options', 'owner_id', 'owner_username',
                   'owner_display_name', 'owner_avatar_url')
 
+    @staticmethod
+    def _without_html_backups(schema):
+        if not isinstance(schema, dict):
+            return schema
+        pages = schema.get('pages')
+        if not isinstance(pages, list) or not any(
+            isinstance(p, dict) and p.get('htmlBackup') for p in pages
+        ):
+            return schema
+        return {
+            **schema,
+            'pages': [
+                {k: v for k, v in p.items() if k != 'htmlBackup'}
+                if isinstance(p, dict) and p.get('htmlBackup')
+                else p
+                for p in pages
+            ],
+        }
+
     def to_representation(self, instance):
-        # Visitors see the live version. A review link (context `draft`) is the
-        # owner asking for comments on the draft, so it shows the draft.
+        # Visitors see the live version. A review link or an owner's editor
+        # preview (context `draft`) shows the saved draft.
         data = super().to_representation(instance)
         if not self.context.get('draft'):
             data['schema'], data['html'] = instance.live_content()
+        data['schema'] = self._without_html_backups(data.get('schema'))
         return data
 
     def _profile(self, obj):

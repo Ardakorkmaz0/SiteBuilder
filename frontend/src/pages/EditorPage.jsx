@@ -116,6 +116,7 @@ import {
   canvasClipboardOwnsShortcut,
   editorShortcutScope,
   hasDocumentTextSelection,
+  hasUnsavedEditorChanges,
   shouldRunEditorAutoSave,
 } from '../utils/editorLeave.js'
 import { projectSnapshot } from '../utils/projectSnapshot.js'
@@ -1002,6 +1003,7 @@ function SiteEditor() {
   saveLifecycleRef.current = {
     save, performSave, liveHtmlMap, dirty, htmlDirty, metaDirty, workspaceDirty, published,
     flushWorkspaceDrafts, historyDraftSnapshot, applyHistoryRestore, captureDetachedDraft,
+    shouldSkipQueuedAutoSave: () => !leftEditorRef.current && !hasUnsavedEditorChanges(saveLifecycleRef.current),
     loading: loading || loadFailed || !!sessionRecovery.draft || conflict.open, autoSaveEnabled, previewing,
   }
   useEditorAutoSave({
@@ -2391,18 +2393,57 @@ function SiteEditor() {
   }
 
   async function previewCurrentSite() {
-    const previewWindow = window.open('', '_blank')
-    const data = await save()
-    const nextSlug = data?.slug || slug
-    if (!data || !nextSlug) {
-      previewWindow?.close()
+    const isSubPage = currentPageId && storePages[0]?.id && currentPageId !== storePages[0].id
+    const hash = isSubPage ? `#${encodeURIComponent(currentPageId)}` : ''
+    const previewUrlFor = (targetSlug) => `/site/${targetSlug}?draft=1${hash}`
+
+    flushSync(() => saveLifecycleRef.current.flushWorkspaceDrafts())
+    const needsSave =
+      saveLifecycleRef.current.historyDraftSnapshot().unsaved ||
+      saving ||
+      autoSaveState === 'saving' ||
+      !slug
+
+    if (!needsSave) {
+      window.open(previewUrlFor(slug), '_blank')
       return
     }
-    // Open the live page (JavaScript running) — same behaviour as the
+
+    // Enqueue the manual save BEFORE opening the preview tab: switching browser
+    // focus to the new tab fires visibilitychange ("hidden"), and starting the
+    // manual save first lets any queued auto-save see that everything was
+    // already persisted and skip a duplicate round-trip.
+    const savePromise = save()
+    const previewWindow = window.open('', '_blank')
+    if (previewWindow?.document) {
+      try {
+        const label = String(t('Loading preview…')).replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]))
+        previewWindow.document.open()
+        previewWindow.document.write(
+          `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>${label}</title></head><body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font:500 14px system-ui,sans-serif">${label}</body></html>`,
+        )
+        previewWindow.document.close()
+      } catch {
+        // Cross-origin or restricted window proxy: safe to ignore and navigate below.
+      }
+    }
+
+    const data = await savePromise
+    const nextSlug = data?.slug || slug
+    if (!data || !nextSlug) {
+      if (previewWindow && !previewWindow.closed) previewWindow.close?.()
+      return
+    }
+    // Open the draft page (JavaScript running) — same behaviour as the
     // editor's View mode. The preview page still has a "Static preview"
     // toggle for inspecting the page with scripts disabled.
-    if (previewWindow) previewWindow.location.href = `/site/${nextSlug}`
-    else window.open(`/site/${nextSlug}`, '_blank')
+    const url = previewUrlFor(nextSlug)
+    if (previewWindow && !previewWindow.closed) {
+      if (typeof previewWindow.location?.replace === 'function') previewWindow.location.replace(url)
+      else previewWindow.location.href = url
+    } else if (!previewWindow) {
+      window.open(url, '_blank')
+    }
   }
 
   // Download the current design as a portable project file (.json) — the same

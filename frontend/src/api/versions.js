@@ -1,4 +1,5 @@
 import client from './client.js'
+import { rememberSyncedSite } from '../utils/schemaPatch.js'
 
 // Read-only list of saved snapshots for the given site, newest first. Used
 // by the History side panel to populate the rollback list.
@@ -13,7 +14,10 @@ export const listVersions = (siteId) =>
 export const restoreVersion = (siteId, versionId, pageId) =>
   client
     .post(`/sites/${siteId}/versions/${versionId}/restore/`, pageId ? { page: pageId } : undefined)
-    .then((r) => r.data)
+    .then((r) => {
+      rememberSyncedSite(r.data)
+      return r.data
+    })
 
 // Create a named "checkpoint" — a pinned save slot the auto-save FIFO never
 // evicts. Snapshots the CURRENTLY SAVED site, so save the editor first.

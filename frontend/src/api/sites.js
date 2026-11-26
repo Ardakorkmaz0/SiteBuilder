@@ -1,17 +1,38 @@
 import client from './client.js'
 import { detectInitialLanguage } from '../i18n/language.js'
+import {
+  advanceSyncedRevision,
+  forgetSyncedSite,
+  prepareSiteSave,
+  rememberSyncedSite,
+} from '../utils/schemaPatch.js'
 
 export const listSites = () => client.get('/sites/').then((r) => r.data)
 
 export const createSite = (title, payload = {}) =>
-  client.post('/sites/', { title, ...payload }).then((r) => r.data)
+  client.post('/sites/', { title, ...payload }).then((r) => {
+    rememberSyncedSite(r.data)
+    return r.data
+  })
 
-export const getSite = (id) => client.get(`/sites/${id}/`).then((r) => r.data)
+export const getSite = (id) =>
+  client.get(`/sites/${id}/`).then((r) => {
+    rememberSyncedSite(r.data)
+    return r.data
+  })
 
-export const updateSite = (id, payload, { saveSource = 'manual' } = {}) =>
-  client.put(`/sites/${id}/`, payload, {
+export const updateSite = (id, payload, { saveSource = 'manual' } = {}) => {
+  const { method, body, commit } = prepareSiteSave(id, payload)
+  return client[method](`/sites/${id}/?omit_content=1`, body, {
     headers: { 'X-Site-Save-Source': saveSource },
-  }).then((r) => r.data)
+  }).then((r) => {
+    commit(r.data?.revision)
+    return r.data
+  }).catch((err) => {
+    if (err?.response?.status === 409) forgetSyncedSite(id)
+    throw err
+  })
+}
 
 export const patchSite = (id, payload) =>
   client.patch(`/sites/${id}/`, payload).then((r) => r.data)
@@ -20,7 +41,10 @@ export const patchSite = (id, payload) =>
 // visitors see. "Copy live to draft" puts the live version back in the draft
 // (the draft it replaces is kept in the history).
 export const liveToDraft = (id) =>
-  client.post(`/sites/${id}/live-to-draft/`).then((r) => r.data)
+  client.post(`/sites/${id}/live-to-draft/`).then((r) => {
+    rememberSyncedSite(r.data)
+    return r.data
+  })
 
 // Send an older version live with the pages rendered from it; the draft is
 // left as it is.
@@ -30,7 +54,10 @@ export const sendVersionLive = (id, versionId, pages, baseRevision) =>
     published_pages: pages,
     live_from_version: versionId,
     ...(baseRevision != null ? { base_revision: baseRevision } : {}),
-  }).then((r) => r.data)
+  }).then((r) => {
+    advanceSyncedRevision(id, baseRevision, r.data?.revision)
+    return r.data
+  })
 
 export const deleteSite = (id) => client.delete(`/sites/${id}/`)
 
@@ -39,8 +66,8 @@ export const deleteSite = (id) => client.delete(`/sites/${id}/`)
 export const cloneSite = (slug) =>
   client.post(`/sites/clone/${slug}/`, { language: detectInitialLanguage() }).then((r) => r.data)
 
-export const getPublicSite = (slug) =>
-  client.get(`/public/sites/${slug}/`).then((r) => r.data)
+export const getPublicSite = (slug, { draft = false } = {}) =>
+  client.get(`/public/sites/${slug}/${draft ? '?draft=1' : ''}`).then((r) => r.data)
 
 // Record one real view. The GET above is side-effect-free; this is what counts.
 export const countSiteView = (slug) =>
@@ -98,7 +125,10 @@ export const sendPageLive = (id, page, baseRevision) =>
   client.post(`/sites/${id}/page-live/`, {
     page,
     ...(baseRevision != null ? { base_revision: baseRevision } : {}),
-  }).then((r) => r.data)
+  }).then((r) => {
+    advanceSyncedRevision(id, baseRevision, r.data?.revision)
+    return r.data
+  })
 
 // Keep a page off the public site, or stop keeping it off.
 export const setPageHidden = (id, pageId, hidden, baseRevision) =>
@@ -106,7 +136,10 @@ export const setPageHidden = (id, pageId, hidden, baseRevision) =>
     page_id: pageId,
     hidden,
     ...(baseRevision != null ? { base_revision: baseRevision } : {}),
-  }).then((r) => r.data)
+  }).then((r) => {
+    advanceSyncedRevision(id, baseRevision, r.data?.revision)
+    return r.data
+  })
 
 // Take a change to the live site back (or bring it back): `snapshot` is the
 // `live_undo` of the response that made the change.
@@ -114,7 +147,10 @@ export const swapLiveChange = (id, snapshot, baseRevision) =>
   client.post(`/sites/${id}/live-undo/`, {
     snapshot,
     ...(baseRevision != null ? { base_revision: baseRevision } : {}),
-  }).then((r) => r.data)
+  }).then((r) => {
+    advanceSyncedRevision(id, baseRevision, r.data?.revision)
+    return r.data
+  })
 
 export const getReviewSite = (token) =>
   client.get(`/public/reviews/${token}/`).then((r) => r.data)

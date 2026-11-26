@@ -84,6 +84,26 @@ describe('where the blocks of a box stand once some are hidden', () => {
     expect(ys).toEqual([0, 140, 140])
     expect(cut).toBe(0)
   })
+
+  it('reflows a thousand-block page with interleaved hidden steps without stalling the preview', () => {
+    const items = Array.from({ length: 1200 }, (_, i) => ({
+      x: 20,
+      y: i * 30,
+      w: 600,
+      h: 28,
+      hidden: i % 3 === 1,
+      gone: false,
+      stretch: false,
+      cut: 0,
+    }))
+    const start = performance.now()
+    const { ys, cut } = reflowLevel(items)
+    const elapsed = performance.now() - start
+
+    expect(cut).toBe(12000)
+    expect(ys[2]).toBe(30)
+    expect(elapsed).toBeLessThan(500)
+  })
 })
 
 describe('what a click does to the keys', () => {

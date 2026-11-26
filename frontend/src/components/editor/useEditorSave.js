@@ -42,6 +42,9 @@ export function useEditorSave({ lifecycleRef, discardRef, conflict, sessionMessa
         // This automatic save may have waited behind one in flight, and a
         // "leave without saving" since then cancels it.
         if (auto && discardRef.current) return null
+        if (auto && nextPublished === undefined && !force && !goLive && lifecycleRef.current.shouldSkipQueuedAutoSave?.()) {
+          return null
+        }
         return lifecycleRef.current.performSave(nextPublished, { auto, versionSource, force, goLive })
       })
       if (saved && refusalRef.current) {

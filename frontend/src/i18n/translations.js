@@ -3434,6 +3434,7 @@ const BASE_TURKISH_TRANSLATIONS = {
   'Values in pixels.': 'Değerler piksel cinsinden.',
   'Stack order': 'Katman sırası',
   'Motion is disabled while this element is pinned to the screen.': 'Bu öğe ekrana sabitliyken hareket devre dışıdır.',
+  'Draft preview: you are viewing your saved draft; visitors still see the live site.': 'Taslak önizlemesi: kayıtlı taslağınızı görüntülüyorsunuz; ziyaretçiler yayındaki sürümü görmeye devam eder.',
 }
 
 registerBaseTranslations(BASE_TURKISH_TRANSLATIONS)

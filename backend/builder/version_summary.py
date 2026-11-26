@@ -7,7 +7,6 @@ whether the change is one that Undo cannot take back, so that the history is
 the only way to it (a page that changed between HTML and canvas, a page that
 was deleted).
 """
-import json
 import re
 from collections import Counter
 
@@ -26,7 +25,7 @@ def _blocks(components, out):
         if not isinstance(component, dict):
             continue
         own = {key: value for key, value in component.items() if key != 'children'}
-        out[str(component.get('id'))] = json.dumps(own, sort_keys=True)
+        out[str(component.get('id'))] = own
         _blocks(component.get('children'), out)
     return out
 
@@ -80,6 +79,8 @@ def summarize(before, after):
         name = str(page.get('name') or '')[:80]
         if page_id not in old:
             pages.append({'id': page_id, 'name': name, 'kind': 'added', 'size': 1.0, 'hard': False})
+            continue
+        if old[page_id] == page:
             continue
         size = _page_change(old[page_id], page)
         mode_changed = (old[page_id].get('mode') == 'html') != (page.get('mode') == 'html')

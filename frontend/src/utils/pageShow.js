@@ -142,20 +142,56 @@ export function reflowLevel(items) {
   // Spans of height, as [top, bottom] pairs. Kept inside, as the published
   // page gets this function as text.
   const union = (spans) => {
-    const sorted = spans.filter(([a, b]) => b > a).sort((p, q) => p[0] - q[0])
+    if (!spans.length) return spans
+    let ordered = true
+    for (let i = 1; i < spans.length; i++) {
+      if (spans[i][0] < spans[i - 1][0]) {
+        ordered = false
+        break
+      }
+    }
+    const sorted = ordered ? spans : spans.slice().sort((p, q) => p[0] - q[0])
     const out = []
-    for (const [a, b] of sorted) {
+    for (let i = 0; i < sorted.length; i++) {
+      const a = sorted[i][0]
+      const b = sorted[i][1]
+      if (b <= a) continue
       const last = out[out.length - 1]
-      if (last && a <= last[1]) last[1] = Math.max(last[1], b)
-      else out.push([a, b])
+      if (last && a <= last[1]) {
+        if (b > last[1]) last[1] = b
+      } else {
+        out.push([a, b])
+      }
     }
     return out
   }
-  const without = (spans, holes) => holes.reduce((out, [ha, hb]) => out.flatMap(([a, b]) => (
-    hb <= a || ha >= b ? [[a, b]] : [[a, Math.min(b, ha)], [Math.max(a, hb), b]].filter(([p, q]) => q > p)
-  )), spans)
+  const without = (spans, holes) => {
+    if (!spans.length || !holes.length) return spans
+    const out = []
+    let j = 0
+    for (let i = 0; i < spans.length; i++) {
+      let a = spans[i][0]
+      const b = spans[i][1]
+      while (j < holes.length && holes[j][1] <= a) j++
+      let k = j
+      while (k < holes.length && holes[k][0] < b && a < b) {
+        if (holes[k][0] > a) out.push([a, Math.min(b, holes[k][0])])
+        a = Math.max(a, holes[k][1])
+        k++
+      }
+      if (a < b) out.push([a, b])
+    }
+    return out
+  }
   // Within the box: from its top down to `limit`.
-  const below = (spans, limit) => spans.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, limit) - Math.max(a, 0)), 0)
+  const below = (spans, limit) => {
+    let sum = 0
+    for (let i = 0; i < spans.length; i++) {
+      const v = Math.min(spans[i][1], limit) - Math.max(spans[i][0], 0)
+      if (v > 0) sum += v
+    }
+    return sum
+  }
   const live = items.map((item, index) => ({ ...item, index, cut: Math.max(0, item.cut || 0) })).filter((item) => !item.gone && !item.stretch)
   const ys = items.map((item) => item.y)
   // Nothing hidden and nothing shorter: nothing moves.
@@ -164,18 +200,26 @@ export function reflowLevel(items) {
   // What stands above the first change cannot move.
   const firstChange = Math.min(...changes.map((item) => item.y))
   const across = (a, b) => a.x < b.x + b.w - 0.5 && b.x < a.x + a.w - 0.5
+  const byY = live.slice().sort((p, q) => p.y - q.y)
   // What each hidden block gives up: its measured room, or down to the
   // next block under it in its column.
   const given = new Map()
-  for (const a of live) {
+  for (let i = 0; i < byY.length; i++) {
+    const a = byY[i]
     if (!a.hidden) continue
     if (Array.isArray(a.bands)) {
       given.set(a, a.bands)
       continue
     }
+    const minNext = a.y + a.h - 0.5
     let next = Infinity
-    for (const c of live) {
-      if (c !== a && across(c, a) && c.y >= a.y + a.h - 0.5 && c.y < next) next = c.y
+    for (let j = 0; j < byY.length; j++) {
+      const c = byY[j]
+      if (c.y < minNext || c === a) continue
+      if (across(c, a)) {
+        next = c.y
+        break
+      }
     }
     given.set(a, [[a.y, Math.max(a.y + a.h, next)]])
   }
@@ -183,12 +227,21 @@ export function reflowLevel(items) {
   const shift = (b) => {
     const removed = []
     const kept = []
-    for (const a of live) {
-      if (a === b || !across(a, b) || a.y + a.h > b.y + 0.5) continue
-      if (a.hidden) removed.push(...given.get(a).map(([top, end]) => [top, Math.min(end, b.y)]))
-      else {
-        if (a.cut) removed.push([a.y + a.h - a.cut, a.y + a.h])
-        kept.push([a.y, a.y + a.h - a.cut])
+    const maxY = b.y + 0.5
+    for (let i = 0; i < byY.length; i++) {
+      const a = byY[i]
+      if (a.y > maxY) break
+      if (a === b || !across(a, b) || a.y + a.h > maxY) continue
+      if (a.hidden) {
+        const spans = given.get(a)
+        for (let s = 0; s < spans.length; s++) {
+          const top = spans[s][0]
+          const end = Math.min(spans[s][1], b.y)
+          if (end > top) removed.push([top, end])
+        }
+      } else {
+        if (a.cut > 0) removed.push([a.y + a.h - a.cut, a.y + a.h])
+        if (a.h - a.cut > 0) kept.push([a.y, a.y + a.h - a.cut])
       }
     }
     return below(without(union(removed), union(kept)), b.y)

@@ -147,6 +147,7 @@ export default function PreviewPage() {
   const { t } = useLanguage()
   const { slug } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
+  const draftPreview = searchParams.get('draft') === '1'
   const [site, setSite] = useState(null)
   const [status, setStatus] = useState('loading') // loading | ok | notfound | error
   const [activeId, setActiveId] = useState(null)
@@ -164,7 +165,7 @@ export default function PreviewPage() {
   useEffect(() => {
     let active = true
     const load = () => {
-      getPublicSite(slug)
+      ;(draftPreview ? getPublicSite(slug, { draft: true }) : getPublicSite(slug))
         .then((data) => {
           if (!active) return
           setSite(data)
@@ -191,7 +192,7 @@ export default function PreviewPage() {
       document.removeEventListener('visibilitychange', onBack)
       window.removeEventListener('focus', onBack)
     }
-  }, [slug])
+  }, [slug, draftPreview])
 
   // Apply launch metadata to the public page, so the readiness settings also
   // drive search results, social previews, and the browser tab.
@@ -253,12 +254,12 @@ export default function PreviewPage() {
   // focus/visibility refetches above, and plain refreshes — so a single visit
   // is a single view (the backend also skips the owner's own views).
   useEffect(() => {
-    if (!slug) return
+    if (!slug || draftPreview) return
     const key = `pwb-viewed:${slug}`
     if (sessionStorage.getItem(key)) return
     sessionStorage.setItem(key, '1')
     countSiteView(slug).catch(() => sessionStorage.removeItem(key))
-  }, [slug])
+  }, [slug, draftPreview])
 
   useEffect(() => {
     const send = async (data, page, source) => {
@@ -487,6 +488,11 @@ export default function PreviewPage() {
     setActiveId(pageId)
     window.history.pushState(null, '', `#${encodeURIComponent(pageId)}`)
   }
+  const draftNotice = site?.published === false
+    ? t('Draft preview: this site is not published yet, only you can see it.')
+    : draftPreview
+      ? t('Draft preview: you are viewing your saved draft; visitors still see the live site.')
+      : ''
 
   // HTML site: render the raw document(s) in a sandboxed iframe so the
   // JavaScript runs (isolated — allow-scripts WITHOUT allow-same-origin, so it
@@ -548,9 +554,9 @@ export default function PreviewPage() {
             style={stageFrameStyle(device)}
           />
         </PreviewStage>
-        {site.published === false && (
+        {draftNotice && (
           <div className="fixed bottom-4 left-1/2 z-[100] -translate-x-1/2 studio-status-warning rounded-[var(--studio-radius)] border px-4 py-2 text-xs font-medium shadow-[var(--studio-shadow)]">
-            {t('Draft preview: this site is not published yet, only you can see it.')}
+            {draftNotice}
           </div>
         )}
       </>
@@ -599,9 +605,9 @@ body { font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, sans-serif);
             style={stageFrameStyle(device)}
           />
         </PreviewStage>
-        {site.published === false && (
+        {draftNotice && (
           <div className="fixed bottom-4 left-1/2 z-[120] -translate-x-1/2 studio-status-warning rounded-[var(--studio-radius)] border px-4 py-2 text-xs font-medium shadow-[var(--studio-shadow)]">
-            {t('Draft preview: this site is not published yet, only you can see it.')}
+            {draftNotice}
           </div>
         )}
       </>
@@ -643,9 +649,9 @@ body { font-family: var(--site-font, system-ui, 'Segoe UI', Roboto, sans-serif);
         </div>
       </PreviewStage>
 
-      {site && site.published === false && (
+      {draftNotice && (
         <div className="fixed bottom-4 left-1/2 z-[100] -translate-x-1/2 studio-status-warning rounded-[var(--studio-radius)] border px-4 py-2 text-xs font-medium shadow-[var(--studio-shadow)]">
-          {t('Draft preview: this site is not published yet, only you can see it.')}
+          {draftNotice}
         </div>
       )}
     </div>
